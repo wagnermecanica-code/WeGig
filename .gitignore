@@ -1,0 +1,90 @@
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# IDE and Editor Files
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Build and Dependencies
+node_modules/
+bower_components/
+dist/
+build/
+out/
+target/
+bin/
+obj/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+venv/
+env/
+ENV/
+.venv
+
+# Logs and Databases
+*.log
+logs/
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+
+# Note: Lock files should typically be committed for reproducible builds
+# Uncomment specific lock files only if needed for your project
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+# Pipfile.lock
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# Temporary Files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# Compiled Files
+*.class
+*.dll
+*.exe
+*.o
+*.so
+*.dylib
