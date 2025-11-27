@@ -58,6 +58,7 @@ CNAME www  wagnermecanica-code.github.io
 ### 5. Testar
 
 Após propagação DNS (até 24h):
+
 - ✅ https://wegig.com.br
 - ✅ https://www.wegig.com.br
 - ✅ https://wegig.com.br/termos.html
@@ -111,6 +112,7 @@ docs/
 ## 🎨 Personalização
 
 Para modificar o design:
+
 1. Edite `docs/style.css` (cores, fontes, espaçamento)
 2. Edite `docs/index.html` (conteúdo, seções)
 3. Commit e push
