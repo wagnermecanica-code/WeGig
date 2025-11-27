@@ -6,15 +6,15 @@
 }
 
 :root {
-  --primary-color: #37475A; /* Dark - Musicians */
-  --secondary-color: #E47911; /* Orange - Bands */
-  --dark-color: #232F3E;
-  --light-color: #F0F3F7;
-  --text-primary: #1A1A1A;
+  --primary-color: #37475a; /* Dark - Musicians */
+  --secondary-color: #e47911; /* Orange - Bands */
+  --dark-color: #232f3e;
+  --light-color: #f0f3f7;
+  --text-primary: #1a1a1a;
   --text-secondary: #717171;
-  --background: #FAFAFA;
-  --surface: #FFFFFF;
-  --border: #E0E0E0;
+  --background: #fafafa;
+  --surface: #ffffff;
+  --border: #e0e0e0;
 }
 
 body {
@@ -47,16 +47,16 @@ header .container {
   align-items: center;
 }
 
-.logo h1 {
-  color: var(--primary-color);
-  font-size: 2rem;
-  font-weight: 700;
+.logo img {
+  height: 60px;
+  width: auto;
+  display: block;
 }
 
-.logo .tagline {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  margin-top: -5px;
+@media (max-width: 768px) {
+  .logo img {
+    height: 50px;
+  }
 }
 
 nav {
@@ -337,6 +337,13 @@ footer {
 .footer-section h4 {
   margin-bottom: 1rem;
   color: var(--primary-color);
+}
+
+.footer-section .footer-logo {
+  height: 50px;
+  width: auto;
+  margin-bottom: 1rem;
+  filter: brightness(0) invert(1);
 }
 
 .footer-section ul {
