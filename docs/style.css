@@ -6,15 +6,15 @@
 }
 
 :root {
-  --primary-color: #00a699; /* Teal - Musicians */
-  --secondary-color: #ff6b6b; /* Coral - Bands */
-  --dark-color: #2c3e50;
-  --light-color: #ecf0f1;
-  --text-primary: #2c3e50;
-  --text-secondary: #7f8c8d;
-  --background: #ffffff;
-  --surface: #f8f9fa;
-  --border: #e0e0e0;
+  --primary-color: #37475A; /* Dark - Musicians */
+  --secondary-color: #E47911; /* Orange - Bands */
+  --dark-color: #232F3E;
+  --light-color: #F0F3F7;
+  --text-primary: #1A1A1A;
+  --text-secondary: #717171;
+  --background: #FAFAFA;
+  --surface: #FFFFFF;
+  --border: #E0E0E0;
 }
 
 body {
