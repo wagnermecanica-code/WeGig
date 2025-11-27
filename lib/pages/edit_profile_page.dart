@@ -30,7 +30,7 @@ Future<String?> _compressImageIsolate(Map<String, dynamic> params) async {
     final int minWidth = params['minWidth'] as int;
     final int minHeight = params['minHeight'] as int;
 
-    final dynamic compressedResult =
+    final File? compressedFile =
         await FlutterImageCompress.compressAndGetFile(
       sourcePath,
       targetPath,
@@ -39,15 +39,7 @@ Future<String?> _compressImageIsolate(Map<String, dynamic> params) async {
       minHeight: minHeight,
     );
 
-    if (compressedResult == null) return null;
-    if (compressedResult is File) return compressedResult.path;
-
-    // Handle XFile or other types
-    try {
-      return (compressedResult as dynamic).path as String;
-    } catch (_) {
-      return null;
-    }
+    return compressedFile?.path;
   } catch (e) {
     debugPrint('Erro na compressão de imagem (isolate): $e');
     return null;
@@ -81,7 +73,7 @@ class AppThemeData {
         elevation: 0,
         centerTitle: true,
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         elevation: 2,
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
@@ -424,12 +416,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         // Usuário cancelou o crop -> usar original
         croppedPath = picked.path;
       } else {
-        try {
-          // cropped pode ser CroppedFile ou XFile dependendo da versão do pacote
-          croppedPath = (cropped as dynamic).path as String?;
-        } catch (_) {
-          croppedPath = picked.path;
-        }
+        // If cropped is not null, it should be a CroppedFile
+        croppedPath = cropped.path;
       }
       if (croppedPath == null) return;
 
@@ -981,14 +969,14 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                                                 ? CachedNetworkImageProvider(
                                                     _currentPhotoUrl!)
                                                 : null)
-                                                as ImageProvider?,
+                                                as ImageProvider?),
                                         child: (_pickedImageFile == null &&
                                                 (_currentPhotoUrl == null || _currentPhotoUrl!.isEmpty)
                                             ? Icon(Icons.person,
                                                 size: 64,
                                                 color: AppThemeData.textSecondary)
                                             : null),
-                                      ), // Missing comma was here
+                                      ),
                                       Positioned(
                                         bottom: 0,
                                         right: 0,
@@ -1066,7 +1054,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                                   Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: Colors.red.withValues(opacity: 0.1),
+                                      color: Colors.red.withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Icon(Icons.location_on,
@@ -1215,14 +1203,14 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                                     boxShadow: [
                                       BoxShadow(
                                         color: AppThemeData.primaryColor
-                                            .withValues(opacity: 0.1),
+                                            .withOpacity(0.1),
                                         blurRadius: 8, // Assuming a reasonable default blur
                                         offset: const Offset(0, 4),
                                       ),
                                     ],
                                     border: Border.all(
                                         color: AppThemeData.primaryColor
-                                            .withValues(opacity: 0.3)),
+                                            .withOpacity(0.3)),
                                   ),
                                     ],
                                   ),
@@ -1288,7 +1276,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
                                       color: AppThemeData.successColor
-                                          .withValues(opacity: 0.1),
+                                          .withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Row(
@@ -1318,8 +1306,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                                                 Text(
                                                   _fetchedNeighborhood!,
                                                   style: TextStyle(
-                                                      color: AppThemeData.textPrimary,
-                                                          .textSecondary,
+                                                      color: AppThemeData.textSecondary,
                                                       fontSize: 12),
                                                 ),
                                             ],
@@ -1349,7 +1336,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
                                       color: AppThemeData.secondaryColor
-                                          .withValues(opacity: 0.1),
+                                          .withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Icon(Icons.star,
@@ -1444,7 +1431,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
                                                                               color: AppThemeData.primaryColor
-                                                                                  .withValues(opacity: 0.1),
+                                                                                  .withOpacity(0.1),
                                                                               borderRadius: BorderRadius.circular(8),
                                                                             ),                                      child: Icon(Icons.music_note,
                                           color: AppThemeData.primaryColor,
@@ -1473,7 +1460,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                                                     .remove(i)),
                                             backgroundColor: AppThemeData
                                                 .primaryColor
-                                                .withValues(opacity: 0.1),
+                                                .withOpacity(0.1),
                                             labelStyle: TextStyle(
                                               color: AppThemeData.primaryColor,
                                               fontWeight: FontWeight.w600,
@@ -1512,7 +1499,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
                                       color: AppThemeData.secondaryColor
-                                          .withValues(opacity: 0.1),
+                                          .withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Icon(Icons.album,
@@ -1540,7 +1527,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                                               () => _selectedGenres.remove(g)),
                                                                                         backgroundColor: AppThemeData
                                                                                             .secondaryColor
-                                                                                            .withValues(opacity: 0.1),                                          labelStyle: TextStyle(
+                                                                                            .withOpacity(0.1),                                          labelStyle: TextStyle(
                                             color: AppThemeData.secondaryColor,
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -1587,7 +1574,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                                   Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: Colors.red.withValues(opacity: 0.1),
+                                      color: Colors.red.withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Icon(
@@ -1700,7 +1687,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(opacity: 0.1),
+                      color: Colors.black.withOpacity(0.1),
                       blurRadius: 8,
                       offset: const Offset(0, -2),
                     ),

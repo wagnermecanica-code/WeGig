@@ -1,4 +1,4 @@
-````instructions
+`````instructions
 ````instructions
 # Tô Sem Banda – AI Coding Agent Guide
 
@@ -76,5 +76,4 @@ Flutter app for connecting musicians and bands, using an **Instagram-style multi
 ---
 
 If anything here is unclear or incomplete, or you need code snippets/examples for a specific pattern, please specify which section to expand.
-````
-
+`````
