@@ -25,6 +25,7 @@ export 'features/post/domain/entities/post_entity.dart';
 export 'features/messages/domain/entities/message_entity.dart';
 export 'features/messages/domain/entities/conversation_entity.dart';
 export 'features/notifications/domain/entities/notification_entity.dart';
+export 'features/settings/domain/entities/user_settings_entity.dart';
 
 // Models
 export 'models/search_params.dart';
