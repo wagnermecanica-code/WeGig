@@ -2,14 +2,15 @@
 
 ## 📱 Status do MVP
 
-**Data**: 28 de novembro de 2025  
+**Data**: 30 de novembro de 2025  
 **Versão**: 1.0.0-MVP (Instagram-Style Architecture + Cloud Functions)  
 **Firebase Project**: `to-sem-banda-83e19`  
 **App Name**: WeGig
 **Website**: https://wegig.com.br (GitHub Pages, design Airbnb 2025)  
 **Arquitetura**: ✅ Refatorada para perfis isolados (profiles/{profileId})  
 **Backend**: ✅ Cloud Functions implementadas (nearbyPost notifications)  
-**Última Atualização**: ✅ Correções críticas 28/11 (Logout, Messages swipe, Emojis, Post Detail)
+**Qualidade de Código**: 🚀 Em progresso - Fase 1 iniciada (Conventional Commits + Lint)  
+**Última Atualização**: ✅ Conventional Commits configurado + Formatação automática (30/11)
 
 ---
 
@@ -1059,16 +1060,19 @@ firebase deploy --only functions
 
 ---
 
-**Status Geral do MVP**: 🟢 **100% Completo - PRODUCTION READY**
+**Status Geral do MVP**: 🟡 **95% Completo - EM POLIMENTO**
 
 **Implementado**: ✅ **14 telas principais + 8 funcionalidades core + Segurança Completa + Profile Switcher com Badge Counters**  
 **Pronto para testes internos**: ✅ SIM  
-**Pronto para beta público**: ✅ SIM  
-**Pronto para produção**: 🟢 **SIM** - Funcionalidades críticas:
+**Pronto para beta público**: ⏳ AGUARDANDO conclusão da Fase 1 (Qualidade de Código)  
+**Pronto para produção**: 🟡 **EM BREVE** - Funcionalidades críticas completas, code quality em andamento:
 
 - [x] **Profile Switcher**: Troca de perfil com badges de notificações/mensagens ✅ **28/11**
 - [x] **Messages Page**: Carregamento corrigido, debug logs adicionados ✅ **28/11**
 - [x] **Badge Counters**: Contadores por perfil funcionando ✅ **28/11**
+- [x] **Conventional Commits**: Configurado com commitlint + husky ✅ **30/11**
+- [x] **CONTRIBUTING.md**: Guia completo de contribuição criado ✅ **30/11**
+- [ ] **Fase 1 - Code Quality**: Lint strict, testes básicos (1 semana - em progresso)
 - [ ] **Verificar Crashlytics e Analytics** (Firebase Console - ver `MONITORING_SETUP_GUIDE.md`)
 - [ ] Deploy Cloud Functions (código pronto)
 - [ ] Configurar APNs no Apple Developer (iOS push)
@@ -1081,6 +1085,28 @@ firebase deploy --only functions
 - [ ] ProfileFormPage: Galeria 12 fotos (atualmente só foto de perfil)
 - [ ] Criar assets (ícone 1024x1024, splash 512x512)
 - [ ] Migrar 100% Image.network → CachedNetworkImage (98% concluído)
+
+**Roadmap de Qualidade de Código (PLANO_ACAO_100_BOAS_PRATICAS.md):**
+
+**Fase 1: Quick Wins** (1 semana → 92% das boas práticas)
+- [x] Task 1.1: Conventional Commits (2h) ✅ **COMPLETO 30/11**
+  - commitlint + husky configurados
+  - CONTRIBUTING.md criado (700+ linhas)
+  - Validação automática de commits funcionando
+- [⏳] Task 1.2: Lint Strict (8h) - **EM PROGRESSO**
+  - Formatação automática executada (126 arquivos, 44 alterados)
+  - 812 → 810 issues (2 corrigidos)
+  - Pendente: 42 errors críticos, habilitar regras strict
+- [ ] Task 1.3: Testes Básicos (30h) - Post/Messages/Home use cases
+
+**Fase 2: Fundação** (2 semanas → 98% das boas práticas)
+- [ ] Code Generation completo (Entities + DTOs)
+- [ ] Testes avançados (Providers + Integration)
+
+**Fase 3: Excelência** (1 semana → 100% das boas práticas)
+- [ ] Refactor Settings + Home
+- [ ] Code generation final
+- [ ] CI/CD setup
 
 **Arquitetura**: ✅ **Instagram-Style - Production Ready**
 
@@ -1465,7 +1491,7 @@ firebase deploy --only functions
 - Social proof for all users increases engagement
 - File: `lib/pages/post_detail_page.dart` (~1100 lines)
 
-**Última atualização**: 29 de novembro de 2025 (Post Feature 100% Completo)  
+**Última atualização**: 30 de novembro de 2025 (Code Quality - Fase 1 iniciada)  
 **Atualizado por**: GitHub Copilot + Wagner Oliveira  
 **App Name**: WeGig (rebranding completo de "Tô Sem Banda")  
 **Website**: https://wegig.com.br (GitHub Pages, design Airbnb 2025, logo 90px/75px)  
@@ -1473,6 +1499,7 @@ firebase deploy --only functions
 **Total de telas**: 14 páginas principais documentadas  
 **Funcionalidades core**: 8 sistemas completos (Auth, Perfis, Posts, Chat, Notificações, Push, Settings, Deep Links)  
 **Segurança**: ✅ Backend (Firestore + Storage rules, Rate limiting) + Frontend (Obfuscation, Secure Storage)  
-**Qualidade**: 1183 Errors (Profile: 60, Notifications: 40, Auth: 10, outros: 4) - Em refatoração ativa  
-**Refatoração Ativa**: ✅ Post Feature 100% completo (75 → 0 erros) - Próximo: Profile Feature (60 erros)  
+**Qualidade de Código**: 🚀 Fase 1 em progresso - 810 issues (42 errors críticos, 768 infos)  
+**Conventional Commits**: ✅ Configurado com commitlint + husky + CONTRIBUTING.md (700+ linhas)  
+**Formatação**: ✅ Executada (126 arquivos, 44 alterados, 2 issues corrigidos)  
 **Refatoração**: Instagram-Style + NotificationService V2 + Performance Crítica + Acessibilidade + PostPage + NotificationsPage + ViewProfilePage + EditProfilePage + ChatDetailPage + MessagesPage + **Migração completa para Riverpod 2.5+** + **Push Notifications FCM 100%** + **Sign In with Apple + Google oficial** + **Long press profile switcher** + **SettingsPage + NotificationSettingsPage + PostDetailPage + Deep Links** + **Security Hardening 27/11** + **Interested Users (Instagram-style) 27/11** + **Link Validation (YouTube/Instagram/TikTok) 27/11** + **Logo Sizes Optimized (App: 120px, Website: 90px/75px) 27/11** + **Paleta de Cores Documentada 27/11** + **Critical Fixes 28/11** (Logout bug fix, Messages swipe actions, Emoji support, Dismissible error fix, Post Detail availableFor field)
