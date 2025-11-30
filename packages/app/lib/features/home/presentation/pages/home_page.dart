@@ -224,8 +224,8 @@ class _HomePageState extends ConsumerState<HomePage>
       LatLng? targetPos;
 
       // Estratégia 1: Usar posição atual em cache se disponível e recente
-      if (_currentPos != null) {
-        targetPos = _currentPos;
+      if (_mapControllerWrapper.currentPosition != null) {
+        targetPos = _mapControllerWrapper.currentPosition;
         debugPrint('📍 Usando posição em cache');
       } else {
         // Estratégia 2: Tentar obter posição atual com timeout
@@ -240,7 +240,7 @@ class _HomePageState extends ConsumerState<HomePage>
           );
           targetPos = LatLng(position.latitude, position.longitude);
           if (mounted) {
-            setState(() => _currentPos = targetPos);
+            setState(() => _mapControllerWrapper.setCurrentPosition(targetPos));
           }
           debugPrint(
               '📍 Localização obtida: ${targetPos.latitude}, ${targetPos.longitude}');
@@ -253,7 +253,7 @@ class _HomePageState extends ConsumerState<HomePage>
           if (lastPosition != null) {
             targetPos = LatLng(lastPosition.latitude, lastPosition.longitude);
             if (mounted) {
-              setState(() => _currentPos = targetPos);
+              setState(() => _mapControllerWrapper.setCurrentPosition(targetPos));
             }
             debugPrint('📍 Usando última posição conhecida');
 
@@ -269,9 +269,9 @@ class _HomePageState extends ConsumerState<HomePage>
             // Estratégia 4: Fallback para posição atual do mapa se disponível
             debugPrint(
                 '⚠️ Nenhuma localização conhecida, tentando posição do mapa...');
-            if (_mapController != null) {
+            if (_mapControllerWrapper.controller != null) {
               try {
-                final cameraPosition = await _mapController!.getVisibleRegion();
+                final cameraPosition = await _mapControllerWrapper.controller!.getVisibleRegion();
                 // Usar o centro do mapa atual
                 final centerLat = (cameraPosition.northeast.latitude +
                         cameraPosition.southwest.latitude) /
@@ -317,8 +317,8 @@ class _HomePageState extends ConsumerState<HomePage>
       }
 
       // Centralizar no mapa
-      if (targetPos != null && _mapController != null) {
-        await _mapController!.animateCamera(
+      if (targetPos != null && _mapControllerWrapper.controller != null) {
+        await _mapControllerWrapper.controller!.animateCamera(
           CameraUpdate.newLatLngZoom(targetPos, 14),
         );
         debugPrint('✅ Mapa centralizado com sucesso');
@@ -849,7 +849,7 @@ class _HomePageState extends ConsumerState<HomePage>
                   ),
                 ),
                 // Botão "Buscar nessa área" (aparece quando usuário move o mapa)
-                if (_showSearchAreaButton)
+                if (_mapControllerWrapper.showSearchAreaButton)
                   Positioned(
                     top: 110,
                     left: 0,
@@ -860,10 +860,10 @@ class _HomePageState extends ConsumerState<HomePage>
                         borderRadius: BorderRadius.circular(24),
                         child: InkWell(
                           onTap: () async {
-                            setState(() => _showSearchAreaButton = false);
-                            if (_mapController != null) {
-                              _lastSearchBounds =
-                                  await _mapController!.getVisibleRegion();
+                            setState(() => _mapControllerWrapper.setShowSearchAreaButton(false));
+                            if (_mapControllerWrapper.controller != null) {
+                              _mapControllerWrapper.setLastSearchBounds(
+                                  await _mapControllerWrapper.controller!.getVisibleRegion());
                               await _onMapIdle();
                             }
                           },
@@ -907,7 +907,7 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Widget _buildMapView() {
-    final initial = _currentPos ?? const LatLng(-23.55052, -46.633308);
+    final initial = _mapControllerWrapper.currentPosition ?? const LatLng(-23.55052, -46.633308);
     return ClipRRect(
       borderRadius:
           BorderRadius.circular(0), // Airbnb style - cantos arredondados sutis
@@ -915,16 +915,16 @@ class _HomePageState extends ConsumerState<HomePage>
         key: const ValueKey('home_map'), // Previne rebuilds desnecessários
         initialCameraPosition: CameraPosition(
           target: initial,
-          zoom: _currentZoom,
+          zoom: _mapControllerWrapper.currentZoom,
         ),
         style:
-            _mapStyle, // Usando GoogleMap.style ao invés de setMapStyle deprecated
+            _mapControllerWrapper.mapStyle, // Usando GoogleMap.style ao invés de setMapStyle deprecated
         myLocationEnabled: true,
         myLocationButtonEnabled: false,
         zoomControlsEnabled: false,
         mapToolbarEnabled: false,
         onMapCreated: (c) async {
-          _mapController = c;
+          _mapControllerWrapper.setController(c);
 
           // Style já aplicado via GoogleMap.style property
           debugPrint('✅ Map criado com style customizado');
@@ -932,17 +932,17 @@ class _HomePageState extends ConsumerState<HomePage>
           // Aguardar mapa estar completamente pronto
           await Future.delayed(const Duration(milliseconds: 300));
 
-          if (_mapController != null && mounted) {
+          if (_mapControllerWrapper.controller != null && mounted) {
             try {
-              _lastSearchBounds = await _mapController!.getVisibleRegion();
+              _mapControllerWrapper.setLastSearchBounds(await _mapControllerWrapper.controller!.getVisibleRegion());
               await _onMapIdle();
             } catch (e) {
               debugPrint('Erro ao inicializar mapa: $e');
               // Tentar novamente após mais delay
               await Future.delayed(const Duration(milliseconds: 500));
-              if (_mapController != null && mounted) {
+              if (_mapControllerWrapper.controller != null && mounted) {
                 try {
-                  _lastSearchBounds = await _mapController!.getVisibleRegion();
+                  _mapControllerWrapper.setLastSearchBounds(await _mapControllerWrapper.controller!.getVisibleRegion());
                   await _onMapIdle();
                 } catch (e2) {
                   debugPrint('Erro ao inicializar mapa (2ª tentativa): $e2');
@@ -953,12 +953,12 @@ class _HomePageState extends ConsumerState<HomePage>
         },
         markers: _markers,
         onCameraMove: (pos) {
-          _currentZoom = pos.zoom;
+          _mapControllerWrapper.setCurrentZoom(pos.zoom);
         },
         onCameraIdle: () async {
           // Debounce para evitar chamadas excessivas
           await Future.delayed(const Duration(milliseconds: 300));
-          if (mounted && _mapController != null) {
+          if (mounted && _mapControllerWrapper.controller != null) {
             try {
               await _onMapIdle();
             } catch (e) {
@@ -982,15 +982,15 @@ class _HomePageState extends ConsumerState<HomePage>
     debugPrint(
         '🗺️ _onMapIdle: Total de posts disponíveis: ${allPosts.length}');
 
-    if (_mapController == null || !mounted) return;
+    if (_mapControllerWrapper.controller == null || !mounted) return;
 
     try {
-      final bounds = await _mapController!.getVisibleRegion();
+      final bounds = await _mapControllerWrapper.controller!.getVisibleRegion();
       debugPrint(
           '🗺️ Bounds do mapa: NE=${bounds.northeast}, SW=${bounds.southwest}');
 
-      if (!_boundsEqual(bounds, _lastSearchBounds)) {
-        if (mounted) setState(() => _showSearchAreaButton = true);
+      if (!_boundsEqual(bounds, _mapControllerWrapper.lastSearchBounds)) {
+        if (mounted) setState(() => _mapControllerWrapper.setShowSearchAreaButton(true));
       }
 
       final visible = allPosts.where(
@@ -1111,13 +1111,13 @@ class _HomePageState extends ConsumerState<HomePage>
 
       if (mounted) {
         setState(() {
-          _currentPos = LatLng(position.latitude, position.longitude);
+          _mapControllerWrapper.setCurrentPosition(LatLng(position.latitude, position.longitude));
         });
 
         // Animar câmera apenas se o mapa já estiver pronto
-        if (_mapController != null) {
-          await _mapController!
-              .animateCamera(CameraUpdate.newLatLng(_currentPos!));
+        if (_mapControllerWrapper.controller != null) {
+          await _mapControllerWrapper.controller!
+              .animateCamera(CameraUpdate.newLatLng(_mapControllerWrapper.currentPosition!));
           debugPrint(
               '✅ _determinePosition: Câmera animada para posição inicial');
         }
@@ -1131,7 +1131,7 @@ class _HomePageState extends ConsumerState<HomePage>
         if (lastPosition != null && mounted) {
           debugPrint('📍 _determinePosition: Usando última posição conhecida');
           setState(() {
-            _currentPos = LatLng(lastPosition.latitude, lastPosition.longitude);
+            _mapControllerWrapper.setCurrentPosition(LatLng(lastPosition.latitude, lastPosition.longitude));
           });
         }
       } catch (e2) {
