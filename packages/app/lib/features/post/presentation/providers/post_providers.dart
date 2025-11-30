@@ -223,7 +223,7 @@ class PostNotifier extends _$PostNotifier {
 /// Helper provider to get just the posts list
 @riverpod
 List<PostEntity> postList(Ref ref) {
-  final postState = ref.watch(postProvider);
+  final postState = ref.watch(postNotifierProvider);
   return postState.when(
     data: (state) => state.posts,
     loading: () => [],
