@@ -1,0 +1,80 @@
+name: Lint & Analyze
+
+on:
+  pull_request:
+    branches: [main, develop, feat/*]
+  push:
+    branches: [main, develop]
+
+jobs:
+  analyze:
+    name: Flutter Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap monorepo
+        run: melos bootstrap
+
+      - name: Analyze packages/app
+        run: |
+          cd packages/app
+          flutter analyze --fatal-warnings
+
+      - name: Analyze packages/core_ui
+        run: |
+          cd packages/core_ui
+          flutter analyze --fatal-warnings
+
+      - name: Check formatting
+        run: |
+          cd packages/app
+          dart format --set-exit-if-changed lib/ test/
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap monorepo
+        run: melos bootstrap
+
+      - name: Run tests
+        run: |
+          cd packages/app
+          flutter test --reporter expanded --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: packages/app/coverage/lcov.info
+          flags: unittests
+          name: app-coverage
+          fail_ci_if_error: false
