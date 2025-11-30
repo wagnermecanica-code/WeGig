@@ -22,13 +22,13 @@ part 'profile_providers.g.dart';
 
 /// Provider para ProfileRemoteDataSource (singleton)
 @riverpod
-ProfileRemoteDataSource profileRemoteDataSource(ProfileRemoteDataSourceRef ref) {
+ProfileRemoteDataSource profileRemoteDataSource(Ref ref) {
   return ProfileRemoteDataSourceImpl();
 }
 
 /// Provider para ProfileRepository (singleton)
 @riverpod
-ProfileRepository profileRepositoryNew(ProfileRepositoryNewRef ref) {
+ProfileRepository profileRepositoryNew(Ref ref) {
   final dataSource = ref.watch(profileRemoteDataSourceProvider);
   return ProfileRepositoryImpl(remoteDataSource: dataSource);
 }
@@ -38,38 +38,38 @@ ProfileRepository profileRepositoryNew(ProfileRepositoryNewRef ref) {
 /// ============================================
 
 @riverpod
-CreateProfileUseCase createProfileUseCase(CreateProfileUseCaseRef ref) {
+CreateProfileUseCase createProfileUseCase(Ref ref) {
   final repository = ref.watch(profileRepositoryNewProvider);
   return CreateProfileUseCase(repository);
 }
 
 @riverpod
-UpdateProfileUseCase updateProfileUseCase(UpdateProfileUseCaseRef ref) {
+UpdateProfileUseCase updateProfileUseCase(Ref ref) {
   final repository = ref.watch(profileRepositoryNewProvider);
   return UpdateProfileUseCase(repository);
 }
 
 @riverpod
 SwitchActiveProfileUseCase switchActiveProfileUseCase(
-    SwitchActiveProfileUseCaseRef ref) {
+    Ref ref) {
   final repository = ref.watch(profileRepositoryNewProvider);
   return SwitchActiveProfileUseCase(repository);
 }
 
 @riverpod
-DeleteProfileUseCase deleteProfileUseCase(DeleteProfileUseCaseRef ref) {
+DeleteProfileUseCase deleteProfileUseCase(Ref ref) {
   final repository = ref.watch(profileRepositoryNewProvider);
   return DeleteProfileUseCase(repository);
 }
 
 @riverpod
-LoadAllProfilesUseCase loadAllProfilesUseCase(LoadAllProfilesUseCaseRef ref) {
+LoadAllProfilesUseCase loadAllProfilesUseCase(Ref ref) {
   final repository = ref.watch(profileRepositoryNewProvider);
   return LoadAllProfilesUseCase(repository);
 }
 
 @riverpod
-GetActiveProfileUseCase getActiveProfileUseCase(GetActiveProfileUseCaseRef ref) {
+GetActiveProfileUseCase getActiveProfileUseCase(Ref ref) {
   final repository = ref.watch(profileRepositoryNewProvider);
   return GetActiveProfileUseCase(repository);
 }
@@ -252,7 +252,7 @@ final profileProvider =
 
 /// Provider para perfil ativo atual (null-safe)
 @riverpod
-ProfileEntity? activeProfile(ActiveProfileRef ref) {
+ProfileEntity? activeProfile(Ref ref) {
   final AsyncValue<ProfileState> profileState = ref.watch(profileProvider);
   return profileState.maybeWhen(
     data: (ProfileState state) => state.activeProfile,
@@ -262,7 +262,7 @@ ProfileEntity? activeProfile(ActiveProfileRef ref) {
 
 /// Provider para lista de perfis
 @riverpod
-List<ProfileEntity> profileList(ProfileListRef ref) {
+List<ProfileEntity> profileList(Ref ref) {
   final AsyncValue<ProfileState> profileState = ref.watch(profileProvider);
   return profileState.maybeWhen(
     data: (ProfileState state) => state.profiles,
@@ -272,14 +272,14 @@ List<ProfileEntity> profileList(ProfileListRef ref) {
 
 /// Provider para verificar se tem múltiplos perfis
 @riverpod
-bool hasMultipleProfiles(HasMultipleProfilesRef ref) {
+bool hasMultipleProfiles(Ref ref) {
   final profiles = ref.watch(profileListProvider);
   return profiles.length > 1;
 }
 
 /// Provider para stream de mudanças de perfil
 @riverpod
-Stream<ProfileState> profileStream(ProfileStreamRef ref) {
+Stream<ProfileState> profileStream(Ref ref) {
   final notifier = ref.watch(profileProvider.notifier);
   return notifier.stream;
 }

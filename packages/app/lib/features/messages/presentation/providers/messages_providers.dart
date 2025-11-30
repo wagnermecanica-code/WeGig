@@ -22,20 +22,20 @@ part 'messages_providers.g.dart';
 
 /// Provider para FirebaseFirestore instance
 @riverpod
-FirebaseFirestore firestore(FirestoreRef ref) {
+FirebaseFirestore firestore(Ref ref) {
   return FirebaseFirestore.instance;
 }
 
 /// Provider para MessagesRemoteDataSource
 @riverpod
 IMessagesRemoteDataSource messagesRemoteDataSource(
-    MessagesRemoteDataSourceRef ref) {
+    Ref ref) {
   return MessagesRemoteDataSource();
 }
 
 /// Provider para MessagesRepository (nova implementação Clean Architecture)
 @riverpod
-MessagesRepository messagesRepositoryNew(MessagesRepositoryNewRef ref) {
+MessagesRepository messagesRepositoryNew(Ref ref) {
   final dataSource = ref.watch(messagesRemoteDataSourceProvider);
   return MessagesRepositoryImpl(remoteDataSource: dataSource);
 }
@@ -45,43 +45,43 @@ MessagesRepository messagesRepositoryNew(MessagesRepositoryNewRef ref) {
 // ============================================================================
 
 @riverpod
-LoadConversations loadConversationsUseCase(LoadConversationsUseCaseRef ref) {
+LoadConversations loadConversationsUseCase(Ref ref) {
   final repository = ref.watch(messagesRepositoryNewProvider);
   return LoadConversations(repository);
 }
 
 @riverpod
-LoadMessages loadMessagesUseCase(LoadMessagesUseCaseRef ref) {
+LoadMessages loadMessagesUseCase(Ref ref) {
   final repository = ref.watch(messagesRepositoryNewProvider);
   return LoadMessages(repository);
 }
 
 @riverpod
-SendMessage sendMessageUseCase(SendMessageUseCaseRef ref) {
+SendMessage sendMessageUseCase(Ref ref) {
   final repository = ref.watch(messagesRepositoryNewProvider);
   return SendMessage(repository);
 }
 
 @riverpod
-SendImage sendImageUseCase(SendImageUseCaseRef ref) {
+SendImage sendImageUseCase(Ref ref) {
   final repository = ref.watch(messagesRepositoryNewProvider);
   return SendImage(repository);
 }
 
 @riverpod
-MarkAsRead markAsReadUseCase(MarkAsReadUseCaseRef ref) {
+MarkAsRead markAsReadUseCase(Ref ref) {
   final repository = ref.watch(messagesRepositoryNewProvider);
   return MarkAsRead(repository);
 }
 
 @riverpod
-MarkAsUnread markAsUnreadUseCase(MarkAsUnreadUseCaseRef ref) {
+MarkAsUnread markAsUnreadUseCase(Ref ref) {
   final repository = ref.watch(messagesRepositoryNewProvider);
   return MarkAsUnread(repository);
 }
 
 @riverpod
-DeleteConversation deleteConversationUseCase(DeleteConversationUseCaseRef ref) {
+DeleteConversation deleteConversationUseCase(Ref ref) {
   final repository = ref.watch(messagesRepositoryNewProvider);
   return DeleteConversation(repository);
 }

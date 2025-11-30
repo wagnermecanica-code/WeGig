@@ -64,7 +64,7 @@ final class AuthRemoteDataSourceProvider extends $FunctionalProvider<
 }
 
 String _$authRemoteDataSourceHash() =>
-    r'81623d7edccdf752d906b3ed575e7d500a107f64';
+    r'b6a9edd1b6c48be8564688bac362316f598b4432';
 
 /// Provider para AuthRepository (singleton)
 
@@ -110,7 +110,7 @@ final class AuthRepositoryProvider
   }
 }
 
-String _$authRepositoryHash() => r'a678f8abf1b6fe259300fddf49676238f81d2901';
+String _$authRepositoryHash() => r'05c6159f6976986da64509d15b55d499b8b724b4';
 
 /// ============================================
 /// DOMAIN LAYER - UseCases
@@ -168,7 +168,7 @@ final class SignInWithEmailUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$signInWithEmailUseCaseHash() =>
-    r'e5c4712c6497ed2312b86ace2a8b2ef3d50c9e1c';
+    r'8b12333bcccdb296a736f6374d468c815512c4ab';
 
 /// Provider para SignUpWithEmailUseCase
 
@@ -217,7 +217,7 @@ final class SignUpWithEmailUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$signUpWithEmailUseCaseHash() =>
-    r'aad37ba1afdd8983ab16e6e8a0dce1163059cbec';
+    r'208b6723dc4d6968f330194e094d32220878df52';
 
 /// Provider para SignInWithGoogleUseCase
 
@@ -266,7 +266,7 @@ final class SignInWithGoogleUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$signInWithGoogleUseCaseHash() =>
-    r'5276d106e8e23e2a0c4a094cd4d598af7c401a95';
+    r'dc90c4b43fcbfc22a70458e8591d8f4c2d9bc76b';
 
 /// Provider para SignInWithAppleUseCase
 
@@ -315,7 +315,7 @@ final class SignInWithAppleUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$signInWithAppleUseCaseHash() =>
-    r'1ca1c88231300e99f32404763918be61761aca98';
+    r'2ddf12d1c1a02d09e209d7c45c6614c387a2c051';
 
 /// Provider para SignOutUseCase
 
@@ -361,7 +361,7 @@ final class SignOutUseCaseProvider
   }
 }
 
-String _$signOutUseCaseHash() => r'6eb7766aee0033bebfd5367c71aa8a01cd3154df';
+String _$signOutUseCaseHash() => r'8cc2470ed44022c6868a2e710009d5234e1a80fc';
 
 /// Provider para SendPasswordResetEmailUseCase
 
@@ -413,7 +413,7 @@ final class SendPasswordResetEmailUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$sendPasswordResetEmailUseCaseHash() =>
-    r'4dc7751434b54d4887477c9a1d7455e849ec67ed';
+    r'6e03dbb68ffd2ed8bdd85e6f93e2cd61f0945f9b';
 
 /// Provider para SendEmailVerificationUseCase
 
@@ -463,7 +463,7 @@ final class SendEmailVerificationUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$sendEmailVerificationUseCaseHash() =>
-    r'2615c5d17f0dd3e80a63c95550f49a3f00ab721f';
+    r'ca5d253611bfc934c36e87e2a979b71c19aba89c';
 
 /// ============================================
 /// PRESENTATION LAYER - State
@@ -516,7 +516,7 @@ final class AuthStateProvider
   }
 }
 
-String _$authStateHash() => r'34a41c7499f55a661d192878d349cbfab89c78c9';
+String _$authStateHash() => r'3287ebbacddb50a826fd28bc6d4a4708785c8891';
 
 /// Provider para o usuário atual (nullable)
 ///
@@ -567,7 +567,7 @@ final class CurrentUserProvider extends $FunctionalProvider<User?, User?, User?>
   }
 }
 
-String _$currentUserHash() => r'88ba1c74bce80a9739366dfefce2731e2f582f55';
+String _$currentUserHash() => r'ab87a355dd423d79a81ba656f9396a458ad8ed84';
 
 /// Provider para verificar se usuário está autenticado
 
@@ -612,7 +612,7 @@ final class IsAuthenticatedProvider
   }
 }
 
-String _$isAuthenticatedHash() => r'b72ba2077fffcbed5f0a4b6a5d3cbf052855b804';
+String _$isAuthenticatedHash() => r'54fa2e7165f29e09a4d03d1f0bf7ae0df72cf5dc';
 
 /// Provider para verificar se email foi verificado
 
@@ -657,7 +657,7 @@ final class IsEmailVerifiedProvider
   }
 }
 
-String _$isEmailVerifiedHash() => r'16d272301be3a8b6bb79f49a2096540516e3880a';
+String _$isEmailVerifiedHash() => r'21699e3260e423b151b31d17a002ba63097dfde5';
 
 /// ============================================
 /// FACADE - Simplificação de acesso
@@ -729,4 +729,4 @@ final class AuthServiceProvider
   }
 }
 
-String _$authServiceHash() => r'a061f38db57f9c876af0b1b60bbad09babef3994';
+String _$authServiceHash() => r'38f5a8ac9bb90db989e951984da80601ff22f4a6';

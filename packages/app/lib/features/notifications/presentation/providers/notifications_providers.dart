@@ -19,21 +19,21 @@ part 'notifications_providers.g.dart';
 
 /// Provider para FirebaseFirestore instance
 @riverpod
-FirebaseFirestore firestore(FirestoreRef ref) {
+FirebaseFirestore firestore(Ref ref) {
   return FirebaseFirestore.instance;
 }
 
 /// Provider para NotificationsRemoteDataSource
 @riverpod
 INotificationsRemoteDataSource notificationsRemoteDataSource(
-    NotificationsRemoteDataSourceRef ref) {
+    Ref ref) {
   return NotificationsRemoteDataSource();
 }
 
 /// Provider para NotificationsRepository (nova implementação Clean Architecture)
 @riverpod
 NotificationsRepository notificationsRepositoryNew(
-    NotificationsRepositoryNewRef ref) {
+    Ref ref) {
   final dataSource = ref.watch(notificationsRemoteDataSourceProvider);
   return NotificationsRepositoryImpl(remoteDataSource: dataSource);
 }
@@ -43,40 +43,40 @@ NotificationsRepository notificationsRepositoryNew(
 // ============================================================================
 
 @riverpod
-LoadNotifications loadNotificationsUseCase(LoadNotificationsUseCaseRef ref) {
+LoadNotifications loadNotificationsUseCase(Ref ref) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return LoadNotifications(repository);
 }
 
 @riverpod
 MarkNotificationAsRead markNotificationAsReadUseCase(
-    MarkNotificationAsReadUseCaseRef ref) {
+    Ref ref) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return MarkNotificationAsRead(repository);
 }
 
 @riverpod
 MarkAllNotificationsAsRead markAllNotificationsAsReadUseCase(
-    MarkAllNotificationsAsReadUseCaseRef ref) {
+    Ref ref) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return MarkAllNotificationsAsRead(repository);
 }
 
 @riverpod
-DeleteNotification deleteNotificationUseCase(DeleteNotificationUseCaseRef ref) {
+DeleteNotification deleteNotificationUseCase(Ref ref) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return DeleteNotification(repository);
 }
 
 @riverpod
-CreateNotification createNotificationUseCase(CreateNotificationUseCaseRef ref) {
+CreateNotification createNotificationUseCase(Ref ref) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return CreateNotification(repository);
 }
 
 @riverpod
 GetUnreadNotificationCount getUnreadNotificationCountUseCase(
-    GetUnreadNotificationCountUseCaseRef ref) {
+    Ref ref) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return GetUnreadNotificationCount(repository);
 }

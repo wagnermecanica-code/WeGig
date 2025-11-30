@@ -15,13 +15,13 @@ part 'home_providers.g.dart';
 
 /// Provider para Firestore instance
 @riverpod
-FirebaseFirestore firestore(FirestoreRef ref) {
+FirebaseFirestore firestore(Ref ref) {
   return FirebaseFirestore.instance;
 }
 
 /// Provider para HomeRepository
 @riverpod
-HomeRepository homeRepository(HomeRepositoryRef ref) {
+HomeRepository homeRepository(Ref ref) {
   final postRepository = ref.watch(postRepositoryNewProvider);
   final firestore = ref.watch(firestoreProvider);
 
@@ -35,7 +35,7 @@ HomeRepository homeRepository(HomeRepositoryRef ref) {
 
 /// Provider para LoadNearbyPostsUseCase
 @riverpod
-LoadNearbyPostsUseCase loadNearbyPostsUseCase(LoadNearbyPostsUseCaseRef ref) {
+LoadNearbyPostsUseCase loadNearbyPostsUseCase(Ref ref) {
   final repository = ref.watch(homeRepositoryProvider);
   return LoadNearbyPostsUseCase(repository);
 }
@@ -43,14 +43,14 @@ LoadNearbyPostsUseCase loadNearbyPostsUseCase(LoadNearbyPostsUseCaseRef ref) {
 /// Provider para LoadPostsByGenresUseCase
 @riverpod
 LoadPostsByGenresUseCase loadPostsByGenresUseCase(
-    LoadPostsByGenresUseCaseRef ref) {
+    Ref ref) {
   final repository = ref.watch(homeRepositoryProvider);
   return LoadPostsByGenresUseCase(repository);
 }
 
 /// Provider para SearchProfilesUseCase
 @riverpod
-SearchProfilesUseCase searchProfilesUseCase(SearchProfilesUseCaseRef ref) {
+SearchProfilesUseCase searchProfilesUseCase(Ref ref) {
   final repository = ref.watch(homeRepositoryProvider);
   return SearchProfilesUseCase(repository);
 }

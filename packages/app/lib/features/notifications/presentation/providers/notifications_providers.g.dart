@@ -52,7 +52,7 @@ final class FirestoreProvider extends $FunctionalProvider<FirebaseFirestore,
   }
 }
 
-String _$firestoreHash() => r'ef4a6b0737caace50a6d79dd3e4e2aa1bc3031d5';
+String _$firestoreHash() => r'0e25e335c5657f593fc1baf3d9fd026e70bca7fa';
 
 /// Provider para NotificationsRemoteDataSource
 
@@ -104,7 +104,7 @@ final class NotificationsRemoteDataSourceProvider extends $FunctionalProvider<
 }
 
 String _$notificationsRemoteDataSourceHash() =>
-    r'bf0064341200d91ac78b59027e198e253c65135c';
+    r'17130b6d4c9511ce90419518fcd3098d489c49b0';
 
 /// Provider para NotificationsRepository (nova implementação Clean Architecture)
 
@@ -154,7 +154,7 @@ final class NotificationsRepositoryNewProvider extends $FunctionalProvider<
 }
 
 String _$notificationsRepositoryNewHash() =>
-    r'061406f4ba7610bc16ac5523b97841d1e93422b9';
+    r'b770976ca1711ccadcc80e72749f6474368e0135';
 
 @ProviderFor(loadNotificationsUseCase)
 const loadNotificationsUseCaseProvider = LoadNotificationsUseCaseProvider._();
@@ -198,7 +198,7 @@ final class LoadNotificationsUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$loadNotificationsUseCaseHash() =>
-    r'9eb7c2ebf097cd58cbc4a76336055ece39f2a21c';
+    r'545df3e540d980926bc9d877710e29450a757488';
 
 @ProviderFor(markNotificationAsReadUseCase)
 const markNotificationAsReadUseCaseProvider =
@@ -243,7 +243,7 @@ final class MarkNotificationAsReadUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$markNotificationAsReadUseCaseHash() =>
-    r'24397a987924813c5f55edb8674b1f164b005001';
+    r'b1f5e7b17d7da5a9fd89eb800944230e783f8d73';
 
 @ProviderFor(markAllNotificationsAsReadUseCase)
 const markAllNotificationsAsReadUseCaseProvider =
@@ -290,7 +290,7 @@ final class MarkAllNotificationsAsReadUseCaseProvider
 }
 
 String _$markAllNotificationsAsReadUseCaseHash() =>
-    r'7ac1173115543ddd50a7f16a8f9a0547a80666e0';
+    r'1dbe93806b12f40b2734618e8a9af98a2a74a32e';
 
 @ProviderFor(deleteNotificationUseCase)
 const deleteNotificationUseCaseProvider = DeleteNotificationUseCaseProvider._();
@@ -334,7 +334,7 @@ final class DeleteNotificationUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$deleteNotificationUseCaseHash() =>
-    r'ea9276fc08f91ffc948f2771dd5d45e4e95f3d98';
+    r'f11e8a3046e5c6caafffcac1c1958f70600a70bb';
 
 @ProviderFor(createNotificationUseCase)
 const createNotificationUseCaseProvider = CreateNotificationUseCaseProvider._();
@@ -378,7 +378,7 @@ final class CreateNotificationUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$createNotificationUseCaseHash() =>
-    r'b46ecc959fbb5d572a77a54d8b8e276f28af16de';
+    r'ecb5afd7a4b72f15c604a6406a8e363f70d1b4b0';
 
 @ProviderFor(getUnreadNotificationCountUseCase)
 const getUnreadNotificationCountUseCaseProvider =
@@ -425,7 +425,7 @@ final class GetUnreadNotificationCountUseCaseProvider
 }
 
 String _$getUnreadNotificationCountUseCaseHash() =>
-    r'66a65f0d6eeb9fcfe00ec80b56d91d2a2bc08ad3';
+    r'a3223594e4b75641df594d6f5aa9d1a022c20d4d';
 
 /// Stream de notificações em tempo real
 

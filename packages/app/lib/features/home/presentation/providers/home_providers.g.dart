@@ -52,7 +52,7 @@ final class FirestoreProvider extends $FunctionalProvider<FirebaseFirestore,
   }
 }
 
-String _$firestoreHash() => r'ef4a6b0737caace50a6d79dd3e4e2aa1bc3031d5';
+String _$firestoreHash() => r'0e25e335c5657f593fc1baf3d9fd026e70bca7fa';
 
 /// Provider para HomeRepository
 
@@ -98,7 +98,7 @@ final class HomeRepositoryProvider
   }
 }
 
-String _$homeRepositoryHash() => r'e2b1d9425cd593208e613be25196279851582810';
+String _$homeRepositoryHash() => r'acfd1b6a39851f5dbf8a8776cc45abb2a32c8b64';
 
 /// Provider para LoadNearbyPostsUseCase
 
@@ -147,7 +147,7 @@ final class LoadNearbyPostsUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$loadNearbyPostsUseCaseHash() =>
-    r'73a90db092687e9d3c51a5830aa72abbf8aeaca6';
+    r'9fa666579f1733c299742ef279970afb6cd0fee1';
 
 /// Provider para LoadPostsByGenresUseCase
 
@@ -196,7 +196,7 @@ final class LoadPostsByGenresUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$loadPostsByGenresUseCaseHash() =>
-    r'0f0304ffd559db61cf9792360350a0bc55e6b009';
+    r'e8b6dd465a6e3e1603268068e62d3e1f1f5da71b';
 
 /// Provider para SearchProfilesUseCase
 
@@ -245,7 +245,7 @@ final class SearchProfilesUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$searchProfilesUseCaseHash() =>
-    r'cf7ff4dfd9ec87b443e220ef33cf2154470ea246';
+    r'a8911d5395c1dc73af420d36cf214388745e67be';
 
 /// Provider para stream de posts próximos (tempo real)
 

@@ -20,13 +20,13 @@ part 'auth_providers.g.dart';
 
 /// Provider para AuthRemoteDataSource (singleton)
 @riverpod
-AuthRemoteDataSource authRemoteDataSource(AuthRemoteDataSourceRef ref) {
+AuthRemoteDataSource authRemoteDataSource(Ref ref) {
   return AuthRemoteDataSourceImpl();
 }
 
 /// Provider para AuthRepository (singleton)
 @riverpod
-AuthRepository authRepository(AuthRepositoryRef ref) {
+AuthRepository authRepository(Ref ref) {
   final remoteDataSource = ref.watch(authRemoteDataSourceProvider);
   return AuthRepositoryImpl(remoteDataSource: remoteDataSource);
 }
@@ -37,14 +37,14 @@ AuthRepository authRepository(AuthRepositoryRef ref) {
 
 /// Provider para SignInWithEmailUseCase
 @riverpod
-SignInWithEmailUseCase signInWithEmailUseCase(SignInWithEmailUseCaseRef ref) {
+SignInWithEmailUseCase signInWithEmailUseCase(Ref ref) {
   final repository = ref.watch(authRepositoryProvider);
   return SignInWithEmailUseCase(repository);
 }
 
 /// Provider para SignUpWithEmailUseCase
 @riverpod
-SignUpWithEmailUseCase signUpWithEmailUseCase(SignUpWithEmailUseCaseRef ref) {
+SignUpWithEmailUseCase signUpWithEmailUseCase(Ref ref) {
   final repository = ref.watch(authRepositoryProvider);
   return SignUpWithEmailUseCase(repository);
 }
@@ -52,21 +52,21 @@ SignUpWithEmailUseCase signUpWithEmailUseCase(SignUpWithEmailUseCaseRef ref) {
 /// Provider para SignInWithGoogleUseCase
 @riverpod
 SignInWithGoogleUseCase signInWithGoogleUseCase(
-    SignInWithGoogleUseCaseRef ref) {
+    Ref ref) {
   final repository = ref.watch(authRepositoryProvider);
   return SignInWithGoogleUseCase(repository);
 }
 
 /// Provider para SignInWithAppleUseCase
 @riverpod
-SignInWithAppleUseCase signInWithAppleUseCase(SignInWithAppleUseCaseRef ref) {
+SignInWithAppleUseCase signInWithAppleUseCase(Ref ref) {
   final repository = ref.watch(authRepositoryProvider);
   return SignInWithAppleUseCase(repository);
 }
 
 /// Provider para SignOutUseCase
 @riverpod
-SignOutUseCase signOutUseCase(SignOutUseCaseRef ref) {
+SignOutUseCase signOutUseCase(Ref ref) {
   final repository = ref.watch(authRepositoryProvider);
   return SignOutUseCase(repository);
 }
@@ -74,7 +74,7 @@ SignOutUseCase signOutUseCase(SignOutUseCaseRef ref) {
 /// Provider para SendPasswordResetEmailUseCase
 @riverpod
 SendPasswordResetEmailUseCase sendPasswordResetEmailUseCase(
-    SendPasswordResetEmailUseCaseRef ref) {
+    Ref ref) {
   final repository = ref.watch(authRepositoryProvider);
   return SendPasswordResetEmailUseCase(repository);
 }
@@ -82,7 +82,7 @@ SendPasswordResetEmailUseCase sendPasswordResetEmailUseCase(
 /// Provider para SendEmailVerificationUseCase
 @riverpod
 SendEmailVerificationUseCase sendEmailVerificationUseCase(
-    SendEmailVerificationUseCaseRef ref) {
+    Ref ref) {
   final repository = ref.watch(authRepositoryProvider);
   return SendEmailVerificationUseCase(repository);
 }
@@ -95,7 +95,7 @@ SendEmailVerificationUseCase sendEmailVerificationUseCase(
 ///
 /// Reactivo - atualiza automaticamente quando user faz login/logout
 @riverpod
-Stream<User?> authState(AuthStateRef ref) {
+Stream<User?> authState(Ref ref) {
   final repository = ref.watch(authRepositoryProvider);
   return repository.authStateChanges;
 }
@@ -104,19 +104,19 @@ Stream<User?> authState(AuthStateRef ref) {
 ///
 /// Útil para checagens rápidas sem async
 @riverpod
-User? currentUser(CurrentUserRef ref) {
+User? currentUser(Ref ref) {
   return ref.watch(authStateProvider).value;
 }
 
 /// Provider para verificar se usuário está autenticado
 @riverpod
-bool isAuthenticated(IsAuthenticatedRef ref) {
+bool isAuthenticated(Ref ref) {
   return ref.watch(currentUserProvider) != null;
 }
 
 /// Provider para verificar se email foi verificado
 @riverpod
-bool isEmailVerified(IsEmailVerifiedRef ref) {
+bool isEmailVerified(Ref ref) {
   final user = ref.watch(currentUserProvider);
   return user?.emailVerified ?? false;
 }
@@ -133,7 +133,7 @@ bool isEmailVerified(IsEmailVerifiedRef ref) {
 /// DEPRECATED: Novo código deve usar UseCases diretamente
 @Deprecated('Use UseCases diretamente (signInWithEmailUseCaseProvider, etc)')
 @riverpod
-IAuthService authService(AuthServiceRef ref) {
+IAuthService authService(Ref ref) {
   return _AuthServiceFacade(ref);
 }
 
@@ -143,7 +143,7 @@ IAuthService authService(AuthServiceRef ref) {
 /// migramos gradualmente para UseCases
 class _AuthServiceFacade implements IAuthService {
   _AuthServiceFacade(this._ref);
-  final AuthServiceRef _ref;
+  final Ref _ref;
 
   @override
   Stream<User?> get authStateChanges {

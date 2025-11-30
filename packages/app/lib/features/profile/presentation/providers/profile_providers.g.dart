@@ -64,7 +64,7 @@ final class ProfileRemoteDataSourceProvider extends $FunctionalProvider<
 }
 
 String _$profileRemoteDataSourceHash() =>
-    r'e4c1c1887a1b6a88fcdd478fced427961e477780';
+    r'f1abd6607c606939e3a5f9dafd53e7ae8de41419';
 
 /// Provider para ProfileRepository (singleton)
 
@@ -113,7 +113,7 @@ final class ProfileRepositoryNewProvider extends $FunctionalProvider<
 }
 
 String _$profileRepositoryNewHash() =>
-    r'9e5a7c4bbb321038e343fddc9e9857dfba1d7047';
+    r'b585f2c7f37ca445c0255d375ae375342f9dbd93';
 
 /// ============================================
 /// DOMAIN LAYER - UseCases
@@ -168,7 +168,7 @@ final class CreateProfileUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$createProfileUseCaseHash() =>
-    r'ce015ce02f586d93ebaf6992cb6d2e2aad6067df';
+    r'3104bd8a055cbbe28496ee89afa9cfc64f28f7e4';
 
 @ProviderFor(updateProfileUseCase)
 const updateProfileUseCaseProvider = UpdateProfileUseCaseProvider._();
@@ -212,7 +212,7 @@ final class UpdateProfileUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$updateProfileUseCaseHash() =>
-    r'e61021ff937f5c15ad514ff253d1e289324d068b';
+    r'935e2841094c237656457ed8670949c9cb2865ee';
 
 @ProviderFor(switchActiveProfileUseCase)
 const switchActiveProfileUseCaseProvider =
@@ -257,7 +257,7 @@ final class SwitchActiveProfileUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$switchActiveProfileUseCaseHash() =>
-    r'990e2a78c015a48f4f99ada5a123e81fbc60ab5a';
+    r'ccf8bbfe30125f5abd8077ad20a11198684dfabe';
 
 @ProviderFor(deleteProfileUseCase)
 const deleteProfileUseCaseProvider = DeleteProfileUseCaseProvider._();
@@ -301,7 +301,7 @@ final class DeleteProfileUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$deleteProfileUseCaseHash() =>
-    r'e9e5de22025ca5db4e2f2e0268e1d07940b42ed3';
+    r'634dbfb14133227240a68ae934c1c159a11fd802';
 
 @ProviderFor(loadAllProfilesUseCase)
 const loadAllProfilesUseCaseProvider = LoadAllProfilesUseCaseProvider._();
@@ -345,7 +345,7 @@ final class LoadAllProfilesUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$loadAllProfilesUseCaseHash() =>
-    r'98b5059f11855957f2cf8496822fa920bbd61317';
+    r'16a0a839b22827dec43db4fcdbe0e4e38ccde9b7';
 
 @ProviderFor(getActiveProfileUseCase)
 const getActiveProfileUseCaseProvider = GetActiveProfileUseCaseProvider._();
@@ -389,7 +389,7 @@ final class GetActiveProfileUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$getActiveProfileUseCaseHash() =>
-    r'537a360364d14144adcaa3ebdb0adec79cc6f04f';
+    r'ff0cd8cefe580986652728d9eb1fdbd1023ab032';
 
 /// Provider para perfil ativo atual (null-safe)
 
@@ -435,7 +435,7 @@ final class ActiveProfileProvider
   }
 }
 
-String _$activeProfileHash() => r'f3c8fdc00d234d8a3f1cbf15794870570509b04d';
+String _$activeProfileHash() => r'fc32903c544b43733e9d3f4461b6cd74ff589c64';
 
 /// Provider para lista de perfis
 
@@ -483,7 +483,7 @@ final class ProfileListProvider extends $FunctionalProvider<
   }
 }
 
-String _$profileListHash() => r'a0fb8f617871092926b3e7455402dac1c67eed1c';
+String _$profileListHash() => r'a196080eb12c5133c03a19ecf282af1b946898b8';
 
 /// Provider para verificar se tem múltiplos perfis
 
@@ -529,7 +529,7 @@ final class HasMultipleProfilesProvider
 }
 
 String _$hasMultipleProfilesHash() =>
-    r'781a311f71ab4b0335f3a02ac1fbac29cc0d9b37';
+    r'd83b0a867e19223d0a76f70fe166d35267b279b6';
 
 /// Provider para stream de mudanças de perfil
 
@@ -568,4 +568,4 @@ final class ProfileStreamProvider extends $FunctionalProvider<
   }
 }
 
-String _$profileStreamHash() => r'bf7505b4b47cb7eb48efdad9fcce172fedd23ebc';
+String _$profileStreamHash() => r'a18f147c861dcdd53086b017b50481321c301581';

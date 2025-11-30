@@ -23,13 +23,13 @@ part 'post_providers.g.dart';
 
 /// Provider para PostRemoteDataSource (singleton)
 @riverpod
-IPostRemoteDataSource postRemoteDataSource(PostRemoteDataSourceRef ref) {
+IPostRemoteDataSource postRemoteDataSource(Ref ref) {
   return PostRemoteDataSource();
 }
 
 /// Provider para PostRepository (singleton)
 @riverpod
-PostRepository postRepositoryNew(PostRepositoryNewRef ref) {
+PostRepository postRepositoryNew(Ref ref) {
   final dataSource = ref.read(postRemoteDataSourceProvider);
   return PostRepositoryImpl(remoteDataSource: dataSource);
 }
@@ -39,32 +39,32 @@ PostRepository postRepositoryNew(PostRepositoryNewRef ref) {
 /// ============================================
 
 @riverpod
-CreatePost createPostUseCase(CreatePostUseCaseRef ref) {
+CreatePost createPostUseCase(Ref ref) {
   final repository = ref.read(postRepositoryNewProvider);
   return CreatePost(repository);
 }
 
 @riverpod
-UpdatePost updatePostUseCase(UpdatePostUseCaseRef ref) {
+UpdatePost updatePostUseCase(Ref ref) {
   final repository = ref.read(postRepositoryNewProvider);
   return UpdatePost(repository);
 }
 
 @riverpod
-DeletePost deletePostUseCase(DeletePostUseCaseRef ref) {
+DeletePost deletePostUseCase(Ref ref) {
   final repository = ref.read(postRepositoryNewProvider);
   return DeletePost(repository);
 }
 
 @riverpod
-ToggleInterest toggleInterestUseCase(ToggleInterestUseCaseRef ref) {
+ToggleInterest toggleInterestUseCase(Ref ref) {
   final repository = ref.read(postRepositoryNewProvider);
   return ToggleInterest(repository);
 }
 
 @riverpod
 LoadInterestedUsers loadInterestedUsersUseCase(
-    LoadInterestedUsersUseCaseRef ref) {
+    Ref ref) {
   final repository = ref.read(postRepositoryNewProvider);
   return LoadInterestedUsers(repository);
 }
@@ -238,7 +238,7 @@ final postProvider = AsyncNotifierProvider<PostNotifier, PostState>(
 
 /// Helper provider to get just the posts list
 @riverpod
-List<PostEntity> postList(PostListRef ref) {
+List<PostEntity> postList(Ref ref) {
   final postState = ref.watch(postProvider);
   return postState.when(
     data: (state) => state.posts,

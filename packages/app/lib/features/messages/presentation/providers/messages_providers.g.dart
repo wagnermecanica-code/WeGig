@@ -52,7 +52,7 @@ final class FirestoreProvider extends $FunctionalProvider<FirebaseFirestore,
   }
 }
 
-String _$firestoreHash() => r'ef4a6b0737caace50a6d79dd3e4e2aa1bc3031d5';
+String _$firestoreHash() => r'0e25e335c5657f593fc1baf3d9fd026e70bca7fa';
 
 /// Provider para MessagesRemoteDataSource
 
@@ -101,7 +101,7 @@ final class MessagesRemoteDataSourceProvider extends $FunctionalProvider<
 }
 
 String _$messagesRemoteDataSourceHash() =>
-    r'ab88def8e1df67f885da5ac9008dbdcb955633e5';
+    r'e174e14509da3e6a224b3506938ec74fa839a711';
 
 /// Provider para MessagesRepository (nova implementação Clean Architecture)
 
@@ -150,7 +150,7 @@ final class MessagesRepositoryNewProvider extends $FunctionalProvider<
 }
 
 String _$messagesRepositoryNewHash() =>
-    r'457f1aaaa67efc70314525bce0489f4bc48fc699';
+    r'cea8b4b2b4822d5f4279b4ee9b4a15e2aeceb19c';
 
 @ProviderFor(loadConversationsUseCase)
 const loadConversationsUseCaseProvider = LoadConversationsUseCaseProvider._();
@@ -194,7 +194,7 @@ final class LoadConversationsUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$loadConversationsUseCaseHash() =>
-    r'320c0542dd32291d0b0b9f98013d80b4ba2e94d1';
+    r'df8b29966d479a8de4805a0de14840f2814626f9';
 
 @ProviderFor(loadMessagesUseCase)
 const loadMessagesUseCaseProvider = LoadMessagesUseCaseProvider._();
@@ -236,7 +236,7 @@ final class LoadMessagesUseCaseProvider
 }
 
 String _$loadMessagesUseCaseHash() =>
-    r'8bc7fc7bb06d292871893e3fcd33ac0786d60538';
+    r'429b58cd1bca9a603f1881eb4266d529dc40d07b';
 
 @ProviderFor(sendMessageUseCase)
 const sendMessageUseCaseProvider = SendMessageUseCaseProvider._();
@@ -278,7 +278,7 @@ final class SendMessageUseCaseProvider
 }
 
 String _$sendMessageUseCaseHash() =>
-    r'bbfb194e6540a4e84906a464e3fee019e57f1081';
+    r'6b5c609feca234fcc58462801ea68592138639ce';
 
 @ProviderFor(sendImageUseCase)
 const sendImageUseCaseProvider = SendImageUseCaseProvider._();
@@ -319,7 +319,7 @@ final class SendImageUseCaseProvider
   }
 }
 
-String _$sendImageUseCaseHash() => r'781d2e1bd06a66439da3a5e1da360d28d77ad37c';
+String _$sendImageUseCaseHash() => r'ca82319922166ea491899f776c13c24bd9815aa4';
 
 @ProviderFor(markAsReadUseCase)
 const markAsReadUseCaseProvider = MarkAsReadUseCaseProvider._();
@@ -360,7 +360,7 @@ final class MarkAsReadUseCaseProvider
   }
 }
 
-String _$markAsReadUseCaseHash() => r'e2bbd46ecdc3a2a37c1f1f7d6a6be1b16e211885';
+String _$markAsReadUseCaseHash() => r'fcaa6f4bb6b3e4430d1b6af556e2e43eed6bc225';
 
 @ProviderFor(markAsUnreadUseCase)
 const markAsUnreadUseCaseProvider = MarkAsUnreadUseCaseProvider._();
@@ -402,7 +402,7 @@ final class MarkAsUnreadUseCaseProvider
 }
 
 String _$markAsUnreadUseCaseHash() =>
-    r'110087caf2ba23b9e913a4295899e41d64fa5ecf';
+    r'40426050458c583578db5886d833e3de3b506721';
 
 @ProviderFor(deleteConversationUseCase)
 const deleteConversationUseCaseProvider = DeleteConversationUseCaseProvider._();
@@ -446,7 +446,7 @@ final class DeleteConversationUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$deleteConversationUseCaseHash() =>
-    r'b9df445874801ad2caf9c30ea45d012a3b9bcd4b';
+    r'5febffe04ac53b5ce2c243cf74385a21bcb05e36';
 
 /// Stream de conversas em tempo real
 

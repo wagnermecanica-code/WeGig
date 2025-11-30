@@ -64,7 +64,7 @@ final class PostRemoteDataSourceProvider extends $FunctionalProvider<
 }
 
 String _$postRemoteDataSourceHash() =>
-    r'928d5c5cea56c554b19ca2e20e88cf61c37d0d0c';
+    r'0379e0b4988fdbc3bb4c87c0d22ad7910a027204';
 
 /// Provider para PostRepository (singleton)
 
@@ -110,7 +110,7 @@ final class PostRepositoryNewProvider
   }
 }
 
-String _$postRepositoryNewHash() => r'd8afa23b143aeae8ba46f3153100092c6c6d2f82';
+String _$postRepositoryNewHash() => r'194a50534da1a3b49dbbf8d418b6831cfb983d81';
 
 /// ============================================
 /// USE CASE LAYER - Dependency Injection
@@ -162,7 +162,7 @@ final class CreatePostUseCaseProvider
   }
 }
 
-String _$createPostUseCaseHash() => r'b4e427953d51e487cd57f96407be2a02e5656de6';
+String _$createPostUseCaseHash() => r'e9b8dfdb44eea8e5cce9ec559a3edfe5d9babb52';
 
 @ProviderFor(updatePostUseCase)
 const updatePostUseCaseProvider = UpdatePostUseCaseProvider._();
@@ -203,7 +203,7 @@ final class UpdatePostUseCaseProvider
   }
 }
 
-String _$updatePostUseCaseHash() => r'b9069157f83b697660a9cf6ab381ab4ab1cbb06e';
+String _$updatePostUseCaseHash() => r'98f7a2b38ad24c5d0955b01e02168a976d9d2c37';
 
 @ProviderFor(deletePostUseCase)
 const deletePostUseCaseProvider = DeletePostUseCaseProvider._();
@@ -244,7 +244,7 @@ final class DeletePostUseCaseProvider
   }
 }
 
-String _$deletePostUseCaseHash() => r'335302287bae8da127f1e10d74be3eb59bb16092';
+String _$deletePostUseCaseHash() => r'b633ae3a3feb730c3177be8ab32620daf0fdbd1f';
 
 @ProviderFor(toggleInterestUseCase)
 const toggleInterestUseCaseProvider = ToggleInterestUseCaseProvider._();
@@ -286,7 +286,7 @@ final class ToggleInterestUseCaseProvider
 }
 
 String _$toggleInterestUseCaseHash() =>
-    r'ee84d8a5ba0008913b1054ba3201161f399850e0';
+    r'71cfdea3688a5a03ba5f7a0fd72e2d88873d6af5';
 
 @ProviderFor(loadInterestedUsersUseCase)
 const loadInterestedUsersUseCaseProvider =
@@ -331,7 +331,7 @@ final class LoadInterestedUsersUseCaseProvider extends $FunctionalProvider<
 }
 
 String _$loadInterestedUsersUseCaseHash() =>
-    r'4dc0abc44e9faf88da3f6c96c5309fe5c04dbb09';
+    r'c0e86387876da18d9df64b02bab5c729c7482eab';
 
 /// Helper provider to get just the posts list
 
@@ -376,4 +376,4 @@ final class PostListProvider extends $FunctionalProvider<List<PostEntity>,
   }
 }
 
-String _$postListHash() => r'777b238832ec4049e95074c6a578da2be6fcf92f';
+String _$postListHash() => r'07fde0e630ffd8fd76b93dd4ac48f6761f50f29f';
