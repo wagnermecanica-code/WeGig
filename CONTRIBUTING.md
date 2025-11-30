@@ -30,19 +30,19 @@ Todas as mensagens de commit DEVEM seguir o padrão [Conventional Commits](https
 
 ### Tipos Permitidos
 
-| Tipo | Descrição | Exemplo |
-|------|-----------|---------|
-| **feat** | Nova funcionalidade | `feat(auth): add Google sign-in` |
-| **fix** | Correção de bug | `fix(posts): resolve location validation` |
-| **docs** | Alterações em documentação | `docs(readme): update setup instructions` |
-| **style** | Formatação, espaços, vírgulas | `style: format code with dart formatter` |
-| **refactor** | Refatoração sem mudança de comportamento | `refactor(profile): extract ProfileMapper` |
-| **test** | Adição ou correção de testes | `test(auth): add unit tests for AuthService` |
-| **chore** | Tarefas de manutenção | `chore: update dependencies` |
-| **perf** | Melhorias de performance | `perf(home): optimize marker rendering` |
-| **ci** | Mudanças em CI/CD | `ci: add GitHub Actions workflow` |
-| **build** | Mudanças no build system | `build: update gradle version` |
-| **revert** | Reverter commit anterior | `revert: revert feat(auth): add Google sign-in` |
+| Tipo         | Descrição                                | Exemplo                                         |
+| ------------ | ---------------------------------------- | ----------------------------------------------- |
+| **feat**     | Nova funcionalidade                      | `feat(auth): add Google sign-in`                |
+| **fix**      | Correção de bug                          | `fix(posts): resolve location validation`       |
+| **docs**     | Alterações em documentação               | `docs(readme): update setup instructions`       |
+| **style**    | Formatação, espaços, vírgulas            | `style: format code with dart formatter`        |
+| **refactor** | Refatoração sem mudança de comportamento | `refactor(profile): extract ProfileMapper`      |
+| **test**     | Adição ou correção de testes             | `test(auth): add unit tests for AuthService`    |
+| **chore**    | Tarefas de manutenção                    | `chore: update dependencies`                    |
+| **perf**     | Melhorias de performance                 | `perf(home): optimize marker rendering`         |
+| **ci**       | Mudanças em CI/CD                        | `ci: add GitHub Actions workflow`               |
+| **build**    | Mudanças no build system                 | `build: update gradle version`                  |
+| **revert**   | Reverter commit anterior                 | `revert: revert feat(auth): add Google sign-in` |
 
 ### Scopes Sugeridos
 
@@ -201,7 +201,7 @@ class ProfileDTO with _$ProfileDTO {
     required String name,
     // ...
   }) = _ProfileDTO;
-  
+
   factory ProfileDTO.fromJson(Map<String, dynamic> json) =>
       _$ProfileDTOFromJson(json);
 }

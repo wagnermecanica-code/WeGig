@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:flutter/foundation.dart';
 
 /// Interface para PostRemoteDataSource
 abstract class IPostRemoteDataSource {

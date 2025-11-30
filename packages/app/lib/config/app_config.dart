@@ -1,6 +1,6 @@
-import 'dev_config.dart';
-import 'staging_config.dart';
-import 'prod_config.dart';
+import 'package:wegig_app/config/dev_config.dart';
+import 'package:wegig_app/config/prod_config.dart';
+import 'package:wegig_app/config/staging_config.dart';
 
 /// Configuração centralizada de ambiente baseada em flavors
 ///

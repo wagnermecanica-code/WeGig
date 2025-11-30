@@ -146,14 +146,12 @@ class WeGigApp extends ConsumerWidget {
 }
 
 class App extends ConsumerWidget {
-  final String flavor;
-  final String appName;
 
   const App({
-    super.key,
-    required this.flavor,
-    required this.appName,
+    required this.flavor, required this.appName, super.key,
   });
+  final String flavor;
+  final String appName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

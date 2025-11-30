@@ -1,4 +1,3 @@
-import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // TODO: Restore push notification service when implemented
 // import '../../../../services/push_notification_service.dart';
 import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 /// Página de configurações de notificações
 ///

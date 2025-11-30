@@ -1,5 +1,5 @@
-import 'package:wegig_app/features/home/domain/repositories/home_repository.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:wegig_app/features/home/domain/repositories/home_repository.dart';
 
 /// UseCase para carregar posts próximos
 /// Encapsula lógica de busca geoespacial

@@ -1,5 +1,5 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:wegig_app/features/notifications/domain/usecases/create_notification.dart';
 
 import 'mock_notifications_repository.dart';
@@ -23,9 +23,7 @@ void main() {
         recipientProfileId: 'profile-456',
         title: 'Novo post próximo',
         message: 'João criou um post a 5km de você',
-        read: false,
         createdAt: DateTime.now(),
-        priority: NotificationPriority.medium,
         actionType: NotificationActionType.viewPost,
         actionData: {'postId': 'post-789'},
       );
@@ -49,7 +47,6 @@ void main() {
         recipientProfileId: 'profile-456',
         title: 'Alguém se interessou pelo seu post!',
         message: 'Maria demonstrou interesse',
-        read: false,
         createdAt: DateTime.now(),
         priority: NotificationPriority.high,
         actionType: NotificationActionType.navigate,
@@ -74,9 +71,7 @@ void main() {
         recipientProfileId: 'profile-456',
         title: 'Notificação',
         message: 'Mensagem',
-        read: false,
         createdAt: DateTime.now(),
-        priority: NotificationPriority.medium,
         actionType: NotificationActionType.viewPost,
       );
 
@@ -100,9 +95,7 @@ void main() {
         recipientProfileId: '',
         title: 'Notificação',
         message: 'Mensagem',
-        read: false,
         createdAt: DateTime.now(),
-        priority: NotificationPriority.medium,
         actionType: NotificationActionType.viewPost,
       );
 
@@ -127,9 +120,7 @@ void main() {
         recipientProfileId: 'profile-456',
         title: '',
         message: 'Mensagem',
-        read: false,
         createdAt: DateTime.now(),
-        priority: NotificationPriority.medium,
         actionType: NotificationActionType.viewPost,
       );
 
@@ -153,9 +144,7 @@ void main() {
         recipientProfileId: 'profile-456',
         title: 'Título',
         message: '',
-        read: false,
         createdAt: DateTime.now(),
-        priority: NotificationPriority.medium,
         actionType: NotificationActionType.viewPost,
       );
 
@@ -179,9 +168,7 @@ void main() {
         recipientProfileId: 'profile-456',
         title: 'Post próximo',
         message: 'Novo post',
-        read: false,
         createdAt: DateTime.now(),
-        priority: NotificationPriority.medium,
         actionType: NotificationActionType.viewPost,
       );
 
@@ -201,7 +188,6 @@ void main() {
         recipientProfileId: 'profile-456',
         title: 'Interesse',
         message: 'Alguém se interessou',
-        read: false,
         createdAt: DateTime.now(),
         priority: NotificationPriority.high,
         actionType: NotificationActionType.navigate,
@@ -223,7 +209,6 @@ void main() {
         recipientProfileId: 'profile-456',
         title: 'Nova mensagem',
         message: 'João enviou uma mensagem',
-        read: false,
         createdAt: DateTime.now(),
         priority: NotificationPriority.high,
         actionType: NotificationActionType.openChat,
@@ -247,9 +232,7 @@ void main() {
         recipientProfileId: 'profile-456',
         title: 'Título',
         message: 'Mensagem',
-        read: false,
         createdAt: DateTime.now(),
-        priority: NotificationPriority.medium,
         actionType: NotificationActionType.viewPost,
       );
       mockRepository.setupCreateNotificationFailure(

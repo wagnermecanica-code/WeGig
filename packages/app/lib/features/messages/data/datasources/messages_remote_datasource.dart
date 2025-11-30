@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:core_ui/features/messages/domain/entities/conversation_entity.dart';
 import 'package:core_ui/features/messages/domain/entities/message_entity.dart';
+import 'package:flutter/foundation.dart';
 
 /// Interface para MessagesRemoteDataSource
 abstract class IMessagesRemoteDataSource {

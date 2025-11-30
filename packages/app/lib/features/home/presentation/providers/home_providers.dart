@@ -1,13 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:wegig_app/features/home/data/repositories/home_repository_impl.dart';
 import 'package:wegig_app/features/home/domain/repositories/home_repository.dart';
 import 'package:wegig_app/features/home/domain/usecases/load_nearby_posts.dart';
 import 'package:wegig_app/features/home/domain/usecases/load_posts_by_genres.dart';
 import 'package:wegig_app/features/home/domain/usecases/search_profiles.dart';
-import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 
 part 'home_providers.g.dart';
 

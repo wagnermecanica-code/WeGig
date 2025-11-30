@@ -1,7 +1,7 @@
+import 'package:core_ui/models/search_params.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/widgets/multi_select_field.dart';
 import 'package:flutter/material.dart';
-import 'package:core_ui/models/search_params.dart';
 
 /// SearchPage - Página de filtros de busca
 /// Renderizada dentro do BottomNavScaffold (BottomNavigationBar permanece visível)

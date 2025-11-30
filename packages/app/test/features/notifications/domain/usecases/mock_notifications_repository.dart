@@ -31,7 +31,7 @@ class MockNotificationsRepository implements NotificationsRepository {
   // Setup methods
   void setupNotifications(
       String profileId, List<NotificationEntity> notifications) {
-    for (var notification in notifications) {
+    for (final notification in notifications) {
       _notifications[notification.notificationId] = notification;
     }
 
@@ -144,7 +144,7 @@ class MockNotificationsRepository implements NotificationsRepository {
         .where((n) => n.recipientProfileId == profileId)
         .toList();
 
-    for (var notification in profileNotifications) {
+    for (final notification in profileNotifications) {
       _notifications[notification.notificationId] = NotificationEntity(
         notificationId: notification.notificationId,
         type: notification.type,

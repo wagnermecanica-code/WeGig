@@ -1,6 +1,6 @@
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:flutter/foundation.dart';
 import 'package:wegig_app/features/profile/data/datasources/profile_remote_datasource.dart';
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:wegig_app/features/profile/domain/repositories/profile_repository.dart';
 
 /// ProfileRepositoryImpl - Implementação do ProfileRepository

@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:wegig_app/features/post/domain/usecases/create_post.dart';
 
 import 'mock_post_repository.dart';
@@ -480,7 +480,6 @@ void main() {
         instruments: [],
         genres: ['Samba'],
         seekingMusicians: ['Cavaquinista'],
-        youtubeLink: null,
         createdAt: DateTime.now(),
         expiresAt: DateTime.now().add(const Duration(days: 30)),
       );

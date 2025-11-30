@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart';
-import 'package:wegig_app/features/messages/data/datasources/messages_remote_datasource.dart';
 import 'package:core_ui/features/messages/domain/entities/conversation_entity.dart';
 import 'package:core_ui/features/messages/domain/entities/message_entity.dart';
+import 'package:flutter/foundation.dart';
+import 'package:wegig_app/features/messages/data/datasources/messages_remote_datasource.dart';
 import 'package:wegig_app/features/messages/domain/repositories/messages_repository.dart';
 
 /// Implementação do MessagesRepository

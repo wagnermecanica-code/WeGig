@@ -2,18 +2,18 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:wegig_app/app/router/app_router.dart';
-import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/widgets/empty_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
-import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
 // import 'package:wegig_app/models/profile.dart';
 import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 /// Tela de notificações unificada
 /// Exibe todos os tipos de notificações com suporte a ações

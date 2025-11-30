@@ -1,5 +1,5 @@
-import 'package:wegig_app/features/home/domain/repositories/home_repository.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
+import 'package:wegig_app/features/home/domain/repositories/home_repository.dart';
 
 /// UseCase para buscar perfis
 /// Encapsula lógica de busca por nome, instrumento e cidade

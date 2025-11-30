@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:wegig_app/features/post/domain/usecases/toggle_interest.dart';
 
 import 'mock_post_repository.dart';

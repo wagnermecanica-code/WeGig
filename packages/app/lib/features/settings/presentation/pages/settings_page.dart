@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
@@ -8,8 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/settings/presentation/widgets/settings_section.dart';
 import 'package:wegig_app/features/settings/presentation/widgets/settings_tile.dart';
 

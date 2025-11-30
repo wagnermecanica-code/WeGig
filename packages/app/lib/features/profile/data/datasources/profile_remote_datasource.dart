@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
+import 'package:flutter/foundation.dart';
 
 /// ProfileRemoteDataSource - Comunicação direta com Firestore
 ///

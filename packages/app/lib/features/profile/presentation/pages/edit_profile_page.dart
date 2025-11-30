@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/navigation/bottom_nav_scaffold.dart';
 import 'package:core_ui/profile_result.dart';
 import 'package:core_ui/theme/app_colors.dart';
@@ -20,7 +20,7 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 class EditProfilePage extends ConsumerStatefulWidget {
   const EditProfilePage({
@@ -485,8 +485,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
               : _tiktokController.text.trim(),
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
-          notificationRadius: 20,
-          notificationRadiusEnabled: true,
         );
 
         // ✅ Usar profileProvider.notifier (Clean Architecture)
@@ -896,8 +894,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 Icon(_isBand ?? false ? Icons.calendar_today : Icons.cake),
           ),
           validator: (value) {
-            if (value == null || value.trim().isEmpty)
+            if (value == null || value.trim().isEmpty) {
               return null; // Campo opcional
+            }
 
             final yearStr = value.trim();
             final year = int.tryParse(yearStr);

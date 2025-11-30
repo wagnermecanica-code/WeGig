@@ -1,6 +1,6 @@
+import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:flutter/foundation.dart';
 import 'package:wegig_app/features/post/data/datasources/post_remote_datasource.dart';
-import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:wegig_app/features/post/domain/repositories/post_repository.dart';
 
 /// Implementação do PostRepository

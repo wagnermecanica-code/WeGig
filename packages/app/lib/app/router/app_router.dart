@@ -1,4 +1,5 @@
 // lib/app/router/app_router.dart
+import 'package:core_ui/navigation/bottom_nav_scaffold.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,11 +8,10 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:wegig_app/features/auth/presentation/pages/auth_page.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
-import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
-import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
-import 'package:core_ui/navigation/bottom_nav_scaffold.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_detail_page.dart';
+import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 part 'app_router.g.dart';
 

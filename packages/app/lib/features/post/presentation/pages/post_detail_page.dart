@@ -1,16 +1,15 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:wegig_app/app/router/app_router.dart';
-import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
-import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 /// Tela de detalhes completos de um post

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/post_result.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -8,7 +9,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:wegig_app/features/post/data/datasources/post_remote_datasource.dart';
 import 'package:wegig_app/features/post/data/repositories/post_repository_impl.dart';
-import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:wegig_app/features/post/domain/repositories/post_repository.dart';
 import 'package:wegig_app/features/post/domain/usecases/create_post.dart';
 import 'package:wegig_app/features/post/domain/usecases/delete_post.dart';

@@ -1,5 +1,5 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:core_ui/features/messages/domain/entities/message_entity.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:wegig_app/features/messages/domain/usecases/send_message.dart';
 
 import 'mock_messages_repository.dart';
@@ -43,7 +43,7 @@ void main() {
       const senderId = 'user-1';
       const senderProfileId = 'profile-1';
       const text = 'Respondendo sua mensagem';
-      final replyTo = MessageReplyEntity(
+      const replyTo = MessageReplyEntity(
         messageId: 'msg-original',
         text: 'Mensagem original',
         senderId: 'user-2',

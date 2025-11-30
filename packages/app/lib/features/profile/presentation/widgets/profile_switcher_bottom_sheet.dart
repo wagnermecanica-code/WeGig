@@ -1,14 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+// import 'package:wegig_app/models/user_profile.dart'; // Removido: use apenas Profile
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// import 'package:wegig_app/models/user_profile.dart'; // Removido: use apenas Profile
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/profile/presentation/widgets/profile_transition_overlay.dart';
 
 /// BottomSheet para alternar entre perfis do usuário
@@ -697,7 +697,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
 
       if (context.mounted) {
         // Se excluiu o perfil ativo, recarrega com o novo perfil ativo
-        final ProfileEntity? newActiveProfile =
+        final newActiveProfile =
             ref.read(profileProvider).value?.activeProfile;
         if (newActiveProfile != null) {
           onProfileSelected(newActiveProfile.profileId);

@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/widgets/multi_select_field.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +14,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:wegig_app/features/post/domain/services/post_service.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 /// Navega para a página de criação de post
 void showPostModal(BuildContext context, String postType) {

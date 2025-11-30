@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/utils/geo_utils.dart' as geo;
 import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wegig_app/features/home/domain/repositories/home_repository.dart';
-import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:wegig_app/features/post/domain/repositories/post_repository.dart';
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 
 /// Implementação do HomeRepository
 /// Reutiliza PostRepository para operações de posts

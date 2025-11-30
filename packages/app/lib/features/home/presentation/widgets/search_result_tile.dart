@@ -1,7 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:flutter/material.dart';
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:wegig_app/app/router/app_router.dart';
 
 /// Widget de tile para resultado de busca de perfil

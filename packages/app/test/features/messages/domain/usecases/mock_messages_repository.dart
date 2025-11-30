@@ -39,7 +39,7 @@ class MockMessagesRepository implements MessagesRepository {
   void setupConversations(
       String profileId, List<ConversationEntity> conversations) {
     // Store all conversations for this profile
-    for (var conv in conversations) {
+    for (final conv in conversations) {
       _conversations[conv.id] = conv;
     }
   }
@@ -189,7 +189,6 @@ class MockMessagesRepository implements MessagesRepository {
       senderProfileId: senderProfileId,
       text: text,
       timestamp: DateTime.now(),
-      read: false,
       replyTo: replyTo,
     );
 
@@ -224,7 +223,6 @@ class MockMessagesRepository implements MessagesRepository {
       text: text,
       imageUrl: imageUrl,
       timestamp: DateTime.now(),
-      read: false,
       replyTo: replyTo,
     );
 

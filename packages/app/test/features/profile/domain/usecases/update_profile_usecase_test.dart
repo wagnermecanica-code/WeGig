@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:wegig_app/features/profile/domain/usecases/update_profile.dart';
 
 import 'mock_profile_repository.dart';
@@ -24,8 +24,6 @@ void main() {
       location: const GeoPoint(-23.5505, -46.6333),
       city: 'São Paulo',
       createdAt: DateTime.now(),
-      notificationRadius: 20,
-      notificationRadiusEnabled: true,
     );
 
     test('should update profile when user is owner and data is valid',
@@ -56,8 +54,6 @@ void main() {
       location: const GeoPoint(-23.5505, -46.6333),
       city: 'São Paulo',
       createdAt: DateTime.now(),
-      notificationRadius: 20,
-      notificationRadiusEnabled: true,
     );
 
     test('should throw when user is not the owner', () async {
@@ -96,8 +92,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333),
         city: 'São Paulo',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // when & then
@@ -119,8 +113,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333),
         city: 'São Paulo',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // when & then
@@ -142,8 +134,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333),
         city: 'São Paulo',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // when & then
@@ -165,8 +155,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333),
         city: 'São Paulo',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // when & then
@@ -188,8 +176,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333),
         city: 'São Paulo',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // when
@@ -209,8 +195,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333),
         city: 'São Paulo',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // when
@@ -238,8 +222,6 @@ void main() {
         location: const GeoPoint(0, 0),
         city: 'São Paulo',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // when & then
@@ -261,8 +243,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333), // São Paulo
         city: 'São Paulo',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // when
@@ -291,8 +271,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333),
         city: '',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // when & then
@@ -314,8 +292,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333),
         city: '   ',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // when & then

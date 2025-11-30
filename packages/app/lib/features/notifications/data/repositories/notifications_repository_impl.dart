@@ -1,6 +1,6 @@
+import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
 import 'package:flutter/foundation.dart';
 import 'package:wegig_app/features/notifications/data/datasources/notifications_remote_datasource.dart';
-import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
 import 'package:wegig_app/features/notifications/domain/repositories/notifications_repository.dart';
 
 /// Implementação do NotificationsRepository

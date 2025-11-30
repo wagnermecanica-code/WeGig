@@ -1527,10 +1527,11 @@ class _EditPostPageState extends State<EditPostPage> {
                                                 debugPrint(
                                                     'Erro ao buscar localização: $e');
                                               } finally {
-                                                if (mounted)
+                                                if (mounted) {
                                                   setState(() =>
                                                       _isSearchingLocation =
                                                           false);
+                                                }
                                               }
                                             });
                                           } else {

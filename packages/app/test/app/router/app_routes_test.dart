@@ -73,28 +73,28 @@ void main() {
 
     test('goToProfile should use correct route', () {
       const profileId = 'profile123';
-      final expectedRoute = '/profile/$profileId';
+      const expectedRoute = '/profile/$profileId';
 
       expect(AppRoutes.profile(profileId), expectedRoute);
     });
 
     test('goToPostDetail should use correct route', () {
       const postId = 'post456';
-      final expectedRoute = '/post/$postId';
+      const expectedRoute = '/post/$postId';
 
       expect(AppRoutes.postDetail(postId), expectedRoute);
     });
 
     test('goToConversation should use correct route', () {
       const conversationId = 'conv789';
-      final expectedRoute = '/conversation/$conversationId';
+      const expectedRoute = '/conversation/$conversationId';
 
       expect(AppRoutes.conversation(conversationId), expectedRoute);
     });
 
     test('goToEditProfile should use correct route', () {
       const profileId = 'profile123';
-      final expectedRoute = '/profile/$profileId/edit';
+      const expectedRoute = '/profile/$profileId/edit';
 
       expect(AppRoutes.editProfile(profileId), expectedRoute);
     });

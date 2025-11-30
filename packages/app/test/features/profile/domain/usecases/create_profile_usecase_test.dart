@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:wegig_app/features/profile/domain/usecases/create_profile.dart';
 
 import 'mock_profile_repository.dart';
@@ -24,8 +24,6 @@ void main() {
       location: const GeoPoint(-23.5505, -46.6333), // São Paulo
       city: 'São Paulo',
       createdAt: DateTime.now(),
-      notificationRadius: 20,
-      notificationRadiusEnabled: true,
     );
 
     test('should create profile when data is valid', () async {
@@ -54,8 +52,6 @@ void main() {
           location: const GeoPoint(-23.5505, -46.6333),
           city: 'São Paulo',
           createdAt: DateTime.now(),
-          notificationRadius: 20,
-          notificationRadiusEnabled: true,
         ),
       );
       mockRepository.setupExistingProfiles(existingProfiles);
@@ -81,8 +77,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333),
         city: 'São Paulo',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // Act & Assert
@@ -105,8 +99,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333),
         city: 'São Paulo',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // Act & Assert
@@ -129,8 +121,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333),
         city: 'São Paulo',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // Act & Assert
@@ -153,8 +143,6 @@ void main() {
         location: const GeoPoint(0, 0),
         city: 'São Paulo',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // Act & Assert
@@ -177,8 +165,6 @@ void main() {
         location: const GeoPoint(-23.5505, -46.6333),
         city: '',
         createdAt: DateTime.now(),
-        notificationRadius: 20,
-        notificationRadiusEnabled: true,
       );
 
       // Act & Assert

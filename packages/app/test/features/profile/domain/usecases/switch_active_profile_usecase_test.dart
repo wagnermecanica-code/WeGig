@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:wegig_app/features/profile/domain/usecases/switch_active_profile.dart';
 
 import 'mock_profile_repository.dart';
@@ -25,8 +25,6 @@ void main() {
       location: const GeoPoint(-23.5505, -46.6333),
       city: 'São Paulo',
       createdAt: DateTime.now(),
-      notificationRadius: 20,
-      notificationRadiusEnabled: true,
     );
 
     test('should switch active profile when profile exists and user is owner',
