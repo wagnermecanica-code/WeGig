@@ -519,47 +519,57 @@
 
 ---
 
-### Task 3.2: Refatorar Home Page (16h)
+### 🔄 Task 3.2: Refatorar Home Page (3h real vs 16h estimado) - EM PROGRESSO
 
-**Objetivo:** Quebrar home_page.dart (1600 linhas) em features menores
+**Objetivo:** Quebrar home_page.dart (1650 linhas) em features menores
 
 **Subtarefas:**
 
-#### Análise (2h)
+#### ✅ Análise (30min real vs 2h estimado)
 
-- [ ] Identificar responsabilidades:
-  - Feed/Carousel
-  - Map/Markers
-  - Search/Filters
-  - Geolocation
-  - Profile switcher
+- [x] Identificar responsabilidades: ✅
+  - Map/Markers (GoogleMap, MarkerCache)
+  - Search/Filters (Address search, Nominatim API)
+  - Interest Management (send/remove interests)
+  - Feed/Carousel (post cards, carousel)
 
-#### Extrair sub-features (12h)
+#### ✅ Extrair sub-features (2h real vs 12h estimado)
 
-- [ ] **MapFeature** (4h)
-  - [ ] `map_widget.dart`
-  - [ ] `map_controller.dart`
-  - [ ] `marker_builder.dart`
-- [ ] **FeedFeature** (4h)
-  - [ ] `feed_carousel.dart`
-  - [ ] `post_card.dart`
-  - [ ] `feed_controller.dart`
-- [ ] **SearchFeature** (4h)
-  - [ ] `search_bar_widget.dart`
-  - [ ] `filter_dialog.dart`
-  - [ ] `search_controller.dart`
+- [x] **MapFeature** ✅
+  - [x] `map_controller.dart` (77 linhas - estado do GoogleMap)
+  - [x] `marker_builder.dart` (37 linhas - criação de markers)
+- [x] **SearchFeature** ✅
+  - [x] `search_service.dart` (47 linhas - busca de endereços)
+- [x] **FeedFeature** ✅
+  - [x] `interest_service.dart` (61 linhas - lógica de interesses)
 
-#### Testar refactor (2h)
+#### 🔄 Integrar sub-features (30min real) - PARCIAL
+
+- [x] Substituir imports ✅
+- [x] Substituir _rebuildMarkers com MarkerBuilder ✅ (40 → 15 linhas, -62%)
+- [x] Substituir _onMarkerTapped com MapControllerWrapper ✅
+- [x] Substituir _fetchAddressSuggestions com SearchService ✅
+- [ ] Migrar todas refs _mapController → _mapControllerWrapper.controller (pendente)
+- [ ] Migrar todas refs _currentPos → _mapControllerWrapper.currentPosition (pendente)
+- [ ] Corrigir compilation errors (20 erros restantes)
+
+#### Testar refactor
 
 - [ ] Executar app e verificar funcionalidade
 - [ ] Adicionar testes unitários (5 testes por feature)
 
-**Entregáveis:**
+**Resultados Parciais:**
 
-- ✅ home_page.dart: 1600 → 400 linhas
-- ✅ 3 features isoladas e testáveis
+- ✅ Sub-features criadas: 4 arquivos, 222 linhas
+- ✅ home_page.dart: 1650 → 1584 linhas (-66, -4%)
+- 🔄 Target final: 400 linhas (-76% total)
+- ⚠️ 20 compilation errors (refs antigas _mapController, _currentPos)
 
-**Progresso:** Clean Architecture 98% → 100%
+**Progresso:** Clean Architecture 97% → 98% (parcial)
+
+**Commits:**
+- `aae440a` - Extract Map and Search sub-features
+- `1ea3e9e` - Integrate sub-features into home_page.dart (WIP)
 
 ---
 
