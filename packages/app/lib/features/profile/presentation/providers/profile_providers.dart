@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wegig_app/features/profile/data/datasources/profile_remote_datasource.dart';
 import 'package:wegig_app/features/profile/data/repositories/profile_repository_impl.dart';
@@ -14,54 +14,65 @@ import 'package:wegig_app/features/profile/domain/usecases/load_all_profiles.dar
 import 'package:wegig_app/features/profile/domain/usecases/get_active_profile.dart';
 import 'package:core_ui/profile_result.dart';
 
+part 'profile_providers.g.dart';
+
 /// ============================================
 /// DATA LAYER - Dependency Injection
 /// ============================================
 
 /// Provider para ProfileRemoteDataSource (singleton)
-final profileRemoteDataSourceProvider = Provider<ProfileRemoteDataSource>((ref) {
+@riverpod
+ProfileRemoteDataSource profileRemoteDataSource(ProfileRemoteDataSourceRef ref) {
   return ProfileRemoteDataSourceImpl();
-});
+}
 
 /// Provider para ProfileRepository (singleton)
-final profileRepositoryNewProvider = Provider<ProfileRepository>((ref) {
+@riverpod
+ProfileRepository profileRepositoryNew(ProfileRepositoryNewRef ref) {
   final dataSource = ref.watch(profileRemoteDataSourceProvider);
   return ProfileRepositoryImpl(remoteDataSource: dataSource);
-});
+}
 
 /// ============================================
 /// DOMAIN LAYER - UseCases
 /// ============================================
 
-final createProfileUseCaseProvider = Provider<CreateProfileUseCase>((ref) {
+@riverpod
+CreateProfileUseCase createProfileUseCase(CreateProfileUseCaseRef ref) {
   final repository = ref.watch(profileRepositoryNewProvider);
   return CreateProfileUseCase(repository);
-});
+}
 
-final updateProfileUseCaseProvider = Provider<UpdateProfileUseCase>((ref) {
+@riverpod
+UpdateProfileUseCase updateProfileUseCase(UpdateProfileUseCaseRef ref) {
   final repository = ref.watch(profileRepositoryNewProvider);
   return UpdateProfileUseCase(repository);
-});
+}
 
-final switchActiveProfileUseCaseProvider = Provider<SwitchActiveProfileUseCase>((ref) {
+@riverpod
+SwitchActiveProfileUseCase switchActiveProfileUseCase(
+    SwitchActiveProfileUseCaseRef ref) {
   final repository = ref.watch(profileRepositoryNewProvider);
   return SwitchActiveProfileUseCase(repository);
-});
+}
 
-final deleteProfileUseCaseProvider = Provider<DeleteProfileUseCase>((ref) {
+@riverpod
+DeleteProfileUseCase deleteProfileUseCase(DeleteProfileUseCaseRef ref) {
   final repository = ref.watch(profileRepositoryNewProvider);
   return DeleteProfileUseCase(repository);
-});
+}
 
-final loadAllProfilesUseCaseProvider = Provider<LoadAllProfilesUseCase>((ref) {
+@riverpod
+LoadAllProfilesUseCase loadAllProfilesUseCase(LoadAllProfilesUseCaseRef ref) {
   final repository = ref.watch(profileRepositoryNewProvider);
   return LoadAllProfilesUseCase(repository);
-});
+}
 
-final getActiveProfileUseCaseProvider = Provider<GetActiveProfileUseCase>((ref) {
+@riverpod
+GetActiveProfileUseCase getActiveProfileUseCase(GetActiveProfileUseCaseRef ref) {
   final repository = ref.watch(profileRepositoryNewProvider);
   return GetActiveProfileUseCase(repository);
-});
+}
 
 /// ============================================
 /// PRESENTATION LAYER - State Management
@@ -240,31 +251,35 @@ final profileProvider =
     AsyncNotifierProvider<ProfileNotifier, ProfileState>(ProfileNotifier.new);
 
 /// Provider para perfil ativo atual (null-safe)
-final activeProfileProvider = Provider<ProfileEntity?>((ref) {
+@riverpod
+ProfileEntity? activeProfile(ActiveProfileRef ref) {
   final AsyncValue<ProfileState> profileState = ref.watch(profileProvider);
   return profileState.maybeWhen(
     data: (ProfileState state) => state.activeProfile,
     orElse: () => null,
   );
-});
+}
 
 /// Provider para lista de perfis
-final profileListProvider = Provider<List<ProfileEntity>>((ref) {
+@riverpod
+List<ProfileEntity> profileList(ProfileListRef ref) {
   final AsyncValue<ProfileState> profileState = ref.watch(profileProvider);
   return profileState.maybeWhen(
     data: (ProfileState state) => state.profiles,
     orElse: () => <ProfileEntity>[],
   );
-});
+}
 
 /// Provider para verificar se tem múltiplos perfis
-final hasMultipleProfilesProvider = Provider<bool>((ref) {
+@riverpod
+bool hasMultipleProfiles(HasMultipleProfilesRef ref) {
   final profiles = ref.watch(profileListProvider);
   return profiles.length > 1;
-});
+}
 
 /// Provider para stream de mudanças de perfil
-final profileStreamProvider = StreamProvider<ProfileState>((ref) {
+@riverpod
+Stream<ProfileState> profileStream(ProfileStreamRef ref) {
   final notifier = ref.watch(profileProvider.notifier);
   return notifier.stream;
-});
+}
