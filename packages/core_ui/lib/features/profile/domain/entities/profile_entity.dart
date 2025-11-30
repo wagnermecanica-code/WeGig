@@ -1,34 +1,40 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:meta/meta.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:core_ui/core/json_converters.dart';
 
-/// Profile Entity - Immutable profile representation
-@immutable
-class ProfileEntity {
+part 'profile_entity.freezed.dart';
+part 'profile_entity.g.dart';
+
+/// Profile Entity - Immutable profile representation with Freezed
+@freezed
+class ProfileEntity with _$ProfileEntity {
+  const ProfileEntity._();
+
   /// Creates a new ProfileEntity
-  const ProfileEntity({
-    required this.profileId,
-    required this.uid,
-    required this.name,
-    required this.isBand,
-    required this.city,
-    required this.location,
-    required this.createdAt,
-    required this.notificationRadius,
-    required this.notificationRadiusEnabled,
-    this.photoUrl,
-    this.birthYear,
-    this.bio,
-    this.instruments,
-    this.genres,
-    this.level,
-    this.instagramLink,
-    this.tiktokLink,
-    this.youtubeLink,
-    this.neighborhood,
-    this.state,
-    this.bandMembers,
-    this.updatedAt,
-  });
+  const factory ProfileEntity({
+    required String profileId,
+    required String uid,
+    required String name,
+    required bool isBand,
+    required String city,
+    @GeoPointConverter() required GeoPoint location,
+    @TimestampConverter() required DateTime createdAt,
+    @Default(20.0) double notificationRadius,
+    @Default(true) bool notificationRadiusEnabled,
+    String? photoUrl,
+    int? birthYear,
+    String? bio,
+    List<String>? instruments,
+    List<String>? genres,
+    String? level,
+    String? instagramLink,
+    String? tiktokLink,
+    String? youtubeLink,
+    String? neighborhood,
+    String? state,
+    List<String>? bandMembers,
+    @NullableTimestampConverter() DateTime? updatedAt,
+  }) = _ProfileEntity;
 
   /// Creates ProfileEntity from Firestore document
   factory ProfileEntity.fromFirestore(
@@ -94,136 +100,9 @@ class ProfileEntity {
     );
   }
 
-  /// Creates ProfileEntity from JSON
-  factory ProfileEntity.fromJson(Map<String, dynamic> json) {
-    return ProfileEntity(
-      profileId: json['profileId'] as String,
-      uid: json['uid'] as String,
-      name: json['name'] as String,
-      isBand: json['isBand'] as bool,
-      city: json['city'] as String,
-      location: json['location'] is GeoPoint
-          ? json['location'] as GeoPoint
-          : GeoPoint(
-              (json['location']['latitude'] as num).toDouble(),
-              (json['location']['longitude'] as num).toDouble(),
-            ),
-      createdAt: json['createdAt'] is DateTime
-          ? json['createdAt'] as DateTime
-          : (json['createdAt'] as Timestamp).toDate(),
-      notificationRadius: (json['notificationRadius'] as num).toDouble(),
-      notificationRadiusEnabled: json['notificationRadiusEnabled'] as bool,
-      photoUrl: json['photoUrl'] as String?,
-      birthYear: json['birthYear'] as int?,
-      bio: json['bio'] as String?,
-      instruments: (json['instruments'] as List<dynamic>?)?.cast<String>(),
-      genres: (json['genres'] as List<dynamic>?)?.cast<String>(),
-      level: json['level'] as String?,
-      instagramLink: json['instagramLink'] as String?,
-      tiktokLink: json['tiktokLink'] as String?,
-      youtubeLink: json['youtubeLink'] as String?,
-      neighborhood: json['neighborhood'] as String?,
-      state: json['state'] as String?,
-      bandMembers: (json['bandMembers'] as List<dynamic>?)?.cast<String>(),
-      updatedAt: json['updatedAt'] is DateTime?
-          ? json['updatedAt'] as DateTime?
-          : (json['updatedAt'] as Timestamp?)?.toDate(),
-    );
-  }
-
-  /// Unique profile identifier
-  final String profileId;
-
-  /// Firebase Auth user ID
-  final String uid;
-
-  /// Profile display name
-  final String name;
-
-  /// Whether this is a band profile
-  final bool isBand;
-
-  /// City location
-  final String city;
-
-  /// Geographic location
-  final GeoPoint location;
-
-  /// Profile creation timestamp
-  final DateTime createdAt;
-
-  /// Notification radius in kilometers
-  final double notificationRadius;
-
-  /// Whether notification radius is enabled
-  final bool notificationRadiusEnabled;
-
-  /// Profile photo URL
-  final String? photoUrl;
-
-  /// Birth year
-  final int? birthYear;
-
-  /// Biography
-  final String? bio;
-
-  /// Musical instruments
-  final List<String>? instruments;
-
-  /// Musical genres
-  final List<String>? genres;
-
-  /// Skill level
-  final String? level;
-
-  /// Instagram profile link
-  final String? instagramLink;
-
-  /// TikTok profile link
-  final String? tiktokLink;
-
-  /// YouTube channel link
-  final String? youtubeLink;
-
-  /// Neighborhood
-  final String? neighborhood;
-
-  /// State
-  final String? state;
-
-  /// Band members list
-  final List<String>? bandMembers;
-
-  /// Last update timestamp
-  final DateTime? updatedAt;
-
-  /// Converts ProfileEntity to JSON
-  Map<String, dynamic> toJson() {
-    return {
-      'profileId': profileId,
-      'uid': uid,
-      'name': name,
-      'isBand': isBand,
-      'city': city,
-      'location': location,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'notificationRadius': notificationRadius,
-      'notificationRadiusEnabled': notificationRadiusEnabled,
-      if (photoUrl != null) 'photoUrl': photoUrl,
-      if (birthYear != null) 'birthYear': birthYear,
-      if (bio != null) 'bio': bio,
-      if (instruments != null) 'instruments': instruments,
-      if (genres != null) 'genres': genres,
-      if (level != null) 'level': level,
-      if (instagramLink != null) 'instagramLink': instagramLink,
-      if (tiktokLink != null) 'tiktokLink': tiktokLink,
-      if (youtubeLink != null) 'youtubeLink': youtubeLink,
-      if (neighborhood != null) 'neighborhood': neighborhood,
-      if (state != null) 'state': state,
-      if (bandMembers != null) 'bandMembers': bandMembers,
-      if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
-    };
-  }
+  /// Creates ProfileEntity from JSON - generated by freezed
+  factory ProfileEntity.fromJson(Map<String, dynamic> json) =>
+      _$ProfileEntityFromJson(json);
 
   /// Converts ProfileEntity to Firestore map (without profileId)
   Map<String, dynamic> toFirestore() {
@@ -243,69 +122,7 @@ class ProfileEntity {
     };
   }
 
-  /// Creates a copy with modified fields
-  ProfileEntity copyWith({
-    String? profileId,
-    String? uid,
-    String? name,
-    bool? isBand,
-    String? city,
-    GeoPoint? location,
-    DateTime? createdAt,
-    double? notificationRadius,
-    bool? notificationRadiusEnabled,
-    String? photoUrl,
-    int? birthYear,
-    String? bio,
-    List<String>? instruments,
-    List<String>? genres,
-    String? level,
-    String? instagramLink,
-    String? tiktokLink,
-    String? youtubeLink,
-    String? neighborhood,
-    String? state,
-    List<String>? bandMembers,
-    DateTime? updatedAt,
-  }) {
-    return ProfileEntity(
-      profileId: profileId ?? this.profileId,
-      uid: uid ?? this.uid,
-      name: name ?? this.name,
-      isBand: isBand ?? this.isBand,
-      city: city ?? this.city,
-      location: location ?? this.location,
-      createdAt: createdAt ?? this.createdAt,
-      notificationRadius: notificationRadius ?? this.notificationRadius,
-      notificationRadiusEnabled:
-          notificationRadiusEnabled ?? this.notificationRadiusEnabled,
-      photoUrl: photoUrl ?? this.photoUrl,
-      birthYear: birthYear ?? this.birthYear,
-      bio: bio ?? this.bio,
-      instruments: instruments ?? this.instruments,
-      genres: genres ?? this.genres,
-      level: level ?? this.level,
-      instagramLink: instagramLink ?? this.instagramLink,
-      tiktokLink: tiktokLink ?? this.tiktokLink,
-      youtubeLink: youtubeLink ?? this.youtubeLink,
-      neighborhood: neighborhood ?? this.neighborhood,
-      state: state ?? this.state,
-      bandMembers: bandMembers ?? this.bandMembers,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ProfileEntity &&
-          runtimeType == other.runtimeType &&
-          profileId == other.profileId &&
-          uid == other.uid;
-
-  @override
-  int get hashCode => profileId.hashCode ^ uid.hashCode;
-
+  // Computed properties (getters)
   int? get age {
     if (birthYear == null) return null;
     return DateTime.now().year - birthYear!;
