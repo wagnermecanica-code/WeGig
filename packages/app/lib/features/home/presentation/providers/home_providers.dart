@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:riverpod/src/providers/stream_provider.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:wegig_app/features/home/data/repositories/home_repository_impl.dart';
 import 'package:wegig_app/features/home/domain/repositories/home_repository.dart';
 import 'package:wegig_app/features/home/domain/usecases/load_nearby_posts.dart';
@@ -10,15 +9,19 @@ import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 
+part 'home_providers.g.dart';
+
 // ========================= DATA LAYER =========================
 
 /// Provider para Firestore instance
-final firestoreProvider = Provider<FirebaseFirestore>((ref) {
+@riverpod
+FirebaseFirestore firestore(FirestoreRef ref) {
   return FirebaseFirestore.instance;
-});
+}
 
 /// Provider para HomeRepository
-final homeRepositoryProvider = Provider<HomeRepository>((ref) {
+@riverpod
+HomeRepository homeRepository(HomeRepositoryRef ref) {
   final postRepository = ref.watch(postRepositoryNewProvider);
   final firestore = ref.watch(firestoreProvider);
 
@@ -26,28 +29,31 @@ final homeRepositoryProvider = Provider<HomeRepository>((ref) {
     postRepository: postRepository,
     firestore: firestore,
   );
-});
+}
 
 // ========================= USE CASES =========================
 
 /// Provider para LoadNearbyPostsUseCase
-final loadNearbyPostsUseCaseProvider = Provider<LoadNearbyPostsUseCase>((ref) {
+@riverpod
+LoadNearbyPostsUseCase loadNearbyPostsUseCase(LoadNearbyPostsUseCaseRef ref) {
   final repository = ref.watch(homeRepositoryProvider);
   return LoadNearbyPostsUseCase(repository);
-});
+}
 
 /// Provider para LoadPostsByGenresUseCase
-final loadPostsByGenresUseCaseProvider =
-    Provider<LoadPostsByGenresUseCase>((ref) {
+@riverpod
+LoadPostsByGenresUseCase loadPostsByGenresUseCase(
+    LoadPostsByGenresUseCaseRef ref) {
   final repository = ref.watch(homeRepositoryProvider);
   return LoadPostsByGenresUseCase(repository);
-});
+}
 
 /// Provider para SearchProfilesUseCase
-final searchProfilesUseCaseProvider = Provider<SearchProfilesUseCase>((ref) {
+@riverpod
+SearchProfilesUseCase searchProfilesUseCase(SearchProfilesUseCaseRef ref) {
   final repository = ref.watch(homeRepositoryProvider);
   return SearchProfilesUseCase(repository);
-});
+}
 
 // ========================= PRESENTATION LAYER =========================
 
@@ -262,9 +268,11 @@ final profileSearchProvider =
 // ========================= STREAMS =========================
 
 /// Provider para stream de posts próximos (tempo real)
-final StreamProviderFamily<List<PostEntity>, Map<String, double>>
-    nearbyPostsStreamProvider =
-    StreamProvider.family<List<PostEntity>, Map<String, double>>((ref, params) {
+@riverpod
+Stream<List<PostEntity>> nearbyPostsStream(
+  NearbyPostsStreamRef ref,
+  Map<String, double> params,
+) {
   final repository = ref.watch(homeRepositoryProvider);
 
   final latitude = params['latitude'] ?? 0.0;
@@ -276,4 +284,4 @@ final StreamProviderFamily<List<PostEntity>, Map<String, double>>
     longitude: longitude,
     radiusKm: radiusKm,
   );
-});
+}
