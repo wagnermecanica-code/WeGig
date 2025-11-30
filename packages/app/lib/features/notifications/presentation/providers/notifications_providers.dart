@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:riverpod/src/providers/stream_provider.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:wegig_app/features/notifications/data/datasources/notifications_remote_datasource.dart';
 import 'package:wegig_app/features/notifications/data/repositories/notifications_repository_impl.dart';
 import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
@@ -12,84 +11,99 @@ import 'package:wegig_app/features/notifications/domain/usecases/load_notificati
 import 'package:wegig_app/features/notifications/domain/usecases/mark_all_notifications_as_read.dart';
 import 'package:wegig_app/features/notifications/domain/usecases/mark_notification_as_read.dart';
 
+part 'notifications_providers.g.dart';
+
 // ============================================================================
 // DATA LAYER PROVIDERS
 // ============================================================================
 
 /// Provider para FirebaseFirestore instance
-final firestoreProvider = Provider<FirebaseFirestore>((ref) {
+@riverpod
+FirebaseFirestore firestore(FirestoreRef ref) {
   return FirebaseFirestore.instance;
-});
+}
 
 /// Provider para NotificationsRemoteDataSource
-final notificationsRemoteDataSourceProvider =
-    Provider<INotificationsRemoteDataSource>((ref) {
+@riverpod
+INotificationsRemoteDataSource notificationsRemoteDataSource(
+    NotificationsRemoteDataSourceRef ref) {
   return NotificationsRemoteDataSource();
-});
+}
 
 /// Provider para NotificationsRepository (nova implementação Clean Architecture)
-final notificationsRepositoryNewProvider =
-    Provider<NotificationsRepository>((ref) {
+@riverpod
+NotificationsRepository notificationsRepositoryNew(
+    NotificationsRepositoryNewRef ref) {
   final dataSource = ref.watch(notificationsRemoteDataSourceProvider);
   return NotificationsRepositoryImpl(remoteDataSource: dataSource);
-});
+}
 
 // ============================================================================
 // USE CASE PROVIDERS
 // ============================================================================
 
-final loadNotificationsUseCaseProvider = Provider<LoadNotifications>((ref) {
+@riverpod
+LoadNotifications loadNotificationsUseCase(LoadNotificationsUseCaseRef ref) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return LoadNotifications(repository);
-});
+}
 
-final markNotificationAsReadUseCaseProvider =
-    Provider<MarkNotificationAsRead>((ref) {
+@riverpod
+MarkNotificationAsRead markNotificationAsReadUseCase(
+    MarkNotificationAsReadUseCaseRef ref) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return MarkNotificationAsRead(repository);
-});
+}
 
-final markAllNotificationsAsReadUseCaseProvider =
-    Provider<MarkAllNotificationsAsRead>((ref) {
+@riverpod
+MarkAllNotificationsAsRead markAllNotificationsAsReadUseCase(
+    MarkAllNotificationsAsReadUseCaseRef ref) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return MarkAllNotificationsAsRead(repository);
-});
+}
 
-final deleteNotificationUseCaseProvider = Provider<DeleteNotification>((ref) {
+@riverpod
+DeleteNotification deleteNotificationUseCase(DeleteNotificationUseCaseRef ref) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return DeleteNotification(repository);
-});
+}
 
-final createNotificationUseCaseProvider = Provider<CreateNotification>((ref) {
+@riverpod
+CreateNotification createNotificationUseCase(CreateNotificationUseCaseRef ref) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return CreateNotification(repository);
-});
+}
 
-final getUnreadNotificationCountUseCaseProvider =
-    Provider<GetUnreadNotificationCount>((ref) {
+@riverpod
+GetUnreadNotificationCount getUnreadNotificationCountUseCase(
+    GetUnreadNotificationCountUseCaseRef ref) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return GetUnreadNotificationCount(repository);
-});
+}
 
 // ============================================================================
 // STREAM PROVIDERS FOR REAL-TIME UPDATES
 // ============================================================================
 
 /// Stream de notificações em tempo real
-final StreamProviderFamily<List<NotificationEntity>, String>
-    notificationsStreamProvider =
-    StreamProvider.family<List<NotificationEntity>, String>((ref, profileId) {
+@riverpod
+Stream<List<NotificationEntity>> notificationsStream(
+  NotificationsStreamRef ref,
+  String profileId,
+) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return repository.watchNotifications(profileId: profileId);
-});
+}
 
 /// Stream de contador de não lidas para BottomNav badge
-final StreamProviderFamily<int, String>
-    unreadNotificationCountForProfileProvider =
-    StreamProvider.family<int, String>((ref, profileId) {
+@riverpod
+Stream<int> unreadNotificationCountForProfile(
+  UnreadNotificationCountForProfileRef ref,
+  String profileId,
+) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
   return repository.watchUnreadCount(profileId: profileId);
-});
+}
 
 // ============================================================================
 // HELPER FUNCTIONS FOR USE CASES
