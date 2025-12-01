@@ -274,50 +274,74 @@ nav a:hover {
   margin-top: 1rem;
 }
 
-/* Legal Section */
-.legal {
+/* Posts Feed Section */
+.posts-feed {
   padding: 4rem 0;
+  background-color: var(--light-color);
 }
 
-.legal h2 {
+.posts-feed h2 {
   text-align: center;
   font-size: 2rem;
-  margin-bottom: 3rem;
+  margin-bottom: 0.5rem;
   color: var(--dark-color);
 }
 
-.legal-links {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
+.posts-feed .section-subtitle {
+  text-align: center;
+  color: var(--text-secondary);
+  margin-bottom: 3rem;
+  font-size: 1.1rem;
 }
 
-.legal-card {
-  padding: 2rem;
+.posts-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.coming-soon-message {
   background: white;
   border-radius: 16px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-  text-decoration: none;
-  color: inherit;
-  transition: all 0.3s;
-  border: 2px solid transparent;
+  padding: 4rem 2rem;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 2px dashed var(--border);
 }
 
-.legal-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
-  border-color: var(--primary-color);
-}
-
-.legal-card h3 {
-  color: var(--primary-color);
+.coming-soon-message .icon {
+  font-size: 4rem;
   margin-bottom: 1rem;
-  font-size: 1.5rem;
+  animation: pulse 2s ease-in-out infinite;
 }
 
-.legal-card p {
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.coming-soon-message h3 {
+  color: var(--primary-color);
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+}
+
+.coming-soon-message p {
   color: var(--text-secondary);
-  line-height: 1.6;
+  font-size: 1.1rem;
+  line-height: 1.8;
+  margin-bottom: 2rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.coming-soon-message .btn {
+  margin-top: 1rem;
 }
 
 /* Footer */
