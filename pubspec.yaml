@@ -24,6 +24,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ">=6.0.0 <7.0.0"
+  melos: ^6.2.0
 # NOTA: Este pubspec é apenas para o workspace raiz do monorepo.
 # As dependências reais do app estão em packages/app/pubspec.yaml
 # As dependências compartilhadas de UI estão em packages/core_ui/pubspec.yaml
