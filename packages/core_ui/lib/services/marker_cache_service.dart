@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Service para cachear BitmapDescriptor de markers
 /// 
@@ -92,7 +93,7 @@ class MarkerCacheService {
     }
 
     // Ícone centralizado (Material Design)
-    final icon = type == 'band' ? Icons.group : Icons.music_note;
+    final icon = type == 'band' ? Iconsax.people : Iconsax.musicnote;
     final textPainter = TextPainter(
       text: TextSpan(
         text: String.fromCharCode(icon.codePoint),

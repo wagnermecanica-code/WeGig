@@ -93,7 +93,7 @@ DeleteConversation deleteConversationUseCase(Ref ref) {
 /// Stream de conversas em tempo real
 @riverpod
 Stream<List<ConversationEntity>> conversationsStream(
-  ConversationsStreamRef ref,
+  Ref ref,
   String profileId,
 ) {
   final repository = ref.watch(messagesRepositoryNewProvider);
@@ -103,7 +103,7 @@ Stream<List<ConversationEntity>> conversationsStream(
 /// Stream de mensagens em tempo real
 @riverpod
 Stream<List<MessageEntity>> messagesStream(
-  MessagesStreamRef ref,
+  Ref ref,
   String conversationId,
 ) {
   final repository = ref.watch(messagesRepositoryNewProvider);
@@ -113,7 +113,7 @@ Stream<List<MessageEntity>> messagesStream(
 /// Stream de contador de não lidas para BottomNav badge
 @riverpod
 Stream<int> unreadMessageCountForProfile(
-  UnreadMessageCountForProfileRef ref,
+  Ref ref,
   String profileId,
 ) {
   final repository = ref.watch(messagesRepositoryNewProvider);

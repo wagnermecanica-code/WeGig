@@ -1,3 +1,5 @@
+import 'location_utils.dart';
+
 /// Gerador de deep links para compartilhamento
 class DeepLinkGenerator {
   // Base URL do app (ajustar quando tiver domínio registrado)
@@ -25,16 +27,26 @@ class DeepLinkGenerator {
     required String city,
     required String userId,
     required String profileId,
+    String? neighborhood,
+    String? state,
     List<String> instruments = const [],
     List<String> genres = const [],
   }) {
     final tipo = isBand ? 'Banda' : 'Músico';
     final link = generateProfileLink(userId: userId, profileId: profileId);
-    
+    final locationText = formatCleanLocation(
+      neighborhood: neighborhood,
+      city: city,
+      state: state,
+      fallback: city,
+    );
+
     String message = '🎵 Confira este perfil no WeGig!\n\n';
     message += '📛 $name\n';
     message += '🎸 Tipo: $tipo\n';
-    message += '📍 $city\n';
+    if (locationText.isNotEmpty) {
+      message += '📍 $locationText\n';
+    }
     
     if (instruments.isNotEmpty) {
       message += '🎹 Instrumentos: ${instruments.join(", ")}\n';
@@ -56,19 +68,29 @@ class DeepLinkGenerator {
     required String authorName,
     required String postType,
     required String city,
+    String? neighborhood,
+    String? state,
     String? content,
     List<String> instruments = const [],
     List<String> genres = const [],
   }) {
     final link = generatePostLink(postId: postId);
-    
+    final locationText = formatCleanLocation(
+      neighborhood: neighborhood,
+      city: city,
+      state: state,
+      fallback: city,
+    );
+
     String message;
     
     if (postType == 'band') {
       // Banda procurando músicos
-      message = '🎵 Banda procurando músicos no Tô Sem Banda!\n\n';
+      message = '🎵 Banda procurando músicos no WeGig!\n\n';
       message += '🎸 Banda: $authorName\n';
-      message += '📍 $city\n';
+      if (locationText.isNotEmpty) {
+        message += '📍 $locationText\n';
+      }
       
       if (content != null && content.isNotEmpty) {
         message += '\n💬 "$content"\n';
@@ -83,9 +105,11 @@ class DeepLinkGenerator {
       }
     } else {
       // Músico procurando banda
-      message = '🎵 Músico procurando banda no Tô Sem Banda!\n\n';
+      message = '🎵 Músico procurando banda no WeGig!\n\n';
       message += '👤 $authorName\n';
-      message += '📍 $city\n';
+      if (locationText.isNotEmpty) {
+        message += '📍 $locationText\n';
+      }
       
       if (content != null && content.isNotEmpty) {
         message += '\n💬 "$content"\n';

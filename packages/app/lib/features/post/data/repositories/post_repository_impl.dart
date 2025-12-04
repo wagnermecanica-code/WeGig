@@ -6,6 +6,7 @@ import 'package:wegig_app/features/post/domain/repositories/post_repository.dart
 /// Implementação do PostRepository
 /// Conecta o domain layer com o data layer (datasource)
 class PostRepositoryImpl implements PostRepository {
+  /// Cria uma instância de PostRepositoryImpl
   PostRepositoryImpl({
     required IPostRemoteDataSource remoteDataSource,
   }) : _remoteDataSource = remoteDataSource;
@@ -96,6 +97,20 @@ class PostRepositoryImpl implements PostRepository {
       debugPrint('✅ PostRepository: Post deletado com sucesso');
     } catch (e) {
       debugPrint('❌ PostRepository: Erro em deletePost - $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<bool> isPostOwner(String postId, String profileId) async {
+    try {
+      final post = await _remoteDataSource.getPostById(postId);
+      if (post == null) {
+        return false;
+      }
+      return post.authorProfileId == profileId;
+    } catch (e) {
+      debugPrint('❌ PostRepository: Erro em isPostOwner - $e');
       rethrow;
     }
   }

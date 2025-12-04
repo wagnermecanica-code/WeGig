@@ -65,18 +65,21 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
       var query = _firestore
           .collection('conversations')
           .where('participantProfiles', arrayContains: profileId)
-          .where('archived', isEqualTo: false)
-          .orderBy('lastMessageTimestamp', descending: true)
           .limit(limit);
 
       if (startAfter != null) {
         query = query
-            .startAfter([Timestamp.fromDate(startAfter.lastMessageTimestamp)]);
+            .startAfter([startAfter.id]);
       }
 
       final snapshot = await query.get();
-      final conversations =
-          snapshot.docs.map(ConversationEntity.fromFirestore).toList();
+        final conversations = snapshot.docs
+          .map(ConversationEntity.fromFirestore)
+          .where(
+          (conversation) =>
+            !conversation.archivedProfileIds.contains(profileId),
+          )
+          .toList();
 
       debugPrint(
           '✅ MessagesDataSource: ${conversations.length} conversas carregadas');
@@ -303,9 +306,9 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
     try {
       debugPrint(
           '🗑️ MessagesDataSource: deleteConversation - conversationId=$conversationId');
-      // Soft delete - marca como archived apenas para este perfil
+
       await _firestore.collection('conversations').doc(conversationId).update({
-        'archived': true,
+        'archivedProfileIds': FieldValue.arrayUnion([profileId]),
       });
     } catch (e) {
       debugPrint('❌ MessagesDataSource: Erro em deleteConversation - $e');
@@ -319,12 +322,14 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
       final snapshot = await _firestore
           .collection('conversations')
           .where('participantProfiles', arrayContains: profileId)
-          .where('archived', isEqualTo: false)
           .get();
 
       var total = 0;
       for (final doc in snapshot.docs) {
         final conv = ConversationEntity.fromFirestore(doc);
+        if (conv.archivedProfileIds.contains(profileId)) {
+          continue;
+        }
         total += conv.getUnreadCountForProfile(profileId);
       }
 
@@ -341,11 +346,16 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
     return _firestore
         .collection('conversations')
         .where('participantProfiles', arrayContains: profileId)
-        .where('archived', isEqualTo: false)
-        .orderBy('lastMessageTimestamp', descending: true)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map(ConversationEntity.fromFirestore).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(ConversationEntity.fromFirestore)
+              .where(
+                (conversation) =>
+                    !conversation.archivedProfileIds.contains(profileId),
+              )
+              .toList(),
+        );
   }
 
   @override
@@ -366,12 +376,14 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
     return _firestore
         .collection('conversations')
         .where('participantProfiles', arrayContains: profileId)
-        .where('archived', isEqualTo: false)
         .snapshots()
         .map((snapshot) {
       var total = 0;
       for (final doc in snapshot.docs) {
         final conv = ConversationEntity.fromFirestore(doc);
+        if (conv.archivedProfileIds.contains(profileId)) {
+          continue;
+        }
         total += conv.getUnreadCountForProfile(profileId);
       }
       return total;

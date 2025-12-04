@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>development</string>
+    <!-- Opções: development, ad-hoc, app-store, enterprise -->
+    <!-- Para App Store, altere para: app-store -->
+    
+    <key>teamID</key>
+    <string>6PP9UL45V7</string>
+    <!-- Será atualizado automaticamente no CI/CD com secrets.APPLE_DEVELOPER_TEAM_ID -->
+    
+    <key>signingStyle</key>
+    <string>manual</string>
+    <!-- manual = usa provisioning profile específico -->
+    <!-- automatic = deixa Xcode escolher automaticamente -->
+    
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>com.wegig.app.dev</key>
+        <string>WeGig Development Profile</string>
+        
+        <key>com.wegig.app.staging</key>
+        <string>WeGig Staging Profile</string>
+        
+        <key>com.wegig.app</key>
+        <string>WeGig Production Profile</string>
+    </dict>
+    
+    <key>compileBitcode</key>
+    <false/>
+    
+    <key>uploadBitcode</key>
+    <false/>
+    
+    <key>uploadSymbols</key>
+    <true/>
+    
+    <key>signingCertificate</key>
+    <string>iPhone Developer</string>
+    <!-- Para App Store use: iPhone Distribution -->
+    
+    <key>stripSwiftSymbols</key>
+    <true/>
+    
+    <key>thinning</key>
+    <string>&lt;none&gt;</string>
+</dict>
+</plist>

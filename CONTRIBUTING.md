@@ -1,4 +1,4 @@
-# Guia de Contribuição - Tô Sem Banda
+# Guia de Contribuição - WeGig
 
 Obrigado por considerar contribuir para o **WeGig**! Este documento fornece diretrizes para manter a qualidade e consistência do código.
 

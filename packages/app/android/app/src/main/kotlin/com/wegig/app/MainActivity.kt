@@ -1,4 +1,4 @@
-package com.example.to_sem_banda
+package com.wegig.app
 
 import io.flutter.embedding.android.FlutterActivity
 

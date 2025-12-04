@@ -195,7 +195,7 @@ final deleteConversationUseCaseProvider =
 typedef DeleteConversationUseCaseRef
     = AutoDisposeProviderRef<DeleteConversation>;
 String _$conversationsStreamHash() =>
-    r'6ea8e9b45b816fc4b078fcb352bc84017915b2fe';
+    r'8a0ddf8c5543771a553c319adf1df04c2d9e6bd7';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -363,7 +363,7 @@ class _ConversationsStreamProviderElement
   String get profileId => (origin as ConversationsStreamProvider).profileId;
 }
 
-String _$messagesStreamHash() => r'7fb46bada6568e40afb919dc87f16289219a251a';
+String _$messagesStreamHash() => r'53d85537f9bbb5befbab58fdcacb56a9fbafa182';
 
 /// Stream de mensagens em tempo real
 ///
@@ -510,7 +510,7 @@ class _MessagesStreamProviderElement
 }
 
 String _$unreadMessageCountForProfileHash() =>
-    r'db1b340c88290265166e7971b2a3656fc2517b71';
+    r'271e3bc160cfbf5c694121ab39ba49fe291c7fd1';
 
 /// Stream de contador de não lidas para BottomNav badge
 ///

@@ -74,7 +74,7 @@ context.pushEditProfile(String profileId);
 // Access route paths directly
 AppRoutes.home                  // '/home'
 AppRoutes.auth                  // '/auth'
-AppRoutes.createProfile         // '/create-profile'
+AppRoutes.createProfile         // '/profiles/new'
 AppRoutes.profile(id)           // '/profile/:id'
 AppRoutes.postDetail(id)        // '/post/:id'
 AppRoutes.conversation(id)      // '/conversation/:id'
@@ -108,7 +108,7 @@ context.goToPostDetail(postId);
 O router tem redirect automático:
 
 - **Não autenticado** → Vai para `/auth`
-- **Autenticado sem perfil** → Vai para `/create-profile`
+- **Autenticado sem perfil** → Vai para `/profiles/new`
 - **Autenticado com perfil** → Acesso livre a todas as rotas
 
 ## Error Handling

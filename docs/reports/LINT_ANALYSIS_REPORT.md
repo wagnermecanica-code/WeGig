@@ -629,13 +629,13 @@ ScaffoldMessenger.of(context).showSnackBar(snackBar);
 
 ### Very Good Ventures (Padrão de Referência)
 
-| Métrica       | Very Good | Tô Sem Banda (Atual) | Tô Sem Banda (Projetado) | Status       |
-| ------------- | --------- | -------------------- | ------------------------ | ------------ |
-| Warnings      | <10       | 109                  | 25                       | ⚠️ Aceitável |
-| Infos/KLOC    | <50       | ~127                 | ~25                      | ✅ Excelente |
-| Docs Coverage | >90%      | 15%                  | 85%                      | ✅ Bom       |
-| Type Safety   | >95%      | 60%                  | 95%                      | ✅ Excelente |
-| Const Usage   | >80%      | 20%                  | 75%                      | ✅ Bom       |
+| Métrica       | Very Good | WeGig (Atual) | WeGig (Projetado) | Status       |
+| ------------- | --------- | ------------- | ----------------- | ------------ |
+| Warnings      | <10       | 109           | 25                | ⚠️ Aceitável |
+| Infos/KLOC    | <50       | ~127          | ~25               | ✅ Excelente |
+| Docs Coverage | >90%      | 15%           | 85%               | ✅ Bom       |
+| Type Safety   | >95%      | 60%           | 95%               | ✅ Excelente |
+| Const Usage   | >80%      | 20%           | 75%               | ✅ Bom       |
 
 **KLOC = Linhas de código / 1000** (packages/app ≈ 15.000 LOC)
 

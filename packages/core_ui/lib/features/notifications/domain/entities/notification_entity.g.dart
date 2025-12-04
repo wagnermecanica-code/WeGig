@@ -22,6 +22,7 @@ _$NotificationEntityImpl _$$NotificationEntityImplFromJson(
       senderUid: json['senderUid'] as String?,
       senderProfileId: json['senderProfileId'] as String?,
       senderName: json['senderName'] as String?,
+      senderUsername: json['senderUsername'] as String?,
       senderPhoto: json['senderPhoto'] as String?,
       data: json['data'] as Map<String, dynamic>? ?? const {},
       actionType: const NullableNotificationActionTypeConverter()
@@ -49,6 +50,7 @@ Map<String, dynamic> _$$NotificationEntityImplToJson(
       'senderUid': instance.senderUid,
       'senderProfileId': instance.senderProfileId,
       'senderName': instance.senderName,
+      'senderUsername': instance.senderUsername,
       'senderPhoto': instance.senderPhoto,
       'data': instance.data,
       'actionType': const NullableNotificationActionTypeConverter()

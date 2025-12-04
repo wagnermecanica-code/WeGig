@@ -76,8 +76,8 @@ flavors:
 
 # ========== CONFIGURAÇÕES GLOBAIS ==========
 instructions:
-  - android:androidManifest
-  - android:buildGradle
+  # - android:androidManifest
+  # - android:buildGradle
   - flutter:flavors
   - flutter:targets
   - ios:xcconfig

@@ -13,6 +13,7 @@ _$ProfileEntityImpl _$$ProfileEntityImplFromJson(Map<String, dynamic> json) =>
       profileId: json['profileId'] as String,
       uid: json['uid'] as String,
       name: json['name'] as String,
+      username: json['username'] as String?,
       isBand: json['isBand'] as bool,
       city: json['city'] as String,
       location: const GeoPointConverter()
@@ -48,6 +49,7 @@ Map<String, dynamic> _$$ProfileEntityImplToJson(_$ProfileEntityImpl instance) =>
       'profileId': instance.profileId,
       'uid': instance.uid,
       'name': instance.name,
+      'username': instance.username,
       'isBand': instance.isBand,
       'city': instance.city,
       'location': const GeoPointConverter().toJson(instance.location),

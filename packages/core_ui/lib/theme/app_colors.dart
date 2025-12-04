@@ -35,6 +35,9 @@ class AppColors {
   static const Color error = Color(0xFFE53935);
   static const Color warning = Color(0xFFFB8C00);
 
+  // Badge Counters
+  static const Color badgeRed = Color(0xFFFF2828);
+
   // MaterialColor Swatch - Primary (#37475A)
   static MaterialColor get primarySwatch => const MaterialColor(
         0xFF37475A,

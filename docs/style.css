@@ -25,6 +25,14 @@ body {
   background-color: var(--background);
 }
 
+img {
+  image-rendering: auto;
+  image-rendering: -webkit-optimize-contrast;
+  -ms-interpolation-mode: bicubic;
+  max-width: 100%;
+  height: auto;
+}
+
 .container {
   max-width: 1200px;
   margin: 0 auto;
@@ -51,6 +59,8 @@ header .container {
   height: 90px;
   width: auto;
   display: block;
+  image-rendering: auto;
+  image-rendering: -webkit-optimize-contrast;
 }
 
 @media (max-width: 768px) {
@@ -367,7 +377,8 @@ footer {
   height: 75px;
   width: auto;
   margin-bottom: 1rem;
-  filter: brightness(0) invert(1);
+  image-rendering: auto;
+  image-rendering: -webkit-optimize-contrast;
 }
 
 .footer-section ul {

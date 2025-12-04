@@ -5,6 +5,24 @@
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES">
+      <PreActions>
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Set Flutter Target"
+               scriptText = "#!/bin/bash&#10;echo &quot;🎯 Setting FLUTTER_TARGET for PRODUCTION flavor&quot;&#10;ENV_FILE=&quot;${SRCROOT}/Flutter/flutter_export_environment.sh&quot;&#10;# Remove the line with FLUTTER_TARGET and add correct one&#10;grep -v &apos;^export &quot;FLUTTER_TARGET&apos; &quot;$ENV_FILE&quot; &gt; &quot;$ENV_FILE.tmp&quot;&#10;echo &apos;export &quot;FLUTTER_TARGET=lib/main_prod.dart&quot;&apos; &gt;&gt; &quot;$ENV_FILE.tmp&quot;&#10;mv &quot;$ENV_FILE.tmp&quot; &quot;$ENV_FILE&quot;&#10;echo &quot;✅ FLUTTER_TARGET set to lib/main_prod.dart&quot;&#10;">
+               <EnvironmentBuildable>
+                  <BuildableReference
+                     BuildableIdentifier = "primary"
+                     BlueprintIdentifier = "97C146ED1CF9000F007C117D"
+                     BuildableName = "Runner.app"
+                     BlueprintName = "Runner"
+                     ReferencedContainer = "container:Runner.xcodeproj">
+                  </BuildableReference>
+               </EnvironmentBuildable>
+            </ActionContent>
+         </ExecutionAction>
+      </PreActions>
       <BuildActionEntries>
          <BuildActionEntry
             buildForTesting = "YES"
@@ -93,7 +111,11 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "`--dart-define=FLAVOR=prod`"
+            argument = "--dart-define=FLAVOR=prod"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "--target=lib/main_prod.dart"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>

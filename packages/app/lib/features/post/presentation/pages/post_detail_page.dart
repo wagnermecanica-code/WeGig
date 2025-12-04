@@ -1,24 +1,42 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
+import 'package:core_ui/utils/geo_utils.dart';
+import 'package:core_ui/utils/location_utils.dart';
+import 'package:core_ui/widgets/mention_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 /// Tela de detalhes completos de um post
-/// Acessível via navegação de cards de posts, notificações e galerias
+///
+/// Acessível via navegação de cards de posts, notificações e galerias.
+/// Exibe informações completas do post incluindo:
+/// - Foto e informações do autor
+/// - Gêneros, instrumentos e localização
+/// - Link de YouTube (se disponível)
+/// - Sistema de interesse (curtir)
+/// - Lista de perfis interessados
+/// - Ações (editar/deletar para autor, demonstrar interesse para outros)
 class PostDetailPage extends ConsumerStatefulWidget {
+  /// Construtor da página de detalhes
   const PostDetailPage({
     required this.postId,
     super.key,
   });
+
+  /// ID do post a ser exibido
   final String postId;
 
   @override
@@ -35,6 +53,16 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   YoutubePlayerController? _youtubeController;
   List<Map<String, dynamic>> _interestedUsers = [];
   bool _isLoadingInterests = false;
+
+  void _handleBackNavigation() {
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+    context.goToHome();
+  }
 
   @override
   void initState() {
@@ -59,9 +87,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       if (!doc.exists) {
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Post não encontrado')),
-          );
+          AppSnackBar.showError(context, 'Post não encontrado');
         }
         return;
       }
@@ -100,9 +126,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       debugPrint('Erro ao carregar post: $e');
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao carregar post')),
-        );
+        AppSnackBar.showError(context, 'Erro ao carregar post');
       }
     }
   }
@@ -268,6 +292,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         'postAuthorProfileId': _post!.authorProfileId,
         'interestedUid': currentUser.uid,
         'interestedProfileId': activeProfile.profileId,
+        'interestedProfileName': activeProfile.name, // ✅ Cloud Function expects this
+        'interestedProfilePhotoUrl': activeProfile.photoUrl, // ✅ Used in notification
         'createdAt': FieldValue.serverTimestamp(),
         'read': false,
       });
@@ -277,8 +303,22 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         _interestId = docRef.id;
       });
 
+      final distance = _calculateDistance(activeProfile);
+
+      await ref.read(notificationServiceProvider).createInterestReceivedNotification(
+            postId: _post!.id,
+            postOwnerProfileId: _post!.authorProfileId,
+            postOwnerUid: _post!.authorUid,
+            interestedProfileId: activeProfile.profileId,
+            interestedUserName: activeProfile.name,
+            interestedUserPhoto: activeProfile.photoUrl ?? '',
+        interestedUserUsername: activeProfile.username,
+            city: _post!.city,
+            distanceKm: distance,
+          );
+
       // Aguardar 500ms para garantir que o Firestore processou o serverTimestamp
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
 
       // Recarregar lista de interessados
       debugPrint('🔄 Recarregando interessados após demonstrar interesse...');
@@ -287,20 +327,24 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           '✅ Interessados recarregados - _interestedUsers.length: ${_interestedUsers.length}');
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Interesse demonstrado! 💙'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Interesse demonstrado! 💙');
       }
     } catch (e) {
       debugPrint('Erro ao demonstrar interesse: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao demonstrar interesse')),
-        );
+        AppSnackBar.showError(context, 'Erro ao demonstrar interesse');
       }
+    }
+  }
+
+  double? _calculateDistance(ProfileEntity activeProfile) {
+    try {
+      return calculateDistanceBetweenGeoPoints(
+        _post!.location,
+        activeProfile.location,
+      );
+    } catch (_) {
+      return null;
     }
   }
 
@@ -320,7 +364,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       });
 
       // Aguardar 500ms para garantir que o Firestore processou a exclusão
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
 
       // Recarregar lista de interessados
       debugPrint('🔄 Recarregando interessados após remover interesse...');
@@ -329,12 +373,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           '✅ Interessados recarregados - _interestedUsers.length: ${_interestedUsers.length}');
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Interesse removido'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        AppSnackBar.showInfo(context, 'Interesse removido');
       }
     } catch (e) {
       debugPrint('Erro ao remover interesse: $e');
@@ -350,6 +389,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       authorName: _authorName,
       postType: _post!.type,
       city: _post!.city,
+      neighborhood: _post!.neighborhood,
+      state: _post!.state,
       content: _post!.content,
       instruments: _post!.type == 'musician'
           ? _post!.instruments
@@ -357,7 +398,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       genres: _post!.genres,
     );
 
-    Share.share(text);
+    SharePlus.instance.share(ShareParams(text: text));
   }
 
   /// Deleta o post
@@ -403,16 +444,12 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post deletado com sucesso')),
-        );
+        AppSnackBar.showSuccess(context, 'Post deletado com sucesso');
       }
     } catch (e) {
       debugPrint(r'Erro ao deletar post: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao deletar post')),
-        );
+        AppSnackBar.showError(context, 'Erro ao deletar post');
       }
     }
   }
@@ -529,7 +566,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
             // Ícone de seta (indica que é clicável)
             Icon(
-              Icons.chevron_right,
+              Iconsax.arrow_right_3,
               size: 20,
               color: Colors.grey[400],
             ),
@@ -552,7 +589,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       ),
       child: CircleAvatar(
         radius: 14,
-        backgroundColor: AppColors.primary.withOpacity(0.1),
+        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
         backgroundImage:
             photoUrl.isNotEmpty ? CachedNetworkImageProvider(photoUrl) : null,
         child: photoUrl.isEmpty
@@ -568,7 +605,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
   /// Modal bottom sheet com lista completa de interessados
   void _showAllInterestedUsers() {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -601,7 +638,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   child: Row(
                     children: [
                       const Icon(
-                        Icons.favorite,
+                        Iconsax.heart5,
                         color: Colors.red,
                         size: 24,
                       ),
@@ -640,7 +677,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                       final photoUrl = user['photoUrl'] as String;
                       final name = user['name'] as String;
                       final isBand = user['isBand'] as bool;
-                      final userId = user['userId'] as String;
                       final profileId = user['profileId'] as String;
 
                       return ListTile(
@@ -648,7 +684,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                             horizontal: 20, vertical: 4),
                         leading: CircleAvatar(
                           radius: 24,
-                          backgroundColor: AppColors.primary.withOpacity(0.1),
+                            backgroundColor:
+                              AppColors.primary.withValues(alpha: 0.1),
                           backgroundImage: photoUrl.isNotEmpty
                               ? CachedNetworkImageProvider(photoUrl)
                               : null,
@@ -676,7 +713,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                           ),
                         ),
                         trailing: Icon(
-                          Icons.arrow_forward_ios,
+                          Iconsax.arrow_right_3,
                           size: 16,
                           color: Colors.grey[400],
                         ),
@@ -698,7 +735,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
   /// Mostra opções do próprio post
   void _showOwnPostOptions() {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -708,14 +745,14 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.edit, color: AppColors.primary),
+              leading: const Icon(Iconsax.edit, color: AppColors.primary),
               title: const Text('Editar post'),
               onTap: () async {
                 Navigator.pop(context);
 
-                final result = await Navigator.push(
+                final result = await Navigator.push<bool?>(
                   context,
-                  MaterialPageRoute(
+                  MaterialPageRoute<bool?>(
                     builder: (_) => PostPage(
                       postType: _post!.type,
                       existingPostData: {
@@ -743,7 +780,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
+              leading: const Icon(Iconsax.trash, color: Colors.red),
               title: const Text('Deletar post'),
               onTap: () {
                 Navigator.pop(context);
@@ -758,7 +795,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
   /// Mostra opções de interesse
   void _showInterestOptions() {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -768,7 +805,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.favorite_border, color: Colors.red),
+              leading: const Icon(Iconsax.heart, color: Colors.red),
               title: const Text('Remover interesse'),
               onTap: () {
                 Navigator.pop(context);
@@ -804,7 +841,13 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final photoHeight = screenWidth * 0.7; // Proporção ~10:7
 
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        _handleBackNavigation();
+      },
+      child: Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
@@ -838,8 +881,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                   color: Colors.grey[300],
                                   child: Icon(
                                     _post!.type == 'band'
-                                        ? Icons.group
-                                        : Icons.person,
+                                        ? Iconsax.people
+                                        : Iconsax.user,
                                     size: 80,
                                     color: Colors.grey[600],
                                   ),
@@ -848,8 +891,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                             : Center(
                                 child: Icon(
                                   _post!.type == 'band'
-                                      ? Icons.group
-                                      : Icons.person,
+                                      ? Iconsax.people
+                                      : Iconsax.user,
                                   size: 80,
                                   color: Colors.grey[600],
                                 ),
@@ -883,7 +926,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                 child: CircleAvatar(
                                   radius: 28,
                                   backgroundColor:
-                                      AppColors.primary.withOpacity(0.1),
+                                      AppColors.primary.withValues(alpha: 0.1),
                                   backgroundImage: _authorPhotoUrl.isNotEmpty
                                       ? CachedNetworkImageProvider(
                                           _authorPhotoUrl)
@@ -914,8 +957,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                           fontSize: 20,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.black87,
-                                          decoration: TextDecoration.underline,
-                                          decorationColor: Colors.black87,
                                         ),
                                       ),
                                     ),
@@ -965,23 +1006,28 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                               children: [
                                 // Área de Interesse (Localização)
                                 _buildInfoRow(
-                                  Icons.location_on,
+                                  Iconsax.location,
                                   'Área de Interesse',
-                                  _buildLocationString(),
+                                  formatCleanLocation(
+                                    neighborhood: _post!.neighborhood,
+                                    city: _post!.city,
+                                    state: _post!.state,
+                                    fallback: 'Localização não disponível',
+                                  ),
                                 ),
                                 const SizedBox(height: 12),
                                 // Instrumentos (músico) ou Procurando (banda)
                                 if (_post!.type == 'musician' &&
                                     _post!.instruments.isNotEmpty)
                                   _buildInfoRow(
-                                    Icons.music_note,
+                                    Iconsax.musicnote,
                                     'Instrumentos',
                                     _post!.instruments.join(', '),
                                   )
                                 else if (_post!.type == 'band' &&
                                     _post!.seekingMusicians.isNotEmpty)
                                   _buildInfoRow(
-                                    Icons.search,
+                                    Iconsax.search_favorite,
                                     'Procurando',
                                     _post!.seekingMusicians.join(', '),
                                   ),
@@ -993,7 +1039,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                 // Gêneros musicais
                                 if (_post!.genres.isNotEmpty)
                                   _buildInfoRow(
-                                    Icons.album,
+                                    Iconsax.music_library_2,
                                     'Gêneros',
                                     _post!.genres.join(', '),
                                   ),
@@ -1001,7 +1047,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                   const SizedBox(height: 12),
                                 // Nível de habilidade
                                 _buildInfoRow(
-                                  Icons.star,
+                                  Iconsax.star,
                                   'Nível',
                                   _getSkillLevelLabel(_post!.level),
                                 ),
@@ -1009,7 +1055,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                 if (_post!.availableFor.isNotEmpty) ...[
                                   const SizedBox(height: 12),
                                   _buildInfoRow(
-                                    Icons.calendar_today,
+                                    Iconsax.calendar,
                                     'Disponível para',
                                     _post!.availableFor.join(', '),
                                   ),
@@ -1038,7 +1084,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                   const Row(
                                     children: [
                                       Icon(
-                                        Icons.message,
+                                        Iconsax.message,
                                         size: 18,
                                         color: AppColors.primary,
                                       ),
@@ -1054,13 +1100,17 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                     ],
                                   ),
                                   const SizedBox(height: 12),
-                                  SelectableText(
-                                    _post!.content,
+                                  MentionText(
+                                    text: _post!.content,
+                                    selectable: true,
                                     style: TextStyle(
                                       fontSize: 15,
                                       color: Colors.grey[800],
                                       height: 1.5,
                                     ),
+                                    onMentionTap: (username) {
+                                      context.pushProfileByUsername(username);
+                                    },
                                   ),
                                 ],
                               ),
@@ -1112,18 +1162,18 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                     // Botão voltar
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
+                        color: Colors.black.withValues(alpha: 0.5),
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
                         icon: const Icon(
-                          Icons.arrow_back_ios_new,
+                          Iconsax.arrow_left_2,
                           color: Colors.white,
                           size: 18,
                         ),
                         padding: const EdgeInsets.all(8),
                         constraints: const BoxConstraints(),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: _handleBackNavigation,
                       ),
                     ),
                     // Botões de ação
@@ -1132,12 +1182,12 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                         // Compartilhar
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
+                            color: Colors.black.withValues(alpha: 0.5),
                             shape: BoxShape.circle,
                           ),
                           child: IconButton(
                             icon: const Icon(
-                              Icons.share,
+                              Iconsax.share,
                               color: Colors.white,
                               size: 18,
                             ),
@@ -1150,13 +1200,13 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                         // Interesse ou Menu de opções
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
+                            color: Colors.black.withValues(alpha: 0.5),
                             shape: BoxShape.circle,
                           ),
                           child: _isOwnPost()
                               ? IconButton(
                                   icon: const Icon(
-                                    Icons.more_vert,
+                                    Iconsax.more,
                                     color: Colors.white,
                                     size: 18,
                                   ),
@@ -1167,8 +1217,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                               : IconButton(
                                   icon: Icon(
                                     _hasInterest
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
+                                        ? Iconsax.heart5
+                                        : Iconsax.heart,
                                     color: _hasInterest
                                         ? Colors.red
                                         : Colors.white,
@@ -1190,8 +1240,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// Widget para linha de informação
   Widget _buildInfoRow(IconData icon, String label, String value) {
@@ -1247,21 +1298,4 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
-  /// Constrói string de localização com bairro, cidade e estado
-  String _buildLocationString() {
-    if (_post == null) return '';
-
-    final parts = <String>[];
-    if (_post!.neighborhood != null && _post!.neighborhood!.isNotEmpty) {
-      parts.add(_post!.neighborhood!);
-    }
-    if (_post!.city.isNotEmpty) {
-      parts.add(_post!.city);
-    }
-    if (_post!.state != null && _post!.state!.isNotEmpty) {
-      parts.add(_post!.state!);
-    }
-
-    return parts.isNotEmpty ? parts.join(', ') : 'Localização não disponível';
-  }
 }

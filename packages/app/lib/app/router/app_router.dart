@@ -1,5 +1,7 @@
 // lib/app/router/app_router.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/navigation/bottom_nav_scaffold.dart';
+import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,8 +28,11 @@ class AppRoutes {
   /// Auth route path
   static const String auth = '/auth';
 
+  /// Splash/loading route path
+  static const String splash = '/loading';
+
   /// Create profile route path
-  static const String createProfile = '/create-profile';
+  static const String createProfile = '/profiles/new';
 
   /// Home route path
   static const String home = '/home';
@@ -51,97 +56,154 @@ class AppRoutes {
 // ============================================
 
 /// Provider do GoRouter com auth guard e redirect logic usando rotas tipadas
+CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) {
+  final slideTween = Tween<Offset>(
+    begin: const Offset(
+        0.02, 0.04), // Leve deslocamento para reduzir flashes brancos
+    end: Offset.zero,
+  );
+
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    transitionDuration: const Duration(milliseconds: 320),
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    barrierColor: Colors.transparent,
+    maintainState: true,
+    child: child,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final Animation<double> fadeAnimation = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      final Animation<Offset> slideAnimation = fadeAnimation.drive(slideTween);
+      return FadeTransition(
+        opacity: fadeAnimation,
+        child: SlideTransition(
+          position: slideAnimation,
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
 @riverpod
 GoRouter goRouter(Ref ref) {
   final authState = ref.watch(authStateProvider);
-  final profileState = ref.watch(profileProvider);
+  final profileState = authState.valueOrNull != null ? ref.watch(profileProvider) : AsyncValue<ProfileState>.data(ProfileState());
 
   return GoRouter(
-    initialLocation: '/home',
+    initialLocation: AppRoutes.auth,
     debugLogDiagnostics: true,
     redirect: (BuildContext context, GoRouterState state) {
-      final isLoggedIn = authState.value != null;
-      final isGoingToAuth = state.matchedLocation == '/auth';
-      final isGoingToCreateProfile = state.matchedLocation == '/create-profile';
-      final hasProfile = profileState.value?.activeProfile != null;
+      final user = authState.valueOrNull;
+      final isLoggedIn = user != null;
+      final isGoingToAuth = state.matchedLocation == AppRoutes.auth;
+      final isGoingToSplash = state.matchedLocation == AppRoutes.splash;
+      final isGoingToCreateProfile =
+          state.matchedLocation == AppRoutes.createProfile;
 
-      // Se não está logado e não vai para auth, redireciona para auth
-      if (!isLoggedIn && !isGoingToAuth) {
-        return '/auth';
+      debugPrint('Router: location=${state.matchedLocation}, isLoggedIn=$isLoggedIn, isGoingToAuth=$isGoingToAuth, isGoingToSplash=$isGoingToSplash, isGoingToCreateProfile=$isGoingToCreateProfile');
+
+      final profileData = profileState.valueOrNull;
+      final hasProfileData = profileState is AsyncData<ProfileState>;
+      final hasAnyProfile = (profileData?.profiles.isNotEmpty ?? false);
+      final hasActiveProfile = profileData?.activeProfile != null;
+      final isCheckingAuth = authState.isLoading ||
+          (isLoggedIn && profileState.isLoading);
+
+      debugPrint('Router: authState.isLoading=${authState.isLoading}, authState.hasError=${authState.hasError}, user=$user');
+      debugPrint('Router: isCheckingAuth=$isCheckingAuth, hasProfileData=$hasProfileData, hasAnyProfile=$hasAnyProfile, hasActiveProfile=$hasActiveProfile');
+
+      if (isCheckingAuth) {
+        debugPrint('Router: isCheckingAuth, returning splash');
+        return AppRoutes.splash;
       }
 
-      // Se está logado e vai para auth, redireciona para home
-      if (isLoggedIn && isGoingToAuth) {
-        return '/home';
+      if (!isLoggedIn) {
+        debugPrint('Router: not logged in, returning auth');
+        return AppRoutes.auth;
       }
 
-      // Se está logado, mas não tem perfil e não está indo para criar perfil
-      if (isLoggedIn && !hasProfile && !isGoingToCreateProfile) {
-        return '/create-profile';
+      // Agora sabemos que está logado
+      if (hasProfileData && !hasAnyProfile) {
+        debugPrint('Router: logged in but no profiles, returning createProfile');
+        return AppRoutes.createProfile;
       }
 
-      // Caso contrário, permite navegação
-      return null;
+      debugPrint('Router: logged in with profiles, returning home');
+      return AppRoutes.home;
     },
     routes: <RouteBase>[
       GoRoute(
-        path: '/auth',
-        name: 'auth',
-        builder: (BuildContext context, GoRouterState state) =>
-            const AuthPage(),
+        path: AppRoutes.splash,
+        name: 'splash',
+        pageBuilder: (context, state) => _fadePage(state, const _SplashPage()),
       ),
       GoRoute(
-        path: '/create-profile',
+        path: '/auth',
+        name: 'auth',
+        pageBuilder: (context, state) => _fadePage(state, const AuthPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.createProfile,
         name: 'createProfile',
-        builder: (BuildContext context, GoRouterState state) =>
-            const EditProfilePage(isNewProfile: true),
+        pageBuilder: (context, state) =>
+            _fadePage(state, const EditProfilePage(isNewProfile: true)),
       ),
       GoRoute(
         path: '/home',
         name: 'home',
-        builder: (BuildContext context, GoRouterState state) =>
-            const BottomNavScaffold(),
+        pageBuilder: (context, state) =>
+            _fadePage(state, const BottomNavScaffold()),
       ),
       GoRoute(
         path: '/profile/:profileId',
         name: 'profile',
-        builder: (BuildContext context, GoRouterState state) {
+        pageBuilder: (context, state) {
           final profileId = state.pathParameters['profileId']!;
-          return ViewProfilePage(profileId: profileId);
+          return _fadePage(state, ViewProfilePage(profileId: profileId));
         },
       ),
       GoRoute(
         path: '/post/:postId',
         name: 'postDetail',
-        builder: (BuildContext context, GoRouterState state) {
+        pageBuilder: (context, state) {
           final postId = state.pathParameters['postId']!;
-          return PostDetailPage(postId: postId);
+          return _fadePage(state, PostDetailPage(postId: postId));
         },
       ),
       GoRoute(
         path: '/conversation/:conversationId',
         name: 'conversation',
-        builder: (BuildContext context, GoRouterState state) {
+        pageBuilder: (context, state) {
           final conversationId = state.pathParameters['conversationId']!;
           final otherUserId = state.uri.queryParameters['otherUserId'];
           final otherProfileId = state.uri.queryParameters['otherProfileId'];
           final otherUserName = state.uri.queryParameters['otherUserName'];
           final otherUserPhoto = state.uri.queryParameters['otherUserPhoto'];
-          return ChatDetailPage(
-            conversationId: conversationId,
-            otherUserId: otherUserId ?? '',
-            otherProfileId: otherProfileId ?? '',
-            otherUserName: otherUserName ?? '',
-            otherUserPhoto: otherUserPhoto ?? '',
+          return _fadePage(
+            state,
+            ChatDetailPage(
+              conversationId: conversationId,
+              otherUserId: otherUserId ?? '',
+              otherProfileId: otherProfileId ?? '',
+              otherUserName: otherUserName ?? '',
+              otherUserPhoto: otherUserPhoto ?? '',
+            ),
           );
         },
       ),
       GoRoute(
         path: '/profile/:profileId/edit',
         name: 'editProfile',
-        builder: (BuildContext context, GoRouterState state) {
+        pageBuilder: (context, state) {
           final profileId = state.pathParameters['profileId']!;
-          return EditProfilePage(profileIdToEdit: profileId);
+          return _fadePage(
+            state,
+            EditProfilePage(profileIdToEdit: profileId),
+          );
         },
       ),
     ],
@@ -171,6 +233,23 @@ GoRouter goRouter(Ref ref) {
       ),
     ),
   );
+}
+
+class _SplashPage extends StatelessWidget {
+  const _SplashPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: CircularProgressIndicator(),
+        ),
+      ),
+    );
+  }
 }
 
 // ============================================
@@ -246,6 +325,40 @@ extension TypedNavigationExtension on BuildContext {
       },
     );
     push(uri.toString());
+  }
+
+  /// Push profile screen resolving from @username
+  Future<void> pushProfileByUsername(String username) async {
+    final sanitized = username.trim().replaceAll('@', '');
+    if (sanitized.isEmpty) {
+      AppSnackBar.showError(this, 'Perfil não encontrado');
+      return;
+    }
+
+    try {
+      final query = await FirebaseFirestore.instance
+          .collection('profiles')
+          .where(
+            'usernameLowercase',
+            isEqualTo: sanitized.toLowerCase(),
+          )
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) {
+        AppSnackBar.showError(this, 'Perfil não encontrado');
+        return;
+      }
+
+      pushProfile(query.docs.first.id);
+    } catch (error, stackTrace) {
+      debugPrint('pushProfileByUsername error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      AppSnackBar.showError(
+        this,
+        'Não conseguimos abrir esse perfil agora.',
+      );
+    }
   }
 
   /// Navigate to edit profile page

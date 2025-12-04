@@ -1,4 +1,4 @@
-# Status do Monorepo Tô Sem Banda (WeGig)
+# Status do Monorepo WeGig
 
 **Data:** 29 de novembro de 2025  
 **Sessão:** 25 (Architecture Documentation + packages/app Complete)  
@@ -23,7 +23,7 @@
 
 ## 🎯 Visão Geral
 
-O projeto **Tô Sem Banda** (WeGig) está em fase de **migração para arquitetura monorepo** com Clean Architecture. O objetivo é separar a lógica de negócio (app) da camada de UI compartilhada (core_ui) para melhorar manutenibilidade, testabilidade e escalabilidade.
+O projeto **WeGig** está em fase de **migração para arquitetura monorepo** com Clean Architecture. O objetivo é separar a lógica de negócio (app) da camada de UI compartilhada (core_ui) para melhorar manutenibilidade, testabilidade e escalabilidade.
 
 ### Status Atual
 
@@ -1114,7 +1114,7 @@ packages/app/test/features/
 
 ## 📞 Contato & Suporte
 
-**Projeto:** Tô Sem Banda (WeGig)  
+**Projeto:** WeGig  
 **Repositório:** ToSemBandaRepo  
 **Owner:** wagnermecanica-code  
 **Branch:** main

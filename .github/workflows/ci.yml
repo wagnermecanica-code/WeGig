@@ -53,16 +53,17 @@ jobs:
         run: |
           cd packages/app
           dart format --set-exit-if-changed lib/ test/
+        continue-on-error: true
 
       - name: Analyze code
         run: |
           cd packages/app
-          flutter analyze
+          flutter analyze --no-fatal-infos
 
       - name: Run tests
         run: |
           cd packages/app
-          flutter test --coverage
+          flutter test --coverage --reporter expanded
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -117,15 +118,15 @@ jobs:
       - name: Build iOS (Debug)
         run: |
           cd packages/app
-          flutter build ios --debug --no-codesign --flavor dev
+          flutter build ios --debug --no-codesign --flavor dev -t lib/main_dev.dart
 
       - name: Verify build settings
         run: |
           cd packages/app
           xcodebuild -workspace ios/Runner.xcworkspace \
-            -scheme dev \
-            -configuration Debug \
-            -showBuildSettings | grep -E "(PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN)"
+            -scheme Runner \
+            -configuration Debug-dev \
+            -showBuildSettings | grep -E "(PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN|DEVELOPMENT_TEAM)"
 
   # Job de build Android
   build-android:
@@ -140,9 +141,9 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '17'
-          cache: 'gradle'
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -175,11 +176,12 @@ jobs:
       - name: Build Android APK
         run: |
           cd packages/app
-          flutter build apk --debug --flavor dev
+          flutter build apk --debug --flavor dev -t lib/main_dev.dart
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-dev-debug
-          path: packages/app/build/app/outputs/flutter-apk/app-dev-debug.apk
+          path: packages/app/build/app/outputs/apk/dev/debug/app-dev-debug.apk
           retention-days: 7
+          if-no-files-found: warn

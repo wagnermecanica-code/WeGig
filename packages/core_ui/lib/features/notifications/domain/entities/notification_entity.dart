@@ -51,6 +51,7 @@ class NotificationEntity with _$NotificationEntity {
     String? senderUid,
     String? senderProfileId,
     String? senderName,
+    String? senderUsername,
     String? senderPhoto,
     @Default({}) Map<String, dynamic> data,
     @NullableNotificationActionTypeConverter() NotificationActionType? actionType,
@@ -59,6 +60,8 @@ class NotificationEntity with _$NotificationEntity {
     @Default(false) bool read,
     @NullableTimestampConverter() DateTime? readAt,
     @NullableTimestampConverter() DateTime? expiresAt,
+    // Documento Firestore para paginação cursor-based
+    @JsonKey(includeFromJson: false, includeToJson: false) DocumentSnapshot? document,
   }) = _NotificationEntity;
 
   // ============================================================================
@@ -78,9 +81,10 @@ class NotificationEntity with _$NotificationEntity {
       senderUid: data['senderUid'] as String?,
       senderProfileId: data['senderProfileId'] as String?,
       senderName: data['senderName'] as String?,
+      senderUsername: data['senderUsername'] as String?,
       senderPhoto: data['senderPhoto'] as String?,
       title: data['title'] as String? ?? '',
-      message: data['message'] as String? ?? '',
+      message: (data['message'] as String?) ?? (data['body'] as String? ?? ''),
       data: data['data'] != null && data['data'] is Map
           ? Map<String, dynamic>.from(data['data'] as Map)
           : {},
@@ -95,6 +99,7 @@ class NotificationEntity with _$NotificationEntity {
       read: data['read'] as bool? ?? false,
       readAt: (data['readAt'] as Timestamp?)?.toDate(),
       expiresAt: (data['expiresAt'] as Timestamp?)?.toDate(),
+      document: doc, // ✅ Armazena DocumentSnapshot para paginação
     );
   }
 
@@ -118,6 +123,51 @@ class NotificationEntity with _$NotificationEntity {
   /// Se a notificação tem ação
   bool get hasAction =>
       actionType != null && actionType != NotificationActionType.none;
+
+  /// Cidade associada à notificação (quando disponível)
+  String? get city {
+    final actionCity = actionData?['city'];
+    if (actionCity is String && actionCity.isNotEmpty) {
+      return actionCity;
+    }
+    final dataCity = data['city'];
+    if (dataCity is String && dataCity.isNotEmpty) {
+      return dataCity;
+    }
+    return null;
+  }
+
+  /// Distância (em quilômetros) associada à notificação (quando disponível)
+  double? get distance {
+    final rawDistance = actionData?['distance'] ?? data['distance'];
+    if (rawDistance is num) {
+      return rawDistance.toDouble();
+    }
+    if (rawDistance is String) {
+      return double.tryParse(rawDistance);
+    }
+    return null;
+  }
+
+  /// Identificador do recurso alvo (postId, conversationId, etc.)
+  String? get targetId {
+    final actionPostId = actionData?['postId'];
+    if (actionPostId is String && actionPostId.isNotEmpty) {
+      return actionPostId;
+    }
+
+    final dataPostId = data['postId'];
+    if (dataPostId is String && dataPostId.isNotEmpty) {
+      return dataPostId;
+    }
+
+    final explicitTarget = data['targetId'];
+    if (explicitTarget is String && explicitTarget.isNotEmpty) {
+      return explicitTarget;
+    }
+
+    return null;
+  }
 
   /// Ícone baseado no tipo
   String get iconName {
@@ -152,9 +202,11 @@ class NotificationEntity with _$NotificationEntity {
       'senderUid': senderUid,
       'senderProfileId': senderProfileId,
       'senderName': senderName,
+      'senderUsername': senderUsername,
       'senderPhoto': senderPhoto,
       'title': title,
       'message': message,
+      'body': message,
       'data': data,
       'actionType': actionType?.name,
       'actionData': actionData,
@@ -173,6 +225,11 @@ class NotificationEntity with _$NotificationEntity {
   static NotificationType parseType(String type) {
     switch (type) {
       case 'interest':
+      case 'interest_received':
+      case 'interestReceived':
+      case 'newInterest':
+      case 'interestNotification':
+      case 'interest_notification':
         return NotificationType.interest;
       case 'newMessage':
         return NotificationType.newMessage;

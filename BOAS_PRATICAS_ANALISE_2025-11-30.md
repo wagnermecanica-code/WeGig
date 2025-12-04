@@ -1,4 +1,4 @@
-# Análise de Boas Práticas - WeGig/Tô Sem Banda
+# Análise de Boas Práticas - WeGig
 
 **Data:** 30 de novembro de 2025  
 **Branch:** `feat/complete-monorepo-migration`  

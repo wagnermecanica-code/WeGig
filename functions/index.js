@@ -1,5 +1,5 @@
 /**
- * Firebase Cloud Functions para Tô Sem Banda
+ * Firebase Cloud Functions para WeGig
  *
  * Funções:
  * - notifyNearbyPosts: Notificações in-app + push para posts próximos
@@ -215,7 +215,8 @@ exports.notifyNearbyPosts = functions
           priority: "medium",
           title: "Novo post próximo!",
           body: `${authorName} está procurando ${postType} a ${distanceStr} km de você em ${postCity}`,
-          data: {
+          actionType: "viewPost",
+          actionData: {
             postId: postId,
             distance: distanceStr,
             city: postCity,
@@ -223,6 +224,8 @@ exports.notifyNearbyPosts = functions
             authorName: authorName,
             authorProfileId: authorProfileId,
           },
+          senderName: authorName,
+          senderPhoto: post.authorPhotoUrl || null,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           read: false,
           expiresAt: admin.firestore.Timestamp.fromDate(
@@ -462,11 +465,14 @@ exports.sendInterestNotification = functions
       priority: "high",
       title: "Novo interesse!",
       body: `${interestedProfileName} demonstrou interesse em seu post`,
-      data: {
+      actionType: "viewPost",
+      actionData: {
         postId: postId,
         interestedProfileId: interest.interestedProfileId,
         interestedProfileName: interestedProfileName,
       },
+      senderName: interestedProfileName,
+      senderPhoto: interest.interestedProfilePhotoUrl || null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       read: false,
       expiresAt: admin.firestore.Timestamp.fromDate(

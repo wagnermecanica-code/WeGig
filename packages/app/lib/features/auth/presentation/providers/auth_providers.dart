@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -160,9 +161,13 @@ class _AuthServiceFacade implements IAuthService {
   }
 
   @override
-  Future<AuthResult> signUpWithEmail(String email, String password) async {
+  Future<AuthResult> signUpWithEmail(
+    String email,
+    String password,
+    String username,
+  ) async {
     final useCase = _ref.read(signUpWithEmailUseCaseProvider);
-    return useCase(email, password);
+    return useCase(email, password, username);
   }
 
   @override
@@ -201,10 +206,76 @@ abstract class IAuthService {
   Stream<User?> get authStateChanges;
   User? get currentUser;
   Future<AuthResult> signInWithEmail(String email, String password);
-  Future<AuthResult> signUpWithEmail(String email, String password);
+  Future<AuthResult> signUpWithEmail(String email, String password, String username);
   Future<AuthResult> signInWithGoogle();
   Future<AuthResult> signInWithApple();
   Future<void> signOut();
   Future<void> sendPasswordResetEmail(String email);
   Future<void> sendEmailVerification();
 }
+
+/// Documento users/{uid} no Firestore
+class UserAccountDocument {
+  const UserAccountDocument({
+    required this.uid,
+    this.username,
+    this.provider,
+    this.displayName,
+  });
+
+  final String uid;
+  final String? username;
+  final String? provider;
+  final String? displayName;
+
+  bool get hasUsername => (username ?? '').trim().isNotEmpty;
+
+  factory UserAccountDocument.fromSnapshot(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    return UserAccountDocument(
+      uid: doc.id,
+      username: data?['username'] as String?,
+      provider: data?['provider'] as String?,
+      displayName: data?['displayName'] as String?,
+    );
+  }
+
+  factory UserAccountDocument.fromJson(Map<String, dynamic> json) {
+    return UserAccountDocument(
+      uid: json['uid'] as String? ?? '',
+      username: json['username'] as String?,
+      provider: json['provider'] as String?,
+      displayName: json['displayName'] as String?,
+    );
+  }
+}
+
+/// Stream do documento users/{uid} para saber se já existe username
+final userDocumentProvider =
+    StreamProvider.autoDispose<UserAccountDocument?>((ref) {
+  final authAsync = ref.watch(authStateProvider);
+
+  return authAsync.when(
+    data: (user) {
+      if (user == null) {
+        return Stream<UserAccountDocument?>.value(null);
+      }
+      
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots()
+          .map((snapshot) {
+        if (!snapshot.exists) {
+          return null;
+        }
+        return UserAccountDocument.fromJson(
+            snapshot.data() as Map<String, dynamic>);
+      });
+    },
+    loading: () => Stream<UserAccountDocument?>.value(null),
+    error: (_, __) => Stream<UserAccountDocument?>.value(null),
+  );
+});

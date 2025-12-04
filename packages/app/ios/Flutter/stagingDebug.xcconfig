@@ -1,0 +1,6 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
+#include "Generated.xcconfig"
+
+ASSET_PREFIX=staging
+BUNDLE_NAME=WeGig STAGING
+BUNDLE_DISPLAY_NAME=WeGig STAGING

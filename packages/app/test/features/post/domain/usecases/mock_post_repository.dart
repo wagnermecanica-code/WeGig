@@ -92,6 +92,7 @@ class MockPostRepository implements PostRepository {
     return _postsById[postId];
   }
 
+  @override
   Future<bool> isPostOwner(String postId, String profileId) async {
     isPostOwnerCalled = true;
     lastOwnershipCheckPostId = postId;
@@ -121,6 +122,9 @@ class MockPostRepository implements PostRepository {
 
   @override
   Future<bool> hasInterest(String postId, String profileId) async {
+    if (_toggleInterestResponse != null) {
+      return !_toggleInterestResponse!;
+    }
     return _interestedProfiles[postId]?.contains(profileId) ?? false;
   }
 

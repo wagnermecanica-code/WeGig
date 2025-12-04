@@ -166,9 +166,8 @@ class FeedNotifier extends _$FeedNotifier {
   }
 }
 
-/// Provider para FeedNotifier
-final feedProvider =
-    NotifierProvider<FeedNotifier, FeedState>(FeedNotifier.new);
+/// Alias para o provider gerado por Riverpod
+final feedProvider = feedNotifierProvider;
 
 // ========================= SEARCH =========================
 
@@ -230,17 +229,15 @@ class ProfileSearchNotifier extends _$ProfileSearchNotifier {
   }
 }
 
-/// Provider para ProfileSearchNotifier
-final profileSearchProvider =
-    NotifierProvider<ProfileSearchNotifier, ProfileSearchState>(
-        ProfileSearchNotifier.new);
+/// Alias para o provider gerado por Riverpod
+final profileSearchProvider = profileSearchNotifierProvider;
 
 // ========================= STREAMS =========================
 
 /// Provider para stream de posts próximos (tempo real)
 @riverpod
 Stream<List<PostEntity>> nearbyPostsStream(
-  NearbyPostsStreamRef ref,
+  Ref ref,
   Map<String, double> params,
 ) {
   final repository = ref.watch(homeRepositoryProvider);

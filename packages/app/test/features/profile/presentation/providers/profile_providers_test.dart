@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:wegig_app/features/profile/data/datasources/profile_remote_datasource.dart';
@@ -17,11 +18,13 @@ void main() {
     // Use mocks to avoid Firebase initialization
     final mockDataSource = _MockProfileRemoteDataSource();
     final mockRepository = _MockProfileRepository();
+    final fakeAuth = _StubFirebaseAuth();
 
     container = ProviderContainer(
       overrides: [
         profileRemoteDataSourceProvider.overrideWithValue(mockDataSource),
         profileRepositoryNewProvider.overrideWithValue(mockRepository),
+        profileFirebaseAuthProvider.overrideWithValue(fakeAuth),
       ],
     );
   });
@@ -273,6 +276,14 @@ class _MockProfileRemoteDataSource implements ProfileRemoteDataSource {
 
 /// Mock class for testing provider overrides
 class _MockProfileRepository implements ProfileRepository {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _StubFirebaseAuth implements FirebaseAuth {
+  @override
+  User? get currentUser => null;
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

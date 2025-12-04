@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:core_ui/post_result.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/widgets/multi_select_field.dart';
 import 'package:flutter/material.dart';
@@ -11,9 +12,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:uuid/uuid.dart';
-import 'package:wegig_app/features/post/domain/services/post_service.dart';
+import 'package:wegig_app/features/post/domain/models/post_form_input.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
+import 'package:wegig_app/features/post/presentation/widgets/available_for_selector.dart';
+import 'package:wegig_app/features/post/presentation/widgets/post_photo_picker.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 /// Navega para a página de criação de post
@@ -75,7 +77,8 @@ class _PostPageState extends ConsumerState<PostPage> {
   String? _selectedState;
 
   // === Foto & Estado ===
-  String? _photoLocalPath;
+  String? _localPhotoPath;
+  String? _remotePhotoUrl;
   bool _isSaving = false;
 
   // === Limites e opções ===
@@ -303,7 +306,8 @@ class _PostPageState extends ConsumerState<PostPage> {
     // Foto (URL existente)
     if (data['photoUrl'] != null && data['photoUrl'].toString().isNotEmpty) {
       setState(() {
-        _photoLocalPath = data['photoUrl'] as String?;
+        _remotePhotoUrl = data['photoUrl'] as String?;
+        _localPhotoPath = null;
       });
     }
   }
@@ -450,12 +454,18 @@ class _PostPageState extends ConsumerState<PostPage> {
 
       if (compressed == null) {
         debugPrint('⚠️ PostPage: Falha na compressão, usando imagem original');
-        setState(() => _photoLocalPath = picked.path);
+        setState(() {
+          _localPhotoPath = picked.path;
+          _remotePhotoUrl = null;
+        });
       } else {
         final compressedSize = await compressed.length();
         debugPrint(
             '✅ PostPage: Imagem comprimida: ${(compressedSize / 1024).toStringAsFixed(2)} KB');
-        setState(() => _photoLocalPath = compressed.path);
+        setState(() {
+          _localPhotoPath = compressed.path;
+          _remotePhotoUrl = null;
+        });
       }
     } catch (e) {
       debugPrint('❌ PostPage: Erro ao selecionar/comprimir imagem: $e');
@@ -470,175 +480,105 @@ class _PostPageState extends ConsumerState<PostPage> {
     }
   }
 
-  Future<void> _publish() async {
-    final profileAsync = ref.read(profileProvider);
-    final profile =
-        profileAsync is AsyncData ? profileAsync.value?.activeProfile : null;
+  void _removePhoto() {
+    setState(() {
+      _localPhotoPath = null;
+      _remotePhotoUrl = null;
+    });
+  }
+
+  Future<void> _submitPost() async {
     if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Preencha todos os campos obrigatórios.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnackBar('Preencha todos os campos obrigatórios.', isError: true);
       return;
     }
-    if (profile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Perfil não carregado. Tente novamente.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+
+    final location = _selectedLocation;
+    final city = _selectedCity;
+    if (location == null || city == null) {
+      _showSnackBar('Selecione uma localização válida.', isError: true);
       return;
     }
+
     setState(() => _isSaving = true);
+
     try {
-      final postService = PostService();
-      String? photoUrl;
+      final input = PostFormInput(
+        postId: widget.existingPostData?['postId'] as String?,
+        type: _postType,
+        content: _messageController.text.trim(),
+        location: location,
+        city: city,
+        neighborhood: _selectedNeighborhood,
+        state: _selectedState,
+        level: _level,
+        genres: _selectedGenres.toList(),
+        selectedInstruments: _selectedInstruments.toList(),
+        availableFor: _selectedAvailableFor.toList(),
+        youtubeLink: _youtubeController.text.trim().isEmpty
+            ? null
+            : _youtubeController.text.trim(),
+        localPhotoPath: _localPhotoPath,
+        existingPhotoUrl: _remotePhotoUrl,
+        createdAt: _maybeExtractDate(widget.existingPostData?['createdAt']),
+        expiresAt: _maybeExtractDate(widget.existingPostData?['expiresAt']),
+      );
 
-      // Upload de foto apenas se for arquivo local novo
-      if (_photoLocalPath != null) {
-        if (_photoLocalPath!.startsWith('http')) {
-          // É uma URL existente, manter
-          photoUrl = _photoLocalPath;
-        } else {
-          // É um arquivo local, fazer upload
-          final file = File(_photoLocalPath!);
-          if (file.existsSync()) {
-            final postId = (widget.existingPostData?['postId'] as String?) ??
-                const Uuid().v4();
-            photoUrl = await postService.uploadPostImage(file, postId);
-          }
-        }
-      }
+      final notifier = ref.read(postNotifierProvider.notifier);
+      final result = await notifier.savePost(input);
 
-      final ytLink = _youtubeController.text.trim();
+      if (!mounted) return;
 
-      // Preparar postData com campos obrigatórios
-      final postData = <String, dynamic>{
-        'authorUid': profile.uid,
-        'authorProfileId': profile.profileId,
-        'authorName': profile.name,
-        'authorPhotoUrl': profile.photoUrl ?? '',
-        'type': _postType,
-        'availableFor': _selectedAvailableFor.toList(),
-        'genres': _selectedGenres.toList(),
-        'level': _level,
-        'location': _selectedLocation,
-        'city': _selectedCity,
-        'neighborhood': _selectedNeighborhood ?? '',
-        'state': _selectedState ?? '',
-        'content': _messageController.text.trim(),
-        'youtubeLink': ytLink.isEmpty ? null : ytLink,
-        'photoUrl': photoUrl,
-        'createdAt': FieldValue.serverTimestamp(),
-        'expiresAt': Timestamp.fromDate(
-          DateTime.now().add(const Duration(days: 30)), // 30 dias de expiração
-        ),
-      };
-
-      // Adicionar campos específicos por tipo
-      if (_postType == 'musician') {
-        postData['instruments'] = _selectedInstruments.toList();
-        postData['seekingMusicians'] = <String>[]; // Vazio para músicos
-      } else if (_postType == 'band') {
-        postData['instruments'] = <String>[]; // Vazio para bandas
-        postData['seekingMusicians'] =
-            _selectedInstruments.toList(); // Banda busca músicos
-      }
-
-      debugPrint('PostPage: ========== DADOS DO POST ==========');
-      debugPrint('PostPage: Campos presentes: ${postData.keys.toList()}');
-      debugPrint('PostPage: type = ${postData['type']}');
-      debugPrint('PostPage: instruments = ${postData['instruments']}');
-      debugPrint(
-          'PostPage: seekingMusicians = ${postData['seekingMusicians']}');
-      debugPrint(
-          'PostPage: location = ${postData['location']} (${postData['location'].runtimeType})');
-      debugPrint('PostPage: city = ${postData['city']}');
-      debugPrint('PostPage: authorProfileId = ${postData['authorProfileId']}');
-      debugPrint('PostPage: authorUid = ${postData['authorUid']}');
-      debugPrint('PostPage: expiresAt = ${postData['expiresAt']}');
-      debugPrint('PostPage: createdAt = ${postData['createdAt']}');
-
-      // Validar dados antes de salvar
-      try {
-        postService.validatePostData(postData);
-        debugPrint('PostPage: ✅ Validação dos dados passou!');
-      } catch (e) {
-        debugPrint('PostPage: ❌ ERRO na validação: $e');
-        throw Exception('Dados inválidos: $e');
-      }
-
-      // Se é edição, atualizar; caso contrário, criar
-      if (widget.existingPostData != null) {
-        final postId = widget.existingPostData!['postId'] as String;
-        debugPrint('PostPage: Atualizando post existente: $postId');
-        await FirebaseFirestore.instance
-            .collection('posts')
-            .doc(postId)
-            .update(postData);
-        debugPrint('PostPage: ✅ Post atualizado com sucesso!');
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post atualizado com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
+      if (result is PostSuccess) {
+        _showSnackBar(
+          result.message ??
+              (input.isEditing
+                  ? 'Post atualizado com sucesso!'
+                  : 'Post criado com sucesso!'),
         );
+        Navigator.of(context).pop(true);
+      } else if (result is PostValidationError) {
+        _showSnackBar(
+          result.errors.values.join('\n'),
+          isError: true,
+        );
+      } else if (result is PostFailure) {
+        _showSnackBar(result.message, isError: true);
       } else {
-        debugPrint('PostPage: Criando novo post...');
-        final postId = await postService.createPost(postData);
-        debugPrint('PostPage: ✅ Post criado com ID: $postId');
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post criado com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
+        _showSnackBar(
+          'Não foi possível salvar o post. Tente novamente.',
+          isError: true,
         );
       }
-
-      // Invalidar posts provider para forçar atualização em todas as telas
-      ref.invalidate(postProvider);
-
-      Navigator.of(context).pop(true); // Retorna true para indicar sucesso
-    } catch (e) {
-      debugPrint('❌ PostPage: ERRO ao publicar post');
-      debugPrint('❌ PostPage: Erro: $e');
-      debugPrint('❌ PostPage: Tipo: ${e.runtimeType}');
-
+    } catch (e, stackTrace) {
+      debugPrint('❌ PostPage: erro ao salvar post - $e');
+      debugPrint('$stackTrace');
       if (mounted) {
-        var errorMessage = 'Erro ao publicar: $e';
-
-        // Mensagens específicas para erros conhecidos
-        if (e.toString().contains('firebase_storage')) {
-          if (e.toString().contains('400')) {
-            errorMessage =
-                'Erro ao fazer upload da imagem. Verifique se a imagem é válida e tente novamente.';
-          } else if (e.toString().contains('permission')) {
-            errorMessage =
-                'Sem permissão para fazer upload. Verifique suas credenciais.';
-          } else {
-            errorMessage =
-                'Erro no Firebase Storage: ${e.toString().replaceAll('firebase_storage/', '')}';
-          }
-        } else if (e.toString().contains('Arquivo muito grande')) {
-          errorMessage = e.toString();
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        _showSnackBar('Erro ao salvar post: $e', isError: true);
       }
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
+  }
+
+  DateTime? _maybeExtractDate(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
   }
 
   @override
@@ -677,7 +617,7 @@ class _PostPageState extends ConsumerState<PostPage> {
             )
           else
             IconButton(
-              onPressed: _publish,
+              onPressed: _submitPost,
               icon: const Icon(
                 Icons.send_rounded,
                 size: 26,
@@ -803,38 +743,42 @@ class _PostPageState extends ConsumerState<PostPage> {
                   // Disponível para (lista suspensa)
                   Text('Disponível para', style: sectionTitleStyle),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedAvailableFor.isNotEmpty
-                        ? _selectedAvailableFor.first
+                  FormField<Set<String>>(
+                    validator: (_) => _selectedAvailableFor.isEmpty
+                        ? 'Selecione pelo menos uma opção'
                         : null,
-                    items: _availableForOptions
-                        .map(
-                          (option) => DropdownMenuItem(
-                            value: option,
-                            child: Text(option),
+                    builder: (state) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AvailableForSelector(
+                            options: _availableForOptions,
+                            selectedValues: _selectedAvailableFor,
+                            onToggle: (value) {
+                              setState(() {
+                                if (_selectedAvailableFor.contains(value)) {
+                                  _selectedAvailableFor.remove(value);
+                                } else {
+                                  _selectedAvailableFor.add(value);
+                                }
+                              });
+                              state.didChange(_selectedAvailableFor);
+                            },
                           ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedAvailableFor.clear();
-                        if (value != null) {
-                          _selectedAvailableFor.add(value);
-                        }
-                      });
+                          if (state.hasError)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                state.errorText!,
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
                     },
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                    validator: (v) => v == null || v.trim().isEmpty
-                        ? 'Campo obrigatório'
-                        : null,
                   ),
                   const Divider(thickness: 0.5, height: 48),
 
@@ -938,7 +882,7 @@ class _PostPageState extends ConsumerState<PostPage> {
                   Text('Nível', style: sectionTitleStyle),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    initialValue: _level,
+                    value: _level,
                     items: _levelOptions
                         .map(
                           (level) => DropdownMenuItem(
@@ -964,113 +908,12 @@ class _PostPageState extends ConsumerState<PostPage> {
                   // Foto
                   Text('Foto (opcional)', style: sectionTitleStyle),
                   const SizedBox(height: 12),
-                  Stack(
-                    children: [
-                      GestureDetector(
-                        onTap: _pickPhoto,
-                        child: Container(
-                          height: 180,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: AppColors.primary.withValues(
-                                alpha: 0.18,
-                              ),
-                              width: 1.5,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            color: AppColors.surface,
-                          ),
-                          child: _photoLocalPath != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: _photoLocalPath!.startsWith('http')
-                                      ? CachedNetworkImage(
-                                          imageUrl: _photoLocalPath!,
-                                          fit: BoxFit.cover,
-                                          placeholder: (context, url) =>
-                                              const Center(
-                                            child: CircularProgressIndicator(
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                      Color(0xFFE47911)),
-                                            ),
-                                          ),
-                                          errorWidget: (context, url, error) =>
-                                              const Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.error_outline,
-                                                size: 48,
-                                                color: Colors.red,
-                                              ),
-                                              SizedBox(height: 8),
-                                              Text(
-                                                'Erro ao carregar foto',
-                                                style: TextStyle(
-                                                    color: Colors.red),
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                      : Image.file(
-                                          File(_photoLocalPath!),
-                                          fit: BoxFit.cover,
-                                        ),
-                                )
-                              : const Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.add_a_photo,
-                                      size: 48,
-                                      color: Colors.grey,
-                                    ),
-                                    SizedBox(height: 12),
-                                    Text(
-                                      'Toque para adicionar foto',
-                                      style: TextStyle(
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
-                      if (_photoLocalPath != null)
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: GestureDetector(
-                            onTap: () => setState(() => _photoLocalPath = null),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                color: Colors.black54,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+                  PostPhotoPicker(
+                    localPhotoPath: _localPhotoPath,
+                    remotePhotoUrl: _remotePhotoUrl,
+                    onPickPhoto: _pickPhoto,
+                    onRemovePhoto: _removePhoto,
                   ),
-                  if (_photoLocalPath != null)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Center(
-                        child: Text(
-                          'Alterar foto',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-                    ),
                   const Divider(height: 48, thickness: 0.5),
 
                   // Mensagem

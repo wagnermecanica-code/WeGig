@@ -11,8 +11,8 @@ void main() {
       expect(AppRoutes.home, '/home');
     });
 
-    test('createProfile route should be /create-profile', () {
-      expect(AppRoutes.createProfile, '/create-profile');
+    test('createProfile route should be /profiles/new', () {
+      expect(AppRoutes.createProfile, '/profiles/new');
     });
 
     test('profile route should include profileId', () {

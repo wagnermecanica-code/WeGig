@@ -15,6 +15,7 @@ class ProfileEntity with _$ProfileEntity {
     required String profileId,
     required String uid,
     required String name,
+    String? username,
     required bool isBand,
     required String city,
     @GeoPointConverter() required GeoPoint location,
@@ -75,6 +76,7 @@ class ProfileEntity with _$ProfileEntity {
       profileId: snapshot.id,
       uid: (data['uid'] as String?) ?? '',
       name: (data['name'] as String?) ?? '',
+      username: data['username'] as String?,
       isBand: (data['isBand'] as bool?) ?? false,
       city: (data['city'] as String?) ?? '',
       location: parseGeoPoint(data['location']),
@@ -108,6 +110,13 @@ class ProfileEntity with _$ProfileEntity {
   Map<String, dynamic> toFirestore() {
     final json = toJson();
     json.remove('profileId'); // ID vai no documento, não no data
+    if (json['username'] is String &&
+        (json['username'] as String).trim().isNotEmpty) {
+      json['usernameLowercase'] =
+          (json['username'] as String).trim().toLowerCase();
+    } else {
+      json.remove('usernameLowercase');
+    }
     return json;
   }
 

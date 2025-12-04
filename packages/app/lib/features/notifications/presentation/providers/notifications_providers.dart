@@ -84,7 +84,7 @@ GetUnreadNotificationCount getUnreadNotificationCountUseCase(Ref ref) {
 /// Stream de notificações em tempo real
 @riverpod
 Stream<List<NotificationEntity>> notificationsStream(
-  NotificationsStreamRef ref,
+  Ref ref,
   String profileId,
 ) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
@@ -94,7 +94,7 @@ Stream<List<NotificationEntity>> notificationsStream(
 /// Stream de contador de não lidas para BottomNav badge
 @riverpod
 Stream<int> unreadNotificationCountForProfile(
-  UnreadNotificationCountForProfileRef ref,
+  Ref ref,
   String profileId,
 ) {
   final repository = ref.watch(notificationsRepositoryNewProvider);

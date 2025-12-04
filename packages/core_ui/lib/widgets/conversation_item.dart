@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Widget reutilizável para item de conversa na lista
 /// Otimizado com CachedNetworkImage e timeago internacionalizado
@@ -31,9 +32,28 @@ class ConversationItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final conversationId = conversation['conversationId'] as String;
-    final unreadCount = conversation['unreadCount'] as int;
+
+    final currentProfileId = conversation['currentProfileId'] as String?;
+    final rawUnreadCount = conversation['unreadCount'];
+    int unreadCount = 0;
+    if (rawUnreadCount is int) {
+      unreadCount = rawUnreadCount;
+    } else if (rawUnreadCount is Map) {
+      if (currentProfileId != null && currentProfileId.isNotEmpty) {
+        final value = rawUnreadCount[currentProfileId];
+        if (value is int) {
+          unreadCount = value;
+        }
+      }
+      if (unreadCount == 0 && rawUnreadCount.values.isNotEmpty) {
+        final fallback = rawUnreadCount.values.first;
+        if (fallback is int) {
+          unreadCount = fallback;
+        }
+      }
+    }
     final hasUnread = unreadCount > 0;
-    
+
     // Tratar timestamp que pode vir como Timestamp ou int (do cache)
     final rawTimestamp = conversation['lastMessageTimestamp'];
     final Timestamp? timestamp = rawTimestamp is Timestamp
@@ -41,9 +61,9 @@ class ConversationItem extends StatelessWidget {
         : rawTimestamp is int
             ? Timestamp.fromMillisecondsSinceEpoch(rawTimestamp)
             : null;
-    
-    final isOnline = conversation['isOnline'] as bool;
-    final type = conversation['type'] as String;
+
+    final isOnline = (conversation['isOnline'] as bool?) ?? false;
+    final type = conversation['type'] as String? ?? 'musician';
 
     final primaryColor = AppColors.primary;
     final secondaryColor = AppColors.accent;
@@ -74,7 +94,7 @@ class ConversationItem extends StatelessWidget {
         child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.delete, color: Colors.white, size: 32),
+            Icon(Iconsax.trash, color: Colors.white, size: 34),
             SizedBox(height: 4),
             Text(
               'Apagar',
@@ -94,7 +114,7 @@ class ConversationItem extends StatelessWidget {
         child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.mark_email_unread, color: Colors.white, size: 32),
+            Icon(Iconsax.sms, color: Colors.white, size: 34),
             SizedBox(height: 4),
             Text(
               'Não lida',
@@ -119,7 +139,7 @@ class ConversationItem extends StatelessWidget {
               ),
               title: Row(
                 children: [
-                  Icon(Icons.delete_outline, color: Colors.red),
+                  Icon(Iconsax.trash, color: Colors.red),
                   const SizedBox(width: 12),
                   const Text('Apagar conversa'),
                 ],
@@ -160,7 +180,7 @@ class ConversationItem extends StatelessWidget {
                 SnackBar(
                   content: Row(
                     children: [
-                      const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                      const Icon(Iconsax.tick_circle, color: Colors.white, size: 22),
                       const SizedBox(width: 12),
                       const Text('Marcada como não lida'),
                     ],
@@ -234,7 +254,7 @@ class ConversationItem extends StatelessWidget {
                                     valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
                                   ),
                                   errorWidget: (context, url, error) => Icon(
-                                    type == 'band' ? Icons.group : Icons.person,
+                                    type == 'band' ? Iconsax.people : Iconsax.user,
                                     size: 28,
                                     color: type == 'band' ? secondaryColor : primaryColor,
                                   ),
@@ -327,10 +347,10 @@ class ConversationItem extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
-                                vertical: 2,
+                                vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: hasUnread ? primaryColor : Colors.transparent,
+                                color: AppColors.badgeRed,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               constraints: const BoxConstraints(

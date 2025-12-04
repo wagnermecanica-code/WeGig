@@ -4,27 +4,48 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:core_ui/services/env_service.dart';
-import 'package:core_ui/theme/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart' as p;
+import 'package:iconsax/iconsax.dart';
+
+import 'package:core_ui/services/env_service.dart';
+import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/utils/app_snackbar.dart';
+import 'package:core_ui/utils/location_utils.dart';
+import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
+import 'package:wegig_app/features/post/presentation/widgets/genre_selector.dart';
+import 'package:wegig_app/features/post/presentation/widgets/instrument_selector.dart';
 
 /// Tema claro personalizado com paleta de cores definida
+///
+/// Define cores e configurações de tema para a página de edição de posts.
 class AppThemeData {
+  /// Cor primária do tema (AppColors.primary)
   static const Color primaryColor = AppColors.primary;
-  static const Color secondaryColor = AppColors.accent;
-  static const Color backgroundColor = Color(0xFFFFFFFF); // Branco
-  static const Color surfaceColor = Color(0xFFF5F5F5); // Cinza claro
-  static const Color textPrimary = Color(0xFF212121); // Texto principal
-  static const Color textSecondary = Color(0xFF616161); // Texto secundário
 
+  /// Cor secundária do tema (AppColors.accent)
+  static const Color secondaryColor = AppColors.accent;
+
+  /// Cor de fundo (branco)
+  static const Color backgroundColor = Color(0xFFFFFFFF);
+
+  /// Cor de superfície (cinza claro)
+  static const Color surfaceColor = Color(0xFFF5F5F5);
+
+  /// Cor de texto primário
+  static const Color textPrimary = Color(0xFF212121);
+
+  /// Cor de texto secundário
+  static const Color textSecondary = Color(0xFF616161);
+
+  /// Retorna o tema claro configurado
   static ThemeData get lightTheme {
     return ThemeData(
       primaryColor: primaryColor,
@@ -75,8 +96,18 @@ class AppThemeData {
   }
 }
 
+/// Página de edição de posts existentes
+///
+/// Permite editar posts já criados, incluindo:
+/// - Alteração de gêneros e instrumentos
+/// - Upload/substituição de foto com crop
+/// - Edição de localização via mapa
+/// - Atualização de link do YouTube
 class EditPostPage extends StatefulWidget {
+  /// Construtor da página de edição
   const EditPostPage({required this.postData, super.key});
+
+  /// Dados do post a ser editado
   final Map<String, dynamic> postData;
 
   @override
@@ -90,59 +121,9 @@ class _EditPostPageState extends State<EditPostPage> {
   String _postType = 'musician';
 
   // Section 2
-  static const List<String> _instrumentOptions = [
-    'Violão',
-    'Guitarra',
-    'Baixo',
-    'Contrabaixo',
-    'Viola',
-    'Violino',
-    'Cello',
-    'Bateria',
-    'Percussão',
-    'Cajón',
-    'Timbau',
-    'Congas',
-    'Bongô',
-    'Piano',
-    'Teclado',
-    'Órgão',
-    'Synthesizer',
-    'Fender Rhodes',
-    'Saxofone',
-    'Flauta',
-    'Clarinet',
-    'Trompete',
-    'Trombone',
-    'Voz (cantor)',
-    'DJ',
-    'Produção',
-    'Harmônica',
-    'Ukulele'
-  ];
+  // ⚡ PERFORMANCE: _instrumentOptions movidos para InstrumentSelector.instrumentOptions
 
-  static const List<String> _genreOptions = [
-    'Rock',
-    'Pop',
-    'Jazz',
-    'Blues',
-    'Funk',
-    'Soul',
-    'R&B',
-    'Reggae',
-    'MPB',
-    'Sertanejo',
-    'Forró',
-    'Axé',
-    'Hip-Hop',
-    'Rap',
-    'Eletrônica',
-    'House',
-    'Indie',
-    'Metal',
-    'Samba',
-    'Gospel'
-  ];
+  // ⚡ PERFORMANCE: _genreOptions movidos para GenreSelector.genreOptions
 
   late Set<String> _selectedInstruments = {};
   late Set<String> _selectedGenres = {};
@@ -235,7 +216,6 @@ class _EditPostPageState extends State<EditPostPage> {
 
   bool _isSaving = false;
 
-  final ImagePicker _picker = ImagePicker();
 
   String? _name;
   String? _profilePhotoUrl;
@@ -439,19 +419,14 @@ class _EditPostPageState extends State<EditPostPage> {
               _fetchedCity = city ?? _fetchedCity;
               _fetchedState = state;
 
-              // Atualizar campo de exibição com mais detalhes
-              final parts = <String>[];
-              if (neighborhood != null && neighborhood.isNotEmpty) {
-                parts.add(neighborhood);
-              }
-              if (city != null && city.isNotEmpty) {
-                parts.add(city);
-              }
-              if (state != null && state.isNotEmpty) {
-                parts.add(state);
-              }
-              if (parts.isNotEmpty) {
-                _locationSearchController.text = parts.join(', ');
+              final formatted = formatCleanLocation(
+                neighborhood: neighborhood,
+                city: city,
+                state: state,
+                fallback: '',
+              );
+              if (formatted.isNotEmpty) {
+                _locationSearchController.text = formatted;
                 debugPrint(
                     '✅ Campo de localização atualizado: ${_locationSearchController.text}');
               } else {
@@ -471,7 +446,7 @@ class _EditPostPageState extends State<EditPostPage> {
   }
 
   Future<void> _showInstrumentPicker() async {
-    final allOptions = List<String>.from(_instrumentOptions);
+    final allOptions = List<String>.from(InstrumentSelector.instrumentOptions);
     for (final s in _selectedInstruments) {
       if (!allOptions.contains(s)) allOptions.add(s);
     }
@@ -561,7 +536,7 @@ class _EditPostPageState extends State<EditPostPage> {
   }
 
   Future<void> _showGenrePicker() async {
-    final allOptions = List<String>.from(_genreOptions);
+    final allOptions = List<String>.from(GenreSelector.genreOptions);
     for (final s in _selectedGenres) {
       if (!allOptions.contains(s)) allOptions.add(s);
     }
@@ -738,45 +713,6 @@ class _EditPostPageState extends State<EditPostPage> {
         });
   }
 
-  Future<String?> _pickCropCompressAndGetPath() async {
-    // Store theme color synchronously before async operations
-    final primaryColor = Theme.of(context).primaryColor;
-
-    try {
-      final picked = await _picker.pickImage(
-          source: ImageSource.gallery,
-          imageQuality: 95,
-          maxWidth: 2000,
-          maxHeight: 2000);
-      if (picked == null) return null;
-
-      final cropped = await ImageCropper().cropImage(
-        sourcePath: picked.path,
-        uiSettings: [
-          AndroidUiSettings(
-              toolbarTitle: 'Cortar imagem',
-              toolbarColor: primaryColor,
-              toolbarWidgetColor: Colors.white),
-          IOSUiSettings(title: 'Cortar imagem'),
-        ],
-      );
-
-      final path = cropped?.path ?? picked.path;
-
-      final tempDir = Directory.systemTemp;
-      final targetPath = p.join(
-          tempDir.path, '${DateTime.now().millisecondsSinceEpoch}_post.jpg');
-
-      final compressed = await FlutterImageCompress.compressAndGetFile(
-          path, targetPath,
-          quality: 85, minWidth: 800, minHeight: 800);
-      if (compressed == null) return path;
-      return compressed.path;
-    } catch (e) {
-      return null;
-    }
-  }
-
   ImageProvider<Object> _createImageProvider(String pathOrUrl) {
     if (pathOrUrl.startsWith('http')) {
       return NetworkImage(pathOrUrl);
@@ -799,12 +735,37 @@ class _EditPostPageState extends State<EditPostPage> {
     return const AssetImage('assets/avatar_placeholder.png');
   }
 
-  Future<void> _pickPhoto() async {
-    final path = await _pickCropCompressAndGetPath();
-    if (path == null) return;
-    setState(() {
-      _photoLocalPath = path;
-    });
+  Future<void> _pickAndCropImage() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 95,
+    );
+
+    if (picked == null) return;
+
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: picked.path,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Ajustar foto',
+          toolbarColor: AppColors.primary,
+          toolbarWidgetColor: Colors.white,
+          lockAspectRatio: true,
+        ),
+        IOSUiSettings(
+          title: 'Ajustar foto',
+          aspectRatioLockEnabled: true,
+        ),
+      ],
+    );
+
+    if (cropped != null) {
+      setState(() {
+        _photoLocalPath = cropped.path;
+        _photoUrl = null;
+      });
+    }
   }
 
   Future<void> _updatePost() async {
@@ -815,8 +776,9 @@ class _EditPostPageState extends State<EditPostPage> {
         !_seekingMusicians.any((m) => m.toLowerCase().contains('músico'));
 
     if (_selectedInstruments.isEmpty && !isBandSeekingBand) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione pelo menos um instrumento')),
+      AppSnackBar.showWarning(
+        context,
+        'Selecione pelo menos um instrumento',
       );
       return;
     }
@@ -872,6 +834,8 @@ class _EditPostPageState extends State<EditPostPage> {
         'level': _level,
         'message': _messageController.text.trim(),
         'photoUrl': photoUrl,
+        'activeProfileName': _name ?? '',
+        'activeProfilePhotoUrl': _profilePhotoUrl ?? '',
         'youtubeLink': youtubeLink,
         'city': _fetchedCity ?? _cityController.text.trim(),
         'neighborhood': _fetchedNeighborhood ?? '',
@@ -887,24 +851,46 @@ class _EditPostPageState extends State<EditPostPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post atualizado com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
+        AppSnackBar.showSuccess(
+          context,
+          'Post atualizado com sucesso!',
         );
+
+        await _notifyInterestFollowers(postId);
+
         Navigator.of(context).pop(true); // sinaliza que foi atualizado
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Erro ao atualizar: $e'),
-              backgroundColor: Colors.red),
+        AppSnackBar.showError(
+          context,
+          'Erro ao atualizar: $e',
         );
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _notifyInterestFollowers(String postId) async {
+    try {
+      final container = ProviderScope.containerOf(context, listen: false);
+      final notificationService = container.read(notificationServiceProvider);
+
+      await notificationService.createInterestNewPostNotifications(
+        postId: postId,
+        authorName: _name ?? '',
+        genres: _selectedGenres.toList(),
+        instruments: _selectedInstruments.toList(),
+        seeking: _postType == 'band'
+            ? _seekingMusicians.toList()
+            : const <String>[],
+        city: _fetchedCity ?? _cityController.text.trim(),
+      );
+
+      debugPrint('EditPostPage: ✅ Notificações de interesse atualizadas para $postId');
+    } catch (e) {
+      debugPrint('EditPostPage: ❌ Erro ao criar notificações de interesse: $e');
     }
   }
 
@@ -962,7 +948,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                               : null,
                                       child: (_profilePhotoUrl == null ||
                                               _profilePhotoUrl!.isEmpty)
-                                          ? const Icon(Icons.person,
+                                          ? const Icon(Iconsax.user,
                                               size: 32,
                                               color: AppThemeData.primaryColor)
                                           : null,
@@ -1011,7 +997,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                                 BorderRadius.circular(8),
                                           ),
                                           child: const Icon(
-                                            Icons.search,
+                                            Iconsax.search_normal,
                                             color: AppThemeData.secondaryColor,
                                             size: 24,
                                           ),
@@ -1324,7 +1310,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                               ? _level
                                               : null;
                                       return DropdownButtonFormField<String>(
-                                        initialValue: dropdownValue,
+                                        value: dropdownValue,
                                         decoration: InputDecoration(
                                           labelText: 'Selecione o nível',
                                           border: OutlineInputBorder(
@@ -1409,7 +1395,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                                       .text.isNotEmpty
                                                   ? IconButton(
                                                       icon: const Icon(
-                                                          Icons.clear),
+                                                          Iconsax.close_circle),
                                                       color: AppThemeData
                                                           .textSecondary,
                                                       onPressed: () {
@@ -1435,7 +1421,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                                     )
                                                   : _locationValidated
                                                       ? const Icon(
-                                                          Icons.check_circle,
+                                                          Iconsax.tick_circle,
                                                           color: Colors.green)
                                                       : null,
                                           border: OutlineInputBorder(
@@ -1580,7 +1566,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                                 _locationSuggestions[index];
                                             return ListTile(
                                               leading: const Icon(
-                                                  Icons.location_on,
+                                                  Iconsax.location,
                                                   color: AppThemeData
                                                       .primaryColor),
                                               title: Text(
@@ -1657,35 +1643,20 @@ class _EditPostPageState extends State<EditPostPage> {
                                           ),
                                           child: Row(
                                             children: [
-                                              Icon(Icons.check_circle,
+                                              Icon(Iconsax.tick_circle,
                                                   color: Colors.green.shade700,
                                                   size: 20),
                                               const SizedBox(width: 8),
                                               Expanded(
                                                 child: Text(
-                                                  () {
-                                                    final parts = <String>[];
-                                                    if (_fetchedNeighborhood !=
-                                                            null &&
-                                                        _fetchedNeighborhood!
-                                                            .isNotEmpty) {
-                                                      parts.add(
-                                                          _fetchedNeighborhood!);
-                                                    }
-                                                    if (_fetchedCity != null &&
-                                                        _fetchedCity!
-                                                            .isNotEmpty) {
-                                                      parts.add(_fetchedCity!);
-                                                    }
-                                                    if (_fetchedState != null &&
-                                                        _fetchedState!
-                                                            .isNotEmpty) {
-                                                      parts.add(_fetchedState!);
-                                                    }
-                                                    return parts.isNotEmpty
-                                                        ? parts.join(', ')
-                                                        : 'Localização validada';
-                                                  }(),
+                                                  formatCleanLocation(
+                                                    neighborhood:
+                                                        _fetchedNeighborhood,
+                                                    city: _fetchedCity,
+                                                    state: _fetchedState,
+                                                    fallback:
+                                                        'Localização validada',
+                                                  ),
                                                   style: TextStyle(
                                                       fontSize: 13,
                                                       color:
@@ -1715,7 +1686,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                           ),
                                           child: Row(
                                             children: [
-                                              Icon(Icons.info_outline,
+                                              Icon(Iconsax.info_circle,
                                                   color: Colors.orange.shade700,
                                                   size: 20),
                                               const SizedBox(width: 8),
@@ -1790,7 +1761,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                             borderRadius:
                                                 BorderRadius.circular(8),
                                           ),
-                                          child: const Icon(Icons.message,
+                                          child: const Icon(Iconsax.message,
                                               color:
                                                   AppThemeData.secondaryColor,
                                               size: 24),
@@ -1866,7 +1837,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                             borderRadius:
                                                 BorderRadius.circular(8),
                                           ),
-                                          child: const Icon(Icons.photo_camera,
+                                          child: const Icon(Iconsax.camera,
                                               color: AppThemeData.primaryColor,
                                               size: 24),
                                         ),
@@ -1877,7 +1848,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                     ),
                                     const SizedBox(height: 12),
                                     GestureDetector(
-                                      onTap: _pickPhoto,
+                                      onTap: _pickAndCropImage,
                                       child: Container(
                                         width: double.infinity,
                                         height: 180,
@@ -1931,7 +1902,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                                         color: AppThemeData
                                                             .surfaceColor,
                                                         child: Icon(
-                                                            Icons.error_outline,
+                                                            Iconsax.danger,
                                                             color: Colors.red),
                                                       ),
                                                     ),
@@ -1941,7 +1912,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                                         MainAxisAlignment
                                                             .center,
                                                     children: [
-                                                      Icon(Icons.add_a_photo,
+                                                      Icon(Iconsax.camera,
                                                           size: 48,
                                                           color: AppThemeData
                                                               .textSecondary
@@ -1982,7 +1953,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                                 BorderRadius.circular(8),
                                           ),
                                           child: const Icon(
-                                              Icons.play_circle_fill,
+                                              Iconsax.play_circle,
                                               color: Colors.red,
                                               size: 24),
                                         ),
@@ -2015,7 +1986,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                         hintStyle: TextStyle(
                                             color: AppThemeData.textSecondary
                                                 .withValues(alpha: 0.6)),
-                                        prefixIcon: const Icon(Icons.link,
+                                        prefixIcon: const Icon(Iconsax.link,
                                             color: AppThemeData.primaryColor),
                                         border: OutlineInputBorder(
                                           borderRadius:
@@ -2107,7 +2078,7 @@ class _EditPostPageState extends State<EditPostPage> {
                                                               BoxShape.circle,
                                                         ),
                                                         child: const Icon(
-                                                            Icons.play_arrow,
+                                                            Iconsax.play,
                                                             color: Colors.white,
                                                             size: 40),
                                                       ),

@@ -1,108 +1,37 @@
-name: wegig
-description: "WeGig - Plataforma para conectar músicos e bandas via busca geolocalizada"
+name: wegig_monorepo
+description: "WeGig Monorepo - Plataforma para conectar músicos e bandas"
 publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.9.2 <4.0.0"
+  sdk: ">=3.6.0 <4.0.0"
+
+# Este é o pubspec do monorepo raiz.
+# Os apps reais estão em packages/app/ e packages/core_ui/
+# Para builds iOS/Android, execute os comandos de dentro do diretório packages/app/
 
 dependencies:
-  flutter_typeahead: ^5.0.0
+  # Referência aos pacotes internos
+  wegig_app:
+    path: packages/app
+  core_ui:
+    path: packages/core_ui
+
   flutter:
     sdk: flutter
-
-  # Firebase Services (versões fixadas para estabilidade)
-  firebase_core: ">=4.2.0 <5.0.0"
-  firebase_auth: ">=6.1.1 <7.0.0"
-  firebase_crashlytics: ">=5.0.5 <6.0.0"
-  cloud_firestore: ">=6.0.3 <7.0.0"
-  firebase_storage: ">=13.0.4 <14.0.0"
-  firebase_messaging: ">=16.0.3 <17.0.0"
-  firebase_analytics: ">=12.0.3 <13.0.0"
-  flutter_local_notifications: ^18.0.1 # Notificações locais para foreground
-
-  # Google Services
-  google_sign_in: ^6.2.1 # Versão estável com API compatível
-  google_maps_flutter: ^2.14.0
-  geolocator: ">=14.0.2 <15.0.0"
-
-  # Apple Sign In
-  sign_in_with_apple: ^6.1.3 # Sign In with Apple oficial
-
-  # Mídia & Imagens
-  image_picker: ">=1.2.0 <2.0.0"
-  image_cropper: ">=11.0.0 <12.0.0"
-  flutter_image_compress: ">=2.4.0 <3.0.0"
-
-  cached_network_image: ^3.4.1 # Cache de imagens para performance
-  flutter_riverpod: ^3.0.3
-  freezed_annotation: ^2.4.4 # Annotations para freezed
-  json_annotation: ^4.9.0 # Annotations para json_serializable
-
-  # Vídeo & Web
-  youtube_player_flutter: ">=9.1.3 <10.0.0"
-  url_launcher: ">=6.2.5 <7.0.0"
-  flutter_linkify: ^6.0.0 # Detecta e torna URLs clicáveis automaticamente
-  http: ">=1.1.0 <2.0.0" # Usado para validação de YouTube URL
-
-  # Utilitários
-  cupertino_icons: ">=1.0.8 <2.0.0"
-  shared_preferences: ">=2.2.2 <3.0.0"
-  uuid: ">=4.3.3 <5.0.0"
-  path: ">=1.8.3 <2.0.0"
-  path_provider: ">=2.0.0 <3.0.0"
-  flutter_dotenv: ^6.0.0 # Gerenciamento seguro de variáveis de ambiente
-  flutter_secure_storage: ^9.2.2 # Armazenamento seguro usando Keychain (iOS) e Keystore (Android)
-  timeago: ^3.7.0 # Timestamps relativos internacionalizados (agora, 5min atrás, etc)
-  share_plus: ^12.0.1 # Compartilhamento nativo (WhatsApp, Facebook, etc)
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
-  collection: ^1.19.1
-  rxdart: ^0.28.0 # Reactive Extensions para combinar streams (usado em notifications_page)
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ">=6.0.0 <7.0.0"
-
-  # Code generation
-  build_runner: ^2.4.12
-  freezed: ^2.5.7
-  json_serializable: ^6.8.0
-
-  # Ferramentas de desenvolvimento
-  flutter_launcher_icons: ^0.14.1 # Geração automática de ícones
-  flutter_native_splash: ^2.4.1 # Splash screen nativa otimizada
-  flutter_flavorizr: ^2.2.3 # Gerenciamento de flavors (dev/staging/prod)
-  very_good_analysis: ^10.0.0
-
-# Configuração do ícone do app (executar: flutter pub run flutter_launcher_icons)
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: "assets/icon/app_icon.png"
-  adaptive_icon_background: "#37475A" # Cor Primary (Design Minimalista)
-  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
-
-flutter:
-  uses-material-design: true
-
-  assets:
-    - assets/Logo/
-    - assets/avatar_placeholder.png
-    - assets/maps_style.json
-    - assets/icon/app_icon.png
-    - assets/icon/app_icon_foreground.png
-    - .env # Variáveis de ambiente (API keys)
-
-  fonts:
-    - family: Cereal
-      fonts:
-        - asset: assets/fonts/Cereal-Regular.otf
-          weight: 400
-        - asset: assets/fonts/Cereal-Medium.otf
-          weight: 500
-        - asset: assets/fonts/Cereal-Bold.otf
-          weight: 600
-        - asset: assets/fonts/Cereal-ExtraBold.otf
-          weight: 700
+# NOTA: Este pubspec é apenas para o workspace raiz do monorepo.
+# As dependências reais do app estão em packages/app/pubspec.yaml
+# As dependências compartilhadas de UI estão em packages/core_ui/pubspec.yaml
+#
+# Para executar o app:
+#   cd packages/app
+#   flutter run -t lib/main_dev.dart --device-id=<DEVICE_ID>
+#
+# Para build iOS:
+#   cd packages/app
+#   flutter build ios --debug --no-codesign -t lib/main_dev.dart

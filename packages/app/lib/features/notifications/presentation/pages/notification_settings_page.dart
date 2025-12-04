@@ -1,11 +1,11 @@
-import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/core_ui.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// TODO: Restore push notification service when implemented
-// import '../../../../services/push_notification_service.dart';
+import 'package:wegig_app/features/notifications/presentation/providers/push_notification_provider.dart';
 import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Página de configurações de notificações
 ///
@@ -76,7 +76,7 @@ class _NotificationSettingsPageState
           children: [
             const Row(
               children: [
-                Icon(Icons.notifications_active, color: AppColors.accent),
+                Icon(Iconsax.notification_bing, color: AppColors.accent),
                 SizedBox(width: 12),
                 Text(
                   'Status das Notificações',
@@ -104,7 +104,7 @@ class _NotificationSettingsPageState
                     Row(
                       children: [
                         Icon(
-                          isAuthorized ? Icons.check_circle : Icons.error,
+                          isAuthorized ? Iconsax.tick_circle : Iconsax.danger,
                           color: isAuthorized
                               ? AppColors.success
                               : AppColors.error,
@@ -126,7 +126,7 @@ class _NotificationSettingsPageState
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: _requestPermission,
-                          icon: const Icon(Icons.notifications),
+                          icon: const Icon(Iconsax.notification),
                           label: const Text('Solicitar Permissão'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.accent,
@@ -146,7 +146,7 @@ class _NotificationSettingsPageState
   }
 
   /// Card de configurações de posts próximos
-  Widget _buildProximityNotificationsCard(activeProfile) {
+  Widget _buildProximityNotificationsCard(ProfileEntity activeProfile) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -155,7 +155,7 @@ class _NotificationSettingsPageState
           children: [
             const Row(
               children: [
-                Icon(Icons.location_on, color: AppColors.accent),
+                Icon(Iconsax.location, color: AppColors.accent),
                 SizedBox(width: 12),
                 Text(
                   'Posts Próximos',
@@ -180,7 +180,11 @@ class _NotificationSettingsPageState
                   (activeProfile.notificationRadiusEnabled as bool?) ?? false,
               onChanged: _toggleProximityNotifications,
               title: const Text('Ativar notificações de proximidade'),
-              activeThumbColor: AppColors.accent,
+              thumbColor: MaterialStateProperty.resolveWith<Color?>(
+                (states) => states.contains(MaterialState.selected)
+                    ? AppColors.accent
+                    : AppColors.border,
+              ),
               contentPadding: EdgeInsets.zero,
             ),
             if ((activeProfile.notificationRadiusEnabled as bool?) ??
@@ -228,7 +232,7 @@ class _NotificationSettingsPageState
           children: [
             const Row(
               children: [
-                Icon(Icons.tune, color: AppColors.accent),
+                Icon(Iconsax.setting_2, color: AppColors.accent),
                 SizedBox(width: 12),
                 Text(
                   'Tipos de Notificação',
@@ -241,21 +245,21 @@ class _NotificationSettingsPageState
             ),
             const SizedBox(height: 16),
             _buildNotificationTypeItem(
-              icon: Icons.location_on,
+              icon: Iconsax.location,
               title: 'Posts próximos',
               description: 'Novos posts na sua região',
               enabled: true,
             ),
             const Divider(),
             _buildNotificationTypeItem(
-              icon: Icons.favorite,
+              icon: Iconsax.heart5,
               title: 'Interesses',
               description: 'Quando alguém demonstra interesse no seu post',
               enabled: true,
             ),
             const Divider(),
             _buildNotificationTypeItem(
-              icon: Icons.message,
+              icon: Iconsax.message,
               title: 'Mensagens',
               description: 'Novas mensagens no chat',
               enabled: true,
@@ -300,7 +304,7 @@ class _NotificationSettingsPageState
             ),
           ),
           Icon(
-            enabled ? Icons.check_circle : Icons.cancel,
+            enabled ? Iconsax.tick_circle : Iconsax.close_circle,
             color: enabled ? AppColors.success : AppColors.textHint,
           ),
         ],
@@ -342,7 +346,7 @@ class _NotificationSettingsPageState
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.send),
+                    : const Icon(Iconsax.send_2),
                 label: Text(_isLoading ? 'Enviando...' : 'Enviar Teste'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
@@ -358,11 +362,13 @@ class _NotificationSettingsPageState
 
   /// Solicita permissão de notificações
   Future<void> _requestPermission() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Restore push notification service when implemented
-      final settings = await FirebaseMessaging.instance.requestPermission();
+      // Usar PushNotificationService
+      final pushService = ref.read(pushNotificationServiceProvider);
+      final settings = await pushService.requestPermission();
 
       if (!mounted) return;
 
@@ -370,35 +376,20 @@ class _NotificationSettingsPageState
         // Salvar token para perfil ativo
         final activeProfile = ref.read(activeProfileProvider);
         if (activeProfile != null) {
-          // TODO: Save token for profile
-          // await pushService.saveTokenForProfile(activeProfile.profileId);
+          await pushService.saveTokenForProfile(activeProfile.profileId);
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Permissão concedida!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        AppSnackBar.showSuccess(context, '✅ Permissão concedida!');
 
         // Rebuild UI
+        if (!mounted) return;
         setState(() {});
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Permissão negada'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppSnackBar.showError(context, '❌ Permissão negada');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackBar.showError(context, 'Erro: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -406,11 +397,12 @@ class _NotificationSettingsPageState
     }
   }
 
-  /// Ativa/desativa notificações de proximidade
+  /// Alterna notificações de proximidade
   Future<void> _toggleProximityNotifications(bool enabled) async {
     final activeProfile = ref.read(activeProfileProvider);
     if (activeProfile == null) return;
 
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
@@ -423,24 +415,15 @@ class _NotificationSettingsPageState
       ref.invalidate(profileProvider);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            enabled
-                ? '✅ Notificações de proximidade ativadas'
-                : '🔕 Notificações de proximidade desativadas',
-          ),
-          backgroundColor: AppColors.success,
-        ),
+      AppSnackBar.showSuccess(
+        context,
+        enabled
+            ? '✅ Notificações de proximidade ativadas'
+            : '🔕 Notificações de proximidade desativadas',
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackBar.showError(context, 'Erro: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -468,6 +451,7 @@ class _NotificationSettingsPageState
 
   /// Envia notificação de teste
   Future<void> _sendTestNotification() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
@@ -492,22 +476,14 @@ class _NotificationSettingsPageState
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              '✅ Notificação de teste enviada! Verifique a aba de notificações.'),
-          backgroundColor: AppColors.success,
-          duration: Duration(seconds: 3),
-        ),
+      AppSnackBar.showSuccess(
+        context,
+        '✅ Notificação de teste enviada! Verifique a aba de notificações.',
+        duration: const Duration(seconds: 3),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao enviar teste: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackBar.showError(context, 'Erro ao enviar teste: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

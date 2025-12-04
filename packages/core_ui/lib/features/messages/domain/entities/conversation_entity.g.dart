@@ -24,6 +24,10 @@ _$ConversationEntityImpl _$$ConversationEntityImplFromJson(
       unreadCount: Map<String, int>.from(json['unreadCount'] as Map),
       createdAt: DateTime.parse(json['createdAt'] as String),
       archived: json['archived'] as bool? ?? false,
+      archivedProfileIds: (json['archivedProfileIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const <String>[],
       updatedAt: json['updatedAt'] == null
           ? null
           : DateTime.parse(json['updatedAt'] as String),
@@ -40,5 +44,6 @@ Map<String, dynamic> _$$ConversationEntityImplToJson(
       'unreadCount': instance.unreadCount,
       'createdAt': instance.createdAt.toIso8601String(),
       'archived': instance.archived,
+      'archivedProfileIds': instance.archivedProfileIds,
       'updatedAt': instance.updatedAt?.toIso8601String(),
     };

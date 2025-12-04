@@ -188,7 +188,7 @@ final getUnreadNotificationCountUseCaseProvider =
 typedef GetUnreadNotificationCountUseCaseRef
     = AutoDisposeProviderRef<GetUnreadNotificationCount>;
 String _$notificationsStreamHash() =>
-    r'efc7769af9b718f353218f62457cd3f354c04b4c';
+    r'87928495b0794effe4fe13454d2ffb1ec76852be';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -357,7 +357,7 @@ class _NotificationsStreamProviderElement
 }
 
 String _$unreadNotificationCountForProfileHash() =>
-    r'c274a4ee3272789d20ad2e3835751c221ca4f066';
+    r'2630f0abaf95b8616ea0327e1fe4c10bbe0433d3';
 
 /// Stream de contador de não lidas para BottomNav badge
 ///

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Widget para exibir badges de conquistas do usuário
 /// Exemplo: "Top Músico da Semana", "Ativo", "Verificado"
@@ -74,7 +75,7 @@ class UserBadges extends StatelessWidget {
         badges.add({
           'text': 'Ativo',
           'color': AppColors.success,
-          'icon': Icons.check_circle,
+          'icon': Iconsax.tick_circle,
         });
       }
     }
@@ -85,7 +86,7 @@ class UserBadges extends StatelessWidget {
       badges.add({
         'text': 'Verificado',
         'color': AppColors.primary,
-        'icon': Icons.verified,
+        'icon': Iconsax.verify,
       });
     }
 
@@ -95,7 +96,7 @@ class UserBadges extends StatelessWidget {
       badges.add({
         'text': isBand ? 'Top Banda' : 'Top Músico',
         'color': AppColors.accent,
-        'icon': Icons.star,
+        'icon': Iconsax.star,
       });
     }
 
@@ -107,7 +108,7 @@ class UserBadges extends StatelessWidget {
         badges.add({
           'text': 'Novo',
           'color': AppColors.primary,
-          'icon': Icons.fiber_new,
+          'icon': Iconsax.medal_star,
         });
       }
     }
@@ -118,7 +119,7 @@ class UserBadges extends StatelessWidget {
       badges.add({
         'text': 'Premium',
         'color': const Color(0xFFFFD700), // Dourado
-        'icon': Icons.workspace_premium,
+        'icon': Iconsax.crown,
       });
     }
 

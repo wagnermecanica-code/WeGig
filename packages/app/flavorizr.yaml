@@ -1,0 +1,96 @@
+# Configuração de Flavors para WeGig
+# Executar: flutter pub run flutter_flavorizr
+
+flavors:
+  # ========== DEV FLAVOR ==========
+  # Ambiente de desenvolvimento com logs completos
+  dev:
+    app:
+      name: "WeGig DEV"
+
+    android:
+      applicationId: "com.tosembanda.wegig.dev"
+      firebase:
+        config: "../../firebase/dev/google-services.json"
+
+    ios:
+      bundleId: "com.tosembanda.wegig.dev"
+      firebase:
+        config: "../../firebase/dev/GoogleService-Info.plist"
+
+    variables:
+      APP_ENV: "development"
+      API_BASE_URL: "https://dev-api.tosembanda.com"
+      FIREBASE_PROJECT_ID: "to-sem-banda-dev"
+      ENABLE_LOGS: "true"
+      ENABLE_CRASHLYTICS: "false"
+      APP_FLAVOR: "dev"
+
+  # ========== STAGING FLAVOR ==========
+  # Ambiente de homologação para testes internos
+  staging:
+    app:
+      name: "WeGig STAGING"
+
+    android:
+      applicationId: "com.tosembanda.wegig.staging"
+      firebase:
+        config: "../../firebase/staging/google-services.json"
+
+    ios:
+      bundleId: "com.tosembanda.wegig.staging"
+      firebase:
+        config: "../../firebase/staging/GoogleService-Info.plist"
+
+    variables:
+      APP_ENV: "staging"
+      API_BASE_URL: "https://staging-api.tosembanda.com"
+      FIREBASE_PROJECT_ID: "to-sem-banda-staging"
+      ENABLE_LOGS: "true"
+      ENABLE_CRASHLYTICS: "true"
+      APP_FLAVOR: "staging"
+
+  # ========== PROD FLAVOR ==========
+  # Ambiente de produção (App Store / Google Play)
+  prod:
+    app:
+      name: "WeGig"
+
+    android:
+      applicationId: "com.tosembanda.wegig"
+      firebase:
+        config: "../../firebase/prod/google-services.json"
+
+    ios:
+      bundleId: "com.tosembanda.wegig"
+      firebase:
+        config: "../../firebase/prod/GoogleService-Info.plist"
+
+    variables:
+      APP_ENV: "production"
+      API_BASE_URL: "https://api.tosembanda.com"
+      FIREBASE_PROJECT_ID: "to-sem-banda-83e19"
+      ENABLE_LOGS: "false"
+      ENABLE_CRASHLYTICS: "true"
+      APP_FLAVOR: "prod"
+
+# ========== CONFIGURAÇÕES GLOBAIS ==========
+instructions:
+  # - android:androidManifest
+  # - android:buildGradle
+  - flutter:flavors
+  - flutter:targets
+  - ios:xcconfig
+  - ios:buildTargets
+  - ios:schema
+  - ios:plist
+
+# ========== ÍCONES DOS FLAVORS ==========
+# Ícones serão gerados automaticamente a partir do ícone base
+app:
+  android:
+    icon: "assets/icon/app_icon.png"
+  ios:
+    icon: "assets/icon/app_icon.png"
+
+ide: vscode

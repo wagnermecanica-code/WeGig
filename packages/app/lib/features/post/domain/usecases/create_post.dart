@@ -4,9 +4,11 @@ import 'package:wegig_app/features/post/domain/repositories/post_repository.dart
 /// UseCase: Criar um novo post
 /// Valida campos obrigatórios antes de criar
 class CreatePost {
+  /// Cria uma instância de CreatePost
   CreatePost(this._repository);
   final PostRepository _repository;
 
+  /// Executa a criação do post com validações
   Future<PostEntity> call(PostEntity post) async {
     // Validações
     if (post.content.trim().isEmpty) {

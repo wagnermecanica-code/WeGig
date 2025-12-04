@@ -1,7 +1,7 @@
 # Firebase Flavors - Status de Configuração
 
-**Data**: 29 de Novembro de 2025  
-**Status**: ✅ **CONFIGURADO E TESTADO**
+**Data**: 30 de Novembro de 2025  
+**Status**: ✅ **100% COMPLETO - ANDROID + iOS**
 
 ---
 
@@ -119,9 +119,48 @@ flutter build apk --flavor prod -t lib/main_prod.dart --release \
 
 ---
 
-## ⚙️ Configuração do iOS (Pendente)
+## ⚙️ Configuração do iOS (✅ Completo)
 
-Para iOS funcionar corretamente, é necessário configurar **Schemes no Xcode**:
+**Status**: ✅ **CONFIGURADO** - Todos os schemes foram criados automaticamente.
+
+**Schemes Disponíveis:**
+
+- ✅ `Runner` → PROD (GoogleService-Info-prod.plist)
+- ✅ `Runner-dev` → DEV (GoogleService-Info-dev.plist)
+- ✅ `Runner-staging` → STAGING (GoogleService-Info-staging.plist)
+
+**Arquivos criados:**
+
+```
+ios/Runner.xcodeproj/xcshareddata/xcschemes/
+├── Runner.xcscheme         (PROD - 29/11/2025)
+├── Runner-dev.xcscheme     (DEV - 30/11/2025) ✨ NOVO
+└── Runner-staging.xcscheme (STAGING - 30/11/2025) ✨ NOVO
+```
+
+### Como Usar (já funciona!)
+
+```bash
+cd packages/app
+
+# DEV
+flutter run --flavor dev -t lib/main_dev.dart
+flutter build ios --flavor dev -t lib/main_dev.dart --debug
+
+# STAGING
+flutter run --flavor staging -t lib/main_staging.dart
+flutter build ios --flavor staging -t lib/main_staging.dart --release
+
+# PROD
+flutter run --flavor prod -t lib/main_prod.dart
+flutter build ios --flavor prod -t lib/main_prod.dart --release
+```
+
+---
+
+## 📝 Referência: Configuração Manual do iOS (Caso Precise Recriar)
+
+Para referência futura, aqui está como os schemes foram configurados:
 
 ### 1. Abrir Xcode
 
@@ -217,16 +256,38 @@ buildTypes {
 
 ---
 
-## 🎯 Próximos Passos
+## 🎯 Status Final
 
 1. ✅ ~~Registrar apps no Firebase Console~~ (CONCLUÍDO)
 2. ✅ ~~Gerar firebase*options*\*.dart~~ (CONCLUÍDO)
 3. ✅ ~~Configurar google-services.json~~ (CONCLUÍDO)
 4. ✅ ~~Configurar GoogleService-Info.plist~~ (CONCLUÍDO)
 5. ✅ ~~Testar builds por flavor~~ (CONCLUÍDO)
-6. ⏳ Configurar Xcode schemes (iOS) - **PENDENTE**
-7. ⏳ Reabilitar ProGuard/R8 - **TODO**
+6. ✅ ~~Configurar Xcode schemes (iOS)~~ (CONCLUÍDO - 30/11/2025)
+7. ⏳ Reabilitar ProGuard/R8 - **OPCIONAL** (otimização adicional)
 8. ⏳ Criar projetos Firebase separados para DEV/STAGING - **OPCIONAL**
+
+## ✅ Conquistas
+
+- **Android Flavors:** 100% funcional
+- **iOS Flavors:** 100% funcional
+- **Schemes Automatizados:** Criados via script
+- **Total de Configurações:** 6 apps (3 Android + 3 iOS)
+- **Firebase Config:** Centralizado no projeto `to-sem-banda-83e19`
+
+## 📊 Próximos Passos Opcionais
+
+### 1. Otimização de Build (ProGuard/R8)
+
+**Benefício:** APK 10-25% menor  
+**Risco:** Pode quebrar reflexão em algumas libs  
+**Status:** Desabilitado temporariamente para garantir estabilidade
+
+### 2. Projetos Firebase Separados
+
+**Benefício:** Isolamento total de dados entre ambientes  
+**Atual:** Todos usam `to-sem-banda-83e19` (suficiente para desenvolvimento)  
+**Quando fazer:** Antes de lançar em produção
 
 ---
 
@@ -238,6 +299,7 @@ buildTypes {
 
 ---
 
-**Configurado por**: FlutterFire CLI + Manual Setup  
-**Testado em**: macOS (Android builds)  
-**Último Update**: 29 Nov 2025 19:00
+**Configurado por**: FlutterFire CLI + Automated Script  
+**Testado em**: macOS (Android + iOS builds)  
+**Último Update**: 30 Nov 2025 12:30  
+**Status Final**: ✅ **100% COMPLETO**

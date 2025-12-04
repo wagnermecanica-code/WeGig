@@ -10,6 +10,13 @@ class LoadConversations {
     int limit = 20,
     ConversationEntity? startAfter,
   }) async {
+    if (profileId.isEmpty) {
+      throw ArgumentError('ID do perfil é obrigatório');
+    }
+    if (limit <= 0) {
+      throw ArgumentError('Limite deve ser maior que zero');
+    }
+
     return _repository.getConversations(
       profileId: profileId,
       limit: limit,

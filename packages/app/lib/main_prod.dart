@@ -1,41 +1,37 @@
-import 'dart:ui' show PlatformDispatcher;
-
-import 'package:core_ui/services/env_service.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show WidgetsFlutterBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wegig_app/bootstrap/bootstrap_core.dart';
 import 'package:wegig_app/firebase_options_prod.dart';
 import 'package:wegig_app/main.dart' show WeGigApp;
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Carregar variáveis de ambiente
-  await EnvService.init();
-
-  // Initialize Firebase with PRODUCTION configuration
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+  await bootstrapCoreServices(
+    firebaseOptions: DefaultFirebaseOptions.currentPlatform,
+    flavorLabel: 'prod',
+    expectedProjectId: 'wegig-dev',
+    backgroundHandler: _firebaseMessagingBackgroundHandler,
+    enableCrashlytics: true,
+    printEnvOnDebug: false,
   );
 
-  // Configurar Crashlytics (habilitado em PROD)
-  FlutterError.onError = (details) {
-    // Não logar em produção - apenas enviar para Crashlytics
-    FirebaseCrashlytics.instance.recordFlutterFatalError(details);
-  };
-
-  PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true;
-  };
-
-  // Lock orientation to portrait
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-
   runApp(const ProviderScope(child: WeGigApp()));
+}
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
+
+  debugPrint('📩 [prod] Background Message: ${message.messageId}');
+  debugPrint('   Title: ${message.notification?.title}');
+  debugPrint('   Body: ${message.notification?.body}');
+  debugPrint('   Data: ${message.data}');
 }

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:wegig_app/features/post/data/datasources/post_remote_datasource.dart';
@@ -16,11 +17,13 @@ void main() {
     // Use mocks to avoid Firebase initialization
     final mockDataSource = _MockPostRemoteDataSource();
     final mockRepository = _MockPostRepository();
+    final fakeAuth = _StubFirebaseAuth();
 
     container = ProviderContainer(
       overrides: [
         postRemoteDataSourceProvider.overrideWithValue(mockDataSource),
         postRepositoryNewProvider.overrideWithValue(mockRepository),
+        postFirebaseAuthProvider.overrideWithValue(fakeAuth),
       ],
     );
   });
@@ -220,6 +223,7 @@ void main() {
           postRemoteDataSourceProvider
               .overrideWithValue(_MockPostRemoteDataSource()),
           postRepositoryNewProvider.overrideWithValue(_MockPostRepository()),
+          postFirebaseAuthProvider.overrideWithValue(_StubFirebaseAuth()),
         ],
       );
 
@@ -241,6 +245,7 @@ void main() {
           postRemoteDataSourceProvider
               .overrideWithValue(_MockPostRemoteDataSource()),
           postRepositoryNewProvider.overrideWithValue(_MockPostRepository()),
+          postFirebaseAuthProvider.overrideWithValue(_StubFirebaseAuth()),
         ],
       );
 
@@ -265,6 +270,14 @@ class _MockPostRemoteDataSource implements IPostRemoteDataSource {
 }
 
 class _MockPostRepository implements PostRepository {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _StubFirebaseAuth implements FirebaseAuth {
+  @override
+  User? get currentUser => null;
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

@@ -17,7 +17,9 @@ export 'services/env_service.dart';
 
 // Widgets
 export 'widgets/app_loading_overlay.dart';
-export 'widgets/post_card.dart';
+export 'widgets/app_dialogs.dart';
+export 'widgets/app_bottom_sheet.dart';
+export 'widgets/mention_text.dart';
 
 // Domain Entities
 export 'features/profile/domain/entities/profile_entity.dart';
@@ -29,7 +31,12 @@ export 'features/settings/domain/entities/user_settings_entity.dart';
 
 // Models
 export 'models/search_params.dart';
+export 'models/user_type.dart';
+
+// Utils
+export 'utils/app_snackbar.dart';
+export 'utils/location_utils.dart';
 
 // Core Types
-export 'core/ui_state.dart';
+export 'core/ui_state.dart' hide Success; // Hide Success to avoid conflict with result.dart
 export 'core/result.dart';

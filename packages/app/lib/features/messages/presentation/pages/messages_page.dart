@@ -3,16 +3,35 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/messages/domain/entities/conversation_entity.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/widgets/conversation_item.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
 import 'package:wegig_app/features/messages/presentation/providers/messages_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+
+class _ConversationSnapshotFutures {
+  const _ConversationSnapshotFutures({
+    required this.doc,
+    required this.otherProfileId,
+    required this.otherUserId,
+    required this.profileFuture,
+    required this.userFuture,
+  });
+
+  final QueryDocumentSnapshot<Map<String, dynamic>> doc;
+  final String otherProfileId;
+  final String otherUserId;
+  final Future<DocumentSnapshot<Map<String, dynamic>>?> profileFuture;
+  final Future<DocumentSnapshot<Map<String, dynamic>>?> userFuture;
+}
 
 /// Tela principal de mensagens
 /// Lista todas as conversas do usuário com preview da última mensagem
@@ -25,12 +44,14 @@ class MessagesPage extends ConsumerStatefulWidget {
 class _MessagesPageState extends ConsumerState<MessagesPage> {
   // Controllers e estado
   final ScrollController _scrollController = ScrollController();
-  StreamSubscription? _conversationsSubscription;
-  Box? _conversationsBox;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+      _conversationsSubscription;
+  Box<dynamic>? _conversationsBox;
   List<ConversationEntity> _conversations = [];
   bool _isLoading = true;
-  ProviderSubscription?
+    ProviderSubscription<AsyncValue<ProfileState>>?
       _profileListener; // ✅ Armazena subscription para cleanup
+    bool _hasSyncedInitialProfile = false;
 
   // Paginação
   DocumentSnapshot? _lastConversationDoc;
@@ -44,33 +65,35 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
   /// Carrega mais conversas para paginação
   Future<void> _loadMoreConversations() async {
     if (_isLoadingMore || !_hasMoreConversations) return;
+    if (!mounted) return;
     setState(() => _isLoadingMore = true);
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      setState(() => _isLoadingMore = false);
+      if (mounted) setState(() => _isLoadingMore = false);
       return;
     }
     final activeProfile = ref.read(activeProfileProvider);
     if (activeProfile == null) {
       debugPrint(
           'MessagesPage: ❌ Não há perfil ativo para carregar mais conversas');
-      setState(() => _isLoadingMore = false);
+      if (mounted) setState(() => _isLoadingMore = false);
       return;
     }
     final currentProfileId = activeProfile.profileId;
     final query = FirebaseFirestore.instance
         .collection('conversations')
         .where('participantProfiles', arrayContains: currentProfileId)
-        .where('archived', isEqualTo: false)
         .orderBy('lastMessageTimestamp', descending: true)
         .startAfterDocument(_lastConversationDoc!)
         .limit(_conversationsPerPage);
     final querySnapshot = await query.get();
     if (querySnapshot.docs.isEmpty) {
-      setState(() {
-        _hasMoreConversations = false;
-        _isLoadingMore = false;
-      });
+      if (mounted) {
+        setState(() {
+          _hasMoreConversations = false;
+          _isLoadingMore = false;
+        });
+      }
       return;
     }
     final profileFutures = querySnapshot.docs.map((doc) {
@@ -87,41 +110,35 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
         (id) => id != currentUser.uid,
         orElse: () => currentUser.uid,
       );
-      return {
-        'doc': doc,
-        'otherProfileId': otherProfileId,
-        'otherUserId': otherUserId,
-        'profileFuture': otherProfileId.isNotEmpty
+      return _ConversationSnapshotFutures(
+        doc: doc,
+        otherProfileId: otherProfileId,
+        otherUserId: otherUserId,
+        profileFuture: otherProfileId.isNotEmpty
             ? FirebaseFirestore.instance
                 .collection('profiles')
                 .doc(otherProfileId)
                 .get()
-            : Future.value(),
-        'userFuture': otherUserId.isNotEmpty
+            : Future<DocumentSnapshot<Map<String, dynamic>>?>.value(),
+        userFuture: otherUserId.isNotEmpty
             ? FirebaseFirestore.instance
                 .collection('users')
                 .doc(otherUserId)
                 .get()
-            : Future.value(),
-      };
+            : Future<DocumentSnapshot<Map<String, dynamic>>?>.value(),
+      );
     }).toList();
 
-    final profileSnapshots = await Future.wait(
-      profileFutures
-          .map((item) => item['profileFuture']! as Future<DocumentSnapshot?>)
-          .toList(),
-    );
+    final profileSnapshots =
+        await Future.wait(profileFutures.map((item) => item.profileFuture));
 
-    final userSnapshots = await Future.wait(
-      profileFutures
-          .map((item) => item['userFuture']! as Future<DocumentSnapshot?>)
-          .toList(),
-    );
+    final userSnapshots =
+        await Future.wait(profileFutures.map((item) => item.userFuture));
 
     final newConversations = <ConversationEntity>[];
     for (var i = 0; i < profileFutures.length; i++) {
       final item = profileFutures[i];
-      final doc = item['doc']! as QueryDocumentSnapshot<Map<String, dynamic>>;
+      final doc = item.doc;
       final otherProfileDoc = profileSnapshots[i];
       final otherUserDoc = userSnapshots[i];
 
@@ -131,15 +148,14 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
 
       try {
         // Build profiles data list
-        final otherProfileData =
-            otherProfileDoc.data() as Map<String, dynamic>?;
-        final otherUserData = otherUserDoc?.data() as Map<String, dynamic>?;
+        final otherProfileData = otherProfileDoc.data();
+        final otherUserData = otherUserDoc?.data();
 
         final profilesData = <Map<String, dynamic>>[];
         if (otherProfileData != null) {
           profilesData.add({
             'profileId': otherProfileDoc.id,
-            'uid': otherUserData?['uid'] ?? item['otherUserId'],
+            'uid': otherUserData?['uid'] ?? item.otherUserId,
             'name': otherProfileData['name'] ?? 'Usuário',
             'photoUrl': otherProfileData['photoUrl'] ?? '',
             ...otherProfileData,
@@ -154,13 +170,22 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
         continue;
       }
     }
-    setState(() {
-      _conversations.addAll(newConversations);
-      _isLoadingMore = false;
-      if (querySnapshot.docs.isNotEmpty) {
-        _lastConversationDoc = querySnapshot.docs.last;
-      }
-    });
+    if (mounted) {
+      final filtered = newConversations
+          .where(
+            (conversation) =>
+                !conversation.archivedProfileIds.contains(currentProfileId),
+          )
+          .toList();
+
+      setState(() {
+        _conversations.addAll(filtered);
+        _isLoadingMore = false;
+        if (querySnapshot.docs.isNotEmpty) {
+          _lastConversationDoc = querySnapshot.docs.last;
+        }
+      });
+    }
 
     // Salvar no cache usando toJson
     try {
@@ -177,17 +202,28 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
     try {
       final cached = _conversationsBox?.get('conversations') as List<dynamic>?;
       if (cached != null && cached.isNotEmpty) {
-        setState(() {
-          _conversations = cached
-              .map((item) =>
-                  ConversationEntity.fromJson(item as Map<String, dynamic>))
-              .toList();
-          _isLoading = false;
-        });
+        final activeProfileId = ref.read(activeProfileProvider)?.profileId;
+        final cachedConversations = cached
+            .map((item) =>
+                ConversationEntity.fromJson(item as Map<String, dynamic>))
+            .where(
+              (conversation) => activeProfileId == null
+                  ? true
+                  : !conversation.archivedProfileIds
+                      .contains(activeProfileId),
+            )
+            .toList();
+
+        if (mounted) {
+          setState(() {
+            _conversations = cachedConversations;
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       debugPrint('MessagesPage: Erro ao carregar cache: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -197,6 +233,16 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
   static const Color _brandOrange = Color(0xFFE47911);
   static const Color _backgroundColor = Color(0xFFFFFFFF);
 
+  /// Listener do ScrollController para paginação (evita memory leak)
+  void _onScroll() {
+    if (_scrollController.hasClients) {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent * 0.9) {
+        _loadMoreConversations();
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -204,12 +250,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
     timeago.setLocaleMessages('pt_BR', timeago.PtBrMessages());
     _initCacheAndLoad();
     // Listener para paginação (carregar mais ao rolar até 90%)
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >=
-          _scrollController.position.maxScrollExtent * 0.9) {
-        _loadMoreConversations();
-      }
-    });
+    _scrollController.addListener(_onScroll);
   }
 
   Future<void> _initCacheAndLoad() async {
@@ -229,26 +270,14 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // ✅ FIX: Usar listenManual com cleanup no dispose
-    _profileListener ??= ref.listenManual(
+    // ✅ FIX: Cancelar listener anterior antes de criar novo
+    _profileListener?.close();
+    _profileListener = ref.listenManual(
       profileProvider,
-      (previous, next) {
-        final previousProfileId = previous?.value?.activeProfile?.profileId;
-        final newProfileId = next.value?.activeProfile?.profileId;
-
-        if (newProfileId != null && newProfileId != previousProfileId) {
-          debugPrint(
-              'MessagesPage: Perfil mudou de $previousProfileId para $newProfileId');
-          if (mounted) {
-            setState(() {
-              _conversations = [];
-              _isLoading = true;
-            });
-            _loadConversations();
-          }
-        }
-      },
+      _handleProfileStateChange,
     );
+
+    _handleProfileStateChange(null, ref.read(profileProvider));
   }
 
   @override
@@ -257,17 +286,19 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
     _profileListener?.close();
     _profileListener = null;
 
+    // ✅ FIX: Remover scroll listener antes de dispose (usa mesma referência)
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _conversationsSubscription?.cancel();
     // ✅ FIX: Fechar box com tratamento de erro
-    _conversationsBox?.close().catchError((e) {
+    _conversationsBox?.close().catchError((Object e) {
       debugPrint('MessagesPage: Erro ao fechar Hive box: $e');
     });
     super.dispose();
   }
 
   /// Carrega conversas do Firestore em tempo real
-  Future<void> _loadConversations() async {
+  Future<void> _loadConversations({ProfileEntity? activeProfileOverride}) async {
     try {
       debugPrint('MessagesPage: Iniciando carregamento de conversas...');
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -280,7 +311,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
       }
 
       // ✅ FIX: Usar activeProfileProvider diretamente
-      final activeProfile = ref.read(activeProfileProvider);
+      final activeProfile = activeProfileOverride ?? ref.read(activeProfileProvider);
       debugPrint('MessagesPage: activeProfile = $activeProfile');
 
       if (activeProfile == null) {
@@ -304,10 +335,9 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
       debugPrint(
           'MessagesPage: 📡 Criando stream para conversas com profileId: $currentProfileId');
 
-      _conversationsSubscription = FirebaseFirestore.instance
+        _conversationsSubscription = FirebaseFirestore.instance
           .collection('conversations')
           .where('participantProfiles', arrayContains: currentProfileId)
-          .where('archived', isEqualTo: false)
           .orderBy('lastMessageTimestamp', descending: true)
           .limit(_conversationsPerPage)
           .snapshots()
@@ -336,46 +366,38 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
             (id) => id != currentUser.uid,
             orElse: () => currentUser.uid,
           );
-          return {
-            'doc': doc,
-            'otherProfileId': otherProfileId,
-            'otherUserId': otherUserId,
-            'profileFuture': otherProfileId.isNotEmpty
+          return _ConversationSnapshotFutures(
+            doc: doc,
+            otherProfileId: otherProfileId,
+            otherUserId: otherUserId,
+            profileFuture: otherProfileId.isNotEmpty
                 ? FirebaseFirestore.instance
                     .collection('profiles')
                     .doc(otherProfileId)
                     .get()
-                : Future.value(),
-            'userFuture': otherUserId.isNotEmpty
+                : Future<DocumentSnapshot<Map<String, dynamic>>?>.value(),
+            userFuture: otherUserId.isNotEmpty
                 ? FirebaseFirestore.instance
                     .collection('users')
                     .doc(otherUserId)
                     .get()
-                : Future.value(),
-          };
+                : Future<DocumentSnapshot<Map<String, dynamic>>?>.value(),
+          );
         }).toList();
 
-        final profileSnapshots = await Future.wait(
-          profileFutures
-              .map(
-                  (item) => item['profileFuture']! as Future<DocumentSnapshot?>)
-              .toList(),
-        );
+        final profileSnapshots =
+            await Future.wait(profileFutures.map((item) => item.profileFuture));
 
-        final userSnapshots = await Future.wait(
-          profileFutures
-              .map((item) => item['userFuture']! as Future<DocumentSnapshot?>)
-              .toList(),
-        );
+        final userSnapshots =
+            await Future.wait(profileFutures.map((item) => item.userFuture));
 
         final conversations = <ConversationEntity>[];
 
         for (var i = 0; i < profileFutures.length; i++) {
           final item = profileFutures[i];
-          final doc =
-              item['doc']! as QueryDocumentSnapshot<Map<String, dynamic>>;
-          final otherProfileId = item['otherProfileId']! as String;
-          final otherUserId = item['otherUserId']! as String;
+          final doc = item.doc;
+          final otherProfileId = item.otherProfileId;
+          final otherUserId = item.otherUserId;
           final otherProfileDoc = profileSnapshots[i];
           final otherUserDoc = userSnapshots[i];
 
@@ -397,9 +419,8 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
           }
 
           // Buscar dados do perfil diretamente da coleção profiles
-          final otherProfileData =
-              otherProfileDoc.data() as Map<String, dynamic>?;
-          final otherUserData = otherUserDoc?.data() as Map<String, dynamic>?;
+            final otherProfileData = otherProfileDoc.data();
+            final otherUserData = otherUserDoc?.data();
 
           // Build profiles data list
           final profilesData = <Map<String, dynamic>>[];
@@ -425,9 +446,16 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
           }
         }
 
+        final filteredConversations = conversations
+            .where(
+              (conversation) =>
+                  !conversation.archivedProfileIds.contains(currentProfileId),
+            )
+            .toList();
+
         if (mounted) {
           setState(() {
-            _conversations = conversations;
+            _conversations = filteredConversations;
             _isLoading = false;
             if (querySnapshot.docs.isNotEmpty) {
               _lastConversationDoc = querySnapshot.docs.last;
@@ -436,7 +464,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
           // Salva no cache local usando toJson
           try {
             final conversationsForCache =
-                conversations.map((conv) => conv.toJson()).toList();
+                filteredConversations.map((conv) => conv.toJson()).toList();
             _conversationsBox?.put('conversations', conversationsForCache);
           } catch (e) {
             debugPrint('MessagesPage: Erro ao salvar cache: $e');
@@ -444,16 +472,14 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
           debugPrint(
               'MessagesPage: ✅ ${conversations.length} conversas carregadas e exibidas');
         }
-      }, onError: (error, stackTrace) {
+      }, onError: (Object error, StackTrace stackTrace) {
         debugPrint('MessagesPage: ❌ Erro no stream: $error');
         debugPrint('MessagesPage: StackTrace: $stackTrace');
         if (mounted) {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erro ao carregar conversas: $error'),
-              backgroundColor: Colors.red,
-            ),
+          AppSnackBar.showError(
+            context,
+            'Erro ao carregar conversas: $error',
           );
         }
       });
@@ -467,66 +493,126 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
 
   /// Recarrega conversas (para pull-to-refresh)
   Future<void> _refreshConversations() async {
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future<void>.delayed(const Duration(milliseconds: 300));
     _loadConversations();
+  }
+
+  void _handleProfileStateChange(
+    AsyncValue<ProfileState>? previous,
+    AsyncValue<ProfileState> next,
+  ) {
+    final previousProfileId = previous?.valueOrNull?.activeProfile?.profileId;
+    final newProfile = next.valueOrNull?.activeProfile;
+
+    if (newProfile == null) {
+      return;
+    }
+
+    final hasProfileChanged = previousProfileId != newProfile.profileId;
+
+    if (!_hasSyncedInitialProfile || hasProfileChanged) {
+      debugPrint(
+          'MessagesPage: Perfil sincronizado (${previousProfileId ?? "none"} -> ${newProfile.profileId})');
+      _hasSyncedInitialProfile = true;
+      if (mounted) {
+        setState(() {
+          _conversations = [];
+          _isLoading = true;
+          _lastConversationDoc = null;
+          _hasMoreConversations = true;
+          _isSelectionMode = false;
+          _selectedConversations.clear();
+        });
+      }
+      _loadConversations(activeProfileOverride: newProfile);
+    }
   }
 
   // ...existing code...
 
-  /// Exclui uma conversa
-  Future<void> _deleteConversation(String conversationId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('conversations')
-          .doc(conversationId)
-          .delete();
+  Future<void> _hideConversation(
+    String conversationId, {
+    bool showFeedback = true,
+  }) async {
+    final activeProfile = ref.read(activeProfileProvider);
+    if (activeProfile == null) {
+      debugPrint('MessagesPage: ❌ Não há perfil ativo para ocultar conversa');
+      if (mounted && showFeedback) {
+        AppSnackBar.showError(
+          context,
+          'Selecione um perfil para gerenciar conversas',
+        );
+      }
+      return;
+    }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Conversa excluída'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
+    try {
+      await ref.read(deleteConversationUseCaseProvider).call(
+            conversationId: conversationId,
+            profileId: activeProfile.profileId,
+          );
+
+      if (mounted && showFeedback) {
+        AppSnackBar.showSuccess(
+          context,
+          'Conversa arquivada para este perfil',
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao excluir: $e'),
-            backgroundColor: Colors.red,
-          ),
+      debugPrint('MessagesPage: Erro ao ocultar conversa $conversationId: $e');
+      if (mounted && showFeedback) {
+        AppSnackBar.showError(
+          context,
+          'Erro ao arquivar: $e',
         );
       }
     }
   }
 
+  /// Exclui (oculta) uma conversa apenas para o perfil atual
+  Future<void> _deleteConversation(String conversationId) async {
+    await _hideConversation(conversationId);
+  }
+
   /// Arquiva conversas selecionadas
   Future<void> _archiveSelectedConversations() async {
+    final activeProfile = ref.read(activeProfileProvider);
+    if (activeProfile == null) {
+      if (mounted) {
+        AppSnackBar.showError(
+          context,
+          'Selecione um perfil para arquivar conversas',
+        );
+      }
+      return;
+    }
+
+    final deleteConversation = ref.read(deleteConversationUseCaseProvider);
+
     for (final conversationId in _selectedConversations) {
       try {
-        await FirebaseFirestore.instance
-            .collection('conversations')
-            .doc(conversationId)
-            .update({'archived': true});
+        await deleteConversation(
+          conversationId: conversationId,
+          profileId: activeProfile.profileId,
+        );
       } catch (e) {
         debugPrint(
-            'MessagesPage: Erro ao arquivar conversa $conversationId: $e');
+          'MessagesPage: Erro ao arquivar conversa $conversationId: $e',
+        );
       }
     }
 
-    setState(() {
-      _selectedConversations.clear();
-      _isSelectionMode = false;
-    });
+    if (mounted) {
+      setState(() {
+        _selectedConversations.clear();
+        _isSelectionMode = false;
+      });
+    }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Conversas arquivadas'),
-          backgroundColor: Colors.green,
-        ),
+      AppSnackBar.showSuccess(
+        context,
+        'Conversas arquivadas para este perfil',
       );
     }
   }
@@ -566,7 +652,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
     );
 
     Navigator.of(context).push(
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
         builder: (_) => ChatDetailPage(
           conversationId: conversation.id,
           otherUserId: (otherProfile['uid'] as String?) ?? '',
@@ -580,6 +666,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
 
   /// Toggle seleção de conversa
   void _toggleSelection(String conversationId) {
+    if (!mounted) return;
     setState(() {
       if (_selectedConversations.contains(conversationId)) {
         _selectedConversations.remove(conversationId);
@@ -608,23 +695,25 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
         backgroundColor: _brandOrange,
         foregroundColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Iconsax.close_circle),
           onPressed: () {
-            setState(() {
-              _isSelectionMode = false;
-              _selectedConversations.clear();
-            });
+            if (mounted) {
+              setState(() {
+                _isSelectionMode = false;
+                _selectedConversations.clear();
+              });
+            }
           },
         ),
         title: Text('${_selectedConversations.length} selecionada(s)'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.archive),
+            icon: const Icon(Iconsax.archive),
             tooltip: 'Arquivar',
             onPressed: _archiveSelectedConversations,
           ),
           IconButton(
-            icon: const Icon(Icons.delete),
+            icon: const Icon(Iconsax.trash),
             tooltip: 'Excluir',
             onPressed: () async {
               final confirm = await showDialog<bool>(
@@ -654,10 +743,12 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
                 for (final id in _selectedConversations) {
                   await _deleteConversation(id);
                 }
-                setState(() {
-                  _isSelectionMode = false;
-                  _selectedConversations.clear();
-                });
+                if (mounted) {
+                  setState(() {
+                    _isSelectionMode = false;
+                    _selectedConversations.clear();
+                  });
+                }
               }
             },
           ),
@@ -674,19 +765,23 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
         style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 20,
+          color: Colors.white,
         ),
       ),
       actions: [
-        // Ícone de busca
-        IconButton(
-          icon: const Icon(Icons.search),
-          tooltip: 'Buscar',
-          onPressed: () {
-            showSearch(
-              context: context,
-              delegate: _ConversationSearchDelegate(_conversations),
-            );
-          },
+        // Ícone de busca com padding adequado
+        Padding(
+          padding: const EdgeInsets.only(right: 8.0),
+          child: IconButton(
+            icon: const Icon(Iconsax.search_normal, color: Colors.white),
+            tooltip: 'Buscar',
+            onPressed: () {
+              showSearch(
+                context: context,
+                delegate: _ConversationSearchDelegate(_conversations),
+              );
+            },
+          ),
         ),
       ],
     );
@@ -715,7 +810,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.chat_bubble_outline,
+                    Iconsax.message,
                     size: 80,
                     color: Colors.grey[400],
                   ),
@@ -784,6 +879,11 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
       (p) => p['profileId'] != activeProfileId,
       orElse: () => <String, dynamic>{},
     );
+    final unreadCount = activeProfileId != null
+        ? conversation.getUnreadCountForProfile(activeProfileId)
+        : 0;
+    final isBand = (otherProfile['isBand'] as bool?) ?? false;
+    final isOnline = (otherProfile['isOnline'] as bool?) ?? false;
 
     final conversationMap = {
       ...conversation.toJson(),
@@ -792,6 +892,13 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
       'otherUserPhoto': otherProfile['photoUrl'] ?? '',
       'otherProfileId': otherProfile['profileId'] ?? '',
       'otherUserId': otherProfile['uid'] ?? '',
+      'unreadCount': unreadCount,
+      'currentProfileId': activeProfileId ?? '',
+      'type': isBand ? 'band' : 'musician',
+      'isOnline': isOnline,
+      'lastMessageTimestamp': Timestamp.fromDate(
+        conversation.lastMessageTimestamp,
+      ),
     };
 
     return ConversationItem(
@@ -814,10 +921,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
       onToggleSelection: () => _toggleSelection(conversationId),
       onDelete: _deleteConversation,
       onArchive: (id) async {
-        await FirebaseFirestore.instance
-            .collection('conversations')
-            .doc(id)
-            .update({'archived': true});
+        await _hideConversation(id);
       },
     );
   }
@@ -853,7 +957,7 @@ class _ConversationSearchDelegate extends SearchDelegate<ConversationEntity?> {
     return [
       if (query.isNotEmpty)
         IconButton(
-          icon: const Icon(Icons.clear),
+          icon: const Icon(Iconsax.close_circle),
           onPressed: () => query = '',
         ),
     ];
@@ -862,7 +966,7 @@ class _ConversationSearchDelegate extends SearchDelegate<ConversationEntity?> {
   @override
   Widget buildLeading(BuildContext context) {
     return IconButton(
-      icon: const Icon(Icons.arrow_back),
+      icon: const Icon(Iconsax.arrow_left_2),
       onPressed: () => close(context, null),
     );
   }
@@ -927,12 +1031,12 @@ class _ConversationSearchDelegate extends SearchDelegate<ConversationEntity?> {
                             AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
                       ),
                       errorWidget: (context, url, error) =>
-                          const Icon(Icons.person),
+                          const Icon(Iconsax.user),
                       memCacheWidth: 80,
                       memCacheHeight: 80,
                     ),
                   )
-                : const Icon(Icons.person),
+                : const Icon(Iconsax.user),
           ),
           title: Text(otherUserName),
           subtitle: Text(

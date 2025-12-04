@@ -30,6 +30,11 @@ ProfileRemoteDataSource profileRemoteDataSource(Ref ref) {
   return ProfileRemoteDataSourceImpl();
 }
 
+/// Provider para FirebaseAuth (facilita override em testes)
+final profileFirebaseAuthProvider = Provider<FirebaseAuth>(
+  (ref) => FirebaseAuth.instance,
+);
+
 /// Provider para ProfileRepository (singleton)
 @riverpod
 ProfileRepository profileRepositoryNew(Ref ref) {
@@ -103,15 +108,19 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
   @override
   set state(AsyncValue<ProfileState> value) {
     super.state = value;
-    if (value is AsyncData<ProfileState>) {
-      _streamController.add(value.value);
+    if (value is AsyncData<ProfileState> && !_streamController.isClosed) {
+      _streamController.add(value.value);  // ✅ Check if closed before adding
     }
   }
 
   @override
   FutureOr<ProfileState> build() async {
-    // Registra dispose para cleanup
-    ref.onDispose(_streamController.close);
+    // Registra dispose para cleanup (com verificação)
+    ref.onDispose(() {
+      if (!_streamController.isClosed) {
+        _streamController.close();  // ✅ Only close if not already closed
+      }
+    });
 
     return _loadProfiles();
   }
@@ -120,7 +129,7 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
     try {
       debugPrint('🔄 ProfileNotifier: Carregando perfis...');
 
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
       if (uid == null) {
         debugPrint('⚠️ ProfileNotifier: Usuário não autenticado');
         return ProfileState();
@@ -150,7 +159,7 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
 
   Future<void> switchProfile(String profileId) async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
       if (uid == null) throw Exception('Usuário não autenticado');
 
       final switchUseCase = ref.read(switchActiveProfileUseCaseProvider);
@@ -165,7 +174,7 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
 
   Future<ProfileResult> createProfile(ProfileEntity profile) async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
       if (uid == null) {
         return const ProfileFailure(message: 'Usuário não autenticado');
       }
@@ -187,7 +196,7 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
 
   Future<ProfileResult> updateProfile(ProfileEntity profile) async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
       if (uid == null) {
         return const ProfileFailure(message: 'Usuário não autenticado');
       }
@@ -209,7 +218,7 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
 
   Future<void> deleteProfile(String profileId) async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
       if (uid == null) throw Exception('Usuário não autenticado');
 
       final deleteUseCase = ref.read(deleteProfileUseCaseProvider);

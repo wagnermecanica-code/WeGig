@@ -1,6 +1,6 @@
 {
   "name": "to-sem-banda-functions",
-  "description": "Cloud Functions para Tô Sem Banda",
+  "description": "Cloud Functions para WeGig",
   "version": "1.0.0",
   "scripts": {
     "lint": "eslint .",

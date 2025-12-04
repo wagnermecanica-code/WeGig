@@ -29,7 +29,12 @@ abstract class AuthRemoteDataSource {
   ///
   /// Throws:
   /// - FirebaseAuthException se email já existe ou senha fraca
-  Future<User> signUpWithEmail(String email, String password);
+  /// - UsernameAlreadyTakenException se username já está em uso
+  Future<User> signUpWithEmail(
+    String email,
+    String password,
+    String username,
+  );
 
   /// Login com Google
   ///
@@ -64,7 +69,11 @@ abstract class AuthRemoteDataSource {
   /// Criar documento users/{uid} no Firestore
   ///
   /// Chamado automaticamente após signUp ou login social (se novo usuário)
-  Future<void> createUserDocument(User user, String provider);
+  Future<void> createUserDocument(
+    User user,
+    String provider, {
+    String? username,
+  });
 
   /// Verificar se documento users/{uid} existe
   Future<bool> userDocumentExists(String uid);
@@ -77,11 +86,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     GoogleSignIn? googleSignIn,
     FirebaseFirestore? firestore,
   })  : _auth = firebaseAuth ?? FirebaseAuth.instance,
-        _googleSignIn = googleSignIn, // TODO: Disabled until v7.2.0 migration
+        _googleSignIn = googleSignIn ??
+            GoogleSignIn(
+              scopes: const ['email', 'profile'],
+            ),
         _firestore = firestore ?? FirebaseFirestore.instance;
   final FirebaseAuth _auth;
-  final GoogleSignIn?
-      _googleSignIn; // TODO: Fix GoogleSignIn v7.2.0 compatibility
+  final GoogleSignIn _googleSignIn;
   final FirebaseFirestore _firestore;
 
   @override
@@ -112,8 +123,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<User> signUpWithEmail(String email, String password) async {
+  Future<User> signUpWithEmail(
+    String email,
+    String password,
+    String username,
+  ) async {
     debugPrint('🔐 AuthRemoteDataSource: signUpWithEmail');
+
+    final normalizedUsername = _normalizeUsername(username);
 
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
@@ -127,12 +144,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
     }
 
+    try {
+      await _ensureUsernameAvailable(normalizedUsername);
+    } on UsernameAlreadyTakenException {
+      await _deleteUserOnConflict(credential.user);
+      rethrow;
+    }
+
+    await createUserDocument(
+      credential.user!,
+      'email',
+      username: normalizedUsername,
+    );
+
     debugPrint(
         '✅ AuthRemoteDataSource: signUpWithEmail success - ${credential.user!.uid}');
-
-    // Criar documento users/{uid}
-    await createUserDocument(credential.user!, 'email');
-
     // Enviar email de verificação automaticamente
     await credential.user!.sendEmailVerification();
     debugPrint('📧 AuthRemoteDataSource: Email de verificação enviado');
@@ -142,67 +168,88 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<User?> signInWithGoogle() async {
-    // TODO: Fix Google Sign-In v7.2.0 compatibility
-    // The GoogleSignIn API changed in v7.x and requires migration
-    // For now, disable this functionality to unblock other work
-    throw UnimplementedError(
-      'Google Sign-In requires migration to v7.2.0 API. '
-      'Please use email/password authentication.',
-    );
-
-    /* Original implementation - needs migration:
     debugPrint('🔐 AuthRemoteDataSource: signInWithGoogle - iniciando...');
-    
+
     try {
-      // Limpar sessão anterior para garantir seleção de conta
-      await _googleSignIn.signOut();
-      debugPrint('🔐 AuthRemoteDataSource: Google Sign-In deslogado (fresh start)');
-    } catch (e) {
-      debugPrint('⚠️ AuthRemoteDataSource: Erro ao deslogar Google (ignorando): $e');
-    }
-    
-    debugPrint('🔐 AuthRemoteDataSource: Chamando _googleSignIn.signIn()...');
-    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-    
-    // Usuário cancelou
-    if (googleUser == null) {
-      debugPrint('⚠️ AuthRemoteDataSource: Usuário cancelou Google Sign-In');
-      return null;
-    }
-    
-    debugPrint('✅ AuthRemoteDataSource: GoogleSignInAccount obtida - ${googleUser.email}');
-    
-    // Obter tokens
-    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-    debugPrint('✅ AuthRemoteDataSource: Tokens obtidos');
-    
-    // Criar credencial Firebase
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-    
-    debugPrint('🔐 AuthRemoteDataSource: Autenticando no Firebase...');
-    final userCredential = await _auth.signInWithCredential(credential);
-    
-    if (userCredential.user == null) {
-      throw FirebaseAuthException(
-        code: 'null-user',
-        message: 'User is null after Google Sign-In',
+      if (kIsWeb) {
+        debugPrint('🌐 AuthRemoteDataSource: Executando fluxo Google para Web');
+        final provider = GoogleAuthProvider()
+          ..addScope('email')
+          ..setCustomParameters({'prompt': 'select_account'});
+
+        final userCredential = await _auth.signInWithPopup(provider);
+        final user = userCredential.user;
+
+        if (user == null) {
+          throw FirebaseAuthException(
+            code: 'null-user',
+            message: 'User is null after Google Sign-In (web)',
+          );
+        }
+
+        if (userCredential.additionalUserInfo?.isNewUser ?? false) {
+          debugPrint(
+              '🆕 AuthRemoteDataSource: Novo usuário Google (web), criando documento...');
+          await createUserDocument(user, 'google');
+        }
+
+        debugPrint('✅ AuthRemoteDataSource: Google Sign-In web concluído');
+        return user;
+      }
+
+      // Mobile/Desktop flow
+      try {
+        await _googleSignIn.signOut();
+        debugPrint('🔄 AuthRemoteDataSource: Google Sign-In resetado');
+      } catch (e) {
+        debugPrint(
+            '⚠️ AuthRemoteDataSource: Erro ao resetar Google Sign-In: $e');
+      }
+
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        debugPrint('⚠️ AuthRemoteDataSource: Usuário cancelou Google Sign-In');
+        return null;
+      }
+
+      debugPrint(
+          '✅ AuthRemoteDataSource: GoogleSignInAccount obtida - ${googleUser.email}');
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
       );
+
+      debugPrint('🔐 AuthRemoteDataSource: Autenticando no Firebase...');
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user == null) {
+        throw FirebaseAuthException(
+          code: 'null-user',
+          message: 'User is null after Google Sign-In',
+        );
+      }
+
+      if (userCredential.additionalUserInfo?.isNewUser ?? false) {
+        debugPrint(
+            '🆕 AuthRemoteDataSource: Novo usuário Google, criando documento...');
+        await createUserDocument(user, 'google');
+      }
+
+      debugPrint(
+          '✅ AuthRemoteDataSource: Google Sign-In completo - ${user.uid}');
+      return user;
+    } on FirebaseAuthException catch (e) {
+      debugPrint('❌ AuthRemoteDataSource: FirebaseAuthException - ${e.code}');
+      rethrow;
+    } catch (e) {
+      debugPrint(
+          '❌ AuthRemoteDataSource: Erro inesperado no Google Sign-In: $e');
+      rethrow;
     }
-    
-    debugPrint('✅ AuthRemoteDataSource: Firebase auth completa - ${userCredential.user!.uid}');
-    
-    // Se é novo usuário, criar documento
-    final isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
-    if (isNewUser) {
-      debugPrint('🆕 AuthRemoteDataSource: Novo usuário Google, criando documento...');
-      await createUserDocument(userCredential.user!, 'google');
-    }
-    
-    return userCredential.user!;
-    */
   }
 
   @override
@@ -278,7 +325,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     // Sign out Google (se estiver logado)
     try {
-      await _googleSignIn?.signOut();
+      await _googleSignIn.signOut();
       debugPrint('✅ AuthRemoteDataSource: Google Sign-Out completo');
     } catch (e) {
       debugPrint('⚠️ AuthRemoteDataSource: Google não estava conectado: $e');
@@ -312,14 +359,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<void> createUserDocument(User user, String provider) async {
+  Future<void> createUserDocument(
+    User user,
+    String provider, {
+    String? username,
+  }) async {
     debugPrint('📝 AuthRemoteDataSource: createUserDocument - ${user.uid}');
 
     final userDoc = _firestore.collection('users').doc(user.uid);
-
-    // Verificar se já existe
-    final docSnapshot = await userDoc.get();
-    if (docSnapshot.exists) {
+    final alreadyExists = await userDocumentExists(user.uid);
+    if (alreadyExists) {
       debugPrint(
           '📄 AuthRemoteDataSource: Documento já existe, pulando criação');
       return;
@@ -333,6 +382,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       'provider': provider,
       'displayName': user.displayName,
       'photoURL': user.photoURL,
+      if (username != null) 'username': username,
+      if (username != null) 'usernameLowercase': username.toLowerCase(),
     });
 
     debugPrint('✅ AuthRemoteDataSource: Documento users/${user.uid} criado');
@@ -346,4 +397,48 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     debugPrint('📄 AuthRemoteDataSource: Documento existe: $exists');
     return exists;
   }
+
+  String _normalizeUsername(String username) {
+    final sanitized = username.trim().replaceAll(RegExp(r'\s+'), '');
+    if (sanitized.startsWith('@')) {
+      return sanitized.substring(1);
+    }
+    return sanitized;
+  }
+
+  Future<void> _ensureUsernameAvailable(String username) async {
+    final usernameLowercase = username.toLowerCase();
+    final snapshot = await _firestore
+        .collection('profiles')
+        .where('usernameLowercase', isEqualTo: usernameLowercase)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isNotEmpty) {
+      throw const UsernameAlreadyTakenException();
+    }
+  }
+
+  Future<void> _deleteUserOnConflict(User? user) async {
+    if (user == null) return;
+    try {
+      await user.delete();
+      debugPrint(
+          '🗑️ AuthRemoteDataSource: Usuário removido após conflito de username');
+    } catch (e) {
+      debugPrint(
+          '⚠️ AuthRemoteDataSource: Falha ao remover usuário temporário: $e');
+    }
+  }
+}
+
+class UsernameAlreadyTakenException implements Exception {
+  const UsernameAlreadyTakenException({
+    this.message = 'Este @username já está em uso. Escolha outro.',
+  });
+
+  final String message;
+
+  @override
+  String toString() => 'UsernameAlreadyTakenException: $message';
 }

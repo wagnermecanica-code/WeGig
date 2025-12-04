@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Widget de transição animada ao trocar de perfil
 /// Exibe overlay com animação de fade e profile info
@@ -31,7 +32,7 @@ class ProfileTransitionOverlay extends StatefulWidget {
     required VoidCallback onComplete,
     String? photoUrl,
   }) async {
-    await showDialog(
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black.withValues(alpha: 0.7),
@@ -76,7 +77,7 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
 
     // Inicia animação e fecha após completar
     _controller.forward().then((_) {
-      Future.delayed(const Duration(milliseconds: 500), () {
+      Future<void>.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
           Navigator.of(context).pop();
           widget.onComplete();
@@ -146,7 +147,7 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
                             : null,
                     child: widget.photoUrl == null || widget.photoUrl!.isEmpty
                         ? Icon(
-                            widget.isBand ? Icons.groups : Icons.person,
+                            widget.isBand ? Iconsax.people : Iconsax.user,
                             size: 50,
                             color: color,
                           )

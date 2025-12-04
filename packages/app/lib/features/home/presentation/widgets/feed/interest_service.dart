@@ -13,7 +13,7 @@ class InterestService {
     String? message,
   }) async {
     final interestData = {
-      'postId': post.postId,
+      'postId': post.id,
       'postAuthorProfileId': post.authorProfileId,
       'interestedProfileId': activeProfile.profileId,
       'interestedProfileName': activeProfile.name,
@@ -27,7 +27,7 @@ class InterestService {
 
     await _firestore.collection('interests').add(interestData);
     
-    debugPrint('✅ Interest sent to post ${post.postId}');
+    debugPrint('✅ Interest sent to post ${post.id}');
   }
 
   Future<void> removeInterest({

@@ -12,6 +12,7 @@ import 'package:wegig_app/features/profile/presentation/providers/profile_provid
 import 'package:wegig_app/features/settings/presentation/providers/settings_providers.dart';
 import 'package:wegig_app/features/settings/presentation/widgets/settings_section.dart';
 import 'package:wegig_app/features/settings/presentation/widgets/settings_tile.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Tela de Configurações do perfil ativo
 /// Design Airbnb 2025: Clean, minimalista, switches e botões bem organizados
@@ -56,10 +57,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         children: [
           // Seção: Perfil
-          const SettingsSection(title: 'Perfil', icon: Icons.person_outline),
+          const SettingsSection(title: 'Perfil', icon: Iconsax.user),
           const SizedBox(height: 12),
           SettingsTile(
-            icon: Icons.edit_outlined,
+            icon: Iconsax.edit,
             title: 'Editar Perfil',
             subtitle: 'Atualize suas informações',
             onTap: () async {
@@ -72,25 +73,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               final navigator = Navigator.of(context);
               final messenger = ScaffoldMessenger.of(context);
 
-              final result = await navigator.push(
-                MaterialPageRoute(
-                  builder: (context) => const EditProfilePage(),
+              final result = await navigator.push<String?>(
+                MaterialPageRoute<String?>(
+                  builder: (context) => EditProfilePage(
+                    profileIdToEdit: activeProfile.profileId,
+                  ),
                 ),
               );
 
-              // Se o perfil foi atualizado (retornou profileId), atualiza providers
-              if (result is String && result.isNotEmpty) {
-                await ref.read(profileProvider.notifier).refresh();
-                // Invalida posts para garantir que posts do perfil sejam atualizados
-                ref.invalidate(postNotifierProvider);
+              final didUpdateProfile = result is String && result.isNotEmpty;
+              if (!didUpdateProfile) {
+                return;
               }
+
+              await ref.read(profileProvider.notifier).refresh();
+              // Invalida posts para garantir que posts do perfil sejam atualizados
+              ref.invalidate(postNotifierProvider);
 
               if (mounted) {
                 messenger.showSnackBar(
                   const SnackBar(
                     content: Row(
                       children: [
-                        Icon(Icons.check_circle, color: Colors.white),
+                        Icon(Iconsax.tick_circle, color: Colors.white),
                         SizedBox(width: 12),
                         Text('Perfil atualizado!'),
                       ],
@@ -103,7 +108,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           const SizedBox(height: 8),
           SettingsTile(
-            icon: Icons.share_outlined,
+            icon: Iconsax.share,
             title: 'Compartilhar Perfil',
             subtitle: 'Compartilhe com amigos',
             onTap: () => _shareProfile(activeProfile),
@@ -115,7 +120,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
           // Seção: Notificações
           const SettingsSection(
-              title: 'Notificações', icon: Icons.notifications_outlined),
+              title: 'Notificações', icon: Iconsax.notification),
           const SizedBox(height: 12),
           _buildNotificationSettings(),
 
@@ -125,10 +130,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
           // Seção: Conta
           const SettingsSection(
-              title: 'Conta', icon: Icons.account_circle_outlined),
+              title: 'Conta', icon: Iconsax.profile_circle),
           const SizedBox(height: 12),
           SettingsTile(
-            icon: Icons.logout,
+            icon: Iconsax.logout,
             title: 'Sair da Conta',
             subtitle: 'Desconectar do aplicativo',
             iconColor: AppColors.error,
@@ -169,7 +174,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
-                    Icons.location_on_outlined,
+                    Iconsax.location,
                     color: AppColors.primary,
                     size: 24,
                   ),
@@ -187,7 +192,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                 ),
                 value: settings.notifyNearbyPosts,
-                activeThumbColor: AppColors.primary,
+                thumbColor: MaterialStateProperty.resolveWith<Color?>(
+                  (states) => states.contains(MaterialState.selected)
+                      ? AppColors.primary
+                      : AppColors.border,
+                ),
                 onChanged: (value) {
                   ref
                       .read(userSettingsProvider.notifier)
@@ -213,7 +222,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             Row(
                               children: [
                                 const Icon(
-                                  Icons.map_outlined,
+                                  Iconsax.map,
                                   color: AppColors.primary,
                                   size: 18,
                                 ),
@@ -362,7 +371,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         return Column(
           children: [
             SettingsSwitchTile(
-              icon: Icons.favorite_outline,
+              icon: Iconsax.heart,
               title: 'Interesses',
               subtitle: 'Notificação quando alguém demonstra interesse',
               value: settings.notifyInterests,
@@ -375,7 +384,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             const SizedBox(height: 8),
             SettingsSwitchTile(
-              icon: Icons.message_outlined,
+              icon: Iconsax.message,
               title: 'Mensagens',
               subtitle: 'Notificação de novas mensagens',
               value: settings.notifyMessages,
@@ -424,17 +433,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       name: profile.name,
       isBand: profile.isBand,
       city: profile.city,
+      neighborhood: profile.neighborhood,
+      state: profile.state,
       userId: profile.uid,
       profileId: profile.profileId,
       instruments: profile.instruments ?? [],
       genres: profile.genres ?? [],
     );
 
-    Share.share(message, subject: 'Perfil no WeGig');
+    SharePlus.instance.share(
+      ShareParams(
+        text: message,
+        subject: 'Perfil no WeGig',
+      ),
+    );
   }
 
   void _showLogoutDialog() {
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false, // Prevenir fechar acidentalmente
       builder: (context) => AlertDialog(
@@ -443,7 +459,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
         title: const Row(
           children: [
-            Icon(Icons.logout, color: AppColors.error),
+            Icon(Iconsax.logout, color: AppColors.error),
             SizedBox(width: 12),
             Text('Sair da Conta'),
           ],
@@ -474,34 +490,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<void> _performLogout() async {
     if (!mounted) return;
 
-    // Capturar navigator e messenger ANTES de operações async
+    // Capturar TUDO ANTES de operações async (crítico!)
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    final authService = ref.read(authServiceProvider);  // ✅ Capturar ANTES!
 
     try {
       debugPrint('🔓 SettingsPage: Iniciando processo de logout...');
 
-      // CRÍTICO: Pop a tela de configurações imediatamente
-      if (navigator.canPop()) {
-        debugPrint('🔙 SettingsPage: Fechando tela de configurações...');
-        navigator.pop();
-      }
-
-      // Aguardar frame para garantir que o pop foi processado
-      await Future.delayed(const Duration(milliseconds: 150));
-
-      // Invalidar todos os providers ANTES do logout para limpar cache
+      // Invalidar providers ANTES de qualquer navegação
       debugPrint('🧹 SettingsPage: Invalidando providers...');
       ref.invalidate(profileProvider);
       ref.invalidate(postNotifierProvider);
 
-      // Aguardar mais um frame para garantir que invalidação foi processada
-      await Future.delayed(const Duration(milliseconds: 150));
-
-      // Executar logout no AuthService (Firebase + cache cleanup)
+      // Executar logout
       debugPrint('🔓 SettingsPage: Executando signOut...');
-      final authService = ref.read(authServiceProvider);
       await authService.signOut();
+
+      // Pop apenas DEPOIS do signOut (se widget ainda montado)
+      if (navigator.canPop() && mounted) {
+        debugPrint('🔙 SettingsPage: Fechando tela...');
+        navigator.pop();
+      }
 
       debugPrint('✅ SettingsPage: Logout completo com sucesso!');
       debugPrint(
@@ -515,7 +525,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.error, color: Colors.white),
+                const Icon(Iconsax.danger, color: Colors.white),
                 const SizedBox(width: 12),
                 Expanded(child: Text('Erro ao sair: $e')),
               ],
@@ -538,7 +548,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.white, size: 20),
+            const Icon(Iconsax.tick_circle, color: Colors.white, size: 22),
             const SizedBox(width: 12),
             Text(message),
           ],

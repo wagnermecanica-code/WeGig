@@ -1,7 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/models/search_params.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/widgets/multi_select_field.dart';
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:wegig_app/features/home/presentation/widgets/search_result_tile.dart';
 
 /// SearchPage - Página de filtros de busca
 /// Renderizada dentro do BottomNavScaffold (BottomNavigationBar permanece visível)
@@ -19,6 +23,8 @@ class SearchPage extends StatefulWidget {
 }
 
 class SearchPageState extends State<SearchPage> {
+  static const double _swipeDismissThreshold = 80;
+  double _horizontalDrag = 0;
   // === Tipo de post ===
   String? _selectedPostType; // 'musician' ou 'band'
 
@@ -33,6 +39,15 @@ class SearchPageState extends State<SearchPage> {
   // === YouTube ===
   bool _hasYoutube = false;
 
+  // === Username search ===
+  final TextEditingController _usernameSearchController =
+      TextEditingController();
+  List<ProfileEntity> _usernameSearchResults = <ProfileEntity>[];
+  bool _isUsernameSearchLoading = false;
+  bool _hasUsernameSearch = false;
+  String? _usernameSearchError;
+  String? _lastUsernameQuery;
+
   // === Limites e opções ===
   static const int maxInstruments = 5;
   static const int maxGenres = 5;
@@ -41,6 +56,12 @@ class SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     _loadExistingFilters();
+  }
+
+  @override
+  void dispose() {
+    _usernameSearchController.dispose();
+    super.dispose();
   }
 
   /// Carrega filtros existentes do searchNotifier
@@ -216,6 +237,22 @@ class SearchPageState extends State<SearchPage> {
 
   /// Aplica os filtros selecionados (método público para acesso externo)
   void applyFilters() {
+    final usernameQuery = _extractUsernameQuery();
+    if (usernameQuery != null) {
+      _searchByUsername(usernameQuery);
+      return;
+    }
+
+    if (_hasUsernameSearch) {
+      setState(() {
+        _usernameSearchResults = <ProfileEntity>[];
+        _usernameSearchError = null;
+        _isUsernameSearchLoading = false;
+        _hasUsernameSearch = false;
+        _lastUsernameQuery = null;
+      });
+    }
+
     final sp = SearchParams(
       city: 'São Paulo', // TODO: Obter da localização do usuário
       maxDistanceKm: 50, // TODO: Permitir configuração
@@ -240,9 +277,61 @@ class SearchPageState extends State<SearchPage> {
       _selectedInstruments.clear();
       _selectedLevel = null;
       _hasYoutube = false;
+      _usernameSearchController.clear();
+      _usernameSearchResults = <ProfileEntity>[];
+      _usernameSearchError = null;
+      _isUsernameSearchLoading = false;
+      _hasUsernameSearch = false;
+      _lastUsernameQuery = null;
     });
     widget.searchNotifier.value = null;
     widget.onApply();
+  }
+
+  String? _extractUsernameQuery() {
+    final raw = _usernameSearchController.text.trim();
+    if (raw.isEmpty) return null;
+    final sanitized = raw.startsWith('@') ? raw.substring(1) : raw;
+    final normalized = sanitized.trim();
+    if (normalized.isEmpty) return null;
+    return normalized.toLowerCase();
+  }
+
+  Future<void> _searchByUsername(String username) async {
+    setState(() {
+      _isUsernameSearchLoading = true;
+      _usernameSearchError = null;
+      _hasUsernameSearch = true;
+      _lastUsernameQuery = '@$username';
+      _usernameSearchResults = <ProfileEntity>[];
+    });
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('profiles')
+          .where('usernameLowercase', isEqualTo: username)
+          .limit(10)
+          .get();
+
+      if (!mounted) return;
+
+      setState(() {
+        _usernameSearchResults = snapshot.docs
+            .map(ProfileEntity.fromFirestore)
+            .toList();
+        _isUsernameSearchLoading = false;
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Failed to search username: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      setState(() {
+        _usernameSearchError =
+            'Não conseguimos buscar esse @ agora. Tente novamente.';
+        _isUsernameSearchLoading = false;
+        _usernameSearchResults = <ProfileEntity>[];
+      });
+    }
   }
 
   @override
@@ -252,222 +341,330 @@ class SearchPageState extends State<SearchPage> {
       fontWeight: FontWeight.bold,
     );
 
-    return Scaffold(
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
-          children: [
-            // Título da página
-            Text(
-              'Filtros de busca',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 32),
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-            // Tipo de post (Banda ou Músico)
-            Text('Tipo de post', style: sectionTitleStyle),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _TypeFilterButton(
-                    icon: Icons.person,
-                    label: 'Músico\n(buscando banda)',
-                    isSelected: _selectedPostType == 'musician',
-                    onTap: () {
-                      setState(() {
-                        _selectedPostType =
-                            _selectedPostType == 'musician' ? null : 'musician';
-                      });
-                    },
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragStart: (_) => _horizontalDrag = 0,
+      onHorizontalDragUpdate: (details) {
+        _horizontalDrag += details.primaryDelta ?? 0;
+      },
+      onHorizontalDragEnd: (_) {
+        if (_horizontalDrag.abs() >= _swipeDismissThreshold) {
+          _closeSearchPage();
+        }
+        _horizontalDrag = 0;
+      },
+      onHorizontalDragCancel: () => _horizontalDrag = 0,
+      child: Scaffold(
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+            children: [
+              Text(
+                'Filtros de busca',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 32),
+              Text('Buscar por @username', style: sectionTitleStyle),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _usernameSearchController,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  prefixText: '@',
+                  prefixStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textSecondary,
+                  ),
+                  hintText: 'Buscar por username',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 2,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 2,
+                    ),
+                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+                onChanged: (value) {
+                  if (value.trim().isEmpty && _hasUsernameSearch) {
+                    setState(() {
+                      _usernameSearchResults = <ProfileEntity>[];
+                      _usernameSearchError = null;
+                      _isUsernameSearchLoading = false;
+                      _hasUsernameSearch = false;
+                      _lastUsernameQuery = null;
+                    });
+                  }
+                },
+                onFieldSubmitted: (_) => applyFilters(),
+              ),
+              if (_isUsernameSearchLoading) ...[
+                const SizedBox(height: 12),
+                const Center(
+                  child: SizedBox(
+                    height: 32,
+                    width: 32,
+                    child: CircularProgressIndicator(
+                      color: AppColors.primary,
+                      strokeWidth: 2.5,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _TypeFilterButton(
-                    icon: Icons.groups,
-                    label: 'Banda\n(buscando músico)',
-                    isSelected: _selectedPostType == 'band',
-                    onTap: () {
-                      setState(() {
-                        _selectedPostType =
-                            _selectedPostType == 'band' ? null : 'band';
-                      });
-                    },
+              ] else if (_usernameSearchError != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _usernameSearchError!,
+                  style: const TextStyle(
+                    color: AppColors.error,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ] else if (_usernameSearchResults.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Resultados',
+                  style: sectionTitleStyle,
+                ),
+                const SizedBox(height: 12),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemBuilder: (context, index) {
+                    final profile = _usernameSearchResults[index];
+                    return SearchResultTile(profile: profile);
+                  },
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemCount: _usernameSearchResults.length,
+                ),
+              ] else if (_hasUsernameSearch) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Não encontramos ${_lastUsernameQuery ?? ''}.',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
               ],
-            ),
-            const Divider(thickness: 0.5, height: 48),
-
-            // Disponível para (lista suspensa)
-            Text('Disponível para', style: sectionTitleStyle),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedAvailableFor.isNotEmpty
-                  ? _selectedAvailableFor.first
-                  : null,
-              hint: const Text('Selecione uma opção'),
-              items: _availableForOptions
-                  .map(
-                    (option) =>
-                        DropdownMenuItem(value: option, child: Text(option)),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedAvailableFor.clear();
-                  if (value != null) _selectedAvailableFor.add(value);
-                });
-              },
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      const BorderSide(color: AppColors.primary, width: 2),
+              const Divider(thickness: 0.5, height: 48),
+              Text('Tipo de post', style: sectionTitleStyle),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _TypeFilterButton(
+                      icon: Iconsax.user,
+                      label: 'Músico\n(buscando banda)',
+                      isSelected: _selectedPostType == 'musician',
+                      onTap: () {
+                        setState(() {
+                          _selectedPostType =
+                              _selectedPostType == 'musician' ? null : 'musician';
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _TypeFilterButton(
+                      icon: Iconsax.people,
+                      label: 'Banda\n(buscando músico)',
+                      isSelected: _selectedPostType == 'band',
+                      onTap: () {
+                        setState(() {
+                          _selectedPostType =
+                              _selectedPostType == 'band' ? null : 'band';
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(thickness: 0.5, height: 48),
+              Text('Disponível para', style: sectionTitleStyle),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedAvailableFor.isNotEmpty
+                    ? _selectedAvailableFor.first
+                    : null,
+                hint: const Text('Selecione uma opção'),
+                items: _availableForOptions
+                    .map(
+                      (option) =>
+                          DropdownMenuItem(value: option, child: Text(option)),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedAvailableFor.clear();
+                    if (value != null) {
+                      _selectedAvailableFor.add(value);
+                    }
+                  });
+                },
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: AppColors.primary, width: 2),
+                  ),
                 ),
               ),
-            ),
-            const Divider(thickness: 0.5, height: 48),
-
-            // Gêneros musicais
-            MultiSelectField(
-              title: 'Gêneros musicais',
-              placeholder: 'Selecione até 5 gêneros',
-              options: _genreOptions,
-              selectedItems: _selectedGenres,
-              maxSelections: maxGenres,
-              onSelectionChanged: (values) {
-                setState(() {
-                  _selectedGenres
-                    ..clear()
-                    ..addAll(values);
-                });
-              },
-            ),
-            const Divider(thickness: 0.5, height: 48),
-
-            // Instrumentos de busca
-            MultiSelectField(
-              title: 'Instrumentos de busca',
-              placeholder: 'Selecione até 5 instrumentos',
-              options: _instrumentOptions,
-              selectedItems: _selectedInstruments,
-              maxSelections: maxInstruments,
-              onSelectionChanged: (values) {
-                setState(() {
-                  _selectedInstruments
-                    ..clear()
-                    ..addAll(values);
-                });
-              },
-            ),
-            const Divider(thickness: 0.5, height: 48),
-
-            // Nível
-            Text('Nível', style: sectionTitleStyle),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedLevel,
-              hint: const Text('Selecione o nível'),
-              items: _levelOptions
-                  .map(
-                    (level) =>
-                        DropdownMenuItem(value: level, child: Text(level)),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => _selectedLevel = value),
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      const BorderSide(color: AppColors.primary, width: 2),
+              const Divider(thickness: 0.5, height: 48),
+              MultiSelectField(
+                title: 'Gêneros musicais',
+                placeholder: 'Selecione até 5 gêneros',
+                options: _genreOptions,
+                selectedItems: _selectedGenres,
+                maxSelections: maxGenres,
+                onSelectionChanged: (values) {
+                  setState(() {
+                    _selectedGenres
+                      ..clear()
+                      ..addAll(values);
+                  });
+                },
+              ),
+              const Divider(thickness: 0.5, height: 48),
+              MultiSelectField(
+                title: 'Instrumentos de busca',
+                placeholder: 'Selecione até 5 instrumentos',
+                options: _instrumentOptions,
+                selectedItems: _selectedInstruments,
+                maxSelections: maxInstruments,
+                onSelectionChanged: (values) {
+                  setState(() {
+                    _selectedInstruments
+                      ..clear()
+                      ..addAll(values);
+                  });
+                },
+              ),
+              const Divider(thickness: 0.5, height: 48),
+              Text('Nível', style: sectionTitleStyle),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedLevel,
+                hint: const Text('Selecione o nível'),
+                items: _levelOptions
+                    .map(
+                      (level) =>
+                          DropdownMenuItem(value: level, child: Text(level)),
+                    )
+                    .toList(),
+                onChanged: (value) => setState(() => _selectedLevel = value),
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: AppColors.primary, width: 2),
+                  ),
                 ),
               ),
-            ),
-            const Divider(height: 48, thickness: 0.5),
-
-            // Vídeo no YouTube
-            Text('Vídeo', style: sectionTitleStyle),
-            const SizedBox(height: 12),
-            SwitchListTile(
-              title: const Text('Apenas posts com vídeo no YouTube'),
-              value: _hasYoutube,
-              onChanged: (value) => setState(() => _hasYoutube = value),
-              activeTrackColor: AppColors.primary,
-              contentPadding: EdgeInsets.zero,
-            ),
-            const SizedBox(height: 100),
-          ],
+              const Divider(height: 48, thickness: 0.5),
+              Text('Vídeo', style: sectionTitleStyle),
+              const SizedBox(height: 12),
+              SwitchListTile(
+                title: const Text('Apenas posts com vídeo no YouTube'),
+                value: _hasYoutube,
+                onChanged: (value) => setState(() => _hasYoutube = value),
+                activeTrackColor: AppColors.primary,
+                contentPadding: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 100),
+            ],
+          ),
         ),
-      ),
-      bottomSheet: Container(
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              offset: const Offset(0, -2),
-              blurRadius: 8,
-            ),
-          ],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Row(
+        bottomSheet: Container(
+          padding: EdgeInsets.fromLTRB(18, 12, 18, 12 + bottomPadding),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                offset: const Offset(0, -2),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: clearFilters,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: AppColors.primary, width: 2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: clearFilters,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        side: const BorderSide(
+                          color: AppColors.primary,
+                          width: 2,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Limpar',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
                     ),
                   ),
-                  child: const Text(
-                    'Limpar',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: applyFilters,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Aplicar filtros',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: applyFilters,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Aplicar filtros',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
+                ],
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  void _closeSearchPage() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
   }
 }
 

@@ -40,6 +40,10 @@ _$PostEntityImpl _$$PostEntityImplFromJson(Map<String, dynamic> json) =>
               .toList() ??
           const [],
       distanceKm: (json['distanceKm'] as num?)?.toDouble(),
+      authorName: json['authorName'] as String?,
+      authorPhotoUrl: json['authorPhotoUrl'] as String?,
+      activeProfileName: json['activeProfileName'] as String?,
+      activeProfilePhotoUrl: json['activeProfilePhotoUrl'] as String?,
     );
 
 Map<String, dynamic> _$$PostEntityImplToJson(_$PostEntityImpl instance) =>
@@ -63,4 +67,8 @@ Map<String, dynamic> _$$PostEntityImplToJson(_$PostEntityImpl instance) =>
       'youtubeLink': instance.youtubeLink,
       'availableFor': instance.availableFor,
       'distanceKm': instance.distanceKm,
+      'authorName': instance.authorName,
+      'authorPhotoUrl': instance.authorPhotoUrl,
+      'activeProfileName': instance.activeProfileName,
+      'activeProfilePhotoUrl': instance.activeProfilePhotoUrl,
     };

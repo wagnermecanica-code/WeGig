@@ -42,6 +42,10 @@ mixin _$PostEntity {
   String? get youtubeLink => throw _privateConstructorUsedError;
   List<String> get availableFor => throw _privateConstructorUsedError;
   double? get distanceKm => throw _privateConstructorUsedError;
+  String? get authorName => throw _privateConstructorUsedError;
+  String? get authorPhotoUrl => throw _privateConstructorUsedError;
+  String? get activeProfileName => throw _privateConstructorUsedError;
+  String? get activeProfilePhotoUrl => throw _privateConstructorUsedError;
 
   /// Serializes this PostEntity to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -78,7 +82,11 @@ abstract class $PostEntityCopyWith<$Res> {
       String? photoUrl,
       String? youtubeLink,
       List<String> availableFor,
-      double? distanceKm});
+      double? distanceKm,
+      String? authorName,
+      String? authorPhotoUrl,
+      String? activeProfileName,
+      String? activeProfilePhotoUrl});
 }
 
 /// @nodoc
@@ -115,6 +123,10 @@ class _$PostEntityCopyWithImpl<$Res, $Val extends PostEntity>
     Object? youtubeLink = freezed,
     Object? availableFor = null,
     Object? distanceKm = freezed,
+    Object? authorName = freezed,
+    Object? authorPhotoUrl = freezed,
+    Object? activeProfileName = freezed,
+    Object? activeProfilePhotoUrl = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -193,6 +205,22 @@ class _$PostEntityCopyWithImpl<$Res, $Val extends PostEntity>
           ? _value.distanceKm
           : distanceKm // ignore: cast_nullable_to_non_nullable
               as double?,
+      authorName: freezed == authorName
+          ? _value.authorName
+          : authorName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      authorPhotoUrl: freezed == authorPhotoUrl
+          ? _value.authorPhotoUrl
+          : authorPhotoUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      activeProfileName: freezed == activeProfileName
+          ? _value.activeProfileName
+          : activeProfileName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      activeProfilePhotoUrl: freezed == activeProfilePhotoUrl
+          ? _value.activeProfilePhotoUrl
+          : activeProfilePhotoUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -224,7 +252,11 @@ abstract class _$$PostEntityImplCopyWith<$Res>
       String? photoUrl,
       String? youtubeLink,
       List<String> availableFor,
-      double? distanceKm});
+      double? distanceKm,
+      String? authorName,
+      String? authorPhotoUrl,
+      String? activeProfileName,
+      String? activeProfilePhotoUrl});
 }
 
 /// @nodoc
@@ -259,6 +291,10 @@ class __$$PostEntityImplCopyWithImpl<$Res>
     Object? youtubeLink = freezed,
     Object? availableFor = null,
     Object? distanceKm = freezed,
+    Object? authorName = freezed,
+    Object? authorPhotoUrl = freezed,
+    Object? activeProfileName = freezed,
+    Object? activeProfilePhotoUrl = freezed,
   }) {
     return _then(_$PostEntityImpl(
       id: null == id
@@ -337,6 +373,22 @@ class __$$PostEntityImplCopyWithImpl<$Res>
           ? _value.distanceKm
           : distanceKm // ignore: cast_nullable_to_non_nullable
               as double?,
+      authorName: freezed == authorName
+          ? _value.authorName
+          : authorName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      authorPhotoUrl: freezed == authorPhotoUrl
+          ? _value.authorPhotoUrl
+          : authorPhotoUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      activeProfileName: freezed == activeProfileName
+          ? _value.activeProfileName
+          : activeProfileName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      activeProfilePhotoUrl: freezed == activeProfilePhotoUrl
+          ? _value.activeProfilePhotoUrl
+          : activeProfilePhotoUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -363,7 +415,11 @@ class _$PostEntityImpl extends _PostEntity {
       this.photoUrl,
       this.youtubeLink,
       final List<String> availableFor = const [],
-      this.distanceKm})
+      this.distanceKm,
+      this.authorName,
+      this.authorPhotoUrl,
+      this.activeProfileName,
+      this.activeProfilePhotoUrl})
       : _instruments = instruments,
         _genres = genres,
         _seekingMusicians = seekingMusicians,
@@ -440,10 +496,18 @@ class _$PostEntityImpl extends _PostEntity {
 
   @override
   final double? distanceKm;
+  @override
+  final String? authorName;
+  @override
+  final String? authorPhotoUrl;
+  @override
+  final String? activeProfileName;
+  @override
+  final String? activeProfilePhotoUrl;
 
   @override
   String toString() {
-    return 'PostEntity(id: $id, authorProfileId: $authorProfileId, authorUid: $authorUid, content: $content, location: $location, city: $city, type: $type, level: $level, instruments: $instruments, genres: $genres, seekingMusicians: $seekingMusicians, createdAt: $createdAt, expiresAt: $expiresAt, neighborhood: $neighborhood, state: $state, photoUrl: $photoUrl, youtubeLink: $youtubeLink, availableFor: $availableFor, distanceKm: $distanceKm)';
+    return 'PostEntity(id: $id, authorProfileId: $authorProfileId, authorUid: $authorUid, content: $content, location: $location, city: $city, type: $type, level: $level, instruments: $instruments, genres: $genres, seekingMusicians: $seekingMusicians, createdAt: $createdAt, expiresAt: $expiresAt, neighborhood: $neighborhood, state: $state, photoUrl: $photoUrl, youtubeLink: $youtubeLink, availableFor: $availableFor, distanceKm: $distanceKm, authorName: $authorName, authorPhotoUrl: $authorPhotoUrl, activeProfileName: $activeProfileName, activeProfilePhotoUrl: $activeProfilePhotoUrl)';
   }
 
   @override
@@ -481,7 +545,15 @@ class _$PostEntityImpl extends _PostEntity {
             const DeepCollectionEquality()
                 .equals(other._availableFor, _availableFor) &&
             (identical(other.distanceKm, distanceKm) ||
-                other.distanceKm == distanceKm));
+                other.distanceKm == distanceKm) &&
+            (identical(other.authorName, authorName) ||
+                other.authorName == authorName) &&
+            (identical(other.authorPhotoUrl, authorPhotoUrl) ||
+                other.authorPhotoUrl == authorPhotoUrl) &&
+            (identical(other.activeProfileName, activeProfileName) ||
+                other.activeProfileName == activeProfileName) &&
+            (identical(other.activeProfilePhotoUrl, activeProfilePhotoUrl) ||
+                other.activeProfilePhotoUrl == activeProfilePhotoUrl));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -506,7 +578,11 @@ class _$PostEntityImpl extends _PostEntity {
         photoUrl,
         youtubeLink,
         const DeepCollectionEquality().hash(_availableFor),
-        distanceKm
+        distanceKm,
+        authorName,
+        authorPhotoUrl,
+        activeProfileName,
+        activeProfilePhotoUrl
       ]);
 
   /// Create a copy of PostEntity
@@ -545,7 +621,11 @@ abstract class _PostEntity extends PostEntity {
       final String? photoUrl,
       final String? youtubeLink,
       final List<String> availableFor,
-      final double? distanceKm}) = _$PostEntityImpl;
+      final double? distanceKm,
+      final String? authorName,
+      final String? authorPhotoUrl,
+      final String? activeProfileName,
+      final String? activeProfilePhotoUrl}) = _$PostEntityImpl;
   const _PostEntity._() : super._();
 
   factory _PostEntity.fromJson(Map<String, dynamic> json) =
@@ -592,6 +672,14 @@ abstract class _PostEntity extends PostEntity {
   List<String> get availableFor;
   @override
   double? get distanceKm;
+  @override
+  String? get authorName;
+  @override
+  String? get authorPhotoUrl;
+  @override
+  String? get activeProfileName;
+  @override
+  String? get activeProfilePhotoUrl;
 
   /// Create a copy of PostEntity
   /// with the given fields replaced by the non-null parameter values.

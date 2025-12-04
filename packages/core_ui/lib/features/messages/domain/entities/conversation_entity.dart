@@ -20,6 +20,7 @@ class ConversationEntity with _$ConversationEntity {
     required DateTime createdAt,
     @Default([]) @JsonKey(includeFromJson: false, includeToJson: false) List<Map<String, dynamic>> participantProfilesData,
     @Default(false) bool archived,
+    @Default(<String>[]) List<String> archivedProfileIds,
     DateTime? updatedAt,
   }) = _ConversationEntity;
 
@@ -49,6 +50,9 @@ class ConversationEntity with _$ConversationEntity {
               (k, v) => MapEntry(k.toString(), (v as num?)?.toInt() ?? 0)) ??
           {}),
       archived: data['archived'] as bool? ?? false,
+      archivedProfileIds:
+          (data['archivedProfileIds'] as List<dynamic>?)?.cast<String>() ??
+              const <String>[],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
     );
@@ -94,6 +98,7 @@ class ConversationEntity with _$ConversationEntity {
       'lastMessageTimestamp': Timestamp.fromDate(lastMessageTimestamp),
       'unreadCount': unreadCount,
       'archived': archived,
+      'archivedProfileIds': archivedProfileIds,
       'createdAt': Timestamp.fromDate(createdAt),
       if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
     };

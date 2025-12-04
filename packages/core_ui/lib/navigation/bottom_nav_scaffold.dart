@@ -1,17 +1,30 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/mention_text.dart';
+import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/home/presentation/pages/home_page.dart';
+import 'package:wegig_app/features/home/presentation/pages/search_page.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
+import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/messages/presentation/pages/messages_page.dart';
 import 'package:wegig_app/features/notifications/presentation/pages/notifications_page.dart';
+import 'package:wegig_app/features/notifications/presentation/widgets/notification_location_row.dart';
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
 import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
 import 'package:core_ui/models/search_params.dart';
 import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
 import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
+import 'package:wegig_app/features/messages/presentation/providers/messages_providers.dart';
+import 'package:wegig_app/features/notifications/presentation/providers/notifications_providers.dart';
+import 'package:wegig_app/features/profile/presentation/widgets/profile_switcher_bottom_sheet.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
+import 'package:core_ui/utils/app_snackbar.dart';
 
 /// Configuração de item da bottom nav
 class _NavItemConfig {
@@ -51,11 +64,19 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   final ValueNotifier<SearchParams?> _searchNotifier =
       ValueNotifier<SearchParams?>(null);
 
+  // Notificador para forçar refresh manual da Home
+  final ValueNotifier<int> _homeRefreshNotifier = ValueNotifier<int>(0);
+
   // Lazy initialization - páginas carregadas sob demanda
   late final List<Widget> _pages = [
-    HomePage(searchNotifier: _searchNotifier),
+    HomePage(
+      key: const PageStorageKey('home_page'),
+      searchNotifier: _searchNotifier,
+      onOpenSearch: _openSearchPage,
+      refreshNotifier: _homeRefreshNotifier,
+    ),
     const NotificationsPage(),
-    PostPage(postType: 'musician'), // Default to musician type
+    const SizedBox.shrink(), // Placeholder - abre bottom sheet ao tocar
     const MessagesPage(),
     // ViewProfilePage without userId shows the current authenticated user's profile
     const ViewProfilePage(),
@@ -63,18 +84,36 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
 
   // Configuração dos itens da bottom nav (elimina código repetitivo)
   static const List<_NavItemConfig> _navItems = [
-    _NavItemConfig(icon: Icons.home, label: 'Início'),
+    _NavItemConfig(icon: Iconsax.home, label: 'Início'),
     _NavItemConfig(
-        icon: Icons.notifications, label: 'Notificações', hasBadge: true),
-    _NavItemConfig(icon: Icons.add_box, label: 'Criar Post'),
-    _NavItemConfig(icon: Icons.chat_bubble_outline, label: 'Mensagens'),
-    _NavItemConfig(icon: Icons.person, label: 'Perfil', isAvatar: true),
+        icon: Iconsax.notification, label: 'Notificações', hasBadge: true),
+    _NavItemConfig(icon: Iconsax.add_circle, label: 'Criar Post'),
+    _NavItemConfig(icon: Iconsax.message, label: 'Mensagens', hasBadge: true),
+    _NavItemConfig(icon: Iconsax.user, label: 'Perfil', isAvatar: true),
   ];
+
+  /// Abre a tela de filtros/busca
+  void _openSearchPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SearchPage(
+          searchNotifier: _searchNotifier,
+          onApply: () {
+            // Fecha a tela de filtros e volta para HomePage
+            Navigator.pop(context);
+            // HomePage automaticamente reage ao _searchNotifier via listener
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   void dispose() {
     _currentIndexNotifier.dispose();
     _searchNotifier.dispose();
+    _homeRefreshNotifier.dispose();
     super.dispose();
   }
 
@@ -94,24 +133,18 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
             currentIndex: currentIndex,
             showSelectedLabels: false,
             showUnselectedLabels: false,
-            onTap: (i) async {
+            onTap: (i) {
               if (i == 2) {
-                // Show a brief full-screen loader before opening PostPage
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (context) => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-
-                await Future.delayed(const Duration(milliseconds: 300));
-                if (context.mounted) Navigator.of(context).pop();
+                // Tab "Criar Post" - mostrar bottom sheet de seleção
+                _showPostTypeBottomSheet(context);
+              } else {
+                if (i == 0 && _currentIndexNotifier.value == 0) {
+                  ref.invalidate(postNotifierProvider);
+                  _homeRefreshNotifier.value++;
+                  return;
+                }
                 _currentIndexNotifier.value = i;
-                return;
               }
-
-              _currentIndexNotifier.value = i;
             },
             items: List.generate(
               _navItems.length,
@@ -130,8 +163,14 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     Widget icon;
 
     if (config.hasBadge) {
-      // Notificações com badge
-      icon = _buildNotificationIcon();
+      // Badges: notificações ou mensagens
+      if (config.label == 'Notificações') {
+        icon = _buildNotificationIcon();
+      } else if (config.label == 'Mensagens') {
+        icon = _buildMessagesIcon();
+      } else {
+        icon = Icon(config.icon, size: 26);
+      }
     } else if (config.isAvatar) {
       // Avatar do perfil com cache
       icon = _buildAvatarIcon(isSelected);
@@ -151,6 +190,44 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     return StreamBuilder<int>(
       stream: ref.watch(notificationServiceProvider).streamUnreadCount(),
       builder: (context, snapshot) {
+        // Error state
+        if (snapshot.hasError) {
+          return InkWell(
+            onTap: () => _showNotificationsModal(context),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              child: Icon(Iconsax.notification_bing, size: 28, color: Colors.grey),
+            ),
+          );
+        }
+
+        // Loading state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return InkWell(
+            onTap: () => _showNotificationsModal(context),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Iconsax.notification, size: 28),
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
         final unreadCount = snapshot.data ?? 0;
 
         return InkWell(
@@ -167,14 +244,17 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
                     right: -4,
                     top: -4,
                     child: Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary,
-                        shape: BoxShape.circle,
+                        color: AppColors.badgeRed,
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       constraints: const BoxConstraints(
-                        minWidth: 18,
-                        minHeight: 18,
+                        minWidth: 20,
+                        minHeight: 20,
                       ),
                       child: Text(
                         unreadCount > 99 ? '99+' : unreadCount.toString(),
@@ -195,6 +275,82 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     );
   }
 
+  /// Ícone de mensagens com badge reativo
+  Widget _buildMessagesIcon() {
+    final profileState = ref.watch(profileProvider);
+    final activeProfile = profileState.value?.activeProfile;
+
+    if (activeProfile == null) {
+      return const Icon(Iconsax.message, size: 28);
+    }
+
+    return StreamBuilder<int>(
+      stream: ref.watch(unreadMessageCountForProfileProvider(activeProfile.profileId).future).asStream(),
+      builder: (context, snapshot) {
+        // Error state
+        if (snapshot.hasError) {
+          return Icon(Iconsax.message, size: 28, color: Colors.grey);
+        }
+
+        // Loading state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(Iconsax.message, size: 28),
+              Positioned(
+                right: -4,
+                top: -4,
+                child: SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 1.5),
+                ),
+              ),
+            ],
+          );
+        }
+
+        final unreadCount = snapshot.data ?? 0;
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(Icons.chat_bubble_outline, size: 26),
+            if (unreadCount > 0)
+              Positioned(
+                right: -4,
+                top: -4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.badgeRed,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 20,
+                    minHeight: 20,
+                  ),
+                  child: Text(
+                    unreadCount > 99 ? '99+' : unreadCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   /// Mostra modal com notificações recentes
   void _showNotificationsModal(BuildContext context) {
     showModalBottomSheet(
@@ -206,39 +362,46 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   }
 
   /// Avatar do perfil ativo com CachedNetworkImage (otimizado)
+  /// Suporta long press para mostrar o ProfileSwitcherBottomSheet
   Widget _buildAvatarIcon(bool isSelected) {
     final profileState = ref.watch(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
     final photo = activeProfile?.photoUrl;
     if (activeProfile == null) {
-      return const CircleAvatar(
-        radius: 14,
-        backgroundColor: Colors.grey,
-        child: Icon(Icons.person, size: 18),
+      return GestureDetector(
+        onLongPress: () => _showProfileSwitcher(context),
+        child: const CircleAvatar(
+          radius: 14,
+          backgroundColor: Colors.grey,
+          child: Icon(Iconsax.user, size: 20),
+        ),
       );
     }
-    return Container(
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: isSelected
-              ? Theme.of(context).colorScheme.primary
-              : Colors.transparent,
-          width: 2,
+    return GestureDetector(
+      onLongPress: () => _showProfileSwitcher(context),
+      child: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : Colors.transparent,
+            width: 2,
+          ),
         ),
+        child: _buildAvatarImage(photo),
       ),
-      child: _buildAvatarImage(photo),
     );
   }
 
-  /// Constrói imagem do avatar com cache otimizado
+  /// Constrói imagem do avatar com cache otimizado e skeleton loader
   Widget _buildAvatarImage(String? photoUrl) {
     if (photoUrl == null || photoUrl.isEmpty) {
       return CircleAvatar(
         radius: 14,
         backgroundColor: Colors.grey[200],
-        child: const Icon(Icons.person, size: 18),
+        child: const Icon(Iconsax.user, size: 20),
       );
     }
 
@@ -253,13 +416,23 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
             width: 28,
             height: 28,
             fit: BoxFit.cover,
-            placeholder: (context, url) => const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
+            placeholder: (context, url) => Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.grey[300]!,
+                    Colors.grey[200]!,
+                  ],
+                ),
+              ),
             ),
             errorWidget: (context, url, error) => const Icon(
-              Icons.person,
+              Iconsax.user,
               size: 18,
             ),
             // Otimizações de cache
@@ -377,7 +550,7 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.error_outline,
+                            Icon(Iconsax.danger,
                                 size: 48, color: Colors.red.shade300),
                             const SizedBox(height: 16),
                             Text(
@@ -395,7 +568,7 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.notifications_none,
+                            Icon(Iconsax.notification,
                                 size: 48, color: Colors.grey.shade300),
                             const SizedBox(height: 16),
                             Text(
@@ -406,12 +579,20 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                         ),
                       );
                     }
-                    return ListView.builder(
-                      itemCount: recentNotifications.length,
-                      itemBuilder: (context, index) {
-                        return _buildNotificationItem(
-                            recentNotifications[index]);
-                      },
+                    return RefreshIndicator(
+                      color: AppColors.primary,
+                      onRefresh: () => _refreshModalNotifications(
+                        activeProfile.profileId,
+                      ),
+                      child: ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemCount: recentNotifications.length,
+                        itemBuilder: (context, index) {
+                          return _buildNotificationItem(
+                            recentNotifications[index],
+                          );
+                        },
+                      ),
                     );
                   },
                 );
@@ -421,6 +602,12 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
         ],
       ),
     );
+  }
+
+  Future<void> _refreshModalNotifications(String profileId) async {
+    await ref.read(notificationServiceProvider).refreshNotifications(
+          recipientProfileId: profileId,
+        );
   }
 
   Widget _buildNotificationItem(NotificationEntity notification) {
@@ -437,13 +624,17 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    notification.title,
+                  MentionText(
+                    text: notification.title,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    onMentionTap: (username) =>
+                        context.pushProfileByUsername(username),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -455,6 +646,15 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
+                  ),
+                  NotificationLocationRow(
+                    notification: notification,
+                    iconColor: AppColors.primary,
+                    textStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade800,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -488,39 +688,39 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
 
     switch (notification.type) {
       case NotificationType.interest:
-        icon = Icons.favorite;
+        icon = Iconsax.heart5;
         color = Colors.pink;
         break;
       case NotificationType.newMessage:
-        icon = Icons.message;
+        icon = Iconsax.message;
         color = Colors.blue;
         break;
       case NotificationType.postExpiring:
-        icon = Icons.schedule;
+        icon = Iconsax.clock;
         color = Colors.orange;
         break;
       case NotificationType.nearbyPost:
-        icon = Icons.location_on;
+        icon = Iconsax.location;
         color = Colors.green;
         break;
       case NotificationType.profileMatch:
-        icon = Icons.people;
+        icon = Iconsax.people;
         color = Colors.purple;
         break;
       case NotificationType.interestResponse:
-        icon = Icons.reply;
+        icon = Iconsax.arrow_left;
         color = Colors.blue;
         break;
       case NotificationType.postUpdated:
-        icon = Icons.edit;
+        icon = Iconsax.edit;
         color = Colors.grey;
         break;
       case NotificationType.profileView:
-        icon = Icons.visibility;
+        icon = Iconsax.eye;
         color = Colors.purple;
         break;
       case NotificationType.system:
-        icon = Icons.info;
+        icon = Iconsax.info_circle;
         color = Colors.teal;
         break;
     }
@@ -533,13 +733,16 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
   }
 
   Future<void> _handleNotificationTap(NotificationEntity notification) async {
+    final router = GoRouter.of(context);
     // Close modal first
     Navigator.pop(context);
 
     // Mark as read
     if (!notification.read) {
       try {
-        await ref.read(notificationServiceProvider).markAsRead(notification.notificationId);
+        await ref
+            .read(notificationServiceProvider)
+            .markAsRead(notification.notificationId);
       } catch (e) {
         debugPrint('Erro ao marcar notificação como lida: $e');
       }
@@ -547,6 +750,8 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
 
     // Execute action based on type
     if (!mounted) return;
+
+    bool handledNavigation = false;
 
     switch (notification.actionType) {
       case NotificationActionType.viewProfile:
@@ -561,6 +766,7 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
               ),
             ),
           );
+          handledNavigation = true;
         }
         break;
 
@@ -585,30 +791,66 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
               ),
             ),
           );
+          handledNavigation = true;
         }
         break;
 
       case NotificationActionType.viewPost:
-        final postId = notification.actionData?['postId'] as String?;
-        if (postId != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Visualizar post (em desenvolvimento)')),
-          );
+        final postId = notification.targetId;
+        if (postId != null && mounted) {
+          // Navegar usando GoRouter
+          router.push('/post/$postId');
+          handledNavigation = true;
         }
         break;
 
       case NotificationActionType.renewPost:
         final postId = notification.actionData?['postId'] as String?;
-        if (postId != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Renovar post (em desenvolvimento)')),
-          );
+        if (postId != null && mounted) {
+          try {
+            final now = DateTime.now();
+            final newExpiresAt = now.add(const Duration(days: 30));
+            
+            await FirebaseFirestore.instance
+                .collection('posts')
+                .doc(postId)
+                .update({
+              'expiresAt': Timestamp.fromDate(newExpiresAt),
+              'renewedAt': Timestamp.now(),
+              'renewCount': FieldValue.increment(1),
+            });
+            
+            if (mounted) {
+              AppSnackBar.showSuccess(context, 'Post renovado por mais 30 dias! 🎉');
+            }
+            
+            // Marcar como lida
+            final profileState = ref.read(profileProvider);
+            final activeProfile = profileState.value?.activeProfile;
+            if (activeProfile != null) {
+              await ref.read(notificationServiceProvider).markAsRead(
+                notification.notificationId,
+              );
+            }
+            handledNavigation = true;
+          } catch (e) {
+            if (mounted) {
+              AppSnackBar.showError(context, 'Erro ao renovar: $e');
+            }
+            debugPrint('⚠️ Erro ao renovar post: $e');
+          }
         }
         break;
 
       default:
         break;
+    }
+
+    if (notification.type == NotificationType.interest && !handledNavigation) {
+      final postId = notification.targetId;
+      if (postId != null) {
+        router.push('/post/$postId');
+      }
     }
   }
 
@@ -625,5 +867,179 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
     } else {
       return 'Agora';
     }
+  }
+}
+
+/// Método auxiliar para mostrar bottom sheet de seleção de tipo de post
+extension on _BottomNavScaffoldState {
+  /// Mostra bottom sheet para selecionar tipo de post (Músico ou Banda)
+  void _showPostTypeBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle visual
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Título
+            const Text(
+              'Criar post como:',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF37475A),
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Opção: Músico
+            _buildPostTypeOption(
+              context: context,
+              icon: Iconsax.user,
+              title: 'Músico',
+              subtitle: 'Procuro banda, freela ou projeto',
+              color: const Color(0xFF37475A), // Cor escura para músicos
+              onTap: () async {
+                Navigator.pop(context);
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PostPage(postType: 'musician'),
+                  ),
+                );
+                if (result == true) {
+                  // Post criado com sucesso - invalidar providers
+                  ref.invalidate(postNotifierProvider);
+                  ref.invalidate(profileProvider);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            
+            // Opção: Banda
+            _buildPostTypeOption(
+              context: context,
+              icon: Iconsax.people,
+              title: 'Banda',
+              subtitle: 'Procuro músico para a banda',
+              color: const Color(0xFFE47911), // Cor laranja para bandas
+              onTap: () async {
+                Navigator.pop(context);
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PostPage(postType: 'band'),
+                  ),
+                );
+                if (result == true) {
+                  // Post criado com sucesso - invalidar providers
+                  ref.invalidate(postNotifierProvider);
+                  ref.invalidate(profileProvider);
+                }
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Constrói opção de tipo de post no bottom sheet
+  Widget _buildPostTypeOption({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Iconsax.arrow_right_3, size: 18, color: Colors.grey[400]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Mostra bottom sheet de troca de perfil
+  void _showProfileSwitcher(BuildContext context) {
+    final activeProfileId = ref.read(profileProvider).value?.activeProfile?.profileId;
+    
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ProfileSwitcherBottomSheet(
+        activeProfileId: activeProfileId,
+        onProfileSelected: (String profileId) {
+          // Invalidar providers quando perfil mudar
+          ref.invalidate(profileProvider);
+          ref.invalidate(postNotifierProvider);
+          // Voltar para home após trocar perfil
+          _currentIndexNotifier.value = 0;
+          // Fechar o bottom sheet
+          Navigator.pop(context);
+        },
+      ),
+    );
   }
 }

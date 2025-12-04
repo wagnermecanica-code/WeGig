@@ -1,7 +1,7 @@
 name: wegig_app
-description: App principal Tô Sem Banda
+description: WeGig - Conectando músicos e bandas
 publish_to: none
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
@@ -13,19 +13,21 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Firebase Services (versões fixadas para estabilidade)
-  firebase_core: ^3.6.0
-  firebase_auth: ^5.3.1
-  firebase_crashlytics: ^4.1.3
-  cloud_firestore: ^5.4.4
-  firebase_storage: ^12.3.4
-  firebase_messaging: ^15.1.3
-  firebase_analytics: ^11.3.4
+  # Firebase Services (versões atualizadas - Dezembro 2025)
+  firebase_core: ^4.2.1
+  firebase_auth: ^6.1.2
+  firebase_crashlytics: ^5.0.5
+  cloud_firestore: ^6.1.0
+  firebase_storage: ^13.0.4
+  firebase_messaging: ^16.0.4
+  firebase_analytics: ^12.0.4
   flutter_local_notifications: ^19.5.0 # Notificações locais para foreground
 
   # Google Services
-  google_sign_in: ^6.2.0 # Versão estável com API compatível
-  google_maps_flutter: ^2.10.0
+  google_sign_in: ^6.2.1 # Última versão estável com correções de login social
+  google_maps_flutter: 2.10.0
+  google_maps_cluster_manager:
+    path: ../../third_party/google_maps_cluster_manager
   geolocator: ^10.1.0
 
   # Apple Sign In
@@ -45,10 +47,13 @@ dependencies:
   youtube_player_flutter: ">=9.1.3 <10.0.0"
   url_launcher: ">=6.2.5 <7.0.0"
   flutter_linkify: ^6.0.0 # Detecta e torna URLs clicáveis automaticamente
+  linkify: ^5.0.0
   http: ">=1.1.0 <2.0.0" # Usado para validação de YouTube URL
 
   # Utilitários
   cupertino_icons: ">=1.0.8 <2.0.0"
+  iconsax: ^0.0.8 # Ícones modernos e elegantes
+  flutter_svg: ^2.0.10+1
   shared_preferences: ">=2.2.2 <3.0.0"
   uuid: ">=4.3.3 <5.0.0"
   path: ">=1.8.3 <2.0.0"
@@ -60,12 +65,15 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   rxdart: ^0.28.0 # Reactive Extensions para combinar streams (usado em notifications_page)
-  go_router: ^13.2.0
+  go_router: ^14.3.0
   go_router_builder: ^2.4.0
   riverpod_annotation: ^2.3.5
 
   riverpod: any
   meta: any
+  custom_map_markers: ^0.0.2+1
+  widget_to_marker: ^1.0.6 # Converte Widget em BitmapDescriptor de alta qualidade
+  image: ^4.2.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -79,11 +87,18 @@ dev_dependencies:
 
   # Testing
   # mockito: ^5.4.4  # Incompatible with analyzer 7.6.0 (Dart 3.6.0)
+  integration_test:
+    sdk: flutter
 
   # Ferramentas de desenvolvimento
   flutter_launcher_icons: ^0.14.1 # Geração automática de ícones
   flutter_native_splash: ^2.4.1 # Splash screen nativa otimizada
+  flutter_flavorizr: ^2.2.3 # Gerenciamento de flavors (dev/staging/prod)
   very_good_analysis: ^6.0.0
+
+dependency_overrides:
+  image_cropper_platform_interface:
+    path: ../../third_party/image_cropper_platform_interface
 
 # Configuração do ícone do app (executar: flutter pub run flutter_launcher_icons)
 flutter_launcher_icons:
@@ -97,11 +112,13 @@ flutter:
   uses-material-design: true
 
   assets:
+    - .env
     - assets/Logo/
     - assets/avatar_placeholder.png
     - assets/maps_style.json
     - assets/icon/app_icon.png
     - assets/icon/app_icon_foreground.png
+    - assets/pin_template.svg
 
   fonts:
     - family: Cereal

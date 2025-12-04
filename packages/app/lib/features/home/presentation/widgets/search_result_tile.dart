@@ -1,8 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/utils/location_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Widget de tile para resultado de busca de perfil
 /// Usado em search results para exibir perfis encontrados
@@ -16,6 +18,12 @@ class SearchResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primaryColor = profile.isBand ? AppColors.accent : AppColors.primary;
+    final locationText = formatCleanLocation(
+      neighborhood: profile.neighborhood,
+      city: profile.city,
+      state: profile.state,
+      fallback: '',
+    );
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -28,7 +36,7 @@ class SearchResultTile extends StatelessWidget {
                 : null,
         child: profile.photoUrl == null || profile.photoUrl!.isEmpty
             ? Icon(
-                profile.isBand ? Icons.groups_rounded : Icons.person_rounded,
+                profile.isBand ? Iconsax.people : Iconsax.user,
                 color: primaryColor,
                 size: 28,
               )
@@ -49,8 +57,8 @@ class SearchResultTile extends StatelessWidget {
             ),
           ),
           Icon(
-            profile.isBand ? Icons.groups_rounded : Icons.person_rounded,
-            size: 16,
+            profile.isBand ? Iconsax.people : Iconsax.user,
+            size: 18,
             color: primaryColor,
           ),
         ],
@@ -58,6 +66,17 @@ class SearchResultTile extends StatelessWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (profile.username != null && profile.username!.isNotEmpty) ...[
+            Text(
+              '@${profile.username}',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
           if (profile.instruments?.isNotEmpty ?? false) ...[
             const SizedBox(height: 4),
             Wrap(
@@ -83,16 +102,16 @@ class SearchResultTile extends StatelessWidget {
               }).toList(),
             ),
           ],
-          if (profile.city.isNotEmpty) ...[
+          if (locationText.isNotEmpty) ...[
             const SizedBox(height: 4),
             Row(
               children: [
-                const Icon(Icons.location_on_rounded,
+                const Icon(Iconsax.location,
                     size: 12, color: AppColors.textSecondary),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    profile.city,
+                    locationText,
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,

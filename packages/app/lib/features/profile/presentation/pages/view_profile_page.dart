@@ -1,16 +1,18 @@
 import 'dart:async';
 import 'dart:io';
-
+import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
-import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/core_ui.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
@@ -25,9 +27,17 @@ import 'package:wegig_app/features/profile/presentation/widgets/profile_switcher
 import 'package:wegig_app/features/settings/presentation/pages/settings_page.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
+/// Página principal de visualização/edição de perfis, tanto para o próprio
+/// usuário quanto para outros músicos/bandas.
 class ViewProfilePage extends ConsumerStatefulWidget {
+  /// Cria uma nova tela de perfil opcionalmente fixando usuário/perfil.
   const ViewProfilePage({super.key, this.userId, this.profileId});
+
+  /// UID do dono do perfil que deve ser exibido (opcional para perfis próprios).
   final String? userId;
+
+  /// Identificador do perfil específico a ser carregado; quando ausente usa-se o
+  /// perfil ativo do usuário.
   final String? profileId;
 
   @override
@@ -59,6 +69,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
   Future<void> _loadProfileFromFirestore() async {
     debugPrint('🔄 ViewProfilePage: _loadProfileFromFirestore() iniciado');
+    if (!mounted) return;
     setState(() => _loadingProfile = true);
 
     final user = FirebaseAuth.instance.currentUser;
@@ -179,7 +190,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         oldWidget.profileId != widget.profileId) {
       debugPrint(
           '🔄 ViewProfilePage: didUpdateWidget detectou mudança nos parâmetros');
-      _loadProfileFromFirestore();
+      if (mounted) {
+        _loadProfileFromFirestore();
+      }
     }
   }
 
@@ -241,9 +254,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Você precisa estar autenticado')),
-      );
+      AppSnackBar.showError(context, 'Você precisa estar autenticado');
       return;
     }
 
@@ -251,9 +262,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final profileState = ref.read(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
     if (activeProfile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Perfil ativo não encontrado')),
-      );
+      AppSnackBar.showError(context, 'Perfil ativo não encontrado');
       return;
     }
 
@@ -313,8 +322,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
       // Navegar para a tela de chat
       if (mounted) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
+        Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
             builder: (_) => ChatDetailPage(
               conversationId: conversationId!,
               otherUserId: widget.userId ?? _profile!.uid,
@@ -328,12 +337,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     } catch (e) {
       debugPrint('Erro ao abrir conversa: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao abrir conversa: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Erro ao abrir conversa: $e');
       }
     }
   }
@@ -345,35 +349,65 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     try {
       final city = _profile!.city;
 
+      // Gerar deep link para o perfil
+      final profileUrl = 'https://wegig.app/profile/${_loadedProfileId ?? _profile!.profileId}';
+      
       final message = DeepLinkGenerator.generateProfileShareMessage(
         name: _profile!.name,
         isBand: _profile!.isBand,
         city: city,
+        neighborhood: _profile!.neighborhood,
+        state: _profile!.state,
         userId: _loadedUserId ?? _profile!.uid,
         profileId: _loadedProfileId ?? _profile!.profileId,
         instruments: _profile!.instruments ?? <String>[],
         genres: _profile!.genres ?? <String>[],
       );
 
-      Share.share(message, subject: 'Perfil no WeGig');
+      // Compartilhar com deep link incluído
+      await SharePlus.instance.share(
+        ShareParams(
+          text: '$message\n\nVeja o perfil completo: $profileUrl',
+          subject: 'Perfil no WeGig',
+        ),
+      );
     } catch (e) {
       debugPrint('Erro ao compartilhar perfil: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao compartilhar: $e'),
-            backgroundColor: Colors.red,
-          ),
+        AppSnackBar.showError(
+          context,
+          'Erro ao compartilhar: $e',
         );
       }
     }
   }
 
-  String? _extractYoutubeVideoId(String? url) {
-    if (url == null || url.isEmpty) return null;
+  void _openSettings() {
+    Navigator.of(context).push<void>(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const SettingsPage(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeInOutCubic,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  String? _extractYoutubeVideoId(String? originalUrl) {
+    if (originalUrl == null || originalUrl.isEmpty) return null;
 
     // Limpar espaços e garantir que é uma URL válida
-    url = url.trim();
+    var url = originalUrl.trim();
 
     // Padrões mais abrangentes para YouTube
     final patterns = [
@@ -404,56 +438,53 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
         if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Não foi possível abrir o link')),
-            );
+            AppSnackBar.showError(context, 'Não foi possível abrir o link');
           }
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('URL inválida')),
-          );
+          AppSnackBar.showError(context, 'URL inválida');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao abrir o link')),
-        );
+        AppSnackBar.showError(context, 'Erro ao abrir o link');
       }
     }
   }
 
   Widget _buildGalleryImage(String pathOrUrl) {
-    // Container com ClipRRect ao invés de AspectRatio para evitar achatamento
+    // AspectRatio 1:1 para garantir células quadradas e evitar achatamento
     if (pathOrUrl.startsWith('http')) {
-      return Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-        ),
-        child: CachedNetworkImage(
-          imageUrl: pathOrUrl,
-          fit: BoxFit.cover, // Preenche o espaço mantendo proporção
-          placeholder: (context, url) => Container(
+      return AspectRatio(
+        aspectRatio: 1.0,
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
             color: Colors.grey[200],
-            child: const Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          ),
+          child: CachedNetworkImage(
+            imageUrl: pathOrUrl,
+            fit: BoxFit.cover, // Preenche o espaço mantendo proporção
+            placeholder: (context, url) => Container(
+              color: Colors.grey[200],
+              child: const Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                ),
               ),
             ),
+            errorWidget: (context, url, error) => Container(
+              color: Colors.grey[300],
+              child: const Icon(Iconsax.gallery_slash, size: 42, color: Colors.grey),
+            ),
+            memCacheWidth: 400,
+            memCacheHeight: 400,
+            maxWidthDiskCache: 800,
+            maxHeightDiskCache: 800,
           ),
-          errorWidget: (context, url, error) => Container(
-            color: Colors.grey[300],
-            child: const Icon(Icons.broken_image, size: 40, color: Colors.grey),
-          ),
-          memCacheWidth: 400,
-          memCacheHeight: 400,
-          maxWidthDiskCache: 800,
-          maxHeightDiskCache: 800,
         ),
       );
     }
@@ -464,20 +495,23 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
     final f = File(candidate);
     if (f.existsSync()) {
-      return Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-        ),
-        child: Image.file(
-          f,
-          fit: BoxFit.cover, // Preenche o espaço mantendo proporção
-          cacheWidth: 400,
-          cacheHeight: 400,
-          errorBuilder: (context, error, stackTrace) => Container(
-            color: Colors.grey[300],
-            child: const Icon(Icons.broken_image, size: 40),
+      return AspectRatio(
+        aspectRatio: 1.0,
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+          ),
+          child: Image.file(
+            f,
+            fit: BoxFit.cover, // Preenche o espaço mantendo proporção
+            cacheWidth: 400,
+            cacheHeight: 400,
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: Colors.grey[300],
+              child: const Icon(Iconsax.gallery_slash, size: 42),
+            ),
           ),
         ),
       );
@@ -491,7 +525,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
   void _openPhotoViewer(int startIndex) {
     Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (context) {
+      MaterialPageRoute<void>(builder: (context) {
         return _PhotoViewerPage(
           gallery: _gallery,
           startIndex: startIndex,
@@ -513,22 +547,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
               if (mounted) {
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Foto de perfil atualizada!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                AppSnackBar.showSuccess(context, 'Foto de perfil atualizada!');
               }
             } catch (e) {
               debugPrint('Erro ao definir foto de perfil: $e');
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erro: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                AppSnackBar.showError(context, 'Erro: $e');
               }
             }
           },
@@ -546,28 +570,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
               if (mounted) {
                 Navigator.of(context).pop(); // Fecha o visualizador
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Row(
-                      children: [
-                        Icon(Icons.check_circle, color: Colors.white),
-                        SizedBox(width: 12),
-                        Expanded(child: Text('Foto baixada com sucesso!')),
-                      ],
-                    ),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 3),
-                  ),
-                );
+                AppSnackBar.showSuccess(context, 'Foto baixada com sucesso!');
               }
             } catch (e) {
               debugPrint('Erro ao fazer download: $e');
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erro ao fazer download: $e'),
-                    backgroundColor: Colors.red,
-                  ),
+                AppSnackBar.showError(
+                  context,
+                  'Erro ao fazer download: $e',
                 );
               }
             }
@@ -652,6 +662,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               final compressedPath = compressed.path;
               debugPrint('ViewProfile: Imagem comprimida: $compressedPath');
 
+              final squareFile = await _createLetterboxedSquare(compressedPath);
+              debugPrint('ViewProfile: Imagem com letterbox pronta: ${squareFile.path}');
+
               // Fazer upload da foto editada
               final profileState = ref.read(profileProvider);
               final activeProfile = profileState.value?.activeProfile;
@@ -666,7 +679,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   .child('gallery')
                   .child('photo_${DateTime.now().millisecondsSinceEpoch}.jpg');
 
-              await storageRef.putFile(File(compressedPath));
+              await storageRef.putFile(squareFile);
               final newUrl = await storageRef.getDownloadURL();
               debugPrint('ViewProfile: Upload concluído: $newUrl');
 
@@ -699,21 +712,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
               if (mounted) {
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Foto atualizada com sucesso!'),
-                    backgroundColor: Colors.green,
-                  ),
+                AppSnackBar.showSuccess(
+                  context,
+                  'Foto atualizada com sucesso!',
                 );
               }
             } catch (e) {
               debugPrint('ViewProfile: ERRO ao editar foto: $e');
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erro ao editar foto: $e'),
-                    backgroundColor: Colors.red,
-                  ),
+                AppSnackBar.showError(
+                  context,
+                  'Erro ao editar foto: $e',
                 );
               }
             }
@@ -748,21 +757,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
               if (mounted) {
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Foto deletada com sucesso!'),
-                    backgroundColor: Colors.green,
-                  ),
+                AppSnackBar.showSuccess(
+                  context,
+                  'Foto deletada com sucesso!',
                 );
               }
             } catch (e) {
               debugPrint('Erro ao deletar foto: $e');
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erro ao deletar: $e'),
-                    backgroundColor: Colors.red,
-                  ),
+                AppSnackBar.showError(
+                  context,
+                  'Erro ao deletar: $e',
                 );
               }
             }
@@ -775,6 +780,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   @override
   Widget build(BuildContext context) {
     final isOwnProfile = _isMyProfile();
+    final theme = Theme.of(context);
 
     // Listener para detectar mudanças no perfil ativo
     // SEMPRE escuta, mas só age se for visualização do próprio perfil
@@ -814,14 +820,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         elevation: 0,
         leading: Navigator.canPop(context)
             ? IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black),
+                icon: const Icon(Iconsax.arrow_left_2, color: Colors.black),
                 onPressed: () => Navigator.of(context).pop(),
               )
             : null,
         actions: isOwnProfile
             ? [
                 IconButton(
-                  icon: const Icon(Icons.swap_horiz, color: Colors.black),
+                  icon: const Icon(Iconsax.arrow_swap_horizontal, color: Colors.black),
                   tooltip: 'Trocar perfil',
                   onPressed: () {
                     ProfileSwitcherBottomSheet.show(
@@ -835,7 +841,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                         debugPrint(
                             '🔄 ViewProfile: Callback recebido - perfil trocado para $newProfileId');
                         // Aguarda um frame para garantir que o Riverpod atualizou
-                        await Future.delayed(const Duration(milliseconds: 100));
+                        await Future<void>.delayed(
+                          const Duration(milliseconds: 100),
+                        );
                         // Força reload imediato após troca
                         if (mounted) {
                           debugPrint(
@@ -848,15 +856,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.settings, color: Colors.black),
+                  icon: const Icon(Iconsax.setting_2, color: Colors.black),
                   tooltip: 'Configurações',
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsPage(),
-                      ),
-                    );
-                  },
+                  onPressed: _openSettings,
                 ),
               ]
             : null,
@@ -894,7 +896,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                           _profile!.photoUrl!)
                                       : null,
                                   child: _profile!.photoUrl == null
-                                      ? const Icon(Icons.person,
+                                      ? const Icon(Iconsax.user,
                                           size: 42, color: Colors.grey)
                                       : null,
                                 ),
@@ -907,20 +909,49 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                   children: [
                                     Text(
                                       _profile!.name,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16.8),
+                                      style: theme.textTheme.headlineSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 22,
+                                                height: 1.2,
+                                                color: Colors.black87,
+                                              ) ??
+                                          const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 22,
+                                          ),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
+                                    if ((_profile!.username ?? '').isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          '@${_profile!.username}',
+                                          style: theme.textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                    fontSize: 16,
+                                                    color: Colors.grey[700],
+                                                  ) ??
+                                              TextStyle(
+                                                fontSize: 16,
+                                                color: Colors.grey[700],
+                                              ),
+                                        ),
+                                      ),
                                     if (_profile!.bio != null &&
                                         _profile!.bio!.isNotEmpty)
                                       Padding(
                                         padding: const EdgeInsets.only(top: 4),
                                         child: Text(
                                           _profile!.bio!,
-                                          style:
-                                              const TextStyle(fontSize: 12.6),
+                                          style: theme.textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                    fontSize: 15,
+                                                    height: 1.4,
+                                                    color: Colors.grey[800],
+                                                  ) ??
+                                              const TextStyle(fontSize: 15),
                                           maxLines: 4,
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -940,14 +971,20 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                             children: [
                               // Location info
                               Text(
-                                [
-                                  _profile!.city,
-                                  if (_profile!.state != null) _profile!.state,
-                                ]
-                                    .where((e) => e != null && e.isNotEmpty)
-                                    .join(', '),
-                                style: TextStyle(
-                                    fontSize: 13, color: Colors.grey[600]),
+                                formatCleanLocation(
+                                  neighborhood: _profile!.neighborhood,
+                                  city: _profile!.city,
+                                  state: _profile!.state,
+                                ),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontSize: 14.5,
+                                      color: Colors.grey[700],
+                                      fontWeight: FontWeight.w500,
+                                    ) ??
+                                    TextStyle(
+                                      fontSize: 14.5,
+                                      color: Colors.grey[700],
+                                    ),
                               ),
 
                               const SizedBox(height: 12),
@@ -962,7 +999,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                     Expanded(
                                       child: _buildActionButton(
                                         label: 'Mensagem',
-                                        icon: Icons.chat_bubble_outline,
+                                        icon: Iconsax.message,
                                         onPressed: _openOrCreateConversation,
                                         isPrimary: true,
                                       ),
@@ -971,7 +1008,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                     Expanded(
                                       child: _buildActionButton(
                                         label: 'Compartilhar',
-                                        icon: Icons.share_outlined,
+                                        icon: Iconsax.share,
                                         onPressed: _shareProfile,
                                         isPrimary: false,
                                       ),
@@ -1004,10 +1041,10 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                             indicatorColor: Colors.black,
                             indicatorWeight: 1,
                             tabs: const [
-                              Tab(icon: Icon(Icons.grid_on, size: 24)),
-                              Tab(icon: Icon(Icons.smart_display, size: 24)),
-                              Tab(icon: Icon(Icons.list_alt, size: 24)),
-                              Tab(icon: Icon(Icons.favorite_border, size: 24)),
+                              Tab(icon: Icon(Iconsax.element_3, size: 26)),
+                              Tab(icon: Icon(Iconsax.video_play, size: 26)),
+                              Tab(icon: Icon(Iconsax.document_text, size: 26)),
+                              Tab(icon: Icon(Iconsax.heart, size: 26)),
                             ],
                           ),
                         ),
@@ -1049,20 +1086,20 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           if (_profile?.instagramLink != null &&
               _profile!.instagramLink!.isNotEmpty)
             _buildSocialIcon(
-              icon: Icons.photo_camera,
+              icon: Iconsax.camera,
               label: 'Instagram',
               onTap: () => _launchUrl(_profile!.instagramLink!),
             ),
           if (_profile?.tiktokLink != null && _profile!.tiktokLink!.isNotEmpty)
             _buildSocialIcon(
-              icon: Icons.music_note,
+              icon: Iconsax.musicnote,
               label: 'TikTok',
               onTap: () => _launchUrl(_profile!.tiktokLink!),
             ),
           if (_profile?.youtubeLink != null &&
               _profile!.youtubeLink!.isNotEmpty)
             _buildSocialIcon(
-              icon: Icons.play_circle_outline,
+              icon: Iconsax.play_circle,
               label: 'YouTube',
               onTap: () => _launchUrl(_profile!.youtubeLink!),
             ),
@@ -1111,6 +1148,56 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   }
 
   Widget _buildProfileInfoSection() {
+    final theme = Theme.of(context);
+    final sectionTitleStyle = theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+          color: Colors.black87,
+        ) ??
+        const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+          color: Colors.black87,
+        );
+    final labelStyle = theme.textTheme.bodyMedium?.copyWith(
+          fontSize: 14.5,
+          color: Colors.grey[700],
+          fontWeight: FontWeight.w600,
+        ) ??
+        TextStyle(
+          fontSize: 14.5,
+          color: Colors.grey[700],
+          fontWeight: FontWeight.w600,
+        );
+    final valueStyle = theme.textTheme.bodyMedium?.copyWith(
+          fontSize: 14.5,
+          color: Colors.black87,
+        ) ??
+        const TextStyle(
+          fontSize: 14.5,
+          color: Colors.black87,
+        );
+    final chipPrimaryStyle = theme.textTheme.bodySmall?.copyWith(
+          fontSize: 13,
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
+        ) ??
+        const TextStyle(
+          fontSize: 13,
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
+        );
+    final chipSecondaryStyle = theme.textTheme.bodySmall?.copyWith(
+          fontSize: 13,
+          color: Colors.black87,
+          fontWeight: FontWeight.w600,
+        ) ??
+        const TextStyle(
+          fontSize: 13,
+          color: Colors.black87,
+          fontWeight: FontWeight.w600,
+        );
+
     return Container(
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(16),
@@ -1124,11 +1211,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         children: [
           Text(
             _profile!.isBand ? 'Sobre a Banda' : 'Sobre o Músico',
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 15,
-              color: Colors.black87,
-            ),
+            style: sectionTitleStyle,
           ),
           const SizedBox(height: 12),
 
@@ -1139,18 +1222,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               child: Row(
                 children: [
                   Icon(
-                    _profile!.isBand ? Icons.calendar_today : Icons.cake,
+                    _profile!.isBand ? Iconsax.calendar : Iconsax.cake,
                     size: 18,
                     color: Colors.grey[600],
                   ),
                   const SizedBox(width: 8),
                   Text(
                     _profile!.ageOrFormationText!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: valueStyle,
                   ),
                 ],
               ),
@@ -1164,19 +1243,15 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 children: [
-                  Icon(Icons.bar_chart, size: 18, color: Colors.grey[600]),
+                  Icon(Iconsax.chart, size: 20, color: Colors.grey[600]),
                   const SizedBox(width: 8),
                   Text(
                     'Nível: ',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: labelStyle,
                   ),
                   Text(
                     _profile!.level!,
-                    style: const TextStyle(fontSize: 13, color: Colors.black87),
+                    style: valueStyle,
                   ),
                 ],
               ),
@@ -1191,15 +1266,11 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.music_note, size: 18, color: Colors.grey[600]),
+                      Icon(Iconsax.musicnote, size: 20, color: Colors.grey[600]),
                       const SizedBox(width: 8),
                       Text(
                         _profile!.isBand ? 'Instrumentação:' : 'Instrumentos:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: labelStyle,
                       ),
                     ],
                   ),
@@ -1212,13 +1283,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
+                              color: AppColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               instrument,
-                              style: const TextStyle(
-                                  fontSize: 12, color: AppColors.primary),
+                              style: chipPrimaryStyle,
                             ),
                           );
                         }).toList() ??
@@ -1237,16 +1307,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.library_music,
+                      Icon(Iconsax.music_library_2,
                           size: 18, color: Colors.grey[600]),
                       const SizedBox(width: 8),
                       Text(
                         'Gêneros:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: labelStyle,
                       ),
                     ],
                   ),
@@ -1264,8 +1330,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                             ),
                             child: Text(
                               genre,
-                              style: const TextStyle(
-                                  fontSize: 12, color: Colors.black87),
+                              style: chipSecondaryStyle,
                             ),
                           );
                         }).toList() ??
@@ -1282,22 +1347,22 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               children: [
                 Row(
                   children: [
-                    Icon(Icons.people, size: 18, color: Colors.grey[600]),
+                    Icon(Iconsax.people, size: 20, color: Colors.grey[600]),
                     const SizedBox(width: 8),
                     Text(
                       'Membros:',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[700],
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: labelStyle,
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Text(
                   '${_profile!.bandMembers?.length ?? 0} membros cadastrados',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                      ) ??
+                      TextStyle(fontSize: 13, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -1343,7 +1408,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: _pickAndUploadGalleryPhoto,
-              icon: const Icon(Icons.add_a_photo),
+              icon: const Icon(Iconsax.camera),
               label: const Text('Adicionar Foto'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -1406,13 +1471,64 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         ),
         child: Center(
           child: Icon(
-            Icons.add_a_photo,
+            Iconsax.camera,
             size: 32,
             color: Colors.grey[400],
           ),
         ),
       ),
     );
+  }
+
+  Future<File> _createLetterboxedSquare(String sourcePath) async {
+    final originalBytes = await File(sourcePath).readAsBytes();
+    final codec = await ui.instantiateImageCodec(originalBytes);
+    final frame = await codec.getNextFrame();
+    codec.dispose();
+    final image = frame.image;
+
+    final squareSize = math.max(image.width, image.height);
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final backgroundPaint = Paint()..color = Colors.black;
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, squareSize.toDouble(), squareSize.toDouble()),
+      backgroundPaint,
+    );
+
+    final offset = Offset(
+      (squareSize - image.width) / 2,
+      (squareSize - image.height) / 2,
+    );
+    canvas.drawImage(image, offset, Paint());
+
+    final picture = recorder.endRecording();
+    final squareImage = await picture.toImage(squareSize, squareSize);
+    final byteData =
+        await squareImage.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) {
+      image.dispose();
+      squareImage.dispose();
+      throw Exception('Não foi possível gerar imagem quadrada');
+    }
+
+    final tempDir = Directory.systemTemp;
+    final squarePath = p.join(
+      tempDir.path,
+      'gallery_square_${DateTime.now().millisecondsSinceEpoch}.jpg',
+    );
+    final Uint8List pngBytes = byteData.buffer.asUint8List();
+    final jpgBytes = await FlutterImageCompress.compressWithList(
+      pngBytes,
+      quality: 90,
+      format: CompressFormat.jpeg,
+    );
+    final squareFile = await File(squarePath).writeAsBytes(jpgBytes);
+
+    image.dispose();
+    squareImage.dispose();
+
+    return squareFile;
   }
 
   Future<void> _pickAndUploadGalleryPhoto() async {
@@ -1433,28 +1549,41 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
       debugPrint('ViewProfile: Imagem selecionada: ${pickedFile.path}');
 
-      // Crop da imagem
+      // Crop da imagem com opção square
       final cropped = await ImageCropper().cropImage(
         sourcePath: pickedFile.path,
+        compressQuality: 85,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        compressFormat: ImageCompressFormat.jpg,
         uiSettings: [
           AndroidUiSettings(
-            toolbarTitle: 'Editar foto',
+            toolbarTitle: 'Editar Foto',
             toolbarColor: AppColors.primary,
             toolbarWidgetColor: Colors.white,
+            statusBarColor: AppColors.primary,
+            backgroundColor: Colors.black,
+            activeControlsWidgetColor: AppColors.primary,
+            initAspectRatio: CropAspectRatioPreset.square,
             aspectRatioPresets: [
               CropAspectRatioPreset.square,
               CropAspectRatioPreset.ratio3x2,
               CropAspectRatioPreset.ratio4x3,
               CropAspectRatioPreset.ratio16x9,
+              CropAspectRatioPreset.original,
             ],
+            lockAspectRatio: false,
           ),
           IOSUiSettings(
-            title: 'Editar foto',
+            title: 'Editar Foto',
+            minimumAspectRatio: 0.5,
+            aspectRatioLockDimensionSwapEnabled: true,
             aspectRatioPresets: [
               CropAspectRatioPreset.square,
               CropAspectRatioPreset.ratio3x2,
               CropAspectRatioPreset.ratio4x3,
               CropAspectRatioPreset.ratio16x9,
+              CropAspectRatioPreset.original,
             ],
           ),
         ],
@@ -1494,6 +1623,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       final compressedPath = compressed.path;
       debugPrint('ViewProfile: Imagem comprimida: $compressedPath');
 
+      final squareFile = await _createLetterboxedSquare(compressedPath);
+      debugPrint('ViewProfile: Imagem com letterbox pronta: ${squareFile.path}');
+
       // Upload para o Firebase Storage
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
@@ -1508,7 +1640,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           .ref()
           .child('profiles/${activeProfile.profileId}/gallery/$fileName');
 
-      await storageRef.putFile(File(compressedPath));
+      await storageRef.putFile(squareFile);
       final downloadUrl = await storageRef.getDownloadURL();
       debugPrint('ViewProfile: Upload concluído: $downloadUrl');
 
@@ -1524,21 +1656,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Foto adicionada com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
+        AppSnackBar.showSuccess(
+          context,
+          'Foto adicionada com sucesso!',
         );
       }
     } catch (e) {
       debugPrint('ViewProfile: ERRO ao adicionar foto: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao adicionar foto: $e'),
-            backgroundColor: Colors.red,
-          ),
+        AppSnackBar.showError(
+          context,
+          'Erro ao adicionar foto: $e',
         );
       }
     }
@@ -1550,7 +1678,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.smart_display_outlined,
+            Icon(Iconsax.video_play,
                 size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
@@ -1646,7 +1774,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.article_outlined, size: 64, color: Colors.grey[400]),
+                Icon(Iconsax.document_text, size: 68, color: Colors.grey[400]),
                 const SizedBox(height: 16),
                 Text(
                   'Nenhum post encontrado',
@@ -1710,7 +1838,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.lock_outline, size: 64, color: Colors.grey[400]),
+            Icon(Iconsax.lock, size: 68, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               'Conteúdo privado',
@@ -1842,18 +1970,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     if (!mounted) return;
     setState(() => _sentInterests.add(postId));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.favorite, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Interesse enviado! 🎵'),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
+    AppSnackBar.showSuccess(
+      context,
+      'Interesse enviado! 🎵',
     );
 
     try {
@@ -1864,7 +1983,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         'postId': postId,
         'postAuthorProfileId': authorProfileId,
         'interestedProfileId': activeProfile.profileId,
-        'interestedName': activeProfile.name,
+        'interestedProfileName': activeProfile.name, // ✅ Cloud Function expects this
+        'interestedProfilePhotoUrl': activeProfile.photoUrl, // ✅ Used in notification
+        'interestedName': activeProfile.name, // ⚠️ Deprecated but kept for backwards compat
         'createdAt': FieldValue.serverTimestamp(),
         'read': false,
       });
@@ -1872,17 +1993,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       debugPrint('Erro no envio otimista de interesse: $e');
       if (mounted) {
         setState(() => _sentInterests.remove(postId));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Erro ao enviar interesse: $e')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-          ),
+        AppSnackBar.showError(
+          context,
+          'Erro ao enviar interesse: $e',
         );
       }
     }
@@ -1893,18 +2006,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     if (!mounted) return;
     setState(() => _sentInterests.remove(postId));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.favorite_border, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Interesse removido 🎵'),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
+    AppSnackBar.showInfo(
+      context,
+      'Interesse removido 🎵',
     );
 
     try {
@@ -1925,17 +2029,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       debugPrint('Erro ao remover interesse: $e');
       if (mounted) {
         setState(() => _sentInterests.add(postId));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Erro ao remover interesse: $e')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-          ),
+        AppSnackBar.showError(
+          context,
+          'Erro ao remover interesse: $e',
         );
       }
     }
@@ -1946,7 +2042,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final type = (data['type'] as String?) ?? '';
     final authorProfileId = (data['authorProfileId'] as String?) ?? '';
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -1968,13 +2064,13 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             // Opções para o dono do post
             if (isOwner) ...[
               ListTile(
-                leading: const Icon(Icons.edit, color: AppColors.primary),
+                leading: const Icon(Iconsax.edit, color: AppColors.primary),
                 title: const Text('Editar Post'),
                 onTap: () async {
                   Navigator.pop(ctx);
                   // Navegar para PostPage com dados do post para edição
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(
+                  await Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
                       builder: (_) => PostPage(
                         postType: type,
                         existingPostData: {'postId': postId, ...data},
@@ -1990,7 +2086,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
+                leading: const Icon(Iconsax.trash, color: Colors.red),
                 title: const Text('Deletar Post'),
                 onTap: () async {
                   Navigator.pop(ctx);
@@ -2038,18 +2134,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
                       // Mostrar confirmação
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Row(
-                              children: [
-                                Icon(Icons.check_circle, color: Colors.white),
-                                SizedBox(width: 12),
-                                Text('Post deletado com sucesso!'),
-                              ],
-                            ),
-                            backgroundColor: Colors.green,
-                            duration: Duration(seconds: 2),
-                          ),
+                        AppSnackBar.showSuccess(
+                          context,
+                          'Post deletado com sucesso!',
                         );
 
                         // Recarregar posts
@@ -2060,18 +2147,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                     } catch (e) {
                       debugPrint('Erro ao deletar post: $e');
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                const Icon(Icons.error, color: Colors.white),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                    child: Text('Erro ao deletar post: $e')),
-                              ],
-                            ),
-                            backgroundColor: Colors.red,
-                          ),
+                        AppSnackBar.showError(
+                          context,
+                          'Erro ao deletar post: $e',
                         );
                       }
                     }
@@ -2083,7 +2161,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             else ...[
               if (isInterestSent)
                 ListTile(
-                  leading: const Icon(Icons.favorite_border, color: Colors.red),
+                  leading: const Icon(Iconsax.heart, color: Colors.red),
                   title: const Text('Remover Interesse'),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -2092,7 +2170,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 )
               else
                 ListTile(
-                  leading: const Icon(Icons.favorite, color: Colors.pink),
+                  leading: const Icon(Iconsax.heart5, color: Colors.pink),
                   title: const Text('Demonstrar Interesse'),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -2100,7 +2178,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   },
                 ),
               ListTile(
-                leading: const Icon(Icons.person, color: AppColors.primary),
+                leading: const Icon(Iconsax.user, color: AppColors.primary),
                 title: const Text('Ver Perfil'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -2194,8 +2272,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                     color: Colors.grey[200],
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(Icons.music_note,
-                                      color: Colors.grey),
+                                  child: const Icon(Iconsax.musicnote,
+                                      color: Colors.grey, size: 24),
                                 ),
                                 memCacheWidth: 112,
                                 memCacheHeight: 112,
@@ -2213,8 +2291,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                               color: Colors.grey[200],
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.music_note,
-                                color: Colors.grey),
+                            child: const Icon(Iconsax.musicnote,
+                                color: Colors.grey, size: 24),
                           );
                         })(),
                       ),
@@ -2228,7 +2306,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                           color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.music_note, color: Colors.grey),
+                        child: const Icon(Iconsax.musicnote, color: Colors.grey, size: 24),
                       ),
                     ),
               title: isOwner && timeAgo != null
@@ -2270,11 +2348,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     () {
-                      final locationParts = <String>[];
-                      if (city.isNotEmpty) locationParts.add(city);
-                      if (state.isNotEmpty) locationParts.add(state);
-
-                      final locationText = locationParts.join(', ');
+                      final locationText = formatCleanLocation(
+                        neighborhood: data['neighborhood'] as String?,
+                        city: city,
+                        state: state.isEmpty ? null : state,
+                        fallback: '',
+                      );
 
                       return locationText.isNotEmpty
                           ? Text(
@@ -2313,7 +2392,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   onTap: () => _showInterestOptionsDialog(
                       postId, data, isInterestSent, isOwner),
                   child: Icon(
-                    Icons.more_horiz_rounded,
+                    Iconsax.more,
                     color: Colors.grey[600],
                     size: 20,
                   ),
@@ -2336,8 +2415,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                     ),
                     child: Icon(
                       isInterestSent
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
+                          ? Iconsax.heart5
+                          : Iconsax.heart,
                       size: 16,
                       color: isInterestSent ? Colors.pink : primaryColor,
                     ),
@@ -2376,11 +2455,19 @@ class _PhotoViewerPage extends StatefulWidget {
 
 class _PhotoViewerPageState extends State<_PhotoViewerPage> {
   late int _currentIndex;
+  late PageController _pageController;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.startIndex;
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Widget _buildImage(String pathOrUrl) {
@@ -2389,13 +2476,14 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
         return CachedNetworkImage(
           imageUrl: pathOrUrl,
           fit: BoxFit.contain,
+          alignment: Alignment.center,
           placeholder: (context, url) => const ColoredBox(
             color: Colors.black,
             child:
                 Center(child: CircularProgressIndicator(color: Colors.white)),
           ),
           errorWidget: (context, url, error) =>
-              const Icon(Icons.broken_image, size: 100, color: Colors.white),
+              const Icon(Iconsax.gallery_slash, size: 100, color: Colors.white),
           memCacheWidth: 1200,
           memCacheHeight: 1200,
         );
@@ -2410,13 +2498,14 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
         return Image.file(
           f,
           fit: BoxFit.contain,
+          alignment: Alignment.center,
           cacheWidth: 1200,
         );
       }
 
-      return const Icon(Icons.broken_image, size: 100, color: Colors.white);
+      return const Icon(Iconsax.gallery_slash, size: 100, color: Colors.white);
     } catch (e) {
-      return const Icon(Icons.broken_image, size: 100, color: Colors.white);
+      return const Icon(Iconsax.gallery_slash, size: 100, color: Colors.white);
     }
   }
 
@@ -2427,13 +2516,13 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
+          icon: const Icon(Iconsax.close_circle, color: Colors.white, size: 26),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: widget.isMyProfile
             ? [
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, color: Colors.white),
+                  icon: const Icon(Iconsax.more, color: Colors.white, size: 26),
                   color: Colors.white,
                   onSelected: (value) async {
                     final url = widget.gallery[_currentIndex];
@@ -2455,7 +2544,7 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
                       value: 'set_profile',
                       child: Row(
                         children: [
-                          Icon(Icons.account_circle, size: 20),
+                          Icon(Iconsax.profile_circle, size: 22),
                           SizedBox(width: 12),
                           Text('Tornar foto de perfil'),
                         ],
@@ -2465,7 +2554,7 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
                       value: 'download',
                       child: Row(
                         children: [
-                          Icon(Icons.download, size: 20),
+                          Icon(Iconsax.document_download, size: 22),
                           SizedBox(width: 12),
                           Text('Fazer download'),
                         ],
@@ -2475,7 +2564,7 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
                       value: 'edit',
                       child: Row(
                         children: [
-                          Icon(Icons.edit, size: 20),
+                          Icon(Iconsax.edit, size: 22),
                           SizedBox(width: 12),
                           Text('Editar'),
                         ],
@@ -2485,7 +2574,7 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          Icon(Iconsax.trash, size: 22, color: Colors.red),
                           SizedBox(width: 12),
                           Text('Deletar', style: TextStyle(color: Colors.red)),
                         ],
@@ -2499,7 +2588,7 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
       body: Center(
         child: PageView.builder(
           itemCount: widget.gallery.length,
-          controller: PageController(initialPage: _currentIndex),
+          controller: _pageController,
           onPageChanged: (index) {
             setState(() => _currentIndex = index);
           },

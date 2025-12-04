@@ -1,50 +1,88 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:flutter/foundation.dart';
+import 'package:rxdart/rxdart.dart';
 
 /// Interface para PostRemoteDataSource
+///
+/// Define contratos para operações CRUD e queries de posts no Firestore.
 abstract class IPostRemoteDataSource {
+  /// Retorna todos os posts ativos (não expirados)
   Future<List<PostEntity>> getAllPosts(String uid);
+
+  /// Retorna posts criados por um perfil específico
   Future<List<PostEntity>> getPostsByProfile(String profileId);
+
+  /// Busca um post por ID, retorna null se não encontrado
   Future<PostEntity?> getPostById(String postId);
+
+  /// Cria novo post no Firestore
   Future<void> createPost(PostEntity post);
+
+  /// Atualiza post existente no Firestore
   Future<void> updatePost(PostEntity post);
+
+  /// Deleta post do Firestore
   Future<void> deletePost(String postId);
+
+  /// Verifica se perfil demonstrou interesse no post
   Future<bool> hasInterest(String postId, String profileId);
+
+  /// Adiciona interesse de perfil no post
   Future<void> addInterest(
       String postId, String profileId, String authorProfileId);
+
+  /// Remove interesse de perfil no post
   Future<void> removeInterest(String postId, String profileId);
+
+  /// Retorna lista de IDs de perfis interessados no post
   Future<List<String>> getInterestedProfiles(String postId);
+
+  /// Busca posts próximos usando geosearch (Haversine)
   Future<List<PostEntity>> getNearbyPosts({
     required double latitude,
     required double longitude,
     required double radiusKm,
     int limit = 50,
   });
+
+  /// Stream reativo de posts do usuário (atualiza automaticamente)
   Stream<List<PostEntity>> watchPosts(String uid);
+
+  /// Stream reativo de posts de um perfil específico
   Stream<List<PostEntity>> watchPostsByProfile(String profileId);
 }
 
 /// DataSource para Posts - Firebase Firestore operations
+///
+/// Implementa operações de baixo nível para posts:
+/// - CRUD (Create, Read, Update, Delete)
+/// - Geosearch (busca por proximidade)
+/// - Sistema de interesse (like/interesse em posts)
+/// - Streams reativos para atualizações em tempo real
 class PostRemoteDataSource implements IPostRemoteDataSource {
+  /// Construtor com injeção opcional de FirebaseFirestore (para testes)
   PostRemoteDataSource({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
+
+  /// Instância do FirebaseFirestore
   final FirebaseFirestore _firestore;
 
   @override
   Future<List<PostEntity>> getAllPosts(String uid) async {
     try {
-      debugPrint('🔍 PostDataSource: getAllPosts - uid=$uid');
+      debugPrint('🔍 PostDataSource: getAllPosts (requester uid=$uid)');
 
       final snapshot = await _firestore
           .collection('posts')
-          .where('authorUid', isEqualTo: uid)
           .where('expiresAt', isGreaterThan: Timestamp.now())
           .orderBy('expiresAt')
-          .orderBy('createdAt', descending: true)
           .get();
 
       final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
+
+      // Sort by createdAt descending in memory
+      posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       debugPrint('✅ PostDataSource: ${posts.length} posts loaded');
       return posts;
@@ -173,11 +211,18 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
       debugPrint(
           '💚 PostDataSource: addInterest - post=$postId, profile=$profileId');
 
+      // Get profile data for notification
+      final profileDoc = await _firestore.collection('profiles').doc(profileId).get();
+      final profileName = profileDoc.data()?['name'] as String? ?? 'Alguém';
+      final profilePhoto = profileDoc.data()?['photoUrl'] as String?;
+
       // Create interest document
       await _firestore.collection('interests').add({
         'postId': postId,
         'interestedProfileId': profileId,
-        'authorProfileId': authorProfileId,
+        'interestedProfileName': profileName, // ✅ Cloud Function expects this
+        'interestedProfilePhotoUrl': profilePhoto, // ✅ Used in notification
+        'postAuthorProfileId': authorProfileId, // ✅ Fixed field name (was authorProfileId)
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -267,18 +312,18 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
   @override
   Stream<List<PostEntity>> watchPosts(String uid) {
     try {
-      debugPrint('👁️ PostDataSource: watchPosts - uid=$uid');
+      debugPrint('👁️ PostDataSource: watchPosts (requester uid=$uid)');
 
       return _firestore
           .collection('posts')
-          .where('authorUid', isEqualTo: uid)
           .where('expiresAt', isGreaterThan: Timestamp.now())
           .orderBy('expiresAt')
           .orderBy('createdAt', descending: true)
           .snapshots()
+          .debounceTime(const Duration(milliseconds: 300))  // ⚡ Debounce para reduzir rebuilds
           .map((snapshot) {
         final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
-        debugPrint('👁️ PostDataSource: Stream emitiu ${posts.length} posts');
+        debugPrint('👁️ PostDataSource: Stream emitiu ${posts.length} posts (debounced)');
         return posts;
       });
     } catch (e) {
@@ -300,9 +345,10 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
           .orderBy('expiresAt')
           .orderBy('createdAt', descending: true)
           .snapshots()
+          .debounceTime(const Duration(milliseconds: 300))  // ⚡ Debounce para reduzir rebuilds
           .map((snapshot) {
         final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
-        debugPrint('👁️ PostDataSource: Stream emitiu ${posts.length} posts');
+        debugPrint('👁️ PostDataSource: Stream emitiu ${posts.length} posts (debounced)');
         return posts;
       });
     } catch (e) {

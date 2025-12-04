@@ -54,6 +54,7 @@ String _$createPostUseCaseHash() => r'e9b8dfdb44eea8e5cce9ec559a3edfe5d9babb52';
 /// ============================================
 /// USE CASE LAYER - Dependency Injection
 /// ============================================
+/// Provider para CreatePost use case
 ///
 /// Copied from [createPostUseCase].
 @ProviderFor(createPostUseCase)
@@ -72,7 +73,9 @@ final createPostUseCaseProvider = AutoDisposeProvider<CreatePost>.internal(
 typedef CreatePostUseCaseRef = AutoDisposeProviderRef<CreatePost>;
 String _$updatePostUseCaseHash() => r'98f7a2b38ad24c5d0955b01e02168a976d9d2c37';
 
-/// See also [updatePostUseCase].
+/// Provider para UpdatePost use case
+///
+/// Copied from [updatePostUseCase].
 @ProviderFor(updatePostUseCase)
 final updatePostUseCaseProvider = AutoDisposeProvider<UpdatePost>.internal(
   updatePostUseCase,
@@ -89,7 +92,9 @@ final updatePostUseCaseProvider = AutoDisposeProvider<UpdatePost>.internal(
 typedef UpdatePostUseCaseRef = AutoDisposeProviderRef<UpdatePost>;
 String _$deletePostUseCaseHash() => r'b633ae3a3feb730c3177be8ab32620daf0fdbd1f';
 
-/// See also [deletePostUseCase].
+/// Provider para DeletePost use case
+///
+/// Copied from [deletePostUseCase].
 @ProviderFor(deletePostUseCase)
 final deletePostUseCaseProvider = AutoDisposeProvider<DeletePost>.internal(
   deletePostUseCase,
@@ -107,7 +112,9 @@ typedef DeletePostUseCaseRef = AutoDisposeProviderRef<DeletePost>;
 String _$toggleInterestUseCaseHash() =>
     r'71cfdea3688a5a03ba5f7a0fd72e2d88873d6af5';
 
-/// See also [toggleInterestUseCase].
+/// Provider para ToggleInterest use case
+///
+/// Copied from [toggleInterestUseCase].
 @ProviderFor(toggleInterestUseCase)
 final toggleInterestUseCaseProvider =
     AutoDisposeProvider<ToggleInterest>.internal(
@@ -126,7 +133,9 @@ typedef ToggleInterestUseCaseRef = AutoDisposeProviderRef<ToggleInterest>;
 String _$loadInterestedUsersUseCaseHash() =>
     r'c0e86387876da18d9df64b02bab5c729c7482eab';
 
-/// See also [loadInterestedUsersUseCase].
+/// Provider para LoadInterestedUsers use case
+///
+/// Copied from [loadInterestedUsersUseCase].
 @ProviderFor(loadInterestedUsersUseCase)
 final loadInterestedUsersUseCaseProvider =
     AutoDisposeProvider<LoadInterestedUsers>.internal(
@@ -143,7 +152,7 @@ final loadInterestedUsersUseCaseProvider =
 // ignore: unused_element
 typedef LoadInterestedUsersUseCaseRef
     = AutoDisposeProviderRef<LoadInterestedUsers>;
-String _$postListHash() => r'07fde0e630ffd8fd76b93dd4ac48f6761f50f29f';
+String _$postListHash() => r'eda1aa9402b468e1925dc99af5ebf923035e5e33';
 
 /// ============================================
 /// GLOBAL PROVIDERS
@@ -164,9 +173,16 @@ final postListProvider = AutoDisposeProvider<List<PostEntity>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef PostListRef = AutoDisposeProviderRef<List<PostEntity>>;
-String _$postNotifierHash() => r'd0d6ed4c1d20a6e5910a40101c246dc012c17fed';
+String _$postNotifierHash() => r'beb8cd88ffbc7a14df22baba583e96c7427b5b49';
 
-/// PostNotifier - Manages post state with Clean Architecture
+/// PostNotifier - Gerencia estado de posts com Clean Architecture
+///
+/// Responsável por:
+/// - Carregar posts do usuário/perfil
+/// - Criar, atualizar e deletar posts
+/// - Toggle de interesse (like)
+/// - Carregar lista de perfis interessados
+/// - Refresh manual (pull-to-refresh)
 ///
 /// Copied from [PostNotifier].
 @ProviderFor(PostNotifier)

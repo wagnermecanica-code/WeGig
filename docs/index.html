@@ -12,18 +12,40 @@
       content="músicos, bandas, música, networking, geolocalização"
     />
     <title>WeGig - Conectando Músicos</title>
-    <link rel="stylesheet" href="style.css" />
-    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="stylesheet" href="style.css?v=7" />
+    <link rel="shortcut icon" href="favicon-32.png?v=7" />
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=7" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=7" />
+    <link rel="icon" type="image/png" sizes="192x192" href="app_icon.png?v=7" />
+    <link rel="apple-touch-icon" href="app_icon.png?v=7" />
+    <script>
+      // Redirect Firebase domain to custom domain
+      if (
+        window.location.hostname.includes("web.app") ||
+        window.location.hostname.includes("firebaseapp.com")
+      ) {
+        window.location.replace(
+          "https://wegig.com.br" +
+            window.location.pathname +
+            window.location.search +
+            window.location.hash
+        );
+      }
+    </script>
   </head>
   <body>
     <header>
       <div class="container">
         <div class="logo">
-          <img src="WeGigSite.png" alt="WeGig - Conectando Músicos" />
+          <img
+            src="WeGigSloganTransparente.png?v=7"
+            alt="WeGig - Conectando Músicos"
+          />
         </div>
         <nav>
           <a href="#sobre">Sobre</a>
           <a href="#funcionalidades">Funcionalidades</a>
+          <a href="#posts-recentes">Posts Recentes</a>
           <a href="termos.html">Termos de Uso</a>
           <a href="privacidade.html">Privacidade</a>
         </nav>
@@ -161,7 +183,7 @@
         </div>
       </section>
 
-      <section class="posts-feed">
+      <section id="posts-recentes" class="posts-feed">
         <div class="container">
           <h2>Posts Recentes</h2>
           <p class="section-subtitle">
@@ -188,7 +210,7 @@
       <div class="container">
         <div class="footer-content">
           <div class="footer-section">
-            <img src="WeGigSite.png" alt="WeGig" class="footer-logo" />
+            <img src="LogoSite.png?v=7" alt="WeGig" class="footer-logo" />
             <p>Conectando músicos e bandas através da tecnologia</p>
             <p class="copyright">
               &copy; 2025 WeGig. Todos os direitos reservados.
@@ -217,7 +239,7 @@
             <ul>
               <li>
                 Email:
-                <a href="mailto:suporte@wegig.com.br">suporte@wegig.com.br</a>
+                <a href="mailto:contato@wegig.com.br">contato@wegig.com.br</a>
               </li>
               <li>
                 Privacidade:
@@ -231,8 +253,7 @@
 
         <div class="footer-bottom">
           <p>
-            Desenvolvido por Wagner Oliveira | Última atualização: 27 de
-            novembro de 2025
+            Desenvolvido por WeGig | Última atualização: 1 de dezembro de 2025
           </p>
         </div>
       </div>

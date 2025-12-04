@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Widget reutilizável para bolhas de mensagem no chat
 /// Otimizado para performance com CachedNetworkImage
@@ -136,7 +137,7 @@ class MessageBubble extends StatelessWidget {
                       height: 200,
                       alignment: Alignment.center,
                       child: const Icon(
-                        Icons.broken_image,
+                        Iconsax.gallery_slash,
                         size: 48,
                         color: Colors.grey,
                       ),

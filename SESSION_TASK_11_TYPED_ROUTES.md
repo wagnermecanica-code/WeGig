@@ -21,7 +21,7 @@ class AppRoutes {
   // Static routes
   static const String auth = '/auth';
   static const String home = '/home';
-  static const String createProfile = '/create-profile';
+   static const String createProfile = '/profiles/new';
 
   // Factory methods for parameterized routes
   static String profile(String profileId) => '/profile/$profileId';

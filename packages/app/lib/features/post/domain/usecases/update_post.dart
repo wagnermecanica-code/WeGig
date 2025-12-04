@@ -4,9 +4,11 @@ import 'package:wegig_app/features/post/domain/repositories/post_repository.dart
 /// UseCase: Atualizar um post existente
 /// Valida ownership e campos obrigatórios
 class UpdatePost {
+  /// Cria uma instância de UpdatePost
   UpdatePost(this._repository);
   final PostRepository _repository;
 
+  /// Executa a atualização do post com validações e verificação de ownership
   Future<PostEntity> call(PostEntity post, String currentProfileId) async {
     // Verify ownership
     if (post.authorProfileId != currentProfileId) {

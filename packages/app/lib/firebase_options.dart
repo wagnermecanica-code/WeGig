@@ -50,9 +50,9 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSyA3Rq-Fmlsrwn-fywriTBp7xZsOo7i5fyQ',
     appId: '1:278498777601:web:8a281dd57bf8dfce9ebe00',
     messagingSenderId: '278498777601',
-    projectId: 'to-sem-banda-83e19',
-    authDomain: 'to-sem-banda-83e19.firebaseapp.com',
-    storageBucket: 'to-sem-banda-83e19.firebasestorage.app',
+    projectId: 'wegig-dev',
+    authDomain: 'wegig-dev.firebaseapp.com',
+    storageBucket: 'wegig-dev.firebasestorage.app',
     measurementId: 'G-XLW5KQJDH0',
   );
 
@@ -60,16 +60,16 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSyC_QxHROqFRoIzCHBK_NFxu-GG6uMNS0uk',
     appId: '1:278498777601:android:3cb8437111dd6c5f9ebe00',
     messagingSenderId: '278498777601',
-    projectId: 'to-sem-banda-83e19',
-    storageBucket: 'to-sem-banda-83e19.firebasestorage.app',
+    projectId: 'wegig-dev',
+    storageBucket: 'wegig-dev.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAe_WwvD3nN-VJlMZf2L_BRpIx-ne3P_-0',
     appId: '1:278498777601:ios:cdeec8b4da7c657a9ebe00',
     messagingSenderId: '278498777601',
-    projectId: 'to-sem-banda-83e19',
-    storageBucket: 'to-sem-banda-83e19.firebasestorage.app',
+    projectId: 'wegig-dev',
+    storageBucket: 'wegig-dev.firebasestorage.app',
     iosBundleId: 'com.example.toSemBanda',
   );
 }

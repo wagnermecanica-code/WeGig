@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/core_ui.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
@@ -12,10 +13,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:linkify/linkify.dart';
 import 'package:path/path.dart' as path;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/messages/presentation/providers/messages_providers.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:wegig_app/features/messages/utils/mention_linkifier.dart';
 
 // Sanitização de texto para campos de entrada
 String sanitizeText(String input) {
@@ -73,12 +79,14 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
-  StreamSubscription? _messagesSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+      _messagesSubscription;
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
   bool _isUploading = false;
   Map<String, dynamic>? _replyingTo;
-  String? _currentProfileId; // ProfileId ativo do usuário atual
+  ProfileEntity? _activeProfile;
+  ProviderSubscription<ProfileEntity?>? _activeProfileSubscription;
 
   // Pagination state
   DocumentSnapshot? _lastMessageDoc;
@@ -93,38 +101,49 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   static const Color _otherMessageColor = AppColors.surfaceVariant;
   static const Color _reactionBgColor = AppColors.divider;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadCurrentProfile();
-    _loadMessages();
-    _markConversationAsRead();
-
-    // Listener para paginação (carregar mais mensagens ao rolar para cima)
-    _scrollController.addListener(() {
+  /// Listener do ScrollController para paginação (evita memory leak)
+  void _onScroll() {
+    if (_scrollController.hasClients) {
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent * 0.9) {
         _loadMoreMessages();
       }
-    });
+    }
   }
 
-  /// Carrega o profileId ativo do usuário atual
-  Future<void> _loadCurrentProfile() async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) return;
+  @override
+  void initState() {
+    super.initState();
+    _activeProfile = ref.read(activeProfileProvider);
 
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(currentUser.uid)
-        .get();
+    _activeProfileSubscription =
+        ref.listenManual<ProfileEntity?>(activeProfileProvider,
+            (ProfileEntity? previous, ProfileEntity? next) {
+      final previousId = previous?.profileId;
+      final nextId = next?.profileId;
+      if (previousId == nextId) {
+        return;
+      }
 
-    if (mounted) {
-      setState(() {
-        _currentProfileId =
-            userDoc.data()?['activeProfileId'] as String? ?? currentUser.uid;
-      });
+      if (mounted) {
+        setState(() => _activeProfile = next);
+      } else {
+        _activeProfile = next;
+      }
+
+      if (nextId != null) {
+        _markConversationAsRead(profileIdOverride: nextId);
+      }
+    });
+
+    _loadMessages();
+
+    if (_activeProfile?.profileId != null) {
+      _markConversationAsRead(profileIdOverride: _activeProfile!.profileId);
     }
+
+    // Listener para paginação (carregar mais mensagens ao rolar para cima)
+    _scrollController.addListener(_onScroll);
   }
 
   @override
@@ -133,6 +152,10 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     _messagesSubscription?.cancel();
     _messagesSubscription = null;
 
+    // ✅ FIX: Remover scroll listener antes de dispose (usa mesma referência)
+    _scrollController.removeListener(_onScroll);
+    _activeProfileSubscription?.close();
+    _activeProfileSubscription = null;
     _messageController.dispose();
     _scrollController.dispose();
     _messageFocusNode.dispose();
@@ -151,7 +174,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
         .listen((snapshot) {
       final messages = snapshot.docs.map((doc) {
         final data = doc.data();
-        return {
+        return <String, dynamic>{
           'messageId': doc.id,
           'senderId': data['senderId'] ?? '',
           'senderProfileId': data['senderProfileId'] ??
@@ -160,7 +183,9 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
           'text': data['text'] ?? '',
           'imageUrl': data['imageUrl'] ?? '',
           'replyTo': data['replyTo'],
-          'reactions': data['reactions'] ?? {},
+            'reactions':
+              (data['reactions'] as Map?)?.cast<String, dynamic>() ??
+                <String, dynamic>{},
           'timestamp': data['timestamp'] as Timestamp?,
           'read': data['read'] ?? false,
         };
@@ -195,6 +220,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       return;
     }
 
+    if (!mounted) return;
     setState(() => _isLoadingMore = true);
 
     try {
@@ -208,23 +234,27 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
           .get();
 
       if (querySnapshot.docs.isEmpty) {
-        setState(() {
-          _hasMoreMessages = false;
-          _isLoadingMore = false;
-        });
+        if (mounted) {
+          setState(() {
+            _hasMoreMessages = false;
+            _isLoadingMore = false;
+          });
+        }
         return;
       }
 
       final newMessages = querySnapshot.docs.map((doc) {
         final data = doc.data();
-        return {
+        return <String, dynamic>{
           'messageId': doc.id,
           'senderId': data['senderId'] ?? '',
           'senderProfileId': data['senderProfileId'] ?? data['senderId'] ?? '',
           'text': data['text'] ?? '',
           'imageUrl': data['imageUrl'] ?? '',
           'replyTo': data['replyTo'],
-          'reactions': data['reactions'] ?? {},
+            'reactions':
+              (data['reactions'] as Map?)?.cast<String, dynamic>() ??
+                <String, dynamic>{},
           'timestamp': data['timestamp'] as Timestamp?,
           'read': data['read'] ?? false,
         };
@@ -249,24 +279,21 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   }
 
   /// Marca conversa como lida usando o MessageService
-  Future<void> _markConversationAsRead() async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) return;
+  Future<void> _markConversationAsRead({String? profileIdOverride}) async {
+    final profileId = profileIdOverride ??
+        _activeProfile?.profileId ??
+        ref.read(activeProfileProvider)?.profileId;
 
-    // Buscar profileId ativo
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(currentUser.uid)
-        .get();
-
-    final currentProfileId =
-        userDoc.data()?['activeProfileId'] as String? ?? currentUser.uid;
+    if (profileId == null || profileId.isEmpty) {
+      debugPrint(
+          'ChatDetailPage: ❌ Não há perfil ativo para marcar como lida');
+      return;
+    }
 
     try {
-      // Marca como lida usando o use case
       await ref.read(markAsReadUseCaseProvider).call(
             conversationId: widget.conversationId,
-            profileId: currentProfileId,
+            profileId: profileId,
           );
     } catch (e) {
       debugPrint('Erro ao marcar conversa como lida: $e');
@@ -281,33 +308,40 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
 
-    // Buscar profileId ativo do usuário atual
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(currentUser.uid)
-        .get();
+    final activeProfile =
+        _activeProfile ?? ref.read(activeProfileProvider);
+    final currentProfileId = activeProfile?.profileId;
 
-    final currentProfileId = _currentProfileId ??
-        (userDoc.data()?['activeProfileId'] as String? ?? currentUser.uid);
+    if (currentProfileId == null) {
+      debugPrint('ChatDetailPage: ❌ Perfil ativo não encontrado para envio');
+      if (mounted) {
+        AppSnackBar.showError(
+          context,
+          'Não encontramos um perfil ativo. Tente novamente.',
+        );
+      }
+      return;
+    }
 
     final replyTo = _replyingTo;
+    if (!mounted) return;
     setState(() {
       _messageController.clear();
       _replyingTo = null;
     });
 
     try {
-      final messageData = {
+      final messageData = <String, dynamic>{
         'senderId': currentUser.uid,
         'senderProfileId': currentProfileId,
         'text': text,
         'timestamp': FieldValue.serverTimestamp(),
         'read': false,
-        'reactions': {},
+        'reactions': <String, dynamic>{},
       };
 
       if (replyTo != null) {
-        messageData['replyTo'] = {
+        messageData['replyTo'] = <String, dynamic>{
           'messageId': replyTo['messageId'],
           'text': replyTo['text'],
           'senderId': replyTo['senderId'],
@@ -346,12 +380,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     } catch (e) {
       debugPrint('Erro ao enviar mensagem: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao enviar: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Erro ao enviar: $e');
       }
     }
   }
@@ -368,15 +397,38 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
 
+    final activeProfile =
+        _activeProfile ?? ref.read(activeProfileProvider);
+    final currentProfileId = activeProfile?.profileId;
+
+    if (currentProfileId == null) {
+      debugPrint('ChatDetailPage: ❌ Perfil ativo não encontrado para imagem');
+      if (mounted) {
+        AppSnackBar.showError(
+          context,
+          'Não encontramos um perfil ativo. Tente novamente.',
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
     setState(() => _isUploading = true);
 
     try {
       // Comprimir imagem em isolate (não bloqueia UI - 95% mais responsivo)
       final tempDir = Directory.systemTemp.path;
-      final compressedPath = await compute(_compressImageIsolate, {
-        'sourcePath': pickedFile.path,
-        'targetDir': tempDir,
-      });
+      String? compressedPath;
+      try {
+        compressedPath = await compute(_compressImageIsolate, {
+          'sourcePath': pickedFile.path,
+          'targetDir': tempDir,
+        });
+      } catch (e) {
+        debugPrint('Erro ao comprimir imagem: $e');
+        // Fallback: usar arquivo original se compressão falhar
+        compressedPath = pickedFile.path;
+      }
 
       if (compressedPath == null || !File(compressedPath).existsSync()) {
         throw Exception('Falha na compressão da imagem');
@@ -402,15 +454,6 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
         debugPrint('Erro ao deletar arquivo temporário: $e');
       }
 
-      // Buscar profileId ativo
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
-
-      final currentProfileId = _currentProfileId ??
-          (userDoc.data()?['activeProfileId'] as String? ?? currentUser.uid);
-
       // Criar mensagem com imagem
       await FirebaseFirestore.instance
           .collection('conversations')
@@ -423,7 +466,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
         'imageUrl': imageUrl,
         'timestamp': FieldValue.serverTimestamp(),
         'read': false,
-        'reactions': {},
+        'reactions': <String, dynamic>{},
       });
 
       await FirebaseFirestore.instance
@@ -449,12 +492,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     } catch (e) {
       debugPrint('Erro ao enviar imagem: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao enviar imagem: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Erro ao enviar imagem: $e');
       }
     } finally {
       if (mounted) {
@@ -506,30 +544,12 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     try {
       await Clipboard.setData(ClipboardData(text: text));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Mensagem copiada'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Mensagem copiada');
       }
     } catch (e) {
       debugPrint('Erro ao copiar mensagem: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao copiar: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        AppSnackBar.showError(context, 'Erro ao copiar: $e');
       }
     }
   }
@@ -545,13 +565,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
           .delete();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Mensagem deletada'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 1),
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Mensagem deletada', duration: const Duration(seconds: 1));
       }
     } catch (e) {
       debugPrint('Erro ao deletar mensagem: $e');
@@ -580,7 +594,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              Icons.chat_bubble_outline,
+                              Iconsax.message,
                               size: 64,
                               color: Colors.grey.shade400,
                             ),
@@ -640,7 +654,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                   ? NetworkImage(widget.otherUserPhoto)
                   : null,
               child: widget.otherUserPhoto.isEmpty
-                  ? const Icon(Icons.person, size: 20, color: Colors.white)
+                  ? const Icon(Iconsax.user, size: 22, color: Colors.white)
                   : null,
             ),
           ),
@@ -691,7 +705,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       actions: [
         // Menu de opções
         PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert),
+          icon: const Icon(Iconsax.more),
           onSelected: (value) {
             switch (value) {
               case 'clear':
@@ -705,7 +719,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
               value: 'clear',
               child: Row(
                 children: [
-                  Icon(Icons.delete_sweep, size: 20),
+                  Icon(Iconsax.trash, size: 22),
                   SizedBox(width: 12),
                   Text('Limpar conversa'),
                 ],
@@ -715,7 +729,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
               value: 'block',
               child: Row(
                 children: [
-                  Icon(Icons.block, size: 20, color: Colors.red),
+                  Icon(Iconsax.shield_cross, size: 22, color: Colors.red),
                   SizedBox(width: 12),
                   Text('Bloquear usuário', style: TextStyle(color: Colors.red)),
                 ],
@@ -730,8 +744,9 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   /// Bolha de mensagem individual (estilo Instagram Direct)
   Widget _buildMessageBubble(Map<String, dynamic> message) {
     final currentUser = FirebaseAuth.instance.currentUser;
+    final myProfileId = _activeProfile?.profileId;
     final isMyMessage =
-        message['senderProfileId'] == _currentProfileId; // Usa profileId
+      myProfileId != null && message['senderProfileId'] == myProfileId;
     final timestamp = message['timestamp'] as Timestamp?;
     final imageUrl = (message['imageUrl'] as String?) ?? '';
     final replyTo = message['replyTo'] as Map<String, dynamic>?;
@@ -780,7 +795,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                           ? NetworkImage(widget.otherUserPhoto)
                           : null,
                       child: widget.otherUserPhoto.isEmpty
-                          ? const Icon(Icons.person, size: 16)
+                          ? const Icon(Iconsax.user, size: 18)
                           : null,
                     ),
                   ),
@@ -834,7 +849,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                                     children: [
                                       Text(
                                         replyTo['senderProfileId'] ==
-                                                _currentProfileId
+                                                myProfileId
                                             ? 'Você'
                                             : widget.otherUserName,
                                         style: TextStyle(
@@ -884,7 +899,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                                 height: 200,
                                 alignment: Alignment.center,
                                 child: const Icon(
-                                  Icons.broken_image,
+                                  Iconsax.gallery_slash,
                                   size: 48,
                                   color: Colors.grey,
                                 ),
@@ -902,14 +917,32 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                               vertical: 10,
                             ),
                             child: Linkify(
+                              linkifiers: <Linkifier>[
+                                ...defaultLinkifiers,
+                                const MentionLinkifier(),
+                              ],
                               onOpen: (link) async {
-                                // Abre URLs no navegador externo
-                                final uri = Uri.parse(link.url);
-                                if (await canLaunchUrl(uri)) {
-                                  await launchUrl(
-                                    uri,
-                                    mode: LaunchMode.externalApplication,
-                                  );
+                                if (link is MentionElement) {
+                                  context.pushProfileByUsername(link.username);
+                                  return;
+                                }
+
+                                try {
+                                  final uri = Uri.parse(link.url);
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(
+                                      uri,
+                                      mode: LaunchMode.externalApplication,
+                                    );
+                                  }
+                                } catch (e) {
+                                  debugPrint('Erro ao abrir link: $e');
+                                  if (mounted) {
+                                    AppSnackBar.showError(
+                                      context,
+                                      'Erro ao abrir link',
+                                    );
+                                  }
                                 }
                               },
                               text: (message['text'] as String?) ?? '',
@@ -923,7 +956,8 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                                 fontSize: 15,
                                 color:
                                     isMyMessage ? Colors.white : _primaryColor,
-                                decoration: TextDecoration.underline,
+                                decoration: TextDecoration.none,
+                                fontWeight: FontWeight.w600,
                                 height: 1.4,
                               ),
                             ),
@@ -994,11 +1028,12 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
 
   /// Mostra opções ao segurar mensagem (estilo Instagram)
   void _showMessageOptions(Map<String, dynamic> message) {
+    final myProfileId = _activeProfile?.profileId;
     final isMyMessage =
-        message['senderProfileId'] == _currentProfileId; // Usa profileId
+      myProfileId != null && message['senderProfileId'] == myProfileId;
     final messageId = (message['messageId'] as String?) ?? '';
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1049,7 +1084,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
 
             // Responder
             ListTile(
-              leading: const Icon(Icons.reply),
+              leading: const Icon(Iconsax.arrow_left),
               title: const Text('Responder'),
               onTap: () {
                 Navigator.pop(context);
@@ -1063,7 +1098,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
             // Copiar
             if (message['text'].toString().isNotEmpty)
               ListTile(
-                leading: const Icon(Icons.copy),
+                leading: const Icon(Iconsax.copy),
                 title: const Text('Copiar'),
                 onTap: () {
                   Navigator.pop(context);
@@ -1074,7 +1109,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
             // Deletar (apenas para minhas mensagens)
             if (isMyMessage)
               ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
+                leading: const Icon(Iconsax.trash, color: Colors.red),
                 title:
                     const Text('Deletar', style: TextStyle(color: Colors.red)),
                 onTap: () async {
@@ -1152,7 +1187,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Respondendo para ${_replyingTo!['senderProfileId'] == _currentProfileId ? 'você mesmo' : widget.otherUserName}',
+                          'Respondendo para ${_replyingTo!['senderProfileId'] == _activeProfile?.profileId ? 'você mesmo' : widget.otherUserName}',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -1173,7 +1208,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, size: 20),
+                    icon: const Icon(Iconsax.close_circle, size: 22),
                     onPressed: () => setState(() => _replyingTo = null),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -1218,7 +1253,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                   // Botão de foto
                   IconButton(
                     icon: const Icon(
-                      Icons.photo_camera,
+                      Iconsax.camera,
                       color: _primaryColor,
                       size: 28,
                     ),
@@ -1267,7 +1302,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                     ),
                     child: IconButton(
                       icon: const Icon(
-                        Icons.send,
+                        Iconsax.send_2,
                         color: Colors.white,
                         size: 20,
                       ),
@@ -1333,22 +1368,12 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Conversa limpa com sucesso'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Conversa limpa com sucesso');
       }
     } catch (e) {
       debugPrint('Erro ao limpar conversa: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao limpar conversa: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Erro ao limpar conversa: $e');
       }
     }
   }
@@ -1391,23 +1416,13 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${widget.otherUserName} foi bloqueado'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppSnackBar.showSuccess(context, '${widget.otherUserName} foi bloqueado');
         Navigator.pop(context);
       }
     } catch (e) {
       debugPrint('Erro ao bloquear usuário: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao bloquear usuário: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Erro ao bloquear usuário: $e');
       }
     }
   }

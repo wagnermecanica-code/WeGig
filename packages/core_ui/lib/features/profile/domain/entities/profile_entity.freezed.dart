@@ -23,6 +23,7 @@ mixin _$ProfileEntity {
   String get profileId => throw _privateConstructorUsedError;
   String get uid => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
+  String? get username => throw _privateConstructorUsedError;
   bool get isBand => throw _privateConstructorUsedError;
   String get city => throw _privateConstructorUsedError;
   @GeoPointConverter()
@@ -66,6 +67,7 @@ abstract class $ProfileEntityCopyWith<$Res> {
       {String profileId,
       String uid,
       String name,
+      String? username,
       bool isBand,
       String city,
       @GeoPointConverter() GeoPoint location,
@@ -105,6 +107,7 @@ class _$ProfileEntityCopyWithImpl<$Res, $Val extends ProfileEntity>
     Object? profileId = null,
     Object? uid = null,
     Object? name = null,
+    Object? username = freezed,
     Object? isBand = null,
     Object? city = null,
     Object? location = null,
@@ -138,6 +141,10 @@ class _$ProfileEntityCopyWithImpl<$Res, $Val extends ProfileEntity>
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
               as String,
+      username: freezed == username
+          ? _value.username
+          : username // ignore: cast_nullable_to_non_nullable
+              as String?,
       isBand: null == isBand
           ? _value.isBand
           : isBand // ignore: cast_nullable_to_non_nullable
@@ -230,6 +237,7 @@ abstract class _$$ProfileEntityImplCopyWith<$Res>
       {String profileId,
       String uid,
       String name,
+      String? username,
       bool isBand,
       String city,
       @GeoPointConverter() GeoPoint location,
@@ -267,6 +275,7 @@ class __$$ProfileEntityImplCopyWithImpl<$Res>
     Object? profileId = null,
     Object? uid = null,
     Object? name = null,
+    Object? username = freezed,
     Object? isBand = null,
     Object? city = null,
     Object? location = null,
@@ -300,6 +309,10 @@ class __$$ProfileEntityImplCopyWithImpl<$Res>
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
               as String,
+      username: freezed == username
+          ? _value.username
+          : username // ignore: cast_nullable_to_non_nullable
+              as String?,
       isBand: null == isBand
           ? _value.isBand
           : isBand // ignore: cast_nullable_to_non_nullable
@@ -387,6 +400,7 @@ class _$ProfileEntityImpl extends _ProfileEntity {
       {required this.profileId,
       required this.uid,
       required this.name,
+      this.username,
       required this.isBand,
       required this.city,
       @GeoPointConverter() required this.location,
@@ -420,6 +434,8 @@ class _$ProfileEntityImpl extends _ProfileEntity {
   final String uid;
   @override
   final String name;
+  @override
+  final String? username;
   @override
   final bool isBand;
   @override
@@ -490,7 +506,7 @@ class _$ProfileEntityImpl extends _ProfileEntity {
 
   @override
   String toString() {
-    return 'ProfileEntity(profileId: $profileId, uid: $uid, name: $name, isBand: $isBand, city: $city, location: $location, createdAt: $createdAt, notificationRadius: $notificationRadius, notificationRadiusEnabled: $notificationRadiusEnabled, photoUrl: $photoUrl, birthYear: $birthYear, bio: $bio, instruments: $instruments, genres: $genres, level: $level, instagramLink: $instagramLink, tiktokLink: $tiktokLink, youtubeLink: $youtubeLink, neighborhood: $neighborhood, state: $state, bandMembers: $bandMembers, updatedAt: $updatedAt)';
+    return 'ProfileEntity(profileId: $profileId, uid: $uid, name: $name, username: $username, isBand: $isBand, city: $city, location: $location, createdAt: $createdAt, notificationRadius: $notificationRadius, notificationRadiusEnabled: $notificationRadiusEnabled, photoUrl: $photoUrl, birthYear: $birthYear, bio: $bio, instruments: $instruments, genres: $genres, level: $level, instagramLink: $instagramLink, tiktokLink: $tiktokLink, youtubeLink: $youtubeLink, neighborhood: $neighborhood, state: $state, bandMembers: $bandMembers, updatedAt: $updatedAt)';
   }
 
   @override
@@ -502,6 +518,8 @@ class _$ProfileEntityImpl extends _ProfileEntity {
                 other.profileId == profileId) &&
             (identical(other.uid, uid) || other.uid == uid) &&
             (identical(other.name, name) || other.name == name) &&
+            (identical(other.username, username) ||
+                other.username == username) &&
             (identical(other.isBand, isBand) || other.isBand == isBand) &&
             (identical(other.city, city) || other.city == city) &&
             (identical(other.location, location) ||
@@ -544,6 +562,7 @@ class _$ProfileEntityImpl extends _ProfileEntity {
         profileId,
         uid,
         name,
+        username,
         isBand,
         city,
         location,
@@ -586,6 +605,7 @@ abstract class _ProfileEntity extends ProfileEntity {
           {required final String profileId,
           required final String uid,
           required final String name,
+          final String? username,
           required final bool isBand,
           required final String city,
           @GeoPointConverter() required final GeoPoint location,
@@ -617,6 +637,8 @@ abstract class _ProfileEntity extends ProfileEntity {
   String get uid;
   @override
   String get name;
+  @override
+  String? get username;
   @override
   bool get isBand;
   @override

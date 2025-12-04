@@ -3,7 +3,7 @@ import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 /// Repository interface para Posts (domain layer)
 /// Define o contrato para operações de posts
 abstract class PostRepository {
-  /// Lista todos os posts do usuário autenticado
+  /// Lista todos os posts ativos disponíveis no feed
   /// Ordena por createdAt descendente
   Future<List<PostEntity>> getAllPosts(String uid);
 
@@ -24,6 +24,9 @@ abstract class PostRepository {
   /// Deleta um post
   /// Valida ownership antes de deletar
   Future<void> deletePost(String postId, String profileId);
+
+  /// Verifica se um perfil é dono de um post
+  Future<bool> isPostOwner(String postId, String profileId);
 
   /// Verifica se um perfil demonstrou interesse em um post
   Future<bool> hasInterest(String postId, String profileId);
