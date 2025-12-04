@@ -165,11 +165,11 @@ Para permitir instalação simultânea de DEV/STAGING/PROD no mesmo dispositivo:
 1. Volte para **"Build Settings"** do target Runner
 2. Em **"Product Bundle Identifier"**, configure:
    - **Debug-dev**: `com.tosembanda.wegig.dev`
-   - **Debug-staging**: `com.tosembanda.wegig.staging`
-   - **Debug** (original): `com.tosembanda.wegig`
+   - **Debug-staging**: `com.wegig.staging`
+   - **Debug** (original): `com.wegig`
    - **Release-dev**: `com.tosembanda.wegig.dev`
-   - **Release-staging**: `com.tosembanda.wegig.staging`
-   - **Release**: `com.tosembanda.wegig`
+   - **Release-staging**: `com.wegig.staging`
+   - **Release**: `com.wegig`
 
 ### 5.4: Atualizar Schemes com Build Configurations
 
