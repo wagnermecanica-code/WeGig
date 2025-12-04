@@ -244,9 +244,9 @@ Firebase/CoreOnly: 12.4.0 (atualizado)
 
 ```yaml
 Configuration: Debug-dev
-Bundle ID: com.wegig.app.dev
+Bundle ID: com.tosembanda.wegig.dev
 Entrypoint: lib/main_dev.dart
-Firebase Project: to-sem-banda-dev
+Firebase Project: wegig-dev
 Code Signing: Disabled (--no-codesign)
 ```
 
@@ -254,16 +254,16 @@ Code Signing: Disabled (--no-codesign)
 
 ```yaml
 Configuration: Debug-staging / Release-staging
-Bundle ID: com.wegig.app.staging
+Bundle ID: com.tosembanda.wegig.staging
 Entrypoint: lib/main_staging.dart
-Firebase Project: to-sem-banda-staging
+Firebase Project: wegig-staging
 ```
 
 #### Esquema: `Runner` (Production)
 
 ```yaml
 Configuration: Debug / Release / Profile
-Bundle ID: com.wegig.app
+Bundle ID: com.tosembanda.wegig
 Entrypoint: lib/main_prod.dart
 Firebase Project: to-sem-banda-83e19
 ```
@@ -292,7 +292,7 @@ Archive Path: packages/app/build/ios/iphoneos/
 
 **Build Settings Key:**
 
-- `PRODUCT_BUNDLE_IDENTIFIER`: com.wegig.app (varia por flavor)
+- `PRODUCT_BUNDLE_IDENTIFIER`: com.tosembanda.wegig (varia por flavor)
 - `DEVELOPMENT_TEAM`: 6PP9UL45V7
 - `CODE_SIGN_STYLE`: Automatic (para dev local)
 - `CODE_SIGN_IDENTITY`: - (para --no-codesign)

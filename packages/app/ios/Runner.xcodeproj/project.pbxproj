@@ -390,9 +390,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -440,9 +444,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -1032,6 +1040,7 @@
 			baseConfigurationReference = 681E678810DC61F4B9233EB3 /* Pods-RunnerTests.debug-dev.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Debug-dev";
@@ -1041,6 +1050,7 @@
 			baseConfigurationReference = 588E4A61B70E8396EC6CD12D /* Pods-RunnerTests.release-dev.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Release-dev";
@@ -1050,6 +1060,7 @@
 			baseConfigurationReference = 9D0D13E89008D89D6E0A0C18 /* Pods-RunnerTests.profile-dev.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Profile-dev";
@@ -1059,6 +1070,7 @@
 			baseConfigurationReference = 7B6D76C2279A08B4C1B8991C /* Pods-RunnerTests.debug-staging.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Debug-staging";
@@ -1068,6 +1080,7 @@
 			baseConfigurationReference = 31BF16BDC132810838F24F67 /* Pods-RunnerTests.release-staging.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Release-staging";
@@ -1077,6 +1090,7 @@
 			baseConfigurationReference = A947FBDB52FF56FD3AB52923 /* Pods-RunnerTests.profile-staging.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Profile-staging";

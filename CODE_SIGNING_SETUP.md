@@ -10,7 +10,7 @@
 1. **Apple Developer Account** com acesso ao Team ID
 2. **Certificado de Desenvolvedor Apple** (.p12)
 3. **Provisioning Profile** para o app
-4. **Bundle Identifier configurado**: `com.wegig.app`
+4. **Bundle Identifier configurado**: `com.tosembanda.wegig.dev`
 
 ---
 
@@ -88,21 +88,21 @@ Para o projeto WeGig com 3 flavors, você precisa de **3 provisioning profiles**
 
 ### Dev Flavor
 
-- **Bundle ID**: `com.wegig.app.dev`
+- **Bundle ID**: `com.tosembanda.wegig.dev`
 - **Nome**: WeGig DEV
 - **Tipo**: Development ou Ad Hoc
 - **Devices**: Adicione devices de teste
 
 ### Staging Flavor
 
-- **Bundle ID**: `com.wegig.app.staging`
+- **Bundle ID**: `com.tosembanda.wegig.staging`
 - **Nome**: WeGig STAGING
 - **Tipo**: Development ou Ad Hoc
 - **Devices**: Adicione devices de QA
 
 ### Prod Flavor
 
-- **Bundle ID**: `com.wegig.app`
+- **Bundle ID**: `com.tosembanda.wegig`
 - **Nome**: WeGig
 - **Tipo**: App Store
 - **Devices**: N/A (App Store não requer devices)
@@ -137,7 +137,7 @@ sed -i '' 's/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = SEU_TEAM_ID;/g' Runner.xco
 3. Aba **Signing & Capabilities**
 4. Marque **Automatically manage signing**
 5. Selecione seu **Team**
-6. Verifique se o Bundle Identifier está correto: `com.wegig.app`
+6. Verifique se o Bundle Identifier está correto: `com.tosembanda.wegig.dev`
 
 ---
 
@@ -328,7 +328,7 @@ codesign -dv --verbose=4 build/ios/iphoneos/Runner.app
 ### Pré-deploy
 
 - [ ] Team ID configurado no Xcode
-- [ ] Bundle Identifier atualizado: `com.wegig.app`
+- [ ] Bundle Identifier atualizado: `com.tosembanda.wegig.dev`
 - [ ] Certificados válidos no Keychain
 - [ ] Provisioning Profiles instalados
 - [ ] exportOptions.plist criado
@@ -402,4 +402,4 @@ ls ~/Library/MobileDevice/Provisioning\ Profiles/
 
 **Última atualização:** 4 de dezembro de 2025  
 **Team ID atual:** 6PP9UL45V7  
-**Bundle ID:** com.wegig.app
+**Bundle ID:** com.tosembanda.wegig.dev

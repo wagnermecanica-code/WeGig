@@ -538,7 +538,8 @@ gh pr create  # Executa ci.yml automaticamente
 - ✅ **Firebase:** Dependencies atualizadas (20 packages)
 - ✅ **Deprecations:** APIs depreciadas corrigidas (Riverpod, Google Maps, Color)
 - ✅ **CI/CD:** Pipelines iOS + Android configurados
-- ✅ **Bundle ID:** Atualizado para com.wegig.app
+- ✅ **Bundle ID:** Corrigido para `com.tosembanda.wegig.dev` (compatível com Firebase)
+- ✅ **Apple Sign-In:** Erro "invalid-credential" resolvido
 - ✅ **Code Signing:** Documentação e setup completo
 
 ---
