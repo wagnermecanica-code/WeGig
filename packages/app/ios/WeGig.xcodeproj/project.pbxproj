@@ -16,6 +16,16 @@
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		9EE626EC2EB7FF9900FDFFEC /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 9EE626EB2EB7FF9900FDFFEC /* GoogleService-Info.plist */; };
+		9EFBE1212EE259D2008C6C62 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 9EFBE1202EE259D2008C6C62 /* FirebaseAnalytics */; };
+		9EFBE1232EE259D2008C6C62 /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9EFBE1222EE259D2008C6C62 /* FirebaseAnalyticsCore */; };
+		9EFBE1252EE259D2008C6C62 /* FirebaseAnalyticsIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = 9EFBE1242EE259D2008C6C62 /* FirebaseAnalyticsIdentitySupport */; };
+		9EFBE1272EE259D2008C6C62 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 9EFBE1262EE259D2008C6C62 /* FirebaseAuth */; };
+		9EFBE1292EE259D2008C6C62 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 9EFBE1282EE259D2008C6C62 /* FirebaseCrashlytics */; };
+		9EFBE12B2EE259D2008C6C62 /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 9EFBE12A2EE259D2008C6C62 /* FirebaseDatabase */; };
+		9EFBE12D2EE259D2008C6C62 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 9EFBE12C2EE259D2008C6C62 /* FirebaseFirestore */; };
+		9EFBE12F2EE259D2008C6C62 /* FirebaseInAppMessaging-Beta in Frameworks */ = {isa = PBXBuildFile; productRef = 9EFBE12E2EE259D2008C6C62 /* FirebaseInAppMessaging-Beta */; };
+		9EFBE1312EE259D2008C6C62 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 9EFBE1302EE259D2008C6C62 /* FirebaseMessaging */; };
+		9EFBE1332EE259D2008C6C62 /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 9EFBE1322EE259D2008C6C62 /* FirebaseRemoteConfig */; };
 		F696795D7DBA858439E7C59B /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AC6843233EB6E518370676D4 /* Pods_RunnerTests.framework */; };
 /* End PBXBuildFile section */
 
@@ -48,7 +58,7 @@
 		180729726B9E9FF1C75AE4E8 /* Pods-Runner.release-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release-dev.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release-dev.xcconfig"; sourceTree = "<group>"; };
 		31BF16BDC132810838F24F67 /* Pods-RunnerTests.release-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release-staging.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release-staging.xcconfig"; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
-		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		331C8081294A63A400263BE5 /* WeGigTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WeGigTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
 		426155B81669342208CC9D30 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		43B697048FFCD66316E14F42 /* Pods-Runner.profile-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile-staging.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile-staging.xcconfig"; sourceTree = "<group>"; };
@@ -66,7 +76,7 @@
 		7B6D76C2279A08B4C1B8991C /* Pods-RunnerTests.debug-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug-staging.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug-staging.xcconfig"; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
-		97C146EE1CF9000F007C117D /* Runner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		97C146EE1CF9000F007C117D /* WeGig.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WeGig.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		97C146FB1CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -96,6 +106,16 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9EFBE1332EE259D2008C6C62 /* FirebaseRemoteConfig in Frameworks */,
+				9EFBE1252EE259D2008C6C62 /* FirebaseAnalyticsIdentitySupport in Frameworks */,
+				9EFBE1272EE259D2008C6C62 /* FirebaseAuth in Frameworks */,
+				9EFBE1312EE259D2008C6C62 /* FirebaseMessaging in Frameworks */,
+				9EFBE12F2EE259D2008C6C62 /* FirebaseInAppMessaging-Beta in Frameworks */,
+				9EFBE1212EE259D2008C6C62 /* FirebaseAnalytics in Frameworks */,
+				9EFBE1292EE259D2008C6C62 /* FirebaseCrashlytics in Frameworks */,
+				9EFBE1232EE259D2008C6C62 /* FirebaseAnalyticsCore in Frameworks */,
+				9EFBE12D2EE259D2008C6C62 /* FirebaseFirestore in Frameworks */,
+				9EFBE12B2EE259D2008C6C62 /* FirebaseDatabase in Frameworks */,
 				2644FC151CD0288302D695A7 /* Pods_Runner.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -172,8 +192,8 @@
 		97C146EF1CF9000F007C117D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				97C146EE1CF9000F007C117D /* Runner.app */,
-				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
+				97C146EE1CF9000F007C117D /* WeGig.app */,
+				331C8081294A63A400263BE5 /* WeGigTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -198,9 +218,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		331C8080294A63A400263BE5 /* RunnerTests */ = {
+		331C8080294A63A400263BE5 /* WeGigTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 331C8087294A63A400263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */;
+			buildConfigurationList = 331C8087294A63A400263BE5 /* Build configuration list for PBXNativeTarget "WeGigTests" */;
 			buildPhases = (
 				39E5A8A0F92B6DB22C654E27 /* [CP] Check Pods Manifest.lock */,
 				331C807D294A63A400263BE5 /* Sources */,
@@ -212,14 +232,14 @@
 			dependencies = (
 				331C8086294A63A400263BE5 /* PBXTargetDependency */,
 			);
-			name = RunnerTests;
+			name = WeGigTests;
 			productName = RunnerTests;
-			productReference = 331C8081294A63A400263BE5 /* RunnerTests.xctest */;
+			productReference = 331C8081294A63A400263BE5 /* WeGigTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		97C146ED1CF9000F007C117D /* Runner */ = {
+		97C146ED1CF9000F007C117D /* WeGig */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
+			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "WeGig" */;
 			buildPhases = (
 				4DCC06D5A8970254648A5B70 /* [CP] Check Pods Manifest.lock */,
 				B9C1E4B42D1F992C00A1A6F1 /* [CP] Copy GoogleService-Info.plist */,
@@ -237,9 +257,9 @@
 			);
 			dependencies = (
 			);
-			name = Runner;
+			name = WeGig;
 			productName = Runner;
-			productReference = 97C146EE1CF9000F007C117D /* Runner.app */;
+			productReference = 97C146EE1CF9000F007C117D /* WeGig.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -271,12 +291,15 @@
 				Base,
 			);
 			mainGroup = 97C146E51CF9000F007C117D;
+			packageReferences = (
+				9EFBE11F2EE259D1008C6C62 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			productRefGroup = 97C146EF1CF9000F007C117D /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				97C146ED1CF9000F007C117D /* Runner */,
-				331C8080294A63A400263BE5 /* RunnerTests */,
+				97C146ED1CF9000F007C117D /* WeGig */,
+				331C8080294A63A400263BE5 /* WeGigTests */,
 			);
 		};
 /* End PBXProject section */
@@ -482,7 +505,7 @@
 /* Begin PBXTargetDependency section */
 		331C8086294A63A400263BE5 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 97C146ED1CF9000F007C117D /* Runner */;
+			target = 97C146ED1CF9000F007C117D /* WeGig */;
 			targetProxy = 331C8085294A63A400263BE5 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -585,7 +608,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -661,7 +684,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -679,7 +702,7 @@
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -698,7 +721,7 @@
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Runner";
@@ -715,7 +738,7 @@
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Runner";
@@ -800,7 +823,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -1002,7 +1025,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -1027,7 +1050,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -1040,7 +1063,7 @@
 			baseConfigurationReference = 681E678810DC61F4B9233EB3 /* Pods-RunnerTests.debug-dev.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Debug-dev";
@@ -1050,7 +1073,7 @@
 			baseConfigurationReference = 588E4A61B70E8396EC6CD12D /* Pods-RunnerTests.release-dev.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Release-dev";
@@ -1060,7 +1083,7 @@
 			baseConfigurationReference = 9D0D13E89008D89D6E0A0C18 /* Pods-RunnerTests.profile-dev.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Profile-dev";
@@ -1070,7 +1093,7 @@
 			baseConfigurationReference = 7B6D76C2279A08B4C1B8991C /* Pods-RunnerTests.debug-staging.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Debug-staging";
@@ -1080,7 +1103,7 @@
 			baseConfigurationReference = 31BF16BDC132810838F24F67 /* Pods-RunnerTests.release-staging.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Release-staging";
@@ -1090,7 +1113,7 @@
 			baseConfigurationReference = A947FBDB52FF56FD3AB52923 /* Pods-RunnerTests.profile-staging.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev.RennerTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Profile-staging";
@@ -1173,7 +1196,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -1197,7 +1220,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -1222,7 +1245,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -1246,7 +1269,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -1386,7 +1409,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		331C8087294A63A400263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */ = {
+		331C8087294A63A400263BE5 /* Build configuration list for PBXNativeTarget "WeGigTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				331C8088294A63A400263BE5 /* Debug */,
@@ -1418,7 +1441,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */ = {
+		97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "WeGig" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				97C147061CF9000F007C117D /* Debug */,
@@ -1435,6 +1458,70 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		9EFBE11F2EE259D1008C6C62 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9EFBE1202EE259D2008C6C62 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EFBE11F2EE259D1008C6C62 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		9EFBE1222EE259D2008C6C62 /* FirebaseAnalyticsCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EFBE11F2EE259D1008C6C62 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalyticsCore;
+		};
+		9EFBE1242EE259D2008C6C62 /* FirebaseAnalyticsIdentitySupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EFBE11F2EE259D1008C6C62 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalyticsIdentitySupport;
+		};
+		9EFBE1262EE259D2008C6C62 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EFBE11F2EE259D1008C6C62 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		9EFBE1282EE259D2008C6C62 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EFBE11F2EE259D1008C6C62 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
+		};
+		9EFBE12A2EE259D2008C6C62 /* FirebaseDatabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EFBE11F2EE259D1008C6C62 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseDatabase;
+		};
+		9EFBE12C2EE259D2008C6C62 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EFBE11F2EE259D1008C6C62 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		9EFBE12E2EE259D2008C6C62 /* FirebaseInAppMessaging-Beta */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EFBE11F2EE259D1008C6C62 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = "FirebaseInAppMessaging-Beta";
+		};
+		9EFBE1302EE259D2008C6C62 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EFBE11F2EE259D1008C6C62 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		9EFBE1322EE259D2008C6C62 /* FirebaseRemoteConfig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9EFBE11F2EE259D1008C6C62 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseRemoteConfig;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 97C146E61CF9000F007C117D /* Project object */;
 }
