@@ -11,6 +11,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:wegig_app/features/post/domain/models/post_form_input.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
@@ -438,14 +439,56 @@ class _PostPageState extends ConsumerState<PostPage> {
 
       debugPrint('📷 PostPage: Imagem selecionada: ${picked.path}');
 
-      // Comprimir imagem antes de salvar
+      // Crop obrigatório da imagem (4:3)
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        compressQuality: 85,
+        maxWidth: 1600,
+        maxHeight: 1200,
+        compressFormat: ImageCompressFormat.jpg,
+        aspectRatio: const CropAspectRatio(ratioX: 4, ratioY: 3),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Ajustar foto',
+            toolbarColor: AppColors.primary,
+            toolbarWidgetColor: Colors.white,
+            statusBarColor: AppColors.primary,
+            backgroundColor: Colors.black,
+            activeControlsWidgetColor: AppColors.primary,
+            initAspectRatio: CropAspectRatioPreset.ratio4x3,
+            lockAspectRatio: true,
+            hideBottomControls: false,
+            cropFrameColor: AppColors.primary,
+            cropGridColor: Colors.white24,
+            dimmedLayerColor: Colors.black.withValues(alpha: 0.8),
+          ),
+          IOSUiSettings(
+            title: 'Ajustar foto',
+            aspectRatioLockEnabled: true,
+            minimumAspectRatio: 4 / 3,
+            rotateButtonsHidden: false,
+            aspectRatioPickerButtonHidden: true,
+            resetButtonHidden: false,
+            aspectRatioLockDimensionSwapEnabled: false,
+          ),
+        ],
+      );
+
+      if (cropped == null) {
+        debugPrint('📷 PostPage: Crop cancelado pelo usuário');
+        return;
+      }
+
+      debugPrint('📷 PostPage: Imagem cortada: ${cropped.path}');
+
+      // Comprimir imagem após crop
       final tempDir = Directory.systemTemp;
       final targetPath =
           '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}_post.jpg';
 
       debugPrint('📷 PostPage: Comprimindo imagem...');
       final compressed = await FlutterImageCompress.compressAndGetFile(
-        picked.path,
+        cropped.path,
         targetPath,
         quality: 85,
         minWidth: 800,
@@ -453,9 +496,9 @@ class _PostPageState extends ConsumerState<PostPage> {
       );
 
       if (compressed == null) {
-        debugPrint('⚠️ PostPage: Falha na compressão, usando imagem original');
+        debugPrint('⚠️ PostPage: Falha na compressão, usando imagem cortada');
         setState(() {
-          _localPhotoPath = picked.path;
+          _localPhotoPath = cropped.path;
           _remotePhotoUrl = null;
         });
       } else {
@@ -468,7 +511,7 @@ class _PostPageState extends ConsumerState<PostPage> {
         });
       }
     } catch (e) {
-      debugPrint('❌ PostPage: Erro ao selecionar/comprimir imagem: $e');
+      debugPrint('❌ PostPage: Erro ao selecionar/processar imagem: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

@@ -745,17 +745,34 @@ class _EditPostPageState extends State<EditPostPage> {
 
     final cropped = await ImageCropper().cropImage(
       sourcePath: picked.path,
-      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      compressQuality: 85,
+      maxWidth: 1600,
+      maxHeight: 1200,
+      compressFormat: ImageCompressFormat.jpg,
+      aspectRatio: const CropAspectRatio(ratioX: 4, ratioY: 3),
       uiSettings: [
         AndroidUiSettings(
           toolbarTitle: 'Ajustar foto',
           toolbarColor: AppColors.primary,
           toolbarWidgetColor: Colors.white,
+          statusBarColor: AppColors.primary,
+          backgroundColor: Colors.black,
+          activeControlsWidgetColor: AppColors.primary,
+          initAspectRatio: CropAspectRatioPreset.ratio4x3,
           lockAspectRatio: true,
+          hideBottomControls: false,
+          cropFrameColor: AppColors.primary,
+          cropGridColor: Colors.white24,
+          dimmedLayerColor: Colors.black.withValues(alpha: 0.8),
         ),
         IOSUiSettings(
           title: 'Ajustar foto',
           aspectRatioLockEnabled: true,
+          minimumAspectRatio: 4 / 3,
+          rotateButtonsHidden: false,
+          aspectRatioPickerButtonHidden: true,
+          resetButtonHidden: false,
+          aspectRatioLockDimensionSwapEnabled: false,
         ),
       ],
     );
