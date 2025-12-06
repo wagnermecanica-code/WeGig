@@ -9,14 +9,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:collection/collection.dart';
 import 'package:core_ui/core_ui.dart';
-import 'package:core_ui/features/post/domain/entities/post_entity.dart';
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
-import 'package:core_ui/models/search_params.dart';
-import 'package:core_ui/theme/app_colors.dart';
-import 'package:core_ui/theme/app_theme.dart';
-import 'package:iconsax/iconsax.dart';
-import 'package:core_ui/utils/geo_utils.dart';
 import 'package:core_ui/utils/debouncer.dart';
+import 'package:core_ui/utils/geo_utils.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -31,10 +26,8 @@ import 'package:wegig_app/features/home/presentation/widgets/map/map_controller.
 import 'package:wegig_app/features/home/presentation/widgets/map/marker_builder.dart';
 import 'package:wegig_app/features/home/presentation/widgets/search/search_service.dart';
 import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
-import 'package:wegig_app/features/post/presentation/pages/post_detail_page.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
-import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -62,6 +55,7 @@ class _HomePageState extends ConsumerState<HomePage>
   final MapControllerWrapper _mapControllerWrapper = MapControllerWrapper();
   late final MarkerBuilder _markerBuilder;
   final SearchService _searchService = SearchService();
+  // ignore: unused_field
   final InterestService _interestService = InterestService();
   final Debouncer _searchDebouncer = Debouncer(milliseconds: 300);
   
@@ -131,6 +125,7 @@ class _HomePageState extends ConsumerState<HomePage>
 
   @override
   void dispose() {
+    if (!mounted) return;
     // ✅ FIX: Dispose all controllers to prevent memory leaks
     ref.read(mapCenterProvider.notifier).resetAll();
     _postsSubscription?.close();
@@ -440,6 +435,7 @@ class _HomePageState extends ConsumerState<HomePage>
       'postId': post.id,
       'postAuthorUid': post.authorUid,
       'postAuthorProfileId': post.authorProfileId,
+      'profileUid': activeProfile.uid,
       'interestedUid': currentUser.uid,
       'interestedProfileId': activeProfile.profileId,
       'interestedProfileName': activeProfile.name, // ✅ Cloud Function expects this field
@@ -500,7 +496,7 @@ class _HomePageState extends ConsumerState<HomePage>
 
     try {
       final activeProfile = _activeProfile;
-      if (activeProfile == null) throw 'Perfil ativo não encontrado';
+      if (activeProfile == null) throw Exception('Perfil ativo não encontrado');
 
       final notificationsQuery = await FirebaseFirestore.instance
           .collection('notifications')
@@ -526,7 +522,7 @@ class _HomePageState extends ConsumerState<HomePage>
     final isOwner = post.authorProfileId.isNotEmpty &&
         post.authorProfileId == _activeProfile?.profileId;
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -624,7 +620,7 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   void _confirmDeletePost(PostEntity post) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Deletar Post'),
@@ -709,11 +705,6 @@ class _HomePageState extends ConsumerState<HomePage>
           backgroundColor: const Color(0xFFE47911), // Brand Orange
           foregroundColor: const Color(0xFFFAFAFA), // Off-white
           elevation: 2,
-          leading: IconButton(
-            icon: const Icon(Iconsax.filter),
-            tooltip: 'Filtros de busca',
-            onPressed: widget.onOpenSearch,
-          ),
           title: Image.asset(
             'assets/Logo/WeGig.png',
             height: 53.6, // 46.6 * 1.15 = 53.59 (arredondado para 53.6)
@@ -724,6 +715,13 @@ class _HomePageState extends ConsumerState<HomePage>
             },
           ),
           centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Iconsax.filter),
+              tooltip: 'Filtros de busca',
+              onPressed: widget.onOpenSearch,
+            ),
+          ],
         ),
         body: postsAsync.when(
           loading: () => const Center(
@@ -969,7 +967,7 @@ class _HomePageState extends ConsumerState<HomePage>
           debugPrint('✅ Map criado com style customizado');
 
           // Aguardar mapa estar completamente pronto
-          await Future.delayed(const Duration(milliseconds: 300));
+          await Future<void>.delayed(const Duration(milliseconds: 300));
 
           if (_mapControllerWrapper.controller != null && mounted) {
             try {
@@ -978,7 +976,7 @@ class _HomePageState extends ConsumerState<HomePage>
             } catch (e) {
               debugPrint('Erro ao inicializar mapa: $e');
               // Tentar novamente após mais delay
-              await Future.delayed(const Duration(milliseconds: 500));
+              await Future<void>.delayed(const Duration(milliseconds: 500));
               if (_mapControllerWrapper.controller != null && mounted) {
                 try {
                   _mapControllerWrapper.setLastSearchBounds(await _mapControllerWrapper.controller!.getVisibleRegion());
@@ -998,7 +996,7 @@ class _HomePageState extends ConsumerState<HomePage>
         },
         onCameraIdle: () async {
           // Debounce para evitar chamadas excessivas
-          await Future.delayed(const Duration(milliseconds: 300));
+          await Future<void>.delayed(const Duration(milliseconds: 300));
           if (mounted && _mapControllerWrapper.controller != null) {
             try {
               await _onMapIdle();
@@ -1049,7 +1047,7 @@ class _HomePageState extends ConsumerState<HomePage>
       final visibleIds = visible.map((p) => p.id).toSet();
       final currentVisibleIds = _visiblePosts.map((p) => p.id).toSet();
 
-      if (!const SetEquality().equals(visibleIds, currentVisibleIds)) {
+      if (!const SetEquality<String>().equals(visibleIds, currentVisibleIds)) {
         if (_isDisposed || !mounted) return;
 
         setState(() {
@@ -1434,7 +1432,6 @@ class PostCard extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Nome do perfil + botões
                   Row(
@@ -1552,7 +1549,6 @@ class PostCard extends StatelessWidget {
                   if (post.content.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Icon(Iconsax.message,
                           size: 16, color: textSecondary),
@@ -1694,7 +1690,7 @@ class _ProfileAvatar extends StatelessWidget {
 
   Widget _placeholder() {
     return const CircleAvatar(
-      backgroundColor: AppColors.surfaceVariant,
+      backgroundColor: AppColors.surfaceContainerHighest,
       child: Icon(Iconsax.music, color: Colors.white54, size: 16),
     );
   }
