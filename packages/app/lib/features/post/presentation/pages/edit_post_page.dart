@@ -840,6 +840,7 @@ class _EditPostPageState extends State<EditPostPage> {
         'city': _fetchedCity ?? _cityController.text.trim(),
         'neighborhood': _fetchedNeighborhood ?? '',
         'state': _fetchedState ?? '',
+        'profileUid': user.uid,
         'location': _selectedLocation != null
             ? GeoPoint(
                 _selectedLocation!.latitude, _selectedLocation!.longitude)
@@ -927,7 +928,6 @@ class _EditPostPageState extends State<EditPostPage> {
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.all(16),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Header com perfil do usuário
                             Card(
@@ -984,7 +984,6 @@ class _EditPostPageState extends State<EditPostPage> {
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
@@ -1057,7 +1056,6 @@ class _EditPostPageState extends State<EditPostPage> {
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
@@ -1142,7 +1140,6 @@ class _EditPostPageState extends State<EditPostPage> {
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
@@ -1296,7 +1293,6 @@ class _EditPostPageState extends State<EditPostPage> {
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text('Nível',
                                         style: theme.textTheme.titleMedium),
@@ -1340,7 +1336,6 @@ class _EditPostPageState extends State<EditPostPage> {
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
@@ -1749,7 +1744,6 @@ class _EditPostPageState extends State<EditPostPage> {
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
@@ -1825,7 +1819,6 @@ class _EditPostPageState extends State<EditPostPage> {
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
@@ -1940,7 +1933,6 @@ class _EditPostPageState extends State<EditPostPage> {
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [

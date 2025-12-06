@@ -81,6 +81,7 @@ class _LocationAutocompleteFieldState extends State<LocationAutocompleteField> {
 
   @override
   void dispose() {
+    if (!mounted) return;
     _controller.removeListener(_onTextChanged); // ✅ Remove listener antes de dispose
     _controller.dispose();
     _focusNode.dispose();

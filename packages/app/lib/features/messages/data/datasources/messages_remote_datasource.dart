@@ -9,6 +9,7 @@ abstract class IMessagesRemoteDataSource {
     required String profileId,
     int limit = 20,
     ConversationEntity? startAfter,
+    String? profileUid,
   });
   Future<ConversationEntity?> getConversationById(String conversationId);
   Future<ConversationEntity> getOrCreateConversation({
@@ -16,6 +17,7 @@ abstract class IMessagesRemoteDataSource {
     required String otherProfileId,
     required String currentUid,
     required String otherUid,
+    String? profileUid,
   });
   Future<List<MessageEntity>> getMessages({
     required String conversationId,
@@ -40,10 +42,11 @@ abstract class IMessagesRemoteDataSource {
   Future<void> markAsRead(String conversationId, String profileId);
   Future<void> markAsUnread(String conversationId, String profileId);
   Future<void> deleteConversation(String conversationId, String profileId);
-  Future<int> getUnreadMessageCount(String profileId);
-  Stream<List<ConversationEntity>> watchConversations(String profileId);
+  Future<int> getUnreadMessageCount(String profileId, {String? profileUid});
+  Stream<List<ConversationEntity>> watchConversations(String profileId,
+      {String? profileUid});
   Stream<List<MessageEntity>> watchMessages(String conversationId);
-  Stream<int> watchUnreadCount(String profileId);
+  Stream<int> watchUnreadCount(String profileId, {String? profileUid});
 }
 
 /// DataSource para Messages - Firebase Firestore operations
@@ -57,6 +60,7 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
     required String profileId,
     int limit = 20,
     ConversationEntity? startAfter,
+    String? profileUid,
   }) async {
     try {
       debugPrint(
@@ -66,6 +70,10 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
           .collection('conversations')
           .where('participantProfiles', arrayContains: profileId)
           .limit(limit);
+
+      if (profileUid != null && profileUid.isNotEmpty) {
+        query = query.where('profileUid', arrayContains: profileUid);
+      }
 
       if (startAfter != null) {
         query = query
@@ -111,6 +119,7 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
     required String otherProfileId,
     required String currentUid,
     required String otherUid,
+    String? profileUid,
   }) async {
     try {
       debugPrint('🔍 MessagesDataSource: getOrCreateConversation');
@@ -122,6 +131,12 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
 
       for (final doc in snapshot.docs) {
         final conv = ConversationEntity.fromFirestore(doc);
+        // Backfill profileUid array when ausente para suportar filtros por owner UID
+        if (!doc.data().containsKey('profileUid')) {
+          await doc.reference.update({
+            'profileUid': FieldValue.arrayUnion([currentUid, otherUid]),
+          });
+        }
         if (conv.participantProfiles.contains(currentProfileId) &&
             conv.participantProfiles.contains(otherProfileId)) {
           debugPrint('✅ MessagesDataSource: Conversa existente encontrada');
@@ -143,6 +158,10 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
       );
 
       await newConvRef.set(newConv.toFirestore());
+      await newConvRef.update({
+        // Array com donos de cada perfil participante (uids)
+        'profileUid': FieldValue.arrayUnion([currentUid, otherUid]),
+      });
       debugPrint('✅ MessagesDataSource: Nova conversa criada');
       return newConv;
     } catch (e) {
@@ -210,7 +229,10 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
         timestamp: DateTime.now(),
       );
 
-      await messageRef.set(message.toFirestore());
+      await messageRef.set({
+        ...message.toFirestore(),
+        'profileUid': senderId,
+      });
 
       // Update conversation lastMessage
       await _firestore.collection('conversations').doc(conversationId).update({
@@ -255,7 +277,10 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
         timestamp: DateTime.now(),
       );
 
-      await messageRef.set(message.toFirestore());
+      await messageRef.set({
+        ...message.toFirestore(),
+        'profileUid': senderId,
+      });
 
       // Update conversation lastMessage
       await _firestore.collection('conversations').doc(conversationId).update({
@@ -317,12 +342,18 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
   }
 
   @override
-  Future<int> getUnreadMessageCount(String profileId) async {
+  Future<int> getUnreadMessageCount(String profileId,
+      {String? profileUid}) async {
     try {
-      final snapshot = await _firestore
+      var query = _firestore
           .collection('conversations')
-          .where('participantProfiles', arrayContains: profileId)
-          .get();
+          .where('participantProfiles', arrayContains: profileId);
+
+      if (profileUid != null && profileUid.isNotEmpty) {
+        query = query.where('profileUid', arrayContains: profileUid);
+      }
+
+      final snapshot = await query.get();
 
       var total = 0;
       for (final doc in snapshot.docs) {
@@ -342,12 +373,17 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
   }
 
   @override
-  Stream<List<ConversationEntity>> watchConversations(String profileId) {
-    return _firestore
+  Stream<List<ConversationEntity>> watchConversations(String profileId,
+      {String? profileUid}) {
+    var query = _firestore
         .collection('conversations')
-        .where('participantProfiles', arrayContains: profileId)
-        .snapshots()
-        .map(
+        .where('participantProfiles', arrayContains: profileId);
+
+    if (profileUid != null && profileUid.isNotEmpty) {
+      query = query.where('profileUid', arrayContains: profileUid);
+    }
+
+    return query.snapshots().map(
           (snapshot) => snapshot.docs
               .map(ConversationEntity.fromFirestore)
               .where(
@@ -372,12 +408,16 @@ class MessagesRemoteDataSource implements IMessagesRemoteDataSource {
   }
 
   @override
-  Stream<int> watchUnreadCount(String profileId) {
-    return _firestore
+  Stream<int> watchUnreadCount(String profileId, {String? profileUid}) {
+    var query = _firestore
         .collection('conversations')
-        .where('participantProfiles', arrayContains: profileId)
-        .snapshots()
-        .map((snapshot) {
+        .where('participantProfiles', arrayContains: profileId);
+
+    if (profileUid != null && profileUid.isNotEmpty) {
+      query = query.where('profileUid', arrayContains: profileUid);
+    }
+
+    return query.snapshots().map((snapshot) {
       var total = 0;
       for (final doc in snapshot.docs) {
         final conv = ConversationEntity.fromFirestore(doc);

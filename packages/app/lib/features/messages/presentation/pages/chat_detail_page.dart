@@ -98,7 +98,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   static const Color _primaryColor = AppColors.primary;
   static const Color _backgroundColor = AppColors.background;
   static const Color _myMessageColor = AppColors.primary;
-  static const Color _otherMessageColor = AppColors.surfaceVariant;
+  static const Color _otherMessageColor = AppColors.surfaceContainerHighest;
   static const Color _reactionBgColor = AppColors.divider;
 
   /// Listener do ScrollController para paginação (evita memory leak)
@@ -334,6 +334,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       final messageData = <String, dynamic>{
         'senderId': currentUser.uid,
         'senderProfileId': currentProfileId,
+        'profileUid': currentUser.uid,
         'text': text,
         'timestamp': FieldValue.serverTimestamp(),
         'read': false,
@@ -462,6 +463,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
           .add({
         'senderId': currentUser.uid,
         'senderProfileId': currentProfileId,
+        'profileUid': currentUser.uid,
         'text': '',
         'imageUrl': imageUrl,
         'timestamp': FieldValue.serverTimestamp(),
@@ -662,7 +664,6 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
           // Nome do usuário
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   widget.otherUserName,
@@ -816,7 +817,6 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                       ),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Reply preview (se houver)
                         if (replyTo != null)
@@ -1184,7 +1184,6 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Respondendo para ${_replyingTo!['senderProfileId'] == _activeProfile?.profileId ? 'você mesmo' : widget.otherUserName}',

@@ -145,6 +145,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage>
 
   @override
   void dispose() {
+    if (!mounted) return;
     _tabController.dispose();
 
     // Remove listeners and dispose scroll controllers

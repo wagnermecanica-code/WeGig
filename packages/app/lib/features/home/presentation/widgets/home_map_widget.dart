@@ -18,9 +18,9 @@ class HomeMapWidget extends StatelessWidget {
 
   final MapControllerWrapper mapControllerWrapper;
   final Set<Marker> markers;
-  final Function(GoogleMapController) onMapCreated;
+  final void Function(GoogleMapController) onMapCreated;
   final VoidCallback onMapIdle;
-  final Function(CameraPosition) onCameraMove;
+  final void Function(CameraPosition) onCameraMove;
 
   @override
   Widget build(BuildContext context) {

@@ -198,6 +198,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
   @override
   void dispose() {
+    if (!mounted) return;
     _youtubeController?.dispose();
     _tabController?.dispose();
     super.dispose();
@@ -271,6 +272,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       final existingConversations = await FirebaseFirestore.instance
           .collection('conversations')
           .where('participantProfiles', arrayContains: activeProfile.profileId)
+          .where('profileUid', arrayContains: activeProfile.uid)
           .get();
 
       String? conversationId;
@@ -306,6 +308,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         final newConversation =
             await FirebaseFirestore.instance.collection('conversations').add({
           'participants': [currentUser.uid, otherUserId],
+          'profileUid': [currentUser.uid, otherUserId],
           'participantProfiles': [activeProfile.profileId, _profile!.profileId],
           'lastMessage': '',
           'lastMessageTimestamp': FieldValue.serverTimestamp(),
@@ -782,7 +785,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final isOwnProfile = _isMyProfile();
     final theme = Theme.of(context);
 
-    // Listener para detectar mudanças no perfil ativo
+    // ✅ FIX: Listener para detectar mudanças no perfil ativo
+    // Após trocar de perfil, recarrega ViewProfilePage ao invés de ir para Home
     // SEMPRE escuta, mas só age se for visualização do próprio perfil
     ref.listen<AsyncValue<ProfileState?>>(
       profileProvider,
@@ -803,7 +807,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             previousProfileId != currentProfileId) {
           debugPrint(
               '🔄 ViewProfilePage: Perfil ativo mudou de $previousProfileId para $currentProfileId');
-          // Recarrega o perfil imediatamente
+          // ✅ Recarrega o perfil imediatamente na mesma página (não navega para Home)
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               _loadProfileFromFirestore();
@@ -882,7 +886,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 20, vertical: 16),
                           child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Avatar
                               Hero(
@@ -902,10 +905,10 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                 ),
                               ),
                               const SizedBox(width: 16),
-                              // Nome e Bio ao lado da foto
+                              // Nome e Bio ao lado da foto - ALINHADO À ESQUERDA
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
                                   children: [
                                     Text(
                                       _profile!.name,
@@ -963,11 +966,11 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                           ),
                         ),
 
-                        // Location and Social Links Section
+                        // Location and Social Links Section - ALINHADO À ESQUERDA
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
                             children: [
                               // Location info
                               Text(
@@ -1207,7 +1210,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         border: Border.all(color: Colors.grey[200]!),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
         children: [
           Text(
             _profile!.isBand ? 'Sobre a Banda' : 'Sobre o Músico',
@@ -1262,7 +1265,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
                 children: [
                   Row(
                     children: [
@@ -1276,6 +1279,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   ),
                   const SizedBox(height: 6),
                   Wrap(
+                    alignment: WrapAlignment.start, // Alinhamento à esquerda
                     spacing: 6,
                     runSpacing: 6,
                     children: _profile!.instruments?.map((String instrument) {
@@ -1303,7 +1307,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
                 children: [
                   Row(
                     children: [
@@ -1318,6 +1322,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   ),
                   const SizedBox(height: 6),
                   Wrap(
+                    alignment: WrapAlignment.start, // Alinhamento à esquerda
                     spacing: 6,
                     runSpacing: 6,
                     children: _profile!.genres?.map((String genre) {
@@ -1343,7 +1348,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           // Membros da Banda (apenas para bandas)
           if (_profile!.isBand && (_profile!.bandMembers?.isNotEmpty ?? false))
             Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
@@ -1561,7 +1565,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             toolbarTitle: 'Editar Foto',
             toolbarColor: AppColors.primary,
             toolbarWidgetColor: Colors.white,
-            statusBarColor: AppColors.primary,
             backgroundColor: Colors.black,
             activeControlsWidgetColor: AppColors.primary,
             initAspectRatio: CropAspectRatioPreset.square,
@@ -1719,7 +1722,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
@@ -1943,6 +1945,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       final query = await FirebaseFirestore.instance
           .collection('interests')
           .where('interestedProfileId', isEqualTo: activeProfile.profileId)
+          .where('profileUid', isEqualTo: activeProfile.uid)
           .limit(50)
           .get();
 
@@ -1982,6 +1985,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       await FirebaseFirestore.instance.collection('interests').add({
         'postId': postId,
         'postAuthorProfileId': authorProfileId,
+        'profileUid': activeProfile.uid,
         'interestedProfileId': activeProfile.profileId,
         'interestedProfileName': activeProfile.name, // ✅ Cloud Function expects this
         'interestedProfilePhotoUrl': activeProfile.photoUrl, // ✅ Used in notification
@@ -2019,6 +2023,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           .collection('interests')
           .where('postId', isEqualTo: postId)
           .where('interestedProfileId', isEqualTo: activeProfile.profileId)
+          .where('profileUid', isEqualTo: activeProfile.uid)
           .limit(1)
           .get();
 
@@ -2345,7 +2350,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               subtitle: Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     () {
                       final locationText = formatCleanLocation(

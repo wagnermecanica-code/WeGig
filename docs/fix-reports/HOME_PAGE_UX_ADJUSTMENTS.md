@@ -12,11 +12,11 @@ Implementados **ajustes de UX** na HomePage conforme solicitado, melhorando a na
 
 ### 🎯 Resultado
 
-| Ajuste                              | Status             | Arquivo Modificado |
-| ----------------------------------- | ------------------ | ------------------ |
-| **1. Navegação para PostDetail**   | ✅ Já implementado | `home_page.dart`   |
-| **2. Ícone filtro → AppBar actions**| ✅ Concluído       | `home_page.dart`   |
-| **3. Cores dos markers**            | ✅ Já corretas     | `marker_builder.dart`, `wegig_pin_descriptor_builder.dart` |
+| Ajuste                               | Status             | Arquivo Modificado                                         |
+| ------------------------------------ | ------------------ | ---------------------------------------------------------- |
+| **1. Navegação para PostDetail**     | ✅ Já implementado | `home_page.dart`                                           |
+| **2. Ícone filtro → AppBar actions** | ✅ Concluído       | `home_page.dart`                                           |
+| **3. Cores dos markers**             | ✅ Já corretas     | `marker_builder.dart`, `wegig_pin_descriptor_builder.dart` |
 
 **Análise:** ✅ 0 erros, apenas 26 warnings de estilo (info)
 
@@ -69,6 +69,7 @@ extension GoRouterNavigation on BuildContext {
 ```
 
 **Validação:**
+
 - ✅ Rota `/post/:id` registrada
 - ✅ Extension method `context.pushPostDetail()` implementado
 - ✅ Card foto clicável abre PostDetailPage
@@ -119,6 +120,7 @@ appBar: AppBar(
 ```
 
 **Resultado:**
+
 - ✅ Logo WeGig centralizado sem interferência
 - ✅ Ícone de filtro no lado direito (padrão Material Design)
 - ✅ Espaço esquerdo livre para navegação futura (ex: drawer)
@@ -140,7 +142,7 @@ Future<String> _resolveSvg(UserType userType) async {
 
   // ✅ Cores corretas aplicadas
   final Color primaryColor =
-    userType.isBand 
+    userType.isBand
       ? AppColors.accent      // Banda → Laranja #E47911
       : AppColors.primary;    // Músico → Azul Teal
 
@@ -162,12 +164,13 @@ Future<String> _resolveSvg(UserType userType) async {
 
 **Validação:**
 
-| Tipo     | Cor                        | Código      | Design System      |
-| -------- | -------------------------- | ----------- | ------------------ |
-| **Banda**   | 🟠 Laranja vibrante     | `#E47911`   | `AppColors.accent` |
-| **Músico**  | 🔵 Azul teal escuro     | `#00A699`   | `AppColors.primary`|
+| Tipo       | Cor                 | Código    | Design System       |
+| ---------- | ------------------- | --------- | ------------------- |
+| **Banda**  | 🟠 Laranja vibrante | `#E47911` | `AppColors.accent`  |
+| **Músico** | 🔵 Azul teal escuro | `#00A699` | `AppColors.primary` |
 
 **Confirmação:**
+
 - ✅ Banda usa `AppColors.accent` (#E47911 laranja)
 - ✅ Músico usa `AppColors.primary` (#00A699 azul teal)
 - ✅ Markers ativos recebem efeito glow (parâmetro `isHighlighted`)
@@ -275,6 +278,7 @@ Todos os warnings são de **estilo**, não afetam funcionalidade.
 ### 1. `style: mover ícone de filtro para AppBar actions`
 
 **Descrição:**
+
 - Move ícone de filtro de `leading` para `actions`
 - Melhora organização visual seguindo Material Design
 - Libera espaço esquerdo para navegação futura
@@ -301,10 +305,12 @@ Todos os warnings são de **estilo**, não afetam funcionalidade.
 ### Por que `actions` ao invés de `leading`?
 
 **Material Design Guidelines:**
+
 - `leading`: Ícone de navegação (back, menu, drawer)
 - `actions`: Ícones de ação secundária (search, filter, more)
 
 **Benefícios:**
+
 - Consistência com outros apps
 - Logo centralizado sem obstrução
 - Espaço livre para drawer/menu futuro
@@ -312,6 +318,7 @@ Todos os warnings são de **estilo**, não afetam funcionalidade.
 ### Por que cores já estavam corretas?
 
 O sistema de markers usa `WeGigPinDescriptorBuilder` que aplica cores dinamicamente:
+
 - Lê SVG template de `assets/pin_template.svg`
 - Substitui placeholders RGB/HEX com cores do Design System
 - Cache otimizado para evitar regeneração

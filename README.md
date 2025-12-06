@@ -7,6 +7,9 @@ App Flutter para conectar músicos e bandas usando arquitetura multi-perfil esti
 [![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%7C%20Auth%20%7C%20Storage-FFCA28?logo=firebase)](https://firebase.google.com)
 [![Riverpod](https://img.shields.io/badge/Riverpod-3.x-00A699)](https://riverpod.dev)
 [![CI](https://github.com/wagnermecanica-code/ToSemBandaRepo/workflows/CI%20-%20Build%20%26%20Test/badge.svg)](https://github.com/wagnermecanica-code/ToSemBandaRepo/actions)
+[![codecov](https://codecov.io/gh/wagnermecanica-code/ToSemBandaRepo/branch/main/graph/badge.svg)](https://codecov.io/gh/wagnermecanica-code/ToSemBandaRepo)
+[![Tests](https://img.shields.io/badge/Tests-270%20passing-success?logo=flutter)](https://github.com/wagnermecanica-code/ToSemBandaRepo/actions)
+[![Documentation](https://img.shields.io/badge/Docs-DartDoc-blue?logo=dart)](./docs/api/index.html)
 
 ## 🎯 Visão Geral
 
@@ -77,11 +80,11 @@ App Flutter para conectar músicos e bandas usando arquitetura multi-perfil esti
 
 O projeto usa **flutter_flavorizr** para gerenciar 3 ambientes isolados:
 
-| Flavor      | App Name      | Bundle ID                      | Firebase             | Logs   | Obfuscation |
-| ----------- | ------------- | ------------------------------ | -------------------- | ------ | ----------- |
-| **dev**     | WeGig DEV     | `com.tosembanda.wegig.dev`     | to-sem-banda-dev     | ✅ On  | ❌ Off      |
-| **staging** | WeGig STAGING | `com.tosembanda.wegig.staging` | to-sem-banda-staging | ✅ On  | ✅ On       |
-| **prod**    | WeGig         | `com.tosembanda.wegig`         | to-sem-banda-83e19   | ❌ Off | ✅ On       |
+| Flavor      | App Name      | Bundle ID                 | Firebase             | Logs   | Obfuscation |
+| ----------- | ------------- | ------------------------- | -------------------- | ------ | ----------- |
+| **dev**     | WeGig DEV     | `com.wegig.wegig.dev`     | to-sem-banda-dev     | ✅ On  | ❌ Off      |
+| **staging** | WeGig STAGING | `com.wegig.wegig.staging` | to-sem-banda-staging | ✅ On  | ✅ On       |
+| **prod**    | WeGig         | `com.wegig.wegig`         | to-sem-banda-83e19   | ❌ Off | ✅ On       |
 
 **Rodar por flavor:**
 
@@ -100,17 +103,17 @@ flutter run --flavor prod -t lib/main_prod.dart
 
 ```bash
 # Produção (AAB + obfuscation)
-./scripts/build_release.sh prod
+./.tools/scripts/build_release.sh prod
 
 # Staging (APK para teste interno)
-./scripts/build_release.sh staging
+./.tools/scripts/build_release.sh staging
 
 # Dev (APK rápido sem obfuscation)
-./scripts/build_release.sh dev
+./.tools/scripts/build_release.sh dev
 
 # Especificar plataforma
-./scripts/build_release.sh prod android
-./scripts/build_release.sh staging ios
+./.tools/scripts/build_release.sh prod android
+./.tools/scripts/build_release.sh staging ios
 ```
 
 **Configuração por flavor:**
@@ -131,7 +134,7 @@ final enableLogs = AppConfig.enableLogs;
 #### Checklist por plataforma
 
 - **Android**: coloque cada `google-services.json` em `android/app/src/<flavor>/` (ex.: `src/dev/google-services.json`). Rode `flutter clean` após trocar arquivos para o Gradle detectar alterações.
-- **iOS**: o scheme `Runner-dev` usa `ios/Flutter/Dev.xcconfig` com `PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig.dev`. O build phase `[CP] Copy GoogleService-Info.plist` agora copia automaticamente `ios/Firebase/GoogleService-Info-<flavor>.plist` para `Runner/GoogleService-Info.plist` antes do build. Garanta que cada arquivo exista (`GoogleService-Info-dev.plist`, `-staging`, `-prod`).
+- **iOS**: o scheme `WeGig-dev` usa `ios/Flutter/Dev.xcconfig` com `PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig.dev`. O build phase `[CP] Copy GoogleService-Info.plist` agora copia automaticamente `ios/Firebase/GoogleService-Info-<flavor>.plist` para `WeGig/GoogleService-Info.plist` antes do build. Garanta que cada arquivo exista (`GoogleService-Info-dev.plist`, `-staging`, `-prod`).
 - **Firebase Projects**: confirme que a flavor `dev` aponta para `to-sem-banda-83e19` (mesmo projeto usado nos testes). Use o script abaixo para validar rapidamente.
 
 #### Script de sanidade do Firebase
@@ -191,11 +194,11 @@ ref.invalidate(profileProvider);
 
 ### 🍎 Sign in with Apple (flavor dev)
 
-1. **Bundle Identifier correto**: `com.tosembanda.wegig.dev` (definido em `ios/Flutter/Dev.xcconfig`) deve estar registrado no Apple Developer Portal e ter a capability **Sign In with Apple** habilitada para o target `Runner-dev`.
+1. **Bundle Identifier correto**: `com.wegig.wegig.dev` (definido em `ios/Flutter/Dev.xcconfig`) deve estar registrado no Apple Developer Portal e ter a capability **Sign In with Apple** habilitada para o target `WeGig-dev`.
 2. **Firebase Auth Provider**: no projeto `to-sem-banda-83e19`, habilite o provedor Apple e associe o mesmo Services ID usado no Apple Developer. Se trocar de projeto, atualize também os arquivos `GoogleService-Info-dev.plist`/`google-services.json`.
 3. **Checklist de teste**:
 
-- Rode `Runner-dev` em dispositivo físico iOS.
+- Rode `WeGig-dev` em dispositivo físico iOS.
 - Faça login com o mesmo Apple ID duas vezes (instalação limpa + reinstalação) e confirme que o UID retornado pelo Firebase permanece idêntico.
 - Se o UID mudar, verifique se o bundle ID corresponde ao provisionado e se o app aponta para o mesmo projeto Firebase do provedor Apple.
 
@@ -321,7 +324,7 @@ flutter pub get
 2. **Firebase config:**
 
    - Baixe `google-services.json` (Android) e `GoogleService-Info.plist` (iOS)
-   - Coloque em `android/app/` e `ios/Runner/`
+   - Coloque em `android/app/` e `ios/WeGig/`
 
 3. **Environment variables (.env):**
 
@@ -405,7 +408,7 @@ lib/
    ├─ profile_switcher_bottom_sheet.dart
    └─ app_loading_overlay.dart
 
-functions/
+.tools/functions/
 └─ index.js                     # Cloud Functions (190 linhas)
 
 firestore.rules                 # Security rules
@@ -421,7 +424,7 @@ firestore.indexes.json          # 13 composite indexes
 | `[core/duplicate-app] A Firebase App named "[DEFAULT]" already exists` | Garante que apenas `bootstrapCoreServices` inicialize o Firebase (um por flavor). Se aparecer após hot restart, pare o app, rode `flutter clean`, e suba novamente usando o target correto.                    |
 | `cloud_firestore/permission-denied` ao ler `/profiles`                 | Deploy as regras simplificadas (`firebase deploy --only firestore:rules`) e confirme que o usuário está autenticado. Em dev, o provider Apple precisa estar apontando para `to-sem-banda-83e19`.               |
 | `Query/Index Errors`                                                   | Deploy indexes: `firebase deploy --only firestore:indexes`                                                                                                                                                     |
-| `Missing Location Data`                                                | Execute: `scripts/check_posts.sh`                                                                                                                                                                              |
+| `Missing Location Data`                                                | Execute: `.tools/scripts/check_posts.sh`                                                                                                                                                                       |
 | `Profile State Bugs`                                                   | Sempre usar `ref.read(profileProvider).value?.activeProfile`                                                                                                                                                   |
 | `Image Upload Freeze`                                                  | Certificar padrão `compute()` isolate (ver `post_page.dart:442`)                                                                                                                                               |
 | `Cloud Functions Not Firing`                                           | Verificar logs: `firebase functions:log --only onPostCreated`                                                                                                                                                  |
@@ -538,7 +541,7 @@ gh pr create  # Executa ci.yml automaticamente
 - ✅ **Firebase:** Dependencies atualizadas (20 packages)
 - ✅ **Deprecations:** APIs depreciadas corrigidas (Riverpod, Google Maps, Color)
 - ✅ **CI/CD:** Pipelines iOS + Android configurados
-- ✅ **Bundle ID:** Corrigido para `com.tosembanda.wegig.dev` (compatível com Firebase)
+- ✅ **Bundle ID:** Corrigido para `com.wegig.wegig.dev` (compatível com Firebase)
 - ✅ **Apple Sign-In:** Erro "invalid-credential" resolvido
 - ✅ **Code Signing:** Documentação e setup completo
 

@@ -110,7 +110,7 @@ class AppDialogs {
   }) async {
     if (!context.mounted) return;
 
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) => WillPopScope(
@@ -216,7 +216,7 @@ class AppDialogs {
   }) async {
     if (!context.mounted) return;
 
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) => Dialog(
@@ -277,7 +277,7 @@ class AppDialogs {
   ) async {
     if (!context.mounted) return;
 
-    return showDialog(
+    return showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(

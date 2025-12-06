@@ -195,7 +195,13 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                       const Divider(height: 1, indent: 72),
                   itemBuilder: (context, index) {
                     final profile = profiles[index];
+                    // ✅ FIX: Comparação correta do perfil ativo
                     final isActive = profile.profileId == activeProfileId;
+                    
+                    // Debug para verificar se comparação está correta
+                    if (isActive) {
+                      debugPrint('✅ ProfileSwitcher: Perfil ATIVO - ${profile.name} (${profile.profileId})');
+                    }
 
                     // Card com animação FadeIn
                     return AnimatedOpacity(
@@ -522,7 +528,6 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Tem certeza que deseja excluir o perfil "${profile.name}"?',

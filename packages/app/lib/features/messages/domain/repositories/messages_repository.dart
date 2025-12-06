@@ -10,6 +10,7 @@ abstract class MessagesRepository {
     required String profileId,
     int limit = 20,
     ConversationEntity? startAfter,
+    String? profileUid,
   });
 
   /// Busca uma conversa específica por ID
@@ -76,14 +77,15 @@ abstract class MessagesRepository {
 
   /// Conta mensagens não lidas para um perfil
   /// Soma unreadCount de todas as conversas
-  Future<int> getUnreadMessageCount(String profileId);
+  Future<int> getUnreadMessageCount(String profileId, {String? profileUid});
 
   /// Stream de conversas (real-time updates)
-  Stream<List<ConversationEntity>> watchConversations(String profileId);
+  Stream<List<ConversationEntity>> watchConversations(String profileId,
+      {String? profileUid});
 
   /// Stream de mensagens de uma conversa (real-time updates)
   Stream<List<MessageEntity>> watchMessages(String conversationId);
 
   /// Stream de unread count (real-time badge counter)
-  Stream<int> watchUnreadCount(String profileId);
+  Stream<int> watchUnreadCount(String profileId, {String? profileUid});
 }

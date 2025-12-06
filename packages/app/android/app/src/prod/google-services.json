@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:278498777601:android:3cb8437111dd6c5f9ebe00",
         "android_client_info": {
-          "package_name": "com.example.to_sem_banda"
+          "package_name": "com.wegig.wegig"
         }
       },
       "oauth_client": [
@@ -81,7 +81,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:278498777601:android:d7a665f5fd5f93719ebe00",
         "android_client_info": {
-          "package_name": "com.tosembanda.wegig"
+          "package_name": "com.wegig.wegig"
         }
       },
       "oauth_client": [
@@ -117,7 +117,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:278498777601:android:e53cb79c055240be9ebe00",
         "android_client_info": {
-          "package_name": "com.tosembanda.wegig.dev"
+          "package_name": "com.wegig.wegig.dev"
         }
       },
       "oauth_client": [
@@ -153,7 +153,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:278498777601:android:d602ae39fc393d199ebe00",
         "android_client_info": {
-          "package_name": "com.tosembanda.wegig.staging"
+          "package_name": "com.wegig.wegig.staging"
         }
       },
       "oauth_client": [

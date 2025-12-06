@@ -1,4 +1,4 @@
-#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug-staging.xcconfig"
+#include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.debug-staging.xcconfig"
 #include "Generated.xcconfig"
 
 PRODUCT_BUNDLE_IDENTIFIER = com.wegig.staging

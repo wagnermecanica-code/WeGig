@@ -71,8 +71,15 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
   @override
   Future<List<PostEntity>> getAllPosts(String uid) async {
     try {
-      debugPrint('🔍 PostDataSource: getAllPosts (requester uid=$uid)');
+      if (uid.isEmpty) {
+        debugPrint('❌ PostDataSource: UID vazio - usuário não autenticado');
+        throw Exception('Usuário não autenticado');
+      }
+      
+      debugPrint('🔍 PostDataSource: getAllPosts - Buscando TODOS os posts ativos (uid=$uid)');
 
+      // ✅ Buscar TODOS os posts ativos, não apenas do próprio usuário
+      // Removido o filtro .where('profileUid', isEqualTo: uid)
       final snapshot = await _firestore
           .collection('posts')
           .where('expiresAt', isGreaterThan: Timestamp.now())
@@ -84,7 +91,7 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
       // Sort by createdAt descending in memory
       posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-      debugPrint('✅ PostDataSource: ${posts.length} posts loaded');
+      debugPrint('✅ PostDataSource: ${posts.length} posts loaded (TODOS os usuários)');
       return posts;
     } catch (e) {
       debugPrint('❌ PostDataSource: Erro em getAllPosts - $e');
@@ -139,7 +146,11 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
     try {
       debugPrint('📝 PostDataSource: createPost - id=${post.id}');
 
-      await _firestore.collection('posts').doc(post.id).set(post.toFirestore());
+      await _firestore.collection('posts').doc(post.id).set({
+        ...post.toFirestore(),
+        // Vincula com o dono do perfil ativo (uid do autor)
+        'profileUid': post.authorUid,
+      });
 
       debugPrint('✅ PostDataSource: Post criado com sucesso');
     } catch (e) {
@@ -156,7 +167,10 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
       await _firestore
           .collection('posts')
           .doc(post.id)
-          .update(post.toFirestore());
+          .update({
+        ...post.toFirestore(),
+        'profileUid': post.authorUid,
+      });
 
       debugPrint('✅ PostDataSource: Post atualizado com sucesso');
     } catch (e) {
@@ -185,10 +199,15 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
       debugPrint(
           '🔍 PostDataSource: hasInterest - post=$postId, profile=$profileId');
 
+      final profileDoc =
+        await _firestore.collection('profiles').doc(profileId).get();
+      final profileUid = profileDoc.data()?['uid'] as String? ?? '';
+
       final doc = await _firestore
           .collection('interests')
           .where('postId', isEqualTo: postId)
           .where('interestedProfileId', isEqualTo: profileId)
+        .where('profileUid', isEqualTo: profileUid)
           .limit(1)
           .get();
 
@@ -215,11 +234,13 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
       final profileDoc = await _firestore.collection('profiles').doc(profileId).get();
       final profileName = profileDoc.data()?['name'] as String? ?? 'Alguém';
       final profilePhoto = profileDoc.data()?['photoUrl'] as String?;
+      final profileUid = profileDoc.data()?['uid'] as String? ?? '';
 
       // Create interest document
       await _firestore.collection('interests').add({
         'postId': postId,
         'interestedProfileId': profileId,
+        'profileUid': profileUid,
         'interestedProfileName': profileName, // ✅ Cloud Function expects this
         'interestedProfilePhotoUrl': profilePhoto, // ✅ Used in notification
         'postAuthorProfileId': authorProfileId, // ✅ Fixed field name (was authorProfileId)
@@ -239,10 +260,15 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
       debugPrint(
           '💔 PostDataSource: removeInterest - post=$postId, profile=$profileId');
 
+      final profileDoc =
+        await _firestore.collection('profiles').doc(profileId).get();
+      final profileUid = profileDoc.data()?['uid'] as String? ?? '';
+
       final snapshot = await _firestore
           .collection('interests')
           .where('postId', isEqualTo: postId)
           .where('interestedProfileId', isEqualTo: profileId)
+        .where('profileUid', isEqualTo: profileUid)
           .get();
 
       for (final doc in snapshot.docs) {
@@ -316,6 +342,7 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
 
       return _firestore
           .collection('posts')
+          .where('profileUid', isEqualTo: uid)
           .where('expiresAt', isGreaterThan: Timestamp.now())
           .orderBy('expiresAt')
           .orderBy('createdAt', descending: true)

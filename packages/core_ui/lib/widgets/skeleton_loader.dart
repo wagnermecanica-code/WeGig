@@ -40,6 +40,7 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
 
   @override
   void dispose() {
+    if (!mounted) return;
     _controller.dispose();
     super.dispose();
   }
@@ -103,7 +104,6 @@ class SkeletonCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -111,7 +111,6 @@ class SkeletonCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SkeletonLoader(width: 120, height: 16, borderRadius: 4),
                     const SizedBox(height: 6),

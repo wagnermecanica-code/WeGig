@@ -72,7 +72,6 @@ class _NotificationSettingsPageState
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(
               children: [
@@ -151,7 +150,6 @@ class _NotificationSettingsPageState
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(
               children: [
@@ -180,8 +178,8 @@ class _NotificationSettingsPageState
                   (activeProfile.notificationRadiusEnabled as bool?) ?? false,
               onChanged: _toggleProximityNotifications,
               title: const Text('Ativar notificações de proximidade'),
-              thumbColor: MaterialStateProperty.resolveWith<Color?>(
-                (states) => states.contains(MaterialState.selected)
+              thumbColor: WidgetStateProperty.resolveWith<Color?>(
+                (states) => states.contains(WidgetState.selected)
                     ? AppColors.accent
                     : AppColors.border,
               ),
@@ -228,7 +226,6 @@ class _NotificationSettingsPageState
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(
               children: [
@@ -284,7 +281,6 @@ class _NotificationSettingsPageState
           const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,

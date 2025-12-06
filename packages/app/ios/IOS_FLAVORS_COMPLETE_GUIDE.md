@@ -12,7 +12,7 @@ Flutter iOS flavors totalmente configurados e funcionais. O comando `flutter run
 ### 1. Schemes Corretas (Flutter CLI Compatible)
 
 ```
-Antes: Runner-dev, Runner-staging
+Antes: WeGig-dev, WeGig-staging
 Depois: dev, staging
 ```
 
@@ -26,7 +26,7 @@ Depois: dev, staging
 - Debug-dev, Release-dev, Profile-dev
 - Debug-staging, Release-staging, Profile-staging
 
-**Runner Target - 9 configurações:**
+**WeGig Target - 9 configurações:**
 
 - Debug, Release, Profile (base)
 - Debug-dev, Release-dev, Profile-dev
@@ -37,7 +37,7 @@ Depois: dev, staging
 **Podfile atualizado:**
 
 ```ruby
-project 'Runner', {
+project 'WeGig', {
   'Debug' => :debug,
   'Profile' => :release,
   'Release' => :release,
@@ -124,13 +124,13 @@ flutter run --flavor prod -t lib/main_prod.dart
 
 Cria build configurations no projeto (nível global).
 
-### 2. `create_runner_configs.sh`
+### 2. `create_wegig_configs.sh`
 
-Script Bash + Python para criar primeira configuração do Runner target.
+Script Bash + Python para criar primeira configuração do WeGig target.
 
 ### 3. `create_remaining_configs.py` ⭐
 
-**Script principal** que cria todas as 5 configurações restantes do Runner target:
+**Script principal** que cria todas as 5 configurações restantes do WeGig target:
 
 - Release-dev
 - Profile-dev
@@ -149,17 +149,17 @@ python3 create_remaining_configs.py
 
 ### Configuração
 
-- `ios/Runner.xcodeproj/project.pbxproj` - Projeto Xcode (editado automaticamente)
+- `ios/WeGig.xcodeproj/project.pbxproj` - Projeto Xcode (editado automaticamente)
 - `ios/Podfile` - Configuração CocoaPods com flavors
-- `ios/Runner.xcodeproj/xcshareddata/xcschemes/dev.xcscheme`
-- `ios/Runner.xcodeproj/xcshareddata/xcschemes/staging.xcscheme`
+- `ios/WeGig.xcodeproj/xcshareddata/xcschemes/dev.xcscheme`
+- `ios/WeGig.xcodeproj/xcshareddata/xcschemes/staging.xcscheme`
 
 ### Firebase Configs
 
 - `ios/Firebase/GoogleService-Info-dev.plist`
 - `ios/Firebase/GoogleService-Info-staging.plist`
 - `ios/Firebase/GoogleService-Info-prod.plist`
-- `ios/Runner/GoogleService-Info.plist` (copiado dinamicamente via pre-action)
+- `ios/WeGig/GoogleService-Info.plist` (copiado dinamicamente via pre-action)
 
 ### Entry Points
 
@@ -171,7 +171,7 @@ python3 create_remaining_configs.py
 
 ### Erro: "Bundle identifier is missing"
 
-**Causa:** Configuração do Runner target não foi criada.  
+**Causa:** Configuração do WeGig target não foi criada.  
 **Solução:** Rodar `python3 create_remaining_configs.py`
 
 ### Erro: "Unable to load contents of file list"
@@ -185,7 +185,7 @@ python3 create_remaining_configs.py
 ### Erro: "You must specify a --flavor option"
 
 **Causa:** Scheme não corresponde ao nome do flavor.  
-**Solução:** Renomear scheme de `Runner-dev` para `dev`
+**Solução:** Renomear scheme de `WeGig-dev` para `dev`
 
 ### Pod install travado
 
@@ -205,21 +205,21 @@ Para verificar se está tudo configurado:
 cd packages/app/ios
 
 # 1. Verificar schemes
-xcodebuild -project Runner.xcodeproj -list
+xcodebuild -project WeGig.xcodeproj -list
 
 # Deve mostrar:
 #   Schemes:
-#     Runner
+#     WeGig
 #     dev
 #     staging
 
-# 2. Verificar configurações do Runner target
-grep -A 10 "Build configuration list for PBXNativeTarget" Runner.xcodeproj/project.pbxproj
+# 2. Verificar configurações do WeGig target
+grep -A 10 "Build configuration list for PBXNativeTarget" WeGig.xcodeproj/project.pbxproj
 
 # Deve mostrar todas as 9 configurações
 
 # 3. Verificar arquivos CocoaPods
-ls -1 "Pods/Target Support Files/Pods-Runner/" | grep -E "(dev|staging)"
+ls -1 "Pods/Target Support Files/Pods-WeGig/" | grep -E "(dev|staging)"
 
 # Deve mostrar 30 arquivos (.xcfilelist e .xcconfig)
 ```

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the IPostRemoteDataSource class from the post_remote_datasource library, for the Dart programming language.">
+  <title>IPostRemoteDataSource class - post_remote_datasource library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../static-assets/styles.css?v1">
+  <link rel="icon" href="../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../index.html">wegig_app</a></li>
+    <li><a href="../features_post_data_datasources_post_remote_datasource/">features&#47;post&#47;data&#47;datasources&#47;post_remote_datasource.dart</a></li>
+    <li class="self-crumb">IPostRemoteDataSource class</li>
+  </ol>
+  <div class="self-name">IPostRemoteDataSource</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="features_post_data_datasources_post_remote_datasource&#47;features_post_data_datasources_post_remote_datasource-library-sidebar.html"
+    data-below-sidebar="features_post_data_datasources_post_remote_datasource&#47;IPostRemoteDataSource-class-sidebar.html">
+    <div>
+<h1><span class="kind-class">IPostRemoteDataSource</span> class 
+    <a href="https://dart.dev/language/class-modifiers#abstract" class="feature feature-abstract" title="This type can not be directly constructed.">abstract</a>
+ 
+</h1></div>
+
+    
+<section class="desc markdown">
+  <p>Interface para PostRemoteDataSource</p>
+<p>Define contratos para operações CRUD e queries de posts no Firestore.</p>
+</section>
+
+
+    <section>
+      <dl class="dl-horizontal">
+        
+
+        
+        
+
+          <dt>Implementers</dt>
+          <dd><ul class="comma-separated clazz-relationships">
+              <li><a href="../features_post_data_datasources_post_remote_datasource/PostRemoteDataSource-class.html">PostRemoteDataSource</a></li>
+          </ul></dd>
+
+        
+        
+
+
+      </dl>
+    </section>
+
+    
+  <section class="summary offset-anchor" id="constructors">
+    <h2>Constructors</h2>
+    <dl class="constructor-summary-list">
+        <dt id="IPostRemoteDataSource.new" class="callable">
+          <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/IPostRemoteDataSource.html">IPostRemoteDataSource.new</a></span><span class="signature">()</span>
+        </dt>
+        <dd>
+          
+        </dd>
+    </dl>
+  </section>
+    
+  <section
+      class="summary offset-anchor inherited"
+      id="instance-properties">
+    <h2>Properties</h2>
+    <dl class="properties">
+        <dt id="hashCode" class="property inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/hashCode.html">hashCode</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd class="inherited">
+  The hash code for this object.
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="runtimeType" class="property inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/runtimeType.html">runtimeType</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Type-class.html">Type</a></span>
+  
+
+</dt>
+<dd class="inherited">
+  A representation of the runtime type of the object.
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
+
+</dd>
+
+    </dl>
+  </section>
+
+    
+  <section
+      class="summary offset-anchor"
+      id="instance-methods">
+    <h2>Methods</h2>
+    <dl class="callables">
+        <dt id="addInterest" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/addInterest.html">addInterest</a></span><span class="signature">(<wbr><span class="parameter" id="addInterest-param-postId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postId</span>, </span><span class="parameter" id="addInterest-param-profileId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">profileId</span>, </span><span class="parameter" id="addInterest-param-authorProfileId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">authorProfileId</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Adiciona interesse de perfil no post
+  
+
+</dd>
+
+        <dt id="createPost" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/createPost.html">createPost</a></span><span class="signature">(<wbr><span class="parameter" id="createPost-param-post"><span class="type-annotation">PostEntity</span> <span class="parameter-name">post</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Cria novo post no Firestore
+  
+
+</dd>
+
+        <dt id="deletePost" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/deletePost.html">deletePost</a></span><span class="signature">(<wbr><span class="parameter" id="deletePost-param-postId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postId</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Deleta post do Firestore
+  
+
+</dd>
+
+        <dt id="getAllPosts" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/getAllPosts.html">getAllPosts</a></span><span class="signature">(<wbr><span class="parameter" id="getAllPosts-param-uid"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">uid</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter">PostEntity</span>&gt;</span></span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Retorna todos os posts ativos (não expirados)
+  
+
+</dd>
+
+        <dt id="getInterestedProfiles" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/getInterestedProfiles.html">getInterestedProfiles</a></span><span class="signature">(<wbr><span class="parameter" id="getInterestedProfiles-param-postId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postId</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span></span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Retorna lista de IDs de perfis interessados no post
+  
+
+</dd>
+
+        <dt id="getNearbyPosts" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/getNearbyPosts.html">getNearbyPosts</a></span><span class="signature">(<wbr>{<span class="parameter" id="getNearbyPosts-param-latitude"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/double-class.html">double</a></span> <span class="parameter-name">latitude</span>, </span><span class="parameter" id="getNearbyPosts-param-longitude"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/double-class.html">double</a></span> <span class="parameter-name">longitude</span>, </span><span class="parameter" id="getNearbyPosts-param-radiusKm"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/double-class.html">double</a></span> <span class="parameter-name">radiusKm</span>, </span><span class="parameter" id="getNearbyPosts-param-limit"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">limit</span> = <span class="default-value">50</span></span>})
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter">PostEntity</span>&gt;</span></span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Busca posts próximos usando geosearch (Haversine)
+  
+
+</dd>
+
+        <dt id="getPostById" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/getPostById.html">getPostById</a></span><span class="signature">(<wbr><span class="parameter" id="getPostById-param-postId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postId</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">PostEntity?</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Busca um post por ID, retorna null se não encontrado
+  
+
+</dd>
+
+        <dt id="getPostsByProfile" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/getPostsByProfile.html">getPostsByProfile</a></span><span class="signature">(<wbr><span class="parameter" id="getPostsByProfile-param-profileId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">profileId</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter">PostEntity</span>&gt;</span></span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Retorna posts criados por um perfil específico
+  
+
+</dd>
+
+        <dt id="hasInterest" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/hasInterest.html">hasInterest</a></span><span class="signature">(<wbr><span class="parameter" id="hasInterest-param-postId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postId</span>, </span><span class="parameter" id="hasInterest-param-profileId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">profileId</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Verifica se perfil demonstrou interesse no post
+  
+
+</dd>
+
+        <dt id="noSuchMethod" class="callable inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/noSuchMethod.html">noSuchMethod</a></span><span class="signature">(<wbr><span class="parameter" id="noSuchMethod-param-invocation"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Invocation-class.html">Invocation</a></span> <span class="parameter-name">invocation</span></span>)
+    <span class="returntype parameter">&#8594; dynamic</span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  Invoked when a nonexistent method or property is accessed.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="removeInterest" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/removeInterest.html">removeInterest</a></span><span class="signature">(<wbr><span class="parameter" id="removeInterest-param-postId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postId</span>, </span><span class="parameter" id="removeInterest-param-profileId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">profileId</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Remove interesse de perfil no post
+  
+
+</dd>
+
+        <dt id="toString" class="callable inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/toString.html">toString</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  A string representation of this object.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="updatePost" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/updatePost.html">updatePost</a></span><span class="signature">(<wbr><span class="parameter" id="updatePost-param-post"><span class="type-annotation">PostEntity</span> <span class="parameter-name">post</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Atualiza post existente no Firestore
+  
+
+</dd>
+
+        <dt id="watchPosts" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/watchPosts.html">watchPosts</a></span><span class="signature">(<wbr><span class="parameter" id="watchPosts-param-uid"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">uid</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter">PostEntity</span>&gt;</span></span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Stream reativo de posts do usuário (atualiza automaticamente)
+  
+
+</dd>
+
+        <dt id="watchPostsByProfile" class="callable">
+  <span class="name"><a href="../features_post_data_datasources_post_remote_datasource/IPostRemoteDataSource/watchPostsByProfile.html">watchPostsByProfile</a></span><span class="signature">(<wbr><span class="parameter" id="watchPostsByProfile-param-profileId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">profileId</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter">PostEntity</span>&gt;</span></span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Stream reativo de posts de um perfil específico
+  
+
+</dd>
+
+    </dl>
+  </section>
+    
+  <section
+      class="summary offset-anchor inherited"
+      id="operators">
+    <h2>Operators</h2>
+    <dl class="callables">
+        <dt id="operator ==" class="callable inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/operator_equals.html">operator ==</a></span><span class="signature">(<wbr><span class="parameter" id="==-param-other"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Object-class.html">Object</a></span> <span class="parameter-name">other</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  The equality operator.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+    </dl>
+  </section>
+    
+    
+    
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../index.html">wegig_app</a></li>
+    <li><a href="../features_post_data_datasources_post_remote_datasource/">post_remote_datasource</a></li>
+    <li class="self-crumb">IPostRemoteDataSource class</li>
+</ol>
+
+    <h5>post_remote_datasource library</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div>
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+  </div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    wegig_app
+      1.0.1+2
+  </span>
+  
+</footer>
+
+
+<script src="../static-assets/highlight.pack.js?v1"></script>
+<script src="../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

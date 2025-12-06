@@ -7,7 +7,7 @@ echo "🔧 Configurando Firebase para STAGING flavor..."
 PROJECT_DIR="${SRCROOT}"
 FIREBASE_DIR="${PROJECT_DIR}/Firebase"
 PLIST_STAGING="${FIREBASE_DIR}/GoogleService-Info-staging.plist"
-PLIST_TARGET="${PROJECT_DIR}/Runner/GoogleService-Info.plist"
+PLIST_TARGET="${PROJECT_DIR}/WeGig/GoogleService-Info.plist"
 
 # Copiar arquivo correto
 if [ -f "$PLIST_STAGING" ]; then

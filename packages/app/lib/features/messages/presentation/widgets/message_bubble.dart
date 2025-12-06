@@ -37,7 +37,7 @@ class MessageBubble extends StatelessWidget {
   // Paleta de cores
   static const Color _primaryColor = AppColors.primary;
   static const Color _myMessageColor = AppColors.primary;
-  static const Color _otherMessageColor = AppColors.surfaceVariant;
+  static const Color _otherMessageColor = AppColors.surfaceContainerHighest;
   static const Color _reactionBgColor = AppColors.divider;
 
   @override
@@ -78,7 +78,6 @@ class MessageBubble extends StatelessWidget {
                 ],
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Reply preview
                   if (replyTo != null) _buildReplyPreview(replyTo),

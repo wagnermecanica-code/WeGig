@@ -235,7 +235,6 @@ class PhotoMarkerBuilder {
             fontWeight: FontWeight.bold,
           ),
         ),
-        textDirection: TextDirection.ltr,
       );
       textPainter.layout();
       textPainter.paint(
@@ -299,7 +298,6 @@ class PhotoMarkerBuilder {
           fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
         ),
       ),
-      textDirection: TextDirection.ltr,
     );
     textPainter.layout();
     textPainter.paint(

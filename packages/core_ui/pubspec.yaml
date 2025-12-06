@@ -27,6 +27,11 @@ dependencies:
   uuid: ^4.3.3
   flutter_dotenv: ^6.0.0
   iconsax: ^0.0.8
+  shared_preferences: ^2.3.2
+  timeago: ^3.6.1
+  flutter_typeahead: ^5.0.2
+  flutter_image_compress: ^2.3.0
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

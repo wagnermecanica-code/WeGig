@@ -93,7 +93,7 @@ if [[ "$FLAVOR" != "dev" ]]; then
     echo -e "${GREEN}✓ Firebase config found (Android)${NC}"
   fi
   
-  if [ ! -f "ios/Runner/GoogleService-Info.plist" ]; then
+  if [ ! -f "ios/WeGig/GoogleService-Info.plist" ]; then
     echo -e "${YELLOW}⚠️  GoogleService-Info.plist not found (required for $FLAVOR)${NC}"
   else
     echo -e "${GREEN}✓ Firebase config found (iOS)${NC}"
@@ -139,13 +139,13 @@ fi
 # Bundle ID mapping
 case "$FLAVOR" in
   dev)
-    BUNDLE_ID="com.tosembanda.wegig.dev"
+    BUNDLE_ID="com.wegig.wegig.dev"
     ;;
   staging)
-    BUNDLE_ID="com.tosembanda.wegig.staging"
+    BUNDLE_ID="com.wegig.wegig.staging"
     ;;
   prod)
-    BUNDLE_ID="com.tosembanda.wegig"
+    BUNDLE_ID="com.wegig.wegig"
     ;;
 esac
 

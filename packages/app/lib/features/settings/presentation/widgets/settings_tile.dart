@@ -121,10 +121,18 @@ class SettingsSwitchTile extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
-        thumbColor: MaterialStateProperty.resolveWith<Color?>(
-          (states) => states.contains(MaterialState.selected)
+        thumbColor: WidgetStateProperty.resolveWith<Color?>(
+          (states) => states.contains(WidgetState.selected)
               ? AppColors.primary
               : AppColors.border,
+        ),
+        trackColor: WidgetStateProperty.resolveWith<Color?>(
+          (states) => states.contains(WidgetState.selected)
+              ? AppColors.primary.withValues(alpha: 0.2)
+              : AppColors.surfaceVariant,
+        ),
+        thumbIcon: WidgetStateProperty.resolveWith<Icon?>(
+          (states) => null, // Thumb com sombra padrão
         ),
       ),
     );

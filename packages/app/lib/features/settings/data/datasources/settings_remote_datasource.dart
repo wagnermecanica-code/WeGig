@@ -60,6 +60,7 @@ class SettingsRemoteDataSource implements ISettingsRemoteDataSource {
           .update({
         'notificationRadiusEnabled': settings.notifyNearbyPosts,
         'notificationRadius': settings.nearbyRadiusKm,
+        'profileUid': settings.profileId, // CRITICAL: Isolamento de perfil
         'updatedAt': FieldValue.serverTimestamp(),
       });
 

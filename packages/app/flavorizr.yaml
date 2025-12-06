@@ -9,12 +9,12 @@ flavors:
       name: "WeGig DEV"
 
     android:
-      applicationId: "com.tosembanda.wegig.dev"
+      applicationId: "com.wegig.wegig.dev"
       firebase:
         config: "../../firebase/dev/google-services.json"
 
     ios:
-      bundleId: "com.tosembanda.wegig.dev"
+      bundleId: "com.wegig.wegig.dev"
       firebase:
         config: "../../firebase/dev/GoogleService-Info.plist"
 
@@ -33,12 +33,12 @@ flavors:
       name: "WeGig STAGING"
 
     android:
-      applicationId: "com.tosembanda.wegig.staging"
+      applicationId: "com.wegig.wegig.staging"
       firebase:
         config: "../../firebase/staging/google-services.json"
 
     ios:
-      bundleId: "com.tosembanda.wegig.staging"
+      bundleId: "com.wegig.wegig.staging"
       firebase:
         config: "../../firebase/staging/GoogleService-Info.plist"
 
@@ -57,12 +57,12 @@ flavors:
       name: "WeGig"
 
     android:
-      applicationId: "com.tosembanda.wegig"
+      applicationId: "com.wegig.wegig"
       firebase:
         config: "../../firebase/prod/google-services.json"
 
     ios:
-      bundleId: "com.tosembanda.wegig"
+      bundleId: "com.wegig.wegig"
       firebase:
         config: "../../firebase/prod/GoogleService-Info.plist"
 

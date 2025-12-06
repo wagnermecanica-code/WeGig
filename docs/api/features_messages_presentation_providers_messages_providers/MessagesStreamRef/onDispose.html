@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the onDispose method from the MessagesStreamRef mixin, for the Dart programming language.">
+  <title>onDispose method - MessagesStreamRef mixin - messages_providers library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">wegig_app</a></li>
+    <li><a href="../../features_messages_presentation_providers_messages_providers/">features&#47;messages&#47;presentation&#47;providers&#47;messages_providers.dart</a></li>
+    <li><a href="../../features_messages_presentation_providers_messages_providers/MessagesStreamRef-mixin.html">MessagesStreamRef</a></li>
+    <li class="self-crumb">onDispose abstract method</li>
+  </ol>
+  <div class="self-name">onDispose</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="features_messages_presentation_providers_messages_providers&#47;MessagesStreamRef-mixin-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">onDispose</span> abstract method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+<span class="returntype">void</span>
+<span class="name ">onDispose</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="onDispose-param-cb"><span class="type-annotation">void</span> <span class="parameter-name">cb</span>()</span></li>
+</ol>)
+
+      <div class="features"><span class="feature">inherited</span></div>
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Adds a listener to perform an operation right before the provider is destroyed.</p>
+<p>This includes:</p>
+<ul>
+<li>when the provider will rebuild (such as when using <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Ref/watch.html">watch</a> or <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Ref/refresh.html">refresh</a>).</li>
+<li>when an <code>autoDispose</code> provider is no longer used</li>
+<li>when the associated <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/ProviderContainer-class.html">ProviderContainer</a>/<code>ProviderScope</code> is disposed`.</li>
+</ul>
+<p><strong>Prefer</strong> having multiple <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Ref/onDispose.html">onDispose</a>, for every disposable object created,
+instead of a single large <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Ref/onDispose.html">onDispose</a>:</p>
+<p>Good:</p>
+<pre class="language-dart"><code class="language-dart">final disposable1 = Disposable(...);
+ref.onDispose(disposable1.dispose);
+
+final disposable2 = Disposable(...);
+ref.onDispose(disposable2.dispose);
+</code></pre>
+<p>Bad:</p>
+<pre class="language-dart"><code class="language-dart">final disposable1 = Disposable(...);
+final disposable2 = Disposable(...);
+
+ref.onDispose(() {
+  disposable1.dispose();
+  disposable2.dispose();
+});
+</code></pre>
+<p>This is preferable for multiple reasons:</p>
+<ul>
+<li>It is easier for readers to know if a "dispose" is missing for a given
+object. That is because the <code>dispose</code> call is directly next to the
+object creation.</li>
+<li>It prevents memory leaks in cases of an exception.
+If an exception happens inside a <code>dispose()</code> call, or
+if an exception happens before <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Ref/onDispose.html">onDispose</a> is called, then
+some of your objects may not be disposed.</li>
+</ul>
+<p>See also:</p>
+<ul>
+<li><a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Provider/autoDispose-constant.html">Provider.autoDispose</a>, a modifier which tell a provider that it should
+destroy its state when no longer listened to.</li>
+<li><a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/ProviderContainer/dispose.html">ProviderContainer.dispose</a>, to destroy all providers associated with
+a <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/ProviderContainer-class.html">ProviderContainer</a> at once.</li>
+<li><a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Ref/onCancel.html">onCancel</a>, a life-cycle for when all listeners of a provider are removed.</li>
+</ul>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">void onDispose(void Function() cb);</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">wegig_app</a></li>
+    <li><a href="../../features_messages_presentation_providers_messages_providers/">messages_providers</a></li>
+    <li><a href="../../features_messages_presentation_providers_messages_providers/MessagesStreamRef-mixin.html">MessagesStreamRef</a></li>
+    <li class="self-crumb">onDispose abstract method</li>
+</ol>
+
+    <h5>MessagesStreamRef mixin</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    wegig_app
+      1.0.1+2
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

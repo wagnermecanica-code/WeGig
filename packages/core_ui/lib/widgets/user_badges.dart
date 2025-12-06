@@ -42,16 +42,16 @@ class UserBadges extends StatelessWidget {
             return Container(
               padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: badge['color'],
+                color: badge['color'] as Color?,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(badge['icon'], size: 14, color: Colors.white),
+                  Icon(badge['icon'] as IconData?, size: 14, color: Colors.white),
                   SizedBox(width: 4),
                   Text(
-                    badge['text'],
+                    badge['text'] as String? ?? '',
                     style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                   ),
                 ],

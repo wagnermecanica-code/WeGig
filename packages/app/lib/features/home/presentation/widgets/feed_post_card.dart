@@ -147,7 +147,6 @@ class FeedPostCard extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Nome do perfil + botões
                   Row(
@@ -293,7 +292,6 @@ class FeedPostCard extends StatelessWidget {
                   if (post.content.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Icon(Iconsax.message,
                             size: 11, color: textSecondary),

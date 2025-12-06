@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:core_ui/widgets/photo_upload_widget.dart';
+import 'package:iconsax/iconsax.dart';
 
 void main() {
   group('PhotoUploadWidget', () {
@@ -18,7 +19,7 @@ void main() {
       );
 
       expect(find.byType(PhotoUploadWidget), findsOneWidget);
-      expect(find.byIcon(Icons.add_a_photo), findsOneWidget);
+      expect(find.byIcon(Iconsax.camera), findsOneWidget);
       expect(find.text('Toque para adicionar foto'), findsOneWidget);
     });
 
@@ -35,7 +36,7 @@ void main() {
       );
 
       // Should show close button
-      expect(find.byIcon(Icons.close), findsOneWidget);
+      expect(find.byIcon(Iconsax.close_circle), findsOneWidget);
     });
 
     testWidgets('calls onPhotoSelected with null when remove is tapped',
@@ -56,8 +57,8 @@ void main() {
       );
 
       // Tap remove button
-      await tester.tap(find.byIcon(Icons.close));
-      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Iconsax.close_circle));
+      await tester.pump(); // Just pump once, no need for settle
 
       expect(capturedPath, isNull);
     });
@@ -135,7 +136,6 @@ void main() {
       await tester.pumpAndSettle();
 
       // Should show source selection sheet
-      expect(find.text('Escolher origem da foto'), findsOneWidget);
       expect(find.text('Galeria'), findsOneWidget);
       expect(find.text('Câmera'), findsOneWidget);
     });
@@ -154,7 +154,7 @@ void main() {
       await tester.tap(find.byType(GestureDetector).first);
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.photo_library), findsOneWidget);
+      expect(find.byIcon(Iconsax.gallery), findsOneWidget);
       expect(find.text('Galeria'), findsOneWidget);
     });
 
@@ -172,7 +172,8 @@ void main() {
       await tester.tap(find.byType(GestureDetector).first);
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.camera_alt), findsOneWidget);
+      // Find camera icon in the bottom sheet (should be in a ListTile)
+      expect(find.descendant(of: find.byType(ListTile), matching: find.byIcon(Iconsax.camera)), findsOneWidget);
       expect(find.text('Câmera'), findsOneWidget);
     });
 
@@ -207,9 +208,11 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      // Just pump a few times to allow error widget to show
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-      // Widget should handle error gracefully
+      // Widget should still be present (error handling is internal)
       expect(find.byType(PhotoUploadWidget), findsOneWidget);
     });
 
@@ -247,12 +250,12 @@ void main() {
       await tester.tap(find.byType(GestureDetector).first);
       await tester.pumpAndSettle();
 
-      // Tap cancel
-      await tester.tap(find.text('Cancelar'));
+      // Tap outside to close (bottom sheet behavior)
+      await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
 
-      // Sheet should be closed
-      expect(find.text('Escolher origem da foto'), findsNothing);
+      // Sheet should be closed - no specific title to check
+      expect(find.text('Galeria'), findsNothing);
     });
 
     test('validates file size reduction via compression', () {
@@ -293,8 +296,8 @@ void main() {
         ),
       );
 
-      // Should show add photo icon
-      expect(find.byIcon(Icons.add_a_photo), findsOneWidget);
+      // Should show camera icon
+      expect(find.byIcon(Iconsax.camera), findsOneWidget);
     });
   });
 
@@ -351,8 +354,8 @@ void main() {
       await tester.tap(find.byType(GestureDetector).first);
       await tester.pumpAndSettle();
 
-      // Cancel without selecting
-      await tester.tap(find.text('Cancelar'));
+      // Close without selecting by tapping outside
+      await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
 
       // Should not change captured path

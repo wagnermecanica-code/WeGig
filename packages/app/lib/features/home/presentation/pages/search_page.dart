@@ -60,6 +60,7 @@ class SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    if (!mounted) return;
     _usernameSearchController.dispose();
     super.dispose();
   }
@@ -497,7 +498,7 @@ class SearchPageState extends State<SearchPage> {
               Text('Disponível para', style: sectionTitleStyle),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                initialValue: _selectedAvailableFor.isNotEmpty
+                value: _selectedAvailableFor.isNotEmpty
                     ? _selectedAvailableFor.first
                     : null,
                 hint: const Text('Selecione uma opção'),
@@ -557,7 +558,7 @@ class SearchPageState extends State<SearchPage> {
               Text('Nível', style: sectionTitleStyle),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                initialValue: _selectedLevel,
+                value: _selectedLevel,
                 hint: const Text('Selecione o nível'),
                 items: _levelOptions
                     .map(

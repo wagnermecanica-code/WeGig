@@ -64,7 +64,6 @@ class SearchResultTile extends StatelessWidget {
         ],
       ),
       subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (profile.username != null && profile.username!.isNotEmpty) ...[
             Text(

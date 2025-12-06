@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
@@ -52,10 +51,6 @@ class PostService {
 
     if (!['musician', 'band'].contains(post.type)) {
       throw ArgumentError('Tipo inválido: ${post.type}');
-    }
-
-    if (post.location is! GeoPoint) {
-      throw ArgumentError('Localização inválida');
     }
 
     if (post.expiresAt.isBefore(DateTime.now())) {

@@ -35,7 +35,7 @@ class WeGigClusterRenderer {
         icon: descriptor,
         anchor: const Offset(0.5, 0.5),
         onTap: () => onClusterTap?.call(cluster),
-        zIndexInt: cluster.count.toDouble(),
+        zIndex: cluster.count.toDouble(),
       );
     }
 
@@ -50,7 +50,7 @@ class WeGigClusterRenderer {
       icon: descriptor,
       anchor: const Offset(0.5, 1.0),
       onTap: () => onMarkerTap(item.post),
-      zIndexInt: cluster.count.toDouble(),
+      zIndex: cluster.count.toDouble(),
     );
   }
 

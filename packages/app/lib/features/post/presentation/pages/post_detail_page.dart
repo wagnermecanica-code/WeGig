@@ -229,6 +229,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           .where('postId', isEqualTo: post.id)
           .where('interestedUid', isEqualTo: currentUser.uid)
           .where('interestedProfileId', isEqualTo: activeProfile.profileId)
+          .where('profileUid', isEqualTo: activeProfile.uid)
           .limit(1)
           .get();
 
@@ -290,6 +291,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         'postId': _post!.id,
         'postAuthorUid': _post!.authorUid,
         'postAuthorProfileId': _post!.authorProfileId,
+        'profileUid': activeProfile.uid,
         'interestedUid': currentUser.uid,
         'interestedProfileId': activeProfile.profileId,
         'interestedProfileName': activeProfile.name, // ✅ Cloud Function expects this
@@ -843,7 +845,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
     return PopScope(
       canPop: true,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
         if (didPop) return;
         _handleBackNavigation();
       },
@@ -854,7 +856,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           // Conteúdo scrollável
           SingleChildScrollView(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Hero com foto do post
                 Hero(
@@ -911,7 +912,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                       ),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Header com autor e localização
                         Padding(
@@ -944,7 +944,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                               // Nome e localização
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     // Nome do perfil (clicável e destacado)
                                     GestureDetector(
@@ -1002,7 +1001,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 // Área de Interesse (Localização)
                                 _buildInfoRow(
@@ -1079,7 +1077,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Row(
                                     children: [
@@ -1247,7 +1244,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   /// Widget para linha de informação
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(
           icon,
@@ -1257,7 +1253,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         const SizedBox(width: 12),
         Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,

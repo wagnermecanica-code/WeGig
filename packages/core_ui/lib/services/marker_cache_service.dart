@@ -104,7 +104,6 @@ class MarkerCacheService {
           fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
         ),
       ),
-      textDirection: TextDirection.ltr,
     );
     textPainter.layout();
     textPainter.paint(

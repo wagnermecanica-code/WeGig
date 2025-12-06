@@ -27,7 +27,7 @@ dependencies:
   google_sign_in: ^6.2.1 # Última versão estável com correções de login social
   google_maps_flutter: 2.10.0
   google_maps_cluster_manager:
-    path: ../../third_party/google_maps_cluster_manager
+    path: /Users/wagneroliveira/to_sem_banda/.tools/third_party/google_maps_cluster_manager
   geolocator: ^10.1.0
 
   # Apple Sign In
@@ -98,7 +98,7 @@ dev_dependencies:
 
 dependency_overrides:
   image_cropper_platform_interface:
-    path: ../../third_party/image_cropper_platform_interface
+    path: /Users/wagneroliveira/to_sem_banda/.tools/third_party/image_cropper_platform_interface
 
 # Configuração do ícone do app (executar: flutter pub run flutter_launcher_icons)
 flutter_launcher_icons:

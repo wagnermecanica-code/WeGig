@@ -334,10 +334,12 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
 
       debugPrint(
           'MessagesPage: 📡 Criando stream para conversas com profileId: $currentProfileId');
+      debugPrint('MessagesPage: 🔑 User UID: ${currentUser.uid}');
 
         _conversationsSubscription = FirebaseFirestore.instance
           .collection('conversations')
           .where('participantProfiles', arrayContains: currentProfileId)
+          .where('profileUid', arrayContains: activeProfile.uid)
           .orderBy('lastMessageTimestamp', descending: true)
           .limit(_conversationsPerPage)
           .snapshots()

@@ -686,16 +686,16 @@ class _HomePageState extends ConsumerState<HomePage>
     final postsAsync = ref.watch(postNotifierProvider);
     final profileAsync = ref.watch(profileProvider);
 
-    // Recalcular distâncias quando o perfil ativo mudar
-    profileAsync.whenData((profileState) {
-      if (profileState.activeProfile != null && _visiblePosts.isNotEmpty) {
-        // Usar WidgetsBinding para evitar setState durante build
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            setState(_updatePostDistances);
-          }
-        });
-      }
+    // Listener que executa APENAS quando o perfil ativo mudar (não a cada rebuild)
+    ref.listen<AsyncValue<ProfileState>>(profileProvider, (previous, next) {
+      next.whenData((profileState) {
+        if (profileState.activeProfile != null && 
+            _visiblePosts.isNotEmpty &&
+            mounted) {
+          _updatePostDistances();
+          setState(() {});
+        }
+      });
     });
 
     return Theme(

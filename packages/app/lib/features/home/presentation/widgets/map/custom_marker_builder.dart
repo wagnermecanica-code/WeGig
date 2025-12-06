@@ -1,6 +1,5 @@
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:custom_map_markers/custom_map_markers.dart';
-import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wegig_app/features/home/presentation/widgets/map/custom_marker_widget.dart';
 

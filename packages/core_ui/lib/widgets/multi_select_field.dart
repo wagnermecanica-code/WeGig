@@ -47,7 +47,6 @@ class _MultiSelectFieldState extends State<MultiSelectField> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           widget.title,
@@ -152,6 +151,7 @@ class _MultiSelectModalState extends State<_MultiSelectModal> {
 
   @override
   void dispose() {
+    if (!mounted) return;
     _searchController.dispose();
     super.dispose();
   }

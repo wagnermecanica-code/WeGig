@@ -48,7 +48,7 @@ Improperly formatted define flag: "FLUTTER_TARGET="lib/main.dart"
 
 ### Solução Automática (Run Script Phase)
 
-**✅ Script Criado:** `packages/app/ios/Runner/FixFlutterTarget.sh`
+**✅ Script Criado:** `packages/app/ios/WeGig/FixFlutterTarget.sh`
 
 **Como Adicionar no Xcode:**
 
@@ -211,7 +211,7 @@ class AppConfig {
 
 ## 🔗 Arquivos Relacionados
 
-- **Script de correção:** `packages/app/ios/Runner/FixFlutterTarget.sh`
+- **Script de correção:** `packages/app/ios/WeGig/FixFlutterTarget.sh`
 - **Documentação completa:** `docs/setup/FIX_XCODE_FLUTTER_TARGET_FINAL.md`
 - **Flavors Android:** `packages/app/android/app/build.gradle.kts` (linhas 72-92)
 - **Flavors iOS:** `packages/app/ios/Runner.xcodeproj/xcshareddata/xcschemes/*.xcscheme`

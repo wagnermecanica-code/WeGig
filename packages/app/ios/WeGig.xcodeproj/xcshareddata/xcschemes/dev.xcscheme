@@ -36,7 +36,7 @@
                BlueprintIdentifier = "97C146ED1CF9000F007C117D"
                BuildableName = "WeGig.app"
                BlueprintName = "WeGig"
-               ReferencedContainer = "container:Runner.xcodeproj">
+               ReferencedContainer = "container:WeGig.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -102,7 +102,7 @@
             BlueprintIdentifier = "97C146ED1CF9000F007C117D"
             BuildableName = "WeGig.app"
             BlueprintName = "WeGig"
-            ReferencedContainer = "container:Runner.xcodeproj">
+            ReferencedContainer = "container:WeGig.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

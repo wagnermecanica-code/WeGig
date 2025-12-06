@@ -16,6 +16,7 @@ class InterestService {
       'postId': post.id,
       'postAuthorProfileId': post.authorProfileId,
       'interestedProfileId': activeProfile.profileId,
+      'profileUid': activeProfile.uid,
       'interestedProfileName': activeProfile.name,
       'interestedProfileCity': activeProfile.city,
       'interestedProfileIsBand': activeProfile.isBand,
@@ -50,14 +51,20 @@ class InterestService {
   Future<bool> hasInterest({
     required String postId,
     required String profileId,
+    String? profileUid,
   }) async {
-    final querySnapshot = await _firestore
+    var querySnapshot = _firestore
         .collection('interests')
         .where('postId', isEqualTo: postId)
-        .where('interestedProfileId', isEqualTo: profileId)
-        .limit(1)
-        .get();
+        .where('interestedProfileId', isEqualTo: profileId);
 
-    return querySnapshot.docs.isNotEmpty;
+    if (profileUid != null && profileUid.isNotEmpty) {
+      querySnapshot =
+          querySnapshot.where('profileUid', isEqualTo: profileUid);
+    }
+
+    final result = await querySnapshot.limit(1).get();
+
+    return result.docs.isNotEmpty;
   }
 }

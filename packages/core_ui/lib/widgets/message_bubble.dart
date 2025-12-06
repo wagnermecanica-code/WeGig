@@ -57,7 +57,6 @@ class MessageBubble extends StatelessWidget {
             ],
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Reply preview (se houver)
               if (replyTo != null)
@@ -86,7 +85,6 @@ class MessageBubble extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'Respondendo a:',
@@ -100,7 +98,7 @@ class MessageBubble extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                replyTo!['text'] ?? '',
+                                (replyTo!['text'] as String?) ?? '',
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(

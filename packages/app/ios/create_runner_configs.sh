@@ -17,17 +17,17 @@ echo "Release-staging: $RELEASE_STAGING_UUID"
 echo "Profile-staging: $PROFILE_STAGING_UUID"
 
 # Backup
-cp Runner.xcodeproj/project.pbxproj Runner.xcodeproj/project.pbxproj.backup
+cp WeGig.xcodeproj/project.pbxproj WeGig.xcodeproj/project.pbxproj.backup
 
 # Script Python para adicionar as configurações
 python3 << PYTHON_EOF
 import re
 
 # Ler o arquivo
-with open('Runner.xcodeproj/project.pbxproj', 'r') as f:
+with open('WeGig.xcodeproj/project.pbxproj', 'r') as f:
     content = f.read()
 
-# Encontrar a configuração Debug do Runner (97C147061CF9000F007C117D)
+# Encontrar a configuração Debug do WeGig (97C147061CF9000F007C117D)
 debug_config_match = re.search(
     r'(97C147061CF9000F007C117D /\* Debug \*/ = \{.*?name = Debug;.*?\};)',
     content,

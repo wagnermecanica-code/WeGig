@@ -10,12 +10,12 @@ As capabilities de Push Notifications no iOS devem ser configuradas via Xcode. S
 
 ```bash
 cd ios
-open Runner.xcworkspace
+open WeGig.xcworkspace
 ```
 
 ### 2. Habilitar Push Notifications
 
-1. Selecione o target **Runner** no Project Navigator
+1. Selecione o target **WeGig** no Project Navigator
 2. Vá para aba **Signing & Capabilities**
 3. Clique no botão **+ Capability**
 4. Adicione **Push Notifications**
@@ -60,7 +60,7 @@ Após configurar, você pode testar via Firebase Console:
 Após seguir os passos acima, o Xcode criará automaticamente:
 
 ```xml
-<!-- ios/Runner/Runner.entitlements -->
+<!-- ios/WeGig/WeGig.entitlements -->
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -78,7 +78,7 @@ Após seguir os passos acima, o Xcode criará automaticamente:
 
 ## 🔐 Info.plist (já configurado)
 
-O arquivo `ios/Runner/Info.plist` já deve conter:
+O arquivo `ios/WeGig/Info.plist` já deve conter:
 
 ```xml
 <!-- Permissões de notificação -->

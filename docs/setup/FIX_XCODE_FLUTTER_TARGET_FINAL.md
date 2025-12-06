@@ -31,7 +31,7 @@ export "FLUTTER_TARGET=lib/main_dev.dart"  # ✅ CORRETO
 
 Criamos um script que executa **APÓS** o Flutter gerar os arquivos, corrigindo as aspas:
 
-**Arquivo:** `packages/app/ios/Runner/FixFlutterTarget.sh`
+**Arquivo:** `packages/app/ios/WeGig/FixFlutterTarget.sh`
 
 ```bash
 #!/bin/bash
@@ -154,7 +154,7 @@ O script detecta automaticamente o flavor baseado em `$CONFIGURATION` e aplica o
 
 ## 🔗 Arquivos Relacionados
 
-- `packages/app/ios/Runner/FixFlutterTarget.sh` - Script de correção
+- `packages/app/ios/WeGig/FixFlutterTarget.sh` - Script de correção
 - `packages/app/ios/Runner.xcodeproj/project.pbxproj` - Configuração do Run Script Phase
 - `packages/app/ios/Flutter/flutter_export_environment.sh` - Arquivo corrigido (gerado automaticamente)
 

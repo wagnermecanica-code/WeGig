@@ -92,6 +92,7 @@ class MockMessagesRepository implements MessagesRepository {
     required String profileId,
     int limit = 20,
     ConversationEntity? startAfter,
+    String? profileUid,
   }) async {
     getConversationsCalled = true;
 
@@ -116,6 +117,7 @@ class MockMessagesRepository implements MessagesRepository {
     required String otherProfileId,
     required String currentUid,
     required String otherUid,
+    String? profileUid,
   }) async {
     getOrCreateConversationCalled = true;
 
@@ -300,12 +302,12 @@ class MockMessagesRepository implements MessagesRepository {
   }
 
   @override
-  Future<int> getUnreadMessageCount(String profileId) async {
+  Future<int> getUnreadMessageCount(String profileId, {String? profileUid}) async {
     return _unreadCounts[profileId] ?? 0;
   }
 
   @override
-  Stream<List<ConversationEntity>> watchConversations(String profileId) {
+  Stream<List<ConversationEntity>> watchConversations(String profileId, {String? profileUid}) {
     return Stream.value(
       _conversations.values
           .where((conv) => conv.participantProfiles.contains(profileId))
@@ -314,12 +316,12 @@ class MockMessagesRepository implements MessagesRepository {
   }
 
   @override
-  Stream<List<MessageEntity>> watchMessages(String conversationId) {
+  Stream<List<MessageEntity>> watchMessages(String conversationId, {String? profileUid}) {
     return Stream.value(_messages[conversationId] ?? []);
   }
 
   @override
-  Stream<int> watchUnreadCount(String profileId) {
+  Stream<int> watchUnreadCount(String profileId, {String? profileUid}) {
     return Stream.value(_unreadCounts[profileId] ?? 0);
   }
 }

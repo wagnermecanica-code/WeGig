@@ -242,10 +242,10 @@ class ConversationItem extends StatelessWidget {
                             ? secondaryColor.withValues(alpha: 0.2)
                             : primaryColor.withValues(alpha: 0.2),
                         child: conversation['otherUserPhoto'] != null &&
-                                (conversation['otherUserPhoto'] as String).isNotEmpty
+                                (conversation['otherUserPhoto'] as String?)?.isNotEmpty == true
                             ? ClipOval(
                                 child: CachedNetworkImage(
-                                  imageUrl: conversation['otherUserPhoto'],
+                                  imageUrl: conversation['otherUserPhoto'] as String,
                                   width: 56,
                                   height: 56,
                                   fit: BoxFit.cover,
@@ -298,14 +298,13 @@ class ConversationItem extends StatelessWidget {
                 // Nome, última mensagem e hora
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
                           // Nome do usuário
                           Expanded(
                             child: Text(
-                              conversation['otherUserName'],
+                              conversation['otherUserName'] as String? ?? 'Usuário',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: hasUnread ? FontWeight.bold : FontWeight.w600,
@@ -332,7 +331,7 @@ class ConversationItem extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              conversation['lastMessage'],
+                              conversation['lastMessage'] as String? ?? 'Sem mensagens',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: hasUnread ? textSecondary : textTertiary,

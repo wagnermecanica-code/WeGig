@@ -27,7 +27,7 @@
 
 | Tipo    | Client ID                                                                  | Arquivo                               |
 | ------- | -------------------------------------------------------------------------- | ------------------------------------- |
-| **iOS** | `278498777601-osk6e3v6oe0nih2r7u7vnnvd47b1n8mf.apps.googleusercontent.com` | `ios/Runner/Info.plist` (GIDClientID) |
+| **iOS** | `278498777601-osk6e3v6oe0nih2r7u7vnnvd47b1n8mf.apps.googleusercontent.com` | `ios/WeGig/Info.plist` (GIDClientID) |
 | **Web** | `278498777601-osk6e3v6oe0nih2r7u7vnnvd47b1n8mf.apps.googleusercontent.com` | Usado no backend Firebase             |
 
 ---
@@ -81,7 +81,7 @@ GOOGLE_OAUTH_CLIENT_ID_IOS=278498777601-osk6e3v6oe0nih2r7u7vnnvd47b1n8mf.apps.go
 
 **Status**: ✅ Correto (auto-gerenciado pelo Firebase)
 
-### ✅ `ios/Runner/Info.plist`
+### ✅ `ios/WeGig/Info.plist`
 
 ```xml
 <key>GIDClientID</key>
@@ -158,7 +158,7 @@ Habilitar:
 2. Criar **OAuth 2.0 Client ID** tipo **iOS**
 3. Bundle ID: `com.example.toSemBanda`
 4. Copiar o Client ID gerado
-5. Atualizar `ios/Runner/Info.plist` com o novo Client ID
+5. Atualizar `ios/WeGig/Info.plist` com o novo Client ID
 
 **Veja guia completo em**: `GOOGLE_SIGN_IN_FIX_401.md`
 

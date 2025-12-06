@@ -192,10 +192,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                 ),
                 value: settings.notifyNearbyPosts,
-                thumbColor: MaterialStateProperty.resolveWith<Color?>(
-                  (states) => states.contains(MaterialState.selected)
+                thumbColor: WidgetStateProperty.resolveWith<Color?>(
+                  (states) => states.contains(WidgetState.selected)
                       ? AppColors.primary
                       : AppColors.border,
+                ),
+                trackColor: WidgetStateProperty.resolveWith<Color?>(
+                  (states) => states.contains(WidgetState.selected)
+                      ? AppColors.primary.withValues(alpha: 0.2)
+                      : AppColors.surfaceVariant,
+                ),
+                thumbIcon: WidgetStateProperty.resolveWith<Icon?>(
+                  (states) => null, // Thumb com sombra padrão
                 ),
                 onChanged: (value) {
                   ref
@@ -215,7 +223,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     ? Padding(
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Divider(),
                             const SizedBox(height: 12),

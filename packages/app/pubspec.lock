@@ -988,8 +988,8 @@ packages:
   google_maps_cluster_manager:
     dependency: "direct main"
     description:
-      path: "../../third_party/google_maps_cluster_manager"
-      relative: true
+      path: "/Users/wagneroliveira/to_sem_banda/.tools/third_party/google_maps_cluster_manager"
+      relative: false
     source: path
     version: "3.1.0"
   google_maps_flutter:
@@ -1163,8 +1163,8 @@ packages:
   image_cropper_platform_interface:
     dependency: "direct overridden"
     description:
-      path: "../../third_party/image_cropper_platform_interface"
-      relative: true
+      path: "/Users/wagneroliveira/to_sem_banda/.tools/third_party/image_cropper_platform_interface"
+      relative: false
     source: path
     version: "7.2.0"
   image_picker:

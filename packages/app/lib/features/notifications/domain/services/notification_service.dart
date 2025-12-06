@@ -56,6 +56,7 @@ class NotificationService {
       final notificationData = {
         'type': type,
         'recipientProfileId': recipientProfileId,
+        'profileUid': recipientProfileId, // CRITICAL: Isolamento de perfil
         'senderProfileId': senderProfileId,
         'senderUsername': normalizedUsername,
         'title': title,

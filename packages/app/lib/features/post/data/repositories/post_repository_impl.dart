@@ -1,3 +1,5 @@
+import 'dart:math' show min;
+
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:flutter/foundation.dart';
 import 'package:wegig_app/features/post/data/datasources/post_remote_datasource.dart';
@@ -48,8 +50,10 @@ class PostRepositoryImpl implements PostRepository {
   @override
   Future<PostEntity> createPost(PostEntity post) async {
     try {
+      // Usa min() para evitar RangeError quando content < 30 caracteres
+      final preview = post.content.substring(0, min(30, post.content.length));
       debugPrint(
-          '📝 PostRepository: createPost - content=${post.content.substring(0, 30)}...');
+          '📝 PostRepository: createPost - content=$preview...');
 
       await _remoteDataSource.createPost(post);
 

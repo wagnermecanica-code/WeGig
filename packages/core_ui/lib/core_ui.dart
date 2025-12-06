@@ -10,7 +10,7 @@ export 'theme/app_theme.dart';
 export 'theme/app_typography.dart';
 
 // Navigation
-export 'navigation/bottom_nav_scaffold.dart';
+// export 'navigation/bottom_nav_scaffold.dart'; // Moved to wegig_app package
 
 // Services
 export 'services/env_service.dart';

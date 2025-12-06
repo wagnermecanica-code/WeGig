@@ -89,6 +89,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     'Profissional',
   ];
 
+  // ✨ EXPANDIDO: Lista completa de instrumentos com opção "Outros"
   static const List<String> _instrumentOptions = [
     'Violão',
     'Guitarra',
@@ -100,15 +101,54 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     'Saxofone',
     'Flauta',
     'Trompete',
+    'Trombone',
+    'Clarinete',
+    'Oboé',
+    'Fagote',
     'Violino',
+    'Viola',
     'Cello',
+    'Contrabaixo Acústico',
     'Voz (cantor)',
+    'Voz (Soprano)',
+    'Voz (Contralto)',
+    'Voz (Tenor)',
+    'Voz (Barítono)',
+    'Voz (Baixo)',
     'DJ',
     'Percussão',
+    'Bateria Eletrônica',
+    'Caixa',
+    'Cajón',
+    'Bongô',
+    'Pandeiro',
+    'Zabumba',
+    'Timbal',
     'Harmônica',
+    'Gaita',
+    'Acordeon',
+    'Sanfona',
+    'Bandolim',
+    'Cavaquinho',
     'Ukulele',
+    'Banjo',
+    'Harpa',
+    'Sitar',
+    'Alaúde',
+    'Guitarra Clássica',
+    'Berimbau',
+    'Escaleta',
+    'Melódica',
+    'Theremin',
+    'Sintetizador',
+    'Teclado MIDI',
+    'Sampler',
+    'Produtor Musical',
+    'Beatmaker',
+    'Outros',
   ];
 
+  // ✨ EXPANDIDO: Lista completa de gêneros musicais com opção "Outros"
   static const List<String> _genreOptions = [
     'Rock',
     'Pop',
@@ -120,20 +160,81 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     'Reggae',
     'MPB',
     'Sertanejo',
+    'Sertanejo Universitário',
+    'Sertanejo Raiz',
     'Forró',
+    'Forró Eletrônico',
     'Axé',
     'Hip-Hop',
     'Rap',
+    'Trap',
+    'Drill',
     'Eletrônica',
+    'House',
+    'Techno',
+    'Trance',
+    'Dubstep',
+    'Drum and Bass',
+    'EDM',
     'Folk',
     'Country',
     'Classical',
+    'Ópera',
     'Metal',
+    'Heavy Metal',
+    'Death Metal',
+    'Black Metal',
+    'Thrash Metal',
+    'Power Metal',
     'Punk',
+    'Punk Rock',
+    'Hardcore',
+    'Post-Punk',
     'Indie',
+    'Indie Rock',
+    'Alternative',
+    'Grunge',
     'Samba',
+    'Samba-Enredo',
+    'Pagode',
     'Bossa Nova',
     'Gospel',
+    'Música Católica',
+    'Música Evangélica',
+    'Choro',
+    'Baião',
+    'Maracatu',
+    'Frevo',
+    'Salsa',
+    'Merengue',
+    'Bachata',
+    'Tango',
+    'Flamenco',
+    'Brega',
+    'Piseiro',
+    'Arrocha',
+    'Música Sertaneja',
+    'Música Gaúcha',
+    'Música Caipira',
+    'Rock Progressivo',
+    'Psicodélico',
+    'Disco',
+    'New Wave',
+    'Synth-pop',
+    'Ska',
+    'Reggaeton',
+    'K-Pop',
+    'J-Pop',
+    'World Music',
+    'Afrobeat',
+    'Zouk',
+    'Ambient',
+    'Experimental',
+    'Avant-garde',
+    'Minimalista',
+    'Lo-fi',
+    'Vaporwave',
+    'Outros',
   ];
 
   @override
@@ -144,6 +245,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
   @override
   void dispose() {
+    if (!mounted) return;
     _nameController.dispose();
     _bioController.dispose();
     _birthYearController.dispose();
@@ -364,7 +466,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             toolbarTitle: 'Editar Foto de Perfil',
             toolbarColor: AppColors.primary,
             toolbarWidgetColor: Colors.white,
-            statusBarColor: AppColors.primary,
             backgroundColor: Colors.black,
             activeControlsWidgetColor: AppColors.primary,
             initAspectRatio: CropAspectRatioPreset.square,
@@ -915,13 +1016,12 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     final usernameValue = (_accountUsername ?? _profile?.username)?.trim();
     final hasUsername = usernameValue != null && usernameValue.isNotEmpty;
     final sanitizedUsername = hasUsername
-        ? (usernameValue!.startsWith('@')
+        ? (usernameValue.startsWith('@')
             ? usernameValue.substring(1)
             : usernameValue)
         : null;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Informações Essenciais',
@@ -1194,7 +1294,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
   Widget _buildTypologyBlock() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Tipo de Perfil',
@@ -1297,7 +1396,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
   Widget _buildSkillsBlock() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Habilidades e Estilos',
@@ -1409,7 +1507,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
   Widget _buildSocialLinksBlock() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Links Sociais e Mídia',

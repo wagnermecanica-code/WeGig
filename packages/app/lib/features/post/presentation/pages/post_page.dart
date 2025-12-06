@@ -21,7 +21,7 @@ import 'package:wegig_app/features/profile/presentation/providers/profile_provid
 /// Navega para a página de criação de post
 void showPostModal(BuildContext context, String postType) {
   Navigator.of(context).push(
-    MaterialPageRoute(
+    MaterialPageRoute<void>(
       builder: (context) => PostPage(postType: postType),
     ),
   );
@@ -30,7 +30,7 @@ void showPostModal(BuildContext context, String postType) {
 /// Navega para a página de edição de post
 void showEditPostModal(BuildContext context, Map<String, dynamic> postData) {
   Navigator.of(context).push(
-    MaterialPageRoute(
+    MaterialPageRoute<void>(
       builder: (context) => PostPage(
         postType: (postData['type'] as String?) ?? 'musician',
         existingPostData: postData,
@@ -597,7 +597,6 @@ class _PostPageState extends ConsumerState<PostPage> {
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.close, size: 28),
-          tooltip: 'Fechar',
         ),
         actions: [
           if (_isSaving)
@@ -623,7 +622,6 @@ class _PostPageState extends ConsumerState<PostPage> {
                 size: 26,
                 color: AppColors.primary,
               ),
-              tooltip: 'Publicar',
             ),
         ],
       ),
@@ -749,7 +747,6 @@ class _PostPageState extends ConsumerState<PostPage> {
                         : null,
                     builder: (state) {
                       return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           AvailableForSelector(
                             options: _availableForOptions,

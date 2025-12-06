@@ -126,7 +126,6 @@ class MessageInput extends StatelessWidget {
         children: [
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'Respondendo',

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/profile_result.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +17,7 @@ import 'package:wegig_app/features/profile/domain/usecases/get_active_profile.da
 import 'package:wegig_app/features/profile/domain/usecases/load_all_profiles.dart';
 import 'package:wegig_app/features/profile/domain/usecases/switch_active_profile.dart';
 import 'package:wegig_app/features/profile/domain/usecases/update_profile.dart';
+import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 
 part 'profile_providers.freezed.dart';
 part 'profile_providers.g.dart';
@@ -144,6 +146,11 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
       debugPrint(
           '✅ ProfileNotifier: ${profiles.length} perfis carregados, ativo: ${activeProfile?.name ?? "nenhum"}');
 
+      // CRITICAL: Analytics - Track active profile para segmentação
+      if (activeProfile != null) {
+        _setAnalyticsProfile(activeProfile.profileId);
+      }
+
       return ProfileState(
         activeProfile: activeProfile,
         profiles: profiles,
@@ -165,10 +172,47 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
       final switchUseCase = ref.read(switchActiveProfileUseCaseProvider);
       await switchUseCase(uid, profileId);
 
+      // CRITICAL: Analytics - Track profile switch
+      _setAnalyticsProfile(profileId);
+      _logProfileSwitch(profileId);
+
+      // ✅ Invalidar providers dependentes para recarregar dados do novo perfil
+      debugPrint('🔄 ProfileNotifier: Invalidando providers após troca de perfil');
+      ref.invalidate(postNotifierProvider);
+      // Nota: notificationsStream e conversationsStream são @riverpod com parâmetro,
+      // serão automaticamente recarregados quando o profileProvider mudar
+
       state = AsyncValue.data(await _loadProfiles());
     } catch (e) {
       debugPrint('❌ ProfileNotifier: Erro ao trocar perfil - $e');
       rethrow;
+    }
+  }
+
+  /// CRITICAL: Set active_profile_id in Firebase Analytics
+  void _setAnalyticsProfile(String profileId) {
+    try {
+      FirebaseAnalytics.instance.setUserProperty(
+        name: 'active_profile_id',
+        value: profileId,
+      );
+      debugPrint('📊 Analytics: active_profile_id = $profileId');
+    } catch (e) {
+      debugPrint('⚠️ Analytics error: $e');
+    }
+  }
+
+  /// Log profile switch event
+  void _logProfileSwitch(String toProfileId) {
+    try {
+      FirebaseAnalytics.instance.logEvent(
+        name: 'profile_switched',
+        parameters: {
+          'to_profile_id': toProfileId,
+        },
+      );
+    } catch (e) {
+      debugPrint('⚠️ Analytics error: $e');
     }
   }
 

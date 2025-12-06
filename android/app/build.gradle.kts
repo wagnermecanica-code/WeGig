@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.tosembanda.wegig"
+    namespace = "com.wegig.wegig"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -24,7 +24,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.tosembanda.wegig"
+        applicationId = "com.wegig.wegig"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

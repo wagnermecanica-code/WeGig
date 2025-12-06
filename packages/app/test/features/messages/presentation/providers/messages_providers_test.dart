@@ -19,7 +19,8 @@ import 'package:wegig_app/features/messages/presentation/providers/messages_prov
 
 class _MockMessagesRemoteDataSource implements IMessagesRemoteDataSource {
   @override
-  Stream<List<ConversationEntity>> watchConversations(String profileId) {
+  Stream<List<ConversationEntity>> watchConversations(String profileId,
+      {String? profileUid}) {
     return Stream.value([]);
   }
 
@@ -29,7 +30,7 @@ class _MockMessagesRemoteDataSource implements IMessagesRemoteDataSource {
   }
 
   @override
-  Stream<int> watchUnreadCount(String profileId) {
+  Stream<int> watchUnreadCount(String profileId, {String? profileUid}) {
     return Stream.value(0);
   }
 
@@ -38,6 +39,7 @@ class _MockMessagesRemoteDataSource implements IMessagesRemoteDataSource {
     required String profileId,
     int limit = 20,
     ConversationEntity? startAfter,
+    String? profileUid,
   }) async {
     return [];
   }
@@ -53,6 +55,7 @@ class _MockMessagesRemoteDataSource implements IMessagesRemoteDataSource {
     required String otherProfileId,
     required String currentUid,
     required String otherUid,
+    String? profileUid,
   }) async {
     throw UnimplementedError();
   }
@@ -99,14 +102,15 @@ class _MockMessagesRemoteDataSource implements IMessagesRemoteDataSource {
   Future<void> deleteConversation(String conversationId, String profileId) async {}
 
   @override
-  Future<int> getUnreadMessageCount(String profileId) async {
+  Future<int> getUnreadMessageCount(String profileId, {String? profileUid}) async {
     return 0;
   }
 }
 
 class _MockMessagesRepository implements MessagesRepository {
   @override
-  Stream<List<ConversationEntity>> watchConversations(String profileId) {
+  Stream<List<ConversationEntity>> watchConversations(String profileId,
+      {String? profileUid}) {
     return Stream.value([]);
   }
 
@@ -116,7 +120,7 @@ class _MockMessagesRepository implements MessagesRepository {
   }
 
   @override
-  Stream<int> watchUnreadCount(String profileId) {
+  Stream<int> watchUnreadCount(String profileId, {String? profileUid}) {
     return Stream.value(0);
   }
 
@@ -125,6 +129,7 @@ class _MockMessagesRepository implements MessagesRepository {
     required String profileId,
     int limit = 20,
     ConversationEntity? startAfter,
+    String? profileUid,
   }) async {
     return [];
   }
@@ -140,6 +145,7 @@ class _MockMessagesRepository implements MessagesRepository {
     required String otherProfileId,
     required String currentUid,
     required String otherUid,
+    String? profileUid,
   }) async {
     throw UnimplementedError();
   }
@@ -195,7 +201,7 @@ class _MockMessagesRepository implements MessagesRepository {
   }) async {}
 
   @override
-  Future<int> getUnreadMessageCount(String profileId) async {
+  Future<int> getUnreadMessageCount(String profileId, {String? profileUid}) async {
     return 0;
   }
 }

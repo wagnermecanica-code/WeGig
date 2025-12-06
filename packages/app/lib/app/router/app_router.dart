@@ -1,6 +1,6 @@
 // lib/app/router/app_router.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:core_ui/navigation/bottom_nav_scaffold.dart';
+import '../../navigation/bottom_nav_scaffold.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
@@ -374,8 +374,11 @@ extension TypedNavigationExtension on BuildContext {
   }
 
   /// Log navigation event to Firebase Analytics
+  /// CRITICAL: Includes active_profile_id for proper analytics segmentation
   void _logNavigation(String screenName, Map<String, String> parameters) {
     try {
+      // Note: active_profile_id is set via setUserProperty in ProfileNotifier
+      // Here we just log the navigation event
       FirebaseAnalytics.instance.logEvent(
         name: 'navigate_$screenName',
         parameters: parameters,

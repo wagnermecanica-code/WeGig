@@ -94,7 +94,6 @@ class NotificationItem extends ConsumerWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       MentionText(
                         text: _buildTitleText(notification),

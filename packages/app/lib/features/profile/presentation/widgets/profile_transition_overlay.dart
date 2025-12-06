@@ -78,16 +78,16 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
     // Inicia animação e fecha após completar
     _controller.forward().then((_) {
       Future<void>.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          Navigator.of(context).pop();
-          widget.onComplete();
-        }
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        widget.onComplete();
       });
     });
   }
 
   @override
   void dispose() {
+    if (!mounted) return;
     _controller.dispose();
     super.dispose();
   }

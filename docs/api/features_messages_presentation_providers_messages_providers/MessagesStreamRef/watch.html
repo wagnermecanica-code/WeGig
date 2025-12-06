@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the watch method from the MessagesStreamRef mixin, for the Dart programming language.">
+  <title>watch method - MessagesStreamRef mixin - messages_providers library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">wegig_app</a></li>
+    <li><a href="../../features_messages_presentation_providers_messages_providers/">features&#47;messages&#47;presentation&#47;providers&#47;messages_providers.dart</a></li>
+    <li><a href="../../features_messages_presentation_providers_messages_providers/MessagesStreamRef-mixin.html">MessagesStreamRef</a></li>
+    <li class="self-crumb">watch&lt;<wbr><span class="type-parameter">T</span>&gt; abstract method</li>
+  </ol>
+  <div class="self-name">watch</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="features_messages_presentation_providers_messages_providers&#47;MessagesStreamRef-mixin-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">watch&lt;<wbr><span class="type-parameter">T</span>&gt;</span> abstract method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+<span class="returntype">T</span>
+<span class="name ">watch</span>&lt;<wbr><span class="type-parameter">T</span>&gt;(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="watch-param-provider"><span class="type-annotation"><a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/ProviderListenable-mixin.html">ProviderListenable</a><span class="signature">&lt;<wbr><span class="type-parameter">T</span>&gt;</span></span> <span class="parameter-name">provider</span></span></li>
+</ol>)
+
+      <div class="features"><span class="feature">inherited</span></div>
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Obtains the state of a provider and causes the state to be re-evaluated
+when that provider emits a new value.</p>
+<p>Using <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Ref/watch.html">watch</a> allows supporting the scenario where we want to re-create
+our state when one of the object we are listening to changed.</p>
+<p>This method should be your go-to way to make a provider read another
+provider – even if the value exposed by that other provider never changes.</p>
+<h2 id="use-case-example-sorting-a-todo-list">Use-case example: Sorting a todo-list</h2>
+<p>Consider a todo-list application. We may want to implement a sort feature,
+to see the uncompleted todos first.<br>
+We will want to create a sorted list of todos based on the
+combination of the unsorted list and a sort method (ascendant, descendant, ...),
+both of which may change over time.</p>
+<p>In this situation, what we do not want to do is to sort our list
+directly inside the <code>build</code> method of our UI, as sorting a list can be
+expensive.
+But maintaining a cache manually is difficult and error prone.</p>
+<p>To solve this problem, we could create a separate <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Provider-class.html">Provider</a> that will
+expose the sorted list, and use <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Ref/watch.html">watch</a> to automatically re-evaluate
+the list <strong>only</strong> when needed.</p>
+<p>In code, this may look like:</p>
+<pre class="language-dart"><code class="language-dart">final sortProvider = StateProvider((_) =&gt; Sort.byName);
+final unsortedTodosProvider = StateProvider((_) =&gt; &lt;Todo&gt;[]);
+
+final sortedTodosProvider = Provider((ref) {
+  // listen to both the sort enum and the unfiltered list of todos
+  final sort = ref.watch(sortProvider);
+  final todos = ref.watch(unsortedTodosProvider);
+
+  // Creates a new sorted list from the combination of the unfiltered
+  // list and the filter type.
+  return [...todos].sort((a, b) { ... });
+});
+</code></pre>
+<p>In this code, by using <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Provider-class.html">Provider</a> + <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Ref/watch.html">watch</a>:</p>
+<ul>
+<li>if either <code>sortProvider</code> or <code>unsortedTodosProvider</code> changes, then
+<code>sortedTodosProvider</code> will automatically be recomputed.</li>
+<li>if multiple widgets depends on <code>sortedTodosProvider</code> the list will be
+sorted only once.</li>
+<li>if nothing is listening to <code>sortedTodosProvider</code>, then no sort is performed.</li>
+</ul>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">T watch&lt;T&gt;(ProviderListenable&lt;T&gt; provider);</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">wegig_app</a></li>
+    <li><a href="../../features_messages_presentation_providers_messages_providers/">messages_providers</a></li>
+    <li><a href="../../features_messages_presentation_providers_messages_providers/MessagesStreamRef-mixin.html">MessagesStreamRef</a></li>
+    <li class="self-crumb">watch&lt;<wbr><span class="type-parameter">T</span>&gt; abstract method</li>
+</ol>
+
+    <h5>MessagesStreamRef mixin</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    wegig_app
+      1.0.1+2
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the overrideWith method from the NotificationsStreamProvider class, for the Dart programming language.">
+  <title>overrideWith method - NotificationsStreamProvider class - notifications_providers library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">wegig_app</a></li>
+    <li><a href="../../features_notifications_presentation_providers_notifications_providers/">features&#47;notifications&#47;presentation&#47;providers&#47;notifications_providers.dart</a></li>
+    <li><a href="../../features_notifications_presentation_providers_notifications_providers/NotificationsStreamProvider-class.html">NotificationsStreamProvider</a></li>
+    <li class="self-crumb">overrideWith method</li>
+  </ol>
+  <div class="self-name">overrideWith</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="features_notifications_presentation_providers_notifications_providers&#47;NotificationsStreamProvider-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">overrideWith</span> method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+  <div>
+    <ol class="annotation-list">
+        <li>@<a href="https://api.flutter.dev/flutter/dart-core/override-constant.html">override</a></li>
+    </ol>
+  </div>
+<span class="returntype"><a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Override-class.html">Override</a></span>
+<span class="name ">overrideWith</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="overrideWith-param-create"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter">NotificationEntity</span>&gt;</span></span>&gt;</span></span> <span class="parameter-name">create</span>(<ol class="parameter-list single-line"> <li><span class="parameter" id="param-provider"><span class="type-annotation"><a class="deprecated" href="../../features_notifications_presentation_providers_notifications_providers/NotificationsStreamRef-mixin.html">NotificationsStreamRef</a></span> <span class="parameter-name">provider</span></span></li>
+</ol>)</span></li>
+</ol>)
+
+      <div class="features"><span class="feature">override</span></div>
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Override the provider with a new initialization function.</p>
+<p>This will also disable the auto-scoping mechanism, meaning that if the
+overridden provider specified <code>dependencies</code>, it will have no effect.</p>
+<p>The override must not specify a <code>dependencies</code>.</p>
+<p>Some common use-cases are:</p>
+<ul>
+<li>testing, by replacing a service with a fake implementation, or to reach
+a very specific state easily.</li>
+<li>multiple environments, by changing the implementation of a class
+based on the platform or other parameters.</li>
+</ul>
+<p>This function should be used in combination with <code>ProviderScope.overrides</code>
+or <code>ProviderContainer.overrides</code>:</p>
+<pre class="language-dart"><code class="language-dart">final myService = Provider((ref) =&gt; MyService());
+
+runApp(
+  ProviderScope(
+    overrides: [
+      // Replace the implementation of the provider with a different one
+      myService.overrideWithProvider((ref) {
+        ref.watch('other');
+        return MyFakeService(),
+      })),
+    ],
+    child: MyApp(),
+  ),
+);
+</code></pre>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">@override
+Override overrideWith(
+  Stream&lt;List&lt;NotificationEntity&gt;&gt; Function(NotificationsStreamRef provider)
+      create,
+) {
+  return ProviderOverride(
+    origin: this,
+    override: NotificationsStreamProvider._internal(
+      (ref) =&gt; create(ref as NotificationsStreamRef),
+      from: from,
+      name: null,
+      dependencies: null,
+      allTransitiveDependencies: null,
+      debugGetCreateSourceHash: null,
+      profileId: profileId,
+    ),
+  );
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">wegig_app</a></li>
+    <li><a href="../../features_notifications_presentation_providers_notifications_providers/">notifications_providers</a></li>
+    <li><a href="../../features_notifications_presentation_providers_notifications_providers/NotificationsStreamProvider-class.html">NotificationsStreamProvider</a></li>
+    <li class="self-crumb">overrideWith method</li>
+</ol>
+
+    <h5>NotificationsStreamProvider class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    wegig_app
+      1.0.1+2
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

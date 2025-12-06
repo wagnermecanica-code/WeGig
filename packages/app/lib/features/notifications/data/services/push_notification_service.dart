@@ -1,3 +1,5 @@
+import 'dart:math' show min;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -151,7 +153,9 @@ class PushNotificationService {
       
       if (_currentToken != null) {
         debugPrint('🔑 PushNotificationService: Token obtained');
-        debugPrint('   Token: ${_currentToken!.substring(0, 20)}...');
+        // Usa min() para evitar RangeError quando token < 20 caracteres
+        final tokenPreview = _currentToken!.substring(0, min(20, _currentToken!.length));
+        debugPrint('   Token: $tokenPreview...');
       } else {
         debugPrint('⚠️ PushNotificationService: Token is null');
       }

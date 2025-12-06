@@ -15,6 +15,7 @@ class MessagesRepositoryImpl implements MessagesRepository {
     required String profileId,
     int limit = 20,
     ConversationEntity? startAfter,
+    String? profileUid,
   }) async {
     try {
       debugPrint('📝 MessagesRepository: getConversations');
@@ -22,6 +23,7 @@ class MessagesRepositoryImpl implements MessagesRepository {
         profileId: profileId,
         limit: limit,
         startAfter: startAfter,
+        profileUid: profileUid,
       );
     } catch (e) {
       debugPrint('❌ MessagesRepository: Erro em getConversations - $e');
@@ -175,9 +177,13 @@ class MessagesRepositoryImpl implements MessagesRepository {
   }
 
   @override
-  Future<int> getUnreadMessageCount(String profileId) async {
+  Future<int> getUnreadMessageCount(String profileId,
+      {String? profileUid}) async {
     try {
-      return await _remoteDataSource.getUnreadMessageCount(profileId);
+      return await _remoteDataSource.getUnreadMessageCount(
+        profileId,
+        profileUid: profileUid,
+      );
     } catch (e) {
       debugPrint('❌ MessagesRepository: Erro em getUnreadMessageCount - $e');
       return 0;
@@ -185,8 +191,12 @@ class MessagesRepositoryImpl implements MessagesRepository {
   }
 
   @override
-  Stream<List<ConversationEntity>> watchConversations(String profileId) {
-    return _remoteDataSource.watchConversations(profileId);
+  Stream<List<ConversationEntity>> watchConversations(String profileId,
+      {String? profileUid}) {
+    return _remoteDataSource.watchConversations(
+      profileId,
+      profileUid: profileUid,
+    );
   }
 
   @override
@@ -195,7 +205,10 @@ class MessagesRepositoryImpl implements MessagesRepository {
   }
 
   @override
-  Stream<int> watchUnreadCount(String profileId) {
-    return _remoteDataSource.watchUnreadCount(profileId);
+  Stream<int> watchUnreadCount(String profileId, {String? profileUid}) {
+    return _remoteDataSource.watchUnreadCount(
+      profileId,
+      profileUid: profileUid,
+    );
   }
 }

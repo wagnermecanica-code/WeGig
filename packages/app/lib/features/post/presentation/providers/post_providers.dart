@@ -139,7 +139,12 @@ class PostNotifier extends _$PostNotifier {
   Future<List<PostEntity>> _loadPosts() async {
     try {
       final uid = ref.read(postFirebaseAuthProvider).currentUser?.uid;
-      if (uid == null) return [];
+      if (uid == null) {
+        debugPrint('❌ PostNotifier: Usuário não autenticado (uid=null)');
+        return [];
+      }
+      
+      debugPrint('✅ PostNotifier: Usuário autenticado (uid=$uid)');
 
       // ⚡ Check cache first
       if (_cachedPosts != null && _cacheTimestamp != null) {

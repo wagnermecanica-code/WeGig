@@ -9,6 +9,7 @@ class LoadConversations {
     required String profileId,
     int limit = 20,
     ConversationEntity? startAfter,
+    String? profileUid,
   }) async {
     if (profileId.isEmpty) {
       throw ArgumentError('ID do perfil é obrigatório');
@@ -21,6 +22,7 @@ class LoadConversations {
       profileId: profileId,
       limit: limit,
       startAfter: startAfter,
+      profileUid: profileUid,
     );
   }
 }

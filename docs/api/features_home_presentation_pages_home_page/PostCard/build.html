@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the build method from the PostCard class, for the Dart programming language.">
+  <title>build method - PostCard class - home_page library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">wegig_app</a></li>
+    <li><a href="../../features_home_presentation_pages_home_page/">features&#47;home&#47;presentation&#47;pages&#47;home_page.dart</a></li>
+    <li><a href="../../features_home_presentation_pages_home_page/PostCard-class.html">PostCard</a></li>
+    <li class="self-crumb">build method</li>
+  </ol>
+  <div class="self-name">build</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="features_home_presentation_pages_home_page&#47;PostCard-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">build</span> method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+  <div>
+    <ol class="annotation-list">
+        <li>@<a href="https://api.flutter.dev/flutter/dart-core/override-constant.html">override</a></li>
+    </ol>
+  </div>
+<span class="returntype"><a href="https://api.flutter.dev/flutter/widgets/Widget-class.html">Widget</a></span>
+<span class="name ">build</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="build-param-context"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a></span> <span class="parameter-name">context</span></span></li>
+</ol>)
+
+      <div class="features"><span class="feature">override</span></div>
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Describes the part of the user interface represented by this widget.</p>
+<p>The framework calls this method when this widget is inserted into the tree
+in a given <a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a> and when the dependencies of this widget change
+(e.g., an <a href="https://api.flutter.dev/flutter/widgets/InheritedWidget-class.html">InheritedWidget</a> referenced by this widget changes). This
+method can potentially be called in every frame and should not have any side
+effects beyond building a widget.</p>
+<p>The framework replaces the subtree below this widget with the widget
+returned by this method, either by updating the existing subtree or by
+removing the subtree and inflating a new subtree, depending on whether the
+widget returned by this method can update the root of the existing
+subtree, as determined by calling <a href="https://api.flutter.dev/flutter/widgets/Widget/canUpdate.html">Widget.canUpdate</a>.</p>
+<p>Typically implementations return a newly created constellation of widgets
+that are configured with information from this widget's constructor and
+from the given <a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a>.</p>
+<p>The given <a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a> contains information about the location in the
+tree at which this widget is being built. For example, the context
+provides the set of inherited widgets for this location in the tree. A
+given widget might be built with multiple different <a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a>
+arguments over time if the widget is moved around the tree or if the
+widget is inserted into the tree in multiple places at once.</p>
+<p>The implementation of this method must only depend on:</p>
+<ul>
+<li>the fields of the widget, which themselves must not change over time,
+and</li>
+<li>any ambient state obtained from the <code>context</code> using
+<a href="https://api.flutter.dev/flutter/widgets/BuildContext/dependOnInheritedWidgetOfExactType.html">BuildContext.dependOnInheritedWidgetOfExactType</a>.</li>
+</ul>
+<p>If a widget's <a href="../../features_home_presentation_pages_home_page/PostCard/build.html">build</a> method is to depend on anything else, use a
+<a href="https://api.flutter.dev/flutter/widgets/StatefulWidget-class.html">StatefulWidget</a> instead.</p>
+<p>See also:</p>
+<ul>
+<li><a href="https://api.flutter.dev/flutter/widgets/StatelessWidget-class.html">StatelessWidget</a>, which contains the discussion on performance considerations.</li>
+</ul>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">@override
+Widget build(BuildContext context) {
+  final primaryColor =
+      post.type == &#39;band&#39; ? AppColors.accent : AppColors.primary;
+  final lightColor = primaryColor.withValues(alpha: 0.1);
+  const textSecondary = AppColors.textSecondary;
+
+  final isOwner = post.authorProfileId.isNotEmpty &amp;&amp;
+      post.authorProfileId == currentActiveProfileId;
+  final avatarUrl = (post.activeProfilePhotoUrl != null &amp;&amp;
+      post.activeProfilePhotoUrl!.isNotEmpty)
+    ? post.activeProfilePhotoUrl!
+    : (post.authorPhotoUrl != null &amp;&amp; post.authorPhotoUrl!.isNotEmpty
+      ? post.authorPhotoUrl!
+      : null);
+  final profileName = (post.activeProfileName != null &amp;&amp;
+      post.activeProfileName!.isNotEmpty)
+    ? post.activeProfileName!
+    : (post.authorName != null &amp;&amp; post.authorName!.isNotEmpty
+      ? post.authorName!
+      : &#39;Perfil&#39;);
+
+  return Container(
+    height: 200,
+    margin: const EdgeInsets.symmetric(horizontal: 4),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.2),
+          blurRadius: 16,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        &#47;&#47; Foto à esquerda (35% da largura) com botão fechar
+        Expanded(
+          flex: 35,
+          child: Stack(
+            children: [
+              Hero(
+                tag: &#39;post-photo-${post.id}&#39;,
+                child: GestureDetector(
+                  onTap: () {
+                    context.pushPostDetail(post.id);
+                  },
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: double.infinity,
+                      child:
+                          (post.photoUrl != null &amp;&amp; post.photoUrl!.isNotEmpty)
+                              ? CachedNetworkImage(
+                                  imageUrl: post.photoUrl!,
+                                  fit: BoxFit.cover,
+                                  memCacheWidth: 400,
+                                  placeholder: (_, __) =&gt;
+                                      Container(color: lightColor),
+                                  errorWidget: (_, __, ___) =&gt; ColoredBox(
+                                    color: lightColor,
+                                    child: Center(
+                                      child: Icon(
+                                        post.type == &#39;band&#39;
+                                            ? Iconsax.people
+                                            : Iconsax.user,
+                                        size: 40,
+                                        color: primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : ColoredBox(
+                                  color: lightColor,
+                                  child: Center(
+                                    child: Icon(
+                                      post.type == &#39;band&#39;
+                                          ? Iconsax.people
+                                          : Iconsax.user,
+                                      size: 40,
+                                      color: primaryColor,
+                                    ),
+                                  ),
+                                ),
+                    ),
+                  ),
+                ),
+              ),
+              &#47;&#47; Botão fechar no canto superior esquerdo
+              if (onClose != null)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: GestureDetector(
+                    onTap: onClose,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Iconsax.close_circle,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        &#47;&#47; Conteúdo à direita (65% da largura)
+        Expanded(
+          flex: 65,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                &#47;&#47; Nome do perfil + botões
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          context.pushProfile(post.authorProfileId);
+                        },
+                        child: Row(
+                          children: [
+                            _ProfileAvatar(photoUrl: avatarUrl),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                profileName,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: primaryColor,
+                                  decoration: TextDecoration.none,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    &#47;&#47; Botão interesse ou menu
+                    if (isOwner)
+                      GestureDetector(
+                        onTap: onOpenOptions,
+                        child: const Icon(Iconsax.more,
+                            color: textSecondary, size: 22),
+                      )
+                    else
+                      GestureDetector(
+                        onTap: onOpenOptions,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: isInterestSent
+                                ? Colors.pink.withValues(alpha: 0.15)
+                                : primaryColor.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            isInterestSent
+                                ? Iconsax.heart5
+                                : Iconsax.heart,
+                            size: 18,
+                            color:
+                                isInterestSent ? Colors.pink : primaryColor,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                &#47;&#47; Header clicável
+                GestureDetector(
+                  onTap: () {
+                    context.pushPostDetail(post.id);
+                  },
+                  child: Row(
+                    children: [
+                      Icon(
+                        post.type == &#39;band&#39;
+                            ? Iconsax.search_favorite
+                            : Iconsax.musicnote,
+                        size: 12,
+                        color: primaryColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          post.type == &#39;band&#39;
+                              ? &#39;Busca músico&#39;
+                              : &#39;Busca banda&#39;,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: primaryColor,
+                            decoration: TextDecoration.none,
+                          ),
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                &#47;&#47; Instrumentos em scroll horizontal
+                if (post.type == &#39;musician&#39; &amp;&amp; post.instruments.isNotEmpty)
+                  _buildHorizontalChips(
+                    icon: Iconsax.music,
+                    items: post.instruments,
+                    color: primaryColor,
+                  )
+                else if (post.type == &#39;band&#39; &amp;&amp;
+                    post.seekingMusicians.isNotEmpty)
+                  _buildHorizontalChips(
+                    icon: Iconsax.search_favorite,
+                    items: post.seekingMusicians,
+                    color: primaryColor,
+                  ),
+                const SizedBox(height: 3),
+                &#47;&#47; Nível
+                if (post.level.isNotEmpty)
+                  _buildInfoRow(Iconsax.star, post.level,
+                      primaryColor, textSecondary),
+                &#47;&#47; Mensagem do post
+                if (post.content.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Iconsax.message,
+                        size: 16, color: textSecondary),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: MentionText(
+                          text: post.content,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: textSecondary,
+                            height: 1.35,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          onMentionTap: (username) {
+                            context.pushProfileByUsername(username);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const Spacer(),
+                &#47;&#47; Footer: distância + tempo
+                Row(
+                  children: [
+                      Icon(Iconsax.location,
+                        size: 16, color: primaryColor),
+                    const SizedBox(width: 3),
+                    Text(
+                      &#39;${post.distanceKm?.toStringAsFixed(1) ?? &#39;0.0&#39;}km&#39;,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: primaryColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                      const Icon(Iconsax.clock,
+                        size: 16, color: textSecondary),
+                    const SizedBox(width: 3),
+                    Text(
+                      _formatDaysAgo(post.createdAt),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">wegig_app</a></li>
+    <li><a href="../../features_home_presentation_pages_home_page/">home_page</a></li>
+    <li><a href="../../features_home_presentation_pages_home_page/PostCard-class.html">PostCard</a></li>
+    <li class="self-crumb">build method</li>
+</ol>
+
+    <h5>PostCard class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    wegig_app
+      1.0.1+2
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+
