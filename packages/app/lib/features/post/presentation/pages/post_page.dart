@@ -630,7 +630,8 @@ class _PostPageState extends ConsumerState<PostPage> {
     final sectionTitleStyle = theme.textTheme.titleMedium?.copyWith(
       fontWeight: FontWeight.bold,
     );
-    final profileAsync = ref.watch(profileProvider);
+    // Ler provider apenas uma vez, sem observar mudanças para evitar rebuild loops
+    final profileAsync = ref.read(profileProvider);
 
     return Scaffold(
       backgroundColor: Colors.white,
