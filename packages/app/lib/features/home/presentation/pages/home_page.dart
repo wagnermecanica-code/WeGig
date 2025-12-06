@@ -683,20 +683,9 @@ class _HomePageState extends ConsumerState<HomePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final postsAsync = ref.watch(postNotifierProvider);
-    final profileAsync = ref.watch(profileProvider);
-
-    // Listener que executa APENAS quando o perfil ativo mudar (não a cada rebuild)
-    ref.listen<AsyncValue<ProfileState>>(profileProvider, (previous, next) {
-      next.whenData((profileState) {
-        if (profileState.activeProfile != null && 
-            _visiblePosts.isNotEmpty &&
-            mounted) {
-          _updatePostDistances();
-          setState(() {});
-        }
-      });
-    });
+    // Ler providers sem observar mudanças para evitar rebuild loops
+    final postsAsync = ref.read(postNotifierProvider);
+    final profileAsync = ref.read(profileProvider);
 
     return Theme(
       data: AppTheme.light,

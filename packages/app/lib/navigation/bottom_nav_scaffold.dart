@@ -188,7 +188,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   /// Ícone de notificações com badge reativo e modal
   Widget _buildNotificationIcon() {
     return StreamBuilder<int>(
-      stream: ref.watch(notificationServiceProvider).streamUnreadCount(),
+      stream: ref.read(notificationServiceProvider).streamUnreadCount(),
       builder: (context, snapshot) {
         // Error state
         if (snapshot.hasError) {
@@ -277,7 +277,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
 
   /// Ícone de mensagens com badge reativo
   Widget _buildMessagesIcon() {
-    final profileState = ref.watch(profileProvider);
+    final profileState = ref.read(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
 
     if (activeProfile == null) {
@@ -285,7 +285,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     }
 
     return StreamBuilder<int>(
-      stream: ref.watch(unreadMessageCountForProfileProvider(activeProfile.profileId).future).asStream(),
+      stream: ref.read(unreadMessageCountForProfileProvider(activeProfile.profileId).future).asStream(),
       builder: (context, snapshot) {
         // Error state
         if (snapshot.hasError) {
@@ -364,7 +364,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   /// Avatar do perfil ativo com CachedNetworkImage (otimizado)
   /// Suporta long press para mostrar o ProfileSwitcherBottomSheet
   Widget _buildAvatarIcon(bool isSelected) {
-    final profileState = ref.watch(profileProvider);
+    final profileState = ref.read(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
     final photo = activeProfile?.photoUrl;
     if (activeProfile == null) {
@@ -533,14 +533,14 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
           Expanded(
             child: Consumer(
               builder: (context, ref, child) {
-                final profileState = ref.watch(profileProvider);
+                final profileState = ref.read(profileProvider);
                 final activeProfile = profileState.value?.activeProfile;
                 if (activeProfile == null) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 // ...existing code for notifications...
                 return StreamBuilder<List<NotificationEntity>>(
-                  stream: ref.watch(notificationServiceProvider).streamActiveProfileNotifications(),
+                  stream: ref.read(notificationServiceProvider).streamActiveProfileNotifications(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
