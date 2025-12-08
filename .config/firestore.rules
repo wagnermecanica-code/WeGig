@@ -1,72 +1,122 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+
     function isSignedIn() {
       return request.auth != null;
     }
 
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    // Verifica se o auth.uid é participante de uma conversa (participants ou profileUid)
+    function isConversationMember(conversationId) {
+      let conv = get(/databases/$(database)/documents/conversations/$(conversationId));
+      return conv.exists() && (
+        (conv.data.participants != null && request.auth.uid in conv.data.participants) ||
+        (conv.data.profileUid != null && request.auth.uid in conv.data.profileUid)
+      );
+    }
+
+    // ============================================
+    // PROFILES - Perfis de usuários (multi-perfil)
+    // ============================================
+
     match /profiles/{profileId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn()
-        && request.resource.data.uid == request.auth.uid;
-
-      // PROD HARDENING: require public profile flag before allowing reads.
-      // Example → allow read: if isSignedIn() && resource.data.isPublic == true;
+      allow create, update, delete: if isSignedIn() && request.resource.data.uid == request.auth.uid;
     }
+
+    // ============================================
+    // USERS - Dados privados do usuário
+    // ============================================
 
     match /users/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read, write: if isSignedIn() && isOwner(userId);
     }
+
+    // ============================================
+    // POSTS - Publicações (expiram após 30 dias)
+    // ============================================
+    // Fields: authorUid (auth UID), authorProfileId (profile ID)
 
     match /posts/{postId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid
-        && request.resource.data.profileUid == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.uid == request.auth.uid
-        && resource.data.profileUid == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.authorUid == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && resource.data.authorUid == request.auth.uid;
     }
 
+    // ============================================
+    // CONVERSATIONS - Multi-perfil
+    // ============================================
+    // Estrutura esperada:
+    // - participants: [uid1, uid2] (auth UIDs)
+    // - profileUid: [uid1, uid2] (fallback de owners dos perfis)
+    // - participantProfiles: [profileId1, profileId2]
+
     match /conversations/{conversationId} {
-      allow read, write: if isSignedIn() && 
-        request.auth.uid in resource.data.participants &&
-        request.auth.uid in resource.data.profileUid;
-      allow create: if isSignedIn() && 
-        request.auth.uid in request.resource.data.participants &&
-        request.resource.data.profileUid != null &&
-        request.auth.uid in request.resource.data.profileUid;
+      allow read: if isSignedIn() && isConversationMember(conversationId);
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participantProfiles != null;
+      allow update, delete: if isSignedIn() && isConversationMember(conversationId);
+
+      // ============================================
+      // MESSAGES - Subcoleção aninhada
+      // ============================================
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && isConversationMember(conversationId);
+        allow create: if isSignedIn()
+          && isConversationMember(conversationId)
+          && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if isSignedIn() && resource.data.senderId == request.auth.uid;
+      }
     }
+
+    // ============================================
+    // INTERESTS - Interesses enviados entre perfis
+    // ============================================
 
     match /interests/{interestId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() &&
-        request.resource.data.profileUid == request.auth.uid;
+      allow create, update: if isSignedIn() && request.resource.data.profileUid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.profileUid == request.auth.uid;
     }
+
+    // ============================================
+    // NOTIFICATIONS - Notificações push/in-app
+    // ============================================
 
     match /notifications/{notificationId} {
-      // CRITICAL: Notificações isoladas por profileUid
-      // Leitura: apenas se recipientProfileId pertence ao usuário autenticado
-      // Verificação dupla: recipientProfileId OU profileUid devem corresponder
-      allow read: if isSignedIn() && (
-        resource.data.recipientProfileId != null ||
-        resource.data.profileUid != null
-      );
-      allow create: if isSignedIn() && 
-        request.resource.data.recipientProfileId != null &&
-        request.resource.data.profileUid != null;
-      allow update, delete: if isSignedIn() && (
-        resource.data.recipientProfileId != null ||
-        resource.data.profileUid != null
-      );
+      allow read: if isSignedIn() && resource.data.recipientUid == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.recipientProfileId != null
+        && request.resource.data.recipientUid != null;
+      allow update, delete: if isSignedIn() && resource.data.recipientUid == request.auth.uid;
     }
 
-    match /conversations/{conversationId}/messages/{messageId} {
-      allow read: if isSignedIn() && 
-        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
-      allow create: if isSignedIn() && 
-        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
-        request.resource.data.profileUid == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.senderId == request.auth.uid
-        && resource.data.profileUid == request.auth.uid;
+    // ============================================
+    // BLOCKS - Bloqueios de perfis/usuários
+    // ============================================
+    match /blocks/{blockId} {
+      allow read: if isSignedIn() && resource.data.blockedByUid == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.blockedByUid == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.blockedByUid == request.auth.uid;
+    }
+
+    // ============================================
+    // REPORTS - Denúncias
+    // ============================================
+    match /reports/{reportId} {
+      allow create: if isSignedIn() && request.resource.data.reporterUid == request.auth.uid;
+      allow read, update, delete: if isSignedIn() && resource.data.reporterUid == request.auth.uid;
     }
   }
 }

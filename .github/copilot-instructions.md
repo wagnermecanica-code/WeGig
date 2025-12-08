@@ -4,7 +4,7 @@
 
 - **Monorepo with Clean Architecture**: `packages/app` holds features built as `data → domain → presentation` slices, `packages/core_ui` exposes shared entities/theme/providers/widgets, and imports must flow `core_ui → app` only.
 - **The product**: Multi-profile social network for musicians/bands (expiring posts, geospatial search, realtime chat, proximity push notifications). Multi-profile switching works like Instagram.
-- **Typed navigation** lives in `packages/app/lib/app/router/app_router.dart` with generated extension methods (`context.goToProfile(profileId)`). Never use string routes or bypass auth guards described in `DEEP_LINKING_GUIDE.md`.
+- **Typed navigation** lives in `packages/app/lib/app/router/app_router.dart` with generated extension methods (`context.goToProfile(profileId)`). Never use string routes or bypass auth guards described in `docs/setup/DEEP_LINKING_GUIDE.md`.
 - **Cloud Functions + Firebase infra** at repo root (`.tools/functions/index.js`, `.config/firestore.rules`, `.config/firestore.indexes.json`). Design system tokens/widgets under `packages/core_ui/lib/theme` and `packages/core_ui/lib/widgets`.
 
 ## Daily Workflow & Tooling
@@ -20,8 +20,8 @@
 ### Multi-Profile State Management
 
 - **Always** read `ref.read(profileProvider).value?.activeProfile` on demand; after switching profiles call `ref.invalidate(profileProvider)` plus post feeds and unread counters so Riverpod refreshes state. See `docs/sessions/SESSION_14_MULTI_PROFILE_REFACTORING.md` for why providers get invalidated.
-- **Providers** are handwritten `AsyncNotifier/Notifier/StreamProvider` classes inside `packages/core_ui/lib/di` and feature folders (e.g., `packages/app/lib/features/profile/presentation/providers/profile_providers.dart`).
-- **Memory leaks**: Register `ref.onDispose(() { _streamController.close(); })` for all controllers/streams to avoid leaks documented in `MEMORY_LEAK_AUDIT_CONSOLIDADO.md`. NEVER create inline listeners without named methods for removal.
+- **Providers** are handwritten `AsyncNotifier/Notifier/StreamProvider` classes inside feature folders (e.g., `packages/app/lib/features/profile/presentation/providers/profile_providers.dart`). Each feature owns its providers following Clean Architecture dependency injection.
+- **Memory leaks**: Register `ref.onDispose(() { _streamController.close(); })` for all controllers/streams to avoid leaks documented in `docs/audits/MEMORY_LEAK_AUDIT_CONSOLIDADO.md`. NEVER create inline listeners without named methods for removal.
 
 ### Firestore Query Conventions
 
@@ -31,8 +31,8 @@
 
 ### Navigation Architecture
 
-- **Bottom navigation** centralized in `packages/core_ui/lib/navigation/bottom_nav_scaffold.dart` using `ValueNotifier` + `IndexedStack` to preserve state.
-- Heavy streams (chat/notifications) must be lazily initialized (only when tab is active) to avoid perf regressions. See `NAVIGATION_TRANSITIONS_AUDIT.md` for rules.
+- **Bottom navigation** centralized in `packages/app/lib/navigation/bottom_nav_scaffold.dart` using `ValueNotifier` + `IndexedStack` to preserve state.
+- Heavy streams (chat/notifications) must be lazily initialized (only when tab is active) to avoid perf regressions. See `docs/audits/NAVIGATION_TRANSITIONS_AUDIT.md` for rules.
 - Auth guard in `app_router.dart` auto-redirects: not logged in → `/auth`, logged but no profile → `/profiles/new`, logged + profile → `/home`.
 
 ## UI, Data & Performance Conventions
@@ -46,7 +46,7 @@
 ### Input Debouncing & Utilities
 
 - Use `Debouncer`/`Throttler` classes from `packages/core_ui/lib/utils/debouncer.dart` instead of manual timers. Example: `final _debouncer = Debouncer(milliseconds: 300);` then `_debouncer.run(() { ... });` and `_debouncer.dispose();` in dispose.
-- UI feedback: Use `AppLoadingOverlay.show(context)` and `AppSnackbar.show()` from design system. Colors defined in `packages/core_ui/lib/theme/app_colors.dart` (primary: Teal `#00A699`).
+- UI feedback: Use `AppLoadingOverlay.show(context)` and `AppSnackbar.show()` from design system. Colors defined in `packages/core_ui/lib/theme/app_colors.dart` (primary: Dark `#37475A`, accent: Orange `#E47911`).
 
 ### Analytics & Logging
 
@@ -69,16 +69,32 @@
 
 ### Firebase Deployment
 
-- **Sequence matters**: `firebase deploy --only firestore:indexes` → wait for completion → `firebase deploy --only .config/firestore.rules` → `firebase deploy --only functions`.
+- **Sequence matters**: From `.config/` directory run `firebase deploy --only firestore:indexes --project <env>` → wait for completion → `firebase deploy --only firestore:rules --project <env>` → `firebase deploy --only functions --project <env>`.
+- **Project IDs**: dev=`wegig-dev`, staging=`wegig-staging`, prod=`to-sem-banda-83e19`. Always specify `--project` flag.
 - Debug Cloud Functions: `firebase functions:log --only notifyNearbyPosts` for delivery issues.
-- Security rules in `.config/firestore.rules` require posts to have proper `uid` ownership checks.
+- Security rules in `.config/firestore.rules` use `authorUid` for posts ownership (not `uid`). PostEntity fields: `authorUid` (auth UID), `authorProfileId` (profile ID).
+
+## Troubleshooting Common Issues
+
+### Build/Run Problems
+
+- **Wrong directory**: All `flutter run/build/test` commands MUST run from `packages/app/`, NOT repo root.
+- **Stale generated files**: Run `flutter clean && melos get && melos run build_runner` from repo root.
+- **iOS DerivedData cache**: `rm -rf ~/Library/Developer/Xcode/DerivedData/Runner-*` when Xcode acts weird.
+- **Pod issues**: `cd packages/app/ios && rm -rf Pods Podfile.lock .symlinks && pod install`.
+
+### Firebase Connection Issues
+
+- **Permission denied**: Verify you're deploying to correct project with `--project <env>` flag and that Firebase config files match flavor (`GoogleService-Info.plist`, `google-services.json`).
+- **Index missing errors**: Deploy indexes FIRST, wait for completion (can take 5-10min), then deploy rules/functions.
+- **Wrong Firebase project**: Check `main_<flavor>.dart` has correct `expectedProjectId` matching the `firebase_options_<flavor>.dart`.
 
 ## Key Documentation Reference
 
 - **Multi-profile refactoring**: `docs/sessions/SESSION_14_MULTI_PROFILE_REFACTORING.md` (state management, transactions, validations)
-- **Typed navigation**: `SESSION_TASK_11_TYPED_ROUTES.md` (type-safe routing, analytics integration)
-- **Memory leak audits**: `MEMORY_LEAK_AUDIT_CONSOLIDADO.md` (8 leaks fixed, disposal patterns)
-- **Navigation rules**: `NAVIGATION_TRANSITIONS_AUDIT.md` (transitions, guards, IndexedStack usage)
-- **Deep linking**: `DEEP_LINKING_GUIDE.md` (wegig:// scheme + universal links)
-- **Monorepo structure**: `MONOREPO_STRUCTURE.md` (package organization, dependencies)
-- **CI/CD setup**: `.github/workflows/` (automated builds, code signing)
+- **Typed navigation**: `docs/SESSION_TASK_11_TYPED_ROUTES.md` (type-safe routing, analytics integration)
+- **Memory leak audits**: `docs/audits/MEMORY_LEAK_AUDIT_CONSOLIDADO.md` (8 leaks fixed, disposal patterns)
+- **Navigation rules**: `docs/audits/NAVIGATION_TRANSITIONS_AUDIT.md` (transitions, guards, IndexedStack usage)
+- **Deep linking**: `docs/setup/DEEP_LINKING_GUIDE.md` (wegig:// scheme + universal links)
+- **Monorepo structure**: `docs/MONOREPO_STRUCTURE.md` (package organization, dependencies)
+- **CI/CD setup**: `.github/workflows/ci.yml` (automated builds, Melos integration, code signing)
