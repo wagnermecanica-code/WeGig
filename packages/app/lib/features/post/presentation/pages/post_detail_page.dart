@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
@@ -53,6 +54,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   YoutubePlayerController? _youtubeController;
   List<Map<String, dynamic>> _interestedUsers = [];
   bool _isLoadingInterests = false;
+  int _currentPhotoIndex = 0;
 
   void _handleBackNavigation() {
     if (!mounted) return;
@@ -767,7 +769,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                         'city': _post!.city,
                         'neighborhood': _post!.neighborhood,
                         'state': _post!.state,
-                        'photoUrl': _post!.photoUrl,
+                        'photoUrls': _post!.photoUrls,
+                        'photoUrl': _post!.photoUrl, // fallback para compatibilidade
                         'youtubeLink': _post!.youtubeLink,
                         'location': GeoPoint(_post!.location.latitude,
                             _post!.location.longitude),
@@ -820,6 +823,154 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     );
   }
 
+  /// Constrói o carrossel de fotos do post
+  Widget _buildPhotoCarousel(double screenWidth, double photoHeight) {
+    // Pega as fotos disponíveis (photoUrls ou fallback para photoUrl)
+    final List<String> photos = _post!.photoUrls.isNotEmpty
+        ? _post!.photoUrls
+        : (_post!.photoUrl != null && _post!.photoUrl!.isNotEmpty)
+            ? [_post!.photoUrl!]
+            : [];
+
+    // Se não há fotos, mostra placeholder
+    if (photos.isEmpty) {
+      return Container(
+        width: screenWidth,
+        height: photoHeight,
+        color: Colors.grey[200],
+        child: Center(
+          child: Icon(
+            _post!.type == 'band' ? Iconsax.people : Iconsax.user,
+            size: 80,
+            color: Colors.grey[600],
+          ),
+        ),
+      );
+    }
+
+    // Se só tem uma foto, não precisa de carrossel
+    if (photos.length == 1) {
+      return Hero(
+        tag: 'post-photo-${_post!.id}',
+        child: Container(
+          width: screenWidth,
+          height: photoHeight,
+          color: Colors.grey[200],
+          child: CachedNetworkImage(
+            cacheManager: WeGigImageCacheManager.instance,
+            imageUrl: photos.first,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Container(
+              color: Colors.grey[200],
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+                ),
+              ),
+            ),
+            errorWidget: (context, url, error) => Container(
+              color: Colors.grey[300],
+              child: Icon(
+                _post!.type == 'band' ? Iconsax.people : Iconsax.user,
+                size: 80,
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Múltiplas fotos - carrossel com indicadores
+    return SizedBox(
+      width: screenWidth,
+      height: photoHeight,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          PageView.builder(
+            itemCount: photos.length,
+            onPageChanged: (index) => setState(() => _currentPhotoIndex = index),
+            itemBuilder: (context, index) {
+              return Hero(
+                tag: 'post-photo-${_post!.id}-$index',
+                child: CachedNetworkImage(
+                  cacheManager: WeGigImageCacheManager.instance,
+                  imageUrl: photos[index],
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    color: Colors.grey[300],
+                    child: Icon(
+                      _post!.type == 'band' ? Iconsax.people : Iconsax.user,
+                      size: 80,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          // Indicadores de página (dots)
+          Positioned(
+            bottom: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(
+                  photos.length,
+                  (index) => Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _currentPhotoIndex == index
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Contador de fotos
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${_currentPhotoIndex + 1}/${photos.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -857,49 +1008,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           SingleChildScrollView(
             child: Column(
               children: [
-                // Hero com foto do post
-                Hero(
-                  tag: r'post-photo-${_post!.id}',
-                  child: Container(
-                    width: screenWidth,
-                    height: photoHeight,
-                    color: Colors.grey[200],
-                    child:
-                        (_post!.photoUrl != null && _post!.photoUrl!.isNotEmpty)
-                            ? CachedNetworkImage(
-                                imageUrl: _post!.photoUrl!,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          Color(0xFFE47911)),
-                                    ),
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Colors.grey[300],
-                                  child: Icon(
-                                    _post!.type == 'band'
-                                        ? Iconsax.people
-                                        : Iconsax.user,
-                                    size: 80,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              )
-                            : Center(
-                                child: Icon(
-                                  _post!.type == 'band'
-                                      ? Iconsax.people
-                                      : Iconsax.user,
-                                  size: 80,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                  ),
-                ),
+                // Carrossel de fotos do post
+                _buildPhotoCarousel(screenWidth, photoHeight),
 
                 // Overlap negativo com informações do autor
                 Transform.translate(
@@ -944,6 +1054,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                               // Nome e localização
                               Expanded(
                                 child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     // Nome do perfil (clicável e destacado)
                                     GestureDetector(
@@ -978,14 +1089,17 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                         // Título dinâmico do tipo de post
                         Padding(
                           padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                          child: Text(
-                            _post!.type == 'musician'
-                                ? 'Músico em busca de banda'
-                                : 'Banda em busca de músico',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _post!.type == 'musician'
+                                  ? 'Músico em busca de banda'
+                                  : 'Banda em busca de músico',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
                             ),
                           ),
                         ),
@@ -1001,6 +1115,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 // Área de Interesse (Localização)
                                 _buildInfoRow(
@@ -1077,6 +1192,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Row(
                                     children: [
@@ -1244,6 +1360,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   /// Widget para linha de informação
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(
           icon,
@@ -1253,6 +1370,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         const SizedBox(width: 12),
         Expanded(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,
@@ -1261,6 +1379,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   color: Colors.grey[600],
                   fontWeight: FontWeight.w500,
                 ),
+                textAlign: TextAlign.left,
               ),
               const SizedBox(height: 2),
               Text(
@@ -1269,6 +1388,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   fontSize: 15,
                   color: Colors.black87,
                 ),
+                textAlign: TextAlign.left,
               ),
             ],
           ),
