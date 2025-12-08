@@ -18,6 +18,15 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - **Impacto:** ✅ Posts podem ser criados/editados/deletados corretamente
 - **Arquivos:** `.config/firestore.rules`
 
+#### Firestore Security Rules - Conversations Query Permission Denied
+
+- **Problema:** Ao clicar em "Enviar mensagem" na ViewProfilePage, erro de acesso negado ao buscar conversas existentes
+- **Causa:** A regra `allow read` usava `isConversationMember()` que faz `get()` no documento - isso não funciona para queries, apenas para leituras diretas
+- **Solução:** Alterado `read` e `update/delete` para usar `resource.data` diretamente ao invés de `isConversationMember()`
+- **Deploy:** Regras publicadas em todos os ambientes (DEV, STAGING, PROD)
+- **Impacto:** ✅ Queries em conversations funcionam corretamente
+- **Arquivos:** `.config/firestore.rules`
+
 ### 🚨 Correções Críticas (06/12/2025)
 
 #### GoRouter Navigation Fix

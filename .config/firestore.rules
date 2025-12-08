@@ -62,15 +62,25 @@ service cloud.firestore {
     // - participantProfiles: [profileId1, profileId2]
 
     match /conversations/{conversationId} {
-      allow read: if isSignedIn() && isConversationMember(conversationId);
+      // Para queries: verifica se o usuário está em participants ou profileUid do documento retornado
+      // Para leitura de documento específico: usa isConversationMember
+      allow read: if isSignedIn() && (
+        // Query support: verifica campos do documento retornado (resource.data)
+        (resource.data.participants != null && request.auth.uid in resource.data.participants) ||
+        (resource.data.profileUid != null && request.auth.uid in resource.data.profileUid)
+      );
       allow create: if isSignedIn()
         && request.auth.uid in request.resource.data.participants
         && request.resource.data.participantProfiles != null;
-      allow update, delete: if isSignedIn() && isConversationMember(conversationId);
+      allow update, delete: if isSignedIn() && (
+        (resource.data.participants != null && request.auth.uid in resource.data.participants) ||
+        (resource.data.profileUid != null && request.auth.uid in resource.data.profileUid)
+      );
 
       // ============================================
       // MESSAGES - Subcoleção aninhada
       // ============================================
+      // Usa isConversationMember para verificar se usuário pertence à conversa pai
       match /messages/{messageId} {
         allow read: if isSignedIn() && isConversationMember(conversationId);
         allow create: if isSignedIn()
