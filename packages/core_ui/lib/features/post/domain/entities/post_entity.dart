@@ -27,7 +27,8 @@ class PostEntity with _$PostEntity {
     @TimestampConverter() required DateTime expiresAt,
     String? neighborhood,
     String? state,
-    String? photoUrl,
+    String? photoUrl, // Mantido para compatibilidade
+    @Default([]) List<String> photoUrls, // NOVO: Lista de fotos (até 4)
     String? youtubeLink,
     @Default([]) List<String> availableFor,
     double? distanceKm,
@@ -35,6 +36,15 @@ class PostEntity with _$PostEntity {
     String? authorPhotoUrl,
     String? activeProfileName,
     String? activeProfilePhotoUrl,
+    // Sales-specific fields
+    String? title,
+    String? salesType,
+    double? price,
+    String? discountMode,
+    double? discountValue,
+    @TimestampConverter() DateTime? promoStartDate,
+    @TimestampConverter() DateTime? promoEndDate,
+    String? whatsappNumber,
   }) = _PostEntity;
 
   /// From Firestore Document
@@ -56,6 +66,8 @@ class PostEntity with _$PostEntity {
       neighborhood: data['neighborhood'] as String?,
       state: data['state'] as String?,
       photoUrl: data['photoUrl'] as String?,
+      photoUrls: (data['photoUrls'] as List<dynamic>?)?.cast<String>() ?? 
+          (data['photoUrl'] != null ? [data['photoUrl'] as String] : []), // Compatibilidade
       youtubeLink: data['youtubeLink'] as String?,
       type: data['type'] as String? ?? 'musician',
       level: data['level'] as String? ?? '',
@@ -70,10 +82,19 @@ class PostEntity with _$PostEntity {
       expiresAt: (data['expiresAt'] as Timestamp?)?.toDate() ??
           DateTime.now().add(const Duration(days: 30)),
       distanceKm: (data['distanceKm'] as num?)?.toDouble(),
-        authorName: data['authorName'] as String?,
-        authorPhotoUrl: data['authorPhotoUrl'] as String?,
-        activeProfileName: data['activeProfileName'] as String?,
-        activeProfilePhotoUrl: data['activeProfilePhotoUrl'] as String?,
+      authorName: data['authorName'] as String?,
+      authorPhotoUrl: data['authorPhotoUrl'] as String?,
+      activeProfileName: data['activeProfileName'] as String?,
+      activeProfilePhotoUrl: data['activeProfilePhotoUrl'] as String?,
+      // Sales-specific fields
+      title: data['title'] as String?,
+      salesType: data['salesType'] as String?,
+      price: (data['price'] as num?)?.toDouble(),
+      discountMode: data['discountMode'] as String?,
+      discountValue: (data['discountValue'] as num?)?.toDouble(),
+      promoStartDate: (data['promoStartDate'] as Timestamp?)?.toDate(),
+      promoEndDate: (data['promoEndDate'] as Timestamp?)?.toDate(),
+      whatsappNumber: data['whatsappNumber'] as String?,
     );
   }
 
@@ -85,9 +106,12 @@ class PostEntity with _$PostEntity {
   double get latitude => location.latitude;
   double get longitude => location.longitude;
 
-  bool get hasPhoto => photoUrl != null && photoUrl!.isNotEmpty;
+  bool get hasPhoto => photoUrls.isNotEmpty || (photoUrl != null && photoUrl!.isNotEmpty);
   bool get hasYouTube => youtubeLink != null && youtubeLink!.isNotEmpty;
   bool get isExpired => DateTime.now().isAfter(expiresAt);
+  
+  /// Retorna primeira foto (para compatibilidade com código existente)
+  String? get firstPhotoUrl => photoUrls.isNotEmpty ? photoUrls.first : photoUrl;
 
   /// To Firestore Document
   Map<String, dynamic> toFirestore() {
@@ -100,6 +124,7 @@ class PostEntity with _$PostEntity {
       if (neighborhood != null) 'neighborhood': neighborhood,
       if (state != null) 'state': state,
       if (photoUrl != null) 'photoUrl': photoUrl,
+      if (photoUrls.isNotEmpty) 'photoUrls': photoUrls,
       if (youtubeLink != null) 'youtubeLink': youtubeLink,
       'type': type,
       'level': level,
@@ -114,6 +139,15 @@ class PostEntity with _$PostEntity {
         'activeProfilePhotoUrl': activeProfilePhotoUrl,
       'createdAt': Timestamp.fromDate(createdAt),
       'expiresAt': Timestamp.fromDate(expiresAt),
+      // Sales-specific fields
+      if (title != null) 'title': title,
+      if (salesType != null) 'salesType': salesType,
+      if (price != null) 'price': price,
+      if (discountMode != null) 'discountMode': discountMode,
+      if (discountValue != null) 'discountValue': discountValue,
+      if (promoStartDate != null) 'promoStartDate': Timestamp.fromDate(promoStartDate!),
+      if (promoEndDate != null) 'promoEndDate': Timestamp.fromDate(promoEndDate!),
+      if (whatsappNumber != null) 'whatsappNumber': whatsappNumber,
     };
   }
 

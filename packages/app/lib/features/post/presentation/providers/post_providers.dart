@@ -20,6 +20,7 @@ import 'package:wegig_app/features/post/domain/usecases/load_interested_users.da
 import 'package:wegig_app/features/post/domain/usecases/toggle_interest.dart';
 import 'package:wegig_app/features/post/domain/usecases/update_post.dart';
 import 'package:wegig_app/features/post/domain/services/post_service.dart';
+import 'package:wegig_app/features/post/presentation/providers/post_cache_provider.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:uuid/uuid.dart';
 
@@ -116,10 +117,6 @@ class PostState with _$PostState {
 /// - Refresh manual (pull-to-refresh)
 @riverpod
 class PostNotifier extends _$PostNotifier {
-  // ⚡ PERFORMANCE: Cache de posts com TTL de 5 minutos
-  List<PostEntity>? _cachedPosts;
-  DateTime? _cacheTimestamp;
-  static const Duration _cacheDuration = Duration(minutes: 5);
   ProfileEntity? _activeProfile() {
     final profileState = ref.read(profileProvider);
     return profileState.value?.activeProfile;
@@ -127,12 +124,6 @@ class PostNotifier extends _$PostNotifier {
 
   @override
   FutureOr<PostState> build() async {
-    // ✅ Register cleanup for cache when provider is disposed
-    ref.onDispose(() {
-      _invalidateCache();
-      debugPrint('📦 PostNotifier: Cache limpo no dispose');
-    });
-    
     return PostState(posts: await _loadPosts());
   }
 
@@ -146,25 +137,24 @@ class PostNotifier extends _$PostNotifier {
       
       debugPrint('✅ PostNotifier: Usuário autenticado (uid=$uid)');
 
-      // ⚡ Check cache first
-      if (_cachedPosts != null && _cacheTimestamp != null) {
-        final elapsed = DateTime.now().difference(_cacheTimestamp!);
-        if (elapsed < _cacheDuration) {
-          debugPrint('📦 PostNotifier: Usando cache (${elapsed.inSeconds}s atrás, ${_cachedPosts!.length} posts)');
-          return _cachedPosts!;
-        } else {
-          debugPrint('📦 PostNotifier: Cache expirado (${elapsed.inMinutes}min atrás)');
-        }
+      // ✅ NOVO: Usar PostCacheNotifier do Riverpod
+      final cache = ref.read(postCacheNotifierProvider);
+      final cacheNotifier = ref.read(postCacheNotifierProvider.notifier);
+      
+      // ⚡ Retorna cache se válido
+      if (cacheNotifier.isCacheValid && cache.isNotEmpty) {
+        debugPrint('⚡ PostNotifier: Usando cache Riverpod (${cache.length} posts, ${cacheNotifier.cacheAgeInSeconds}s)');
+        return cache;
       }
 
-      // Cache miss - fetch from repository
+      // Cache miss ou expirado - buscar do repositório
+      debugPrint('🔄 PostNotifier: Buscando posts do Firestore...');
       final repository = ref.read(postRepositoryNewProvider);
       final posts = await repository.getAllPosts(uid);
       
-      // ⚡ Store in cache
-      _cachedPosts = posts;
-      _cacheTimestamp = DateTime.now();
-      debugPrint('📦 PostNotifier: Cache atualizado (${posts.length} posts)');
+      // ⚡ Atualizar cache Riverpod
+      cacheNotifier.updateCache(posts, null);
+      debugPrint('✅ PostNotifier: ${posts.length} posts carregados e cached');
       
       return posts;
     } catch (e) {
@@ -173,13 +163,9 @@ class PostNotifier extends _$PostNotifier {
     }
   }
 
-  /// Invalida cache do contador
-  /// 
-  /// Chame após criar, atualizar ou deletar posts
+  /// Invalida cache (agora delega para PostCacheNotifier)
   void _invalidateCache() {
-    _cachedPosts = null;
-    _cacheTimestamp = null;
-    debugPrint('📦 PostNotifier: Cache invalidado');
+    ref.read(postCacheNotifierProvider.notifier).invalidate();
   }
 
   /// Cria um novo post
@@ -233,21 +219,35 @@ class PostNotifier extends _$PostNotifier {
   /// Novo fluxo único de criação/edição usado pelo PostPage.
   Future<PostResult> savePost(PostFormInput input) async {
     try {
+      debugPrint('📝 PostNotifier.savePost: Iniciando - type=${input.type}, isEditing=${input.isEditing}');
+      
       final profile = _activeProfile();
       if (profile == null) {
+        debugPrint('❌ PostNotifier.savePost: Perfil ativo não encontrado');
         return const PostFailure(
           message: 'Perfil ativo não encontrado. Tente novamente.',
         );
       }
+      
+      debugPrint('✅ PostNotifier.savePost: Perfil encontrado - ${profile.profileId}');
 
       final postService = ref.read(postServiceProvider);
       final postId = input.postId ?? const Uuid().v4();
-      String? photoUrl = input.existingPhotoUrl;
-
-      if (input.localPhotoPath != null && input.localPhotoPath!.isNotEmpty) {
-        final file = File(input.localPhotoPath!);
-        if (file.existsSync()) {
-          photoUrl = await postService.uploadPostImage(file, postId);
+      
+      // Upload de múltiplas fotos
+      final List<String> photoUrls = [...input.existingPhotoUrls];
+      
+      if (input.localPhotoPaths.isNotEmpty) {
+        debugPrint('📷 PostNotifier.savePost: Fazendo upload de ${input.localPhotoPaths.length} imagens...');
+        for (int i = 0; i < input.localPhotoPaths.length; i++) {
+          final path = input.localPhotoPaths[i];
+          final file = File(path);
+          if (file.existsSync()) {
+            final imageId = '${postId}_$i';
+            final url = await postService.uploadPostImage(file, imageId);
+            photoUrls.add(url);
+            debugPrint('✅ PostNotifier.savePost: Upload ${i + 1}/${input.localPhotoPaths.length} concluído - $url');
+          }
         }
       }
 
@@ -261,10 +261,10 @@ class PostNotifier extends _$PostNotifier {
         city: input.city,
         neighborhood: input.neighborhood,
         state: input.state,
-        photoUrl: photoUrl,
+        photoUrls: photoUrls,
         youtubeLink: input.youtubeLink?.isEmpty == true ? null : input.youtubeLink,
         type: input.type,
-        level: input.level,
+        level: input.level ?? '',
         instruments: input.type == 'musician'
             ? input.selectedInstruments
             : <String>[],
@@ -279,20 +279,37 @@ class PostNotifier extends _$PostNotifier {
         authorPhotoUrl: profile.photoUrl,
         activeProfileName: profile.name,
         activeProfilePhotoUrl: profile.photoUrl,
+        // Sales-specific fields
+        title: input.title,
+        salesType: input.salesType,
+        price: input.price,
+        discountMode: input.discountMode,
+        discountValue: input.discountValue,
+        promoStartDate: input.promoStartDate,
+        promoEndDate: input.promoEndDate,
+        whatsappNumber: input.whatsappNumber,
       );
 
+      debugPrint('📝 PostNotifier.savePost: Validando entidade...');
       postService.validatePostEntity(post);
+      debugPrint('✅ PostNotifier.savePost: Validação OK');
 
       if (input.isEditing) {
+        debugPrint('📝 PostNotifier.savePost: Atualizando post existente...');
         final updateUseCase = ref.read(updatePostUseCaseProvider);
         await updateUseCase(post, profile.profileId);
+        debugPrint('✅ PostNotifier.savePost: Post atualizado');
       } else {
+        debugPrint('📝 PostNotifier.savePost: Criando novo post...');
         final createUseCase = ref.read(createPostUseCaseProvider);
         await createUseCase(post);
+        debugPrint('✅ PostNotifier.savePost: Post criado');
       }
 
+      debugPrint('📦 PostNotifier.savePost: Invalidando cache e recarregando...');
       _invalidateCache();
       state = AsyncValue.data(PostState(posts: await _loadPosts()));
+      debugPrint('✅ PostNotifier.savePost: Concluído com sucesso');
 
       return PostSuccess(
         post: post,
@@ -300,7 +317,7 @@ class PostNotifier extends _$PostNotifier {
             input.isEditing ? 'Post atualizado com sucesso' : 'Post criado com sucesso',
       );
     } catch (e) {
-      debugPrint('❌ PostNotifier: Erro ao salvar post - $e');
+      debugPrint('❌ PostNotifier.savePost: Erro - $e');
       return PostFailure(
         message: 'Erro ao salvar post: $e',
         exception: e is Exception ? e : null,
