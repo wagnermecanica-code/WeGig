@@ -14,15 +14,23 @@ class PostFormInput {
     required this.city,
     this.neighborhood,
     this.state,
-    required this.level,
-    required this.genres,
-    required this.selectedInstruments,
-    required this.availableFor,
+    this.level,
+    this.genres = const [],
+    this.selectedInstruments = const [],
+    this.availableFor = const [],
     this.youtubeLink,
-    this.localPhotoPath,
-    this.existingPhotoUrl,
+    this.photoPaths = const [],
     this.createdAt,
     this.expiresAt,
+    // Sales-specific fields
+    this.title,
+    this.salesType,
+    this.price,
+    this.discountMode,
+    this.discountValue,
+    this.promoStartDate,
+    this.promoEndDate,
+    this.whatsappNumber,
   });
 
   /// When null we are creating a new post.
@@ -33,15 +41,38 @@ class PostFormInput {
   final String city;
   final String? neighborhood;
   final String? state;
-  final String level;
+  
+  // Musician/Band fields (nullable for sales)
+  final String? level;
   final List<String> genres;
   final List<String> selectedInstruments;
   final List<String> availableFor;
   final String? youtubeLink;
-  final String? localPhotoPath;
-  final String? existingPhotoUrl;
+  
+  /// Lista de caminhos de fotos (locais ou URLs remotas).
+  /// Paths que começam com 'http' são URLs existentes, outros são arquivos locais.
+  final List<String> photoPaths;
   final DateTime? createdAt;
   final DateTime? expiresAt;
 
+  // Sales-specific fields
+  final String? title;
+  final String? salesType;
+  final double? price;
+  final String? discountMode; // 'none', 'percentage', 'fixed'
+  final double? discountValue;
+  final DateTime? promoStartDate;
+  final DateTime? promoEndDate;
+  final String? whatsappNumber;
+
   bool get isEditing => postId != null;
+  bool get isSales => type == 'sales';
+  
+  /// Retorna apenas os caminhos locais (arquivos que precisam de upload).
+  List<String> get localPhotoPaths => 
+      photoPaths.where((p) => !p.startsWith('http')).toList();
+  
+  /// Retorna apenas as URLs existentes (já estão no Storage).
+  List<String> get existingPhotoUrls => 
+      photoPaths.where((p) => p.startsWith('http')).toList();
 }
