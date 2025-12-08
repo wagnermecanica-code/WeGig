@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:collection/collection.dart';
 import 'package:core_ui/core_ui.dart';
 import 'package:core_ui/utils/debouncer.dart';
@@ -29,6 +30,7 @@ import 'package:wegig_app/features/notifications/domain/services/notification_se
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:wegig_app/features/home/data/datasources/gps_cache_service.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({
@@ -70,8 +72,6 @@ class _HomePageState extends ConsumerState<HomePage>
   ProviderSubscription<AsyncValue<PostState>>? _postsSubscription;
   ProviderSubscription<AsyncValue<ProfileState>>? _profileSubscription;
   Completer<GoogleMapController>? _mapControllerCompleter;
-  bool _isCenteringProfileCamera = false;
-  bool _hasCenteredOnce = false;
   List<PostEntity> _cachedPosts = <PostEntity>[];
   bool _isDisposed = false;
   
@@ -98,7 +98,31 @@ class _HomePageState extends ConsumerState<HomePage>
     final coordinates = _searchService.parseAddressCoordinates(suggestion);
     if (coordinates != null && _mapControllerWrapper.controller != null) {
       _mapControllerWrapper.animateToPosition(coordinates, 14);
-      _searchController.text = _searchService.getDisplayName(suggestion) ?? '';
+
+      // Formato limpo para o texto exibido (igual ao das sugestões)
+      final address = suggestion['address'] as Map<String, dynamic>? ?? {};
+      final road = (address['road'] ?? address['pedestrian'] ?? '') as String;
+      final houseNumber = (address['house_number'] ?? '') as String;
+      final neighbourhood = (address['neighbourhood'] ??
+          address['suburb'] ??
+          address['quarter'] ??
+          '') as String;
+      final city = (address['city'] ??
+          address['town'] ??
+          address['village'] ??
+          address['municipality'] ??
+          '') as String;
+      final state = (address['state'] ?? '') as String;
+
+      final streetLine = [road, houseNumber].where((e) => e.isNotEmpty).join(', ');
+      final List<String> secondaryParts = [];
+      if (neighbourhood.isNotEmpty) secondaryParts.add(neighbourhood);
+      if (city.isNotEmpty) secondaryParts.add(city);
+      if (state.isNotEmpty) secondaryParts.add(state);
+
+      final cleanDisplay = [streetLine, secondaryParts.join(' • ')].where((e) => e.isNotEmpty).join(' • ');
+
+      _searchController.text = cleanDisplay.isNotEmpty ? cleanDisplay : _searchService.getDisplayName(suggestion) ?? '';
       _searchFocusNode.unfocus();
     }
   }
@@ -125,9 +149,8 @@ class _HomePageState extends ConsumerState<HomePage>
 
   @override
   void dispose() {
-    if (!mounted) return;
     // ✅ FIX: Dispose all controllers to prevent memory leaks
-    ref.read(mapCenterProvider.notifier).resetAll();
+    // NOTA: Não usar ref.read() no dispose - causa "Cannot use ref after disposed"
     _postsSubscription?.close();
     _profileSubscription?.close();
     _searchController.dispose();
@@ -175,10 +198,8 @@ class _HomePageState extends ConsumerState<HomePage>
 
         if (nextId == null || nextId == previousId) return;
 
-        _hasCenteredOnce = false;
         ref.read(mapCenterProvider.notifier).reset(nextId);
         _primeInitialCameraTarget(nextProfile);
-        unawaited(_maybeCenterOnActiveProfile(force: true));
       },
     );
 
@@ -200,7 +221,7 @@ class _HomePageState extends ConsumerState<HomePage>
     // Pré-carrega cache de marcadores customizados (alta qualidade)
     await _markerBuilder.initialize();
     await _mapControllerWrapper.loadMapStyle();
-    await _determinePosition();
+    await _initializeMap();
     widget.searchNotifier?.addListener(_onSearchChanged);
   }
 
@@ -294,6 +315,8 @@ class _HomePageState extends ConsumerState<HomePage>
     _rebuildMarkers(force: true);
   }
 
+  /// Centraliza mapa no GPS do usuário com fallbacks
+  /// Ordem: Cache → GPS atual (10s) → LastKnown → Perfil
   Future<void> _centerOnUserLocation() async {
     if (!mounted || _isCenteringLocation) return;
 
@@ -306,84 +329,69 @@ class _HomePageState extends ConsumerState<HomePage>
         return;
       }
 
-      // Verificar permissões primeiro
-      final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        AppSnackBar.showWarning(context, 'Permissão de localização necessária');
-        return;
-      }
-
-      // Verificar se serviços de localização estão ativos
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        AppSnackBar.showWarning(context, 'GPS desativado. Ative nas configurações.');
-        return;
-      }
-
       LatLng? targetPos;
 
-      // Estratégia 1: Usar posição atual em cache se disponível e recente
+      // Estratégia 1: Cache GPS (<24h) - instantâneo
       if (_mapControllerWrapper.currentPosition != null) {
         targetPos = _mapControllerWrapper.currentPosition;
         debugPrint('📍 Usando posição em cache');
+        AppSnackBar.showInfo(context, 'Mapa centralizado!');
       } else {
-        // Estratégia 2: Tentar obter posição atual com timeout
-        debugPrint('📍 Obtendo localização do usuário...');
+        // Estratégia 2: GPS atual com timeout de 10s
+        final permission = await Geolocator.checkPermission();
+        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
-        try {
-          final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high,
-          ).timeout(const Duration(seconds: 8));
-          targetPos = LatLng(position.latitude, position.longitude);
-          if (mounted) {
-            setState(() => _mapControllerWrapper.setCurrentPosition(targetPos!));
-          }
-          debugPrint(
-              '📍 Localização obtida: ${targetPos.latitude}, ${targetPos.longitude}');
-        } catch (timeoutError) {
-          // Estratégia 3: Fallback para última posição conhecida
-          debugPrint(
-              '⚠️ Timeout ao obter localização, tentando última posição conhecida...');
-          final lastPosition = await Geolocator.getLastKnownPosition();
+        if (permission != LocationPermission.denied &&
+            permission != LocationPermission.deniedForever &&
+            serviceEnabled) {
+          try {
+            debugPrint('📍 Obtendo GPS atual...');
+            final position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high,
+            ).timeout(const Duration(seconds: 10));
 
-          if (lastPosition != null) {
-            targetPos = LatLng(lastPosition.latitude, lastPosition.longitude);
+            targetPos = LatLng(position.latitude, position.longitude);
             if (mounted) {
               setState(() => _mapControllerWrapper.setCurrentPosition(targetPos!));
             }
-            debugPrint('📍 Usando última posição conhecida');
+            await GpsCacheService.updateCache(targetPos);
+            debugPrint('✅ GPS atual obtido');
+            AppSnackBar.showSuccess(context, 'Localização atualizada');
+          } catch (timeoutError) {
+            debugPrint('⚠️ GPS timeout, tentando fallback...');
 
-            AppSnackBar.showInfo(context, 'Usando última localização conhecida');
-          } else {
-            // Estratégia 4: Fallback para posição atual do mapa se disponível
-            debugPrint(
-                '⚠️ Nenhuma localização conhecida, tentando posição do mapa...');
-            if (_mapControllerWrapper.controller != null) {
-              try {
-                final cameraPosition = await _mapControllerWrapper.controller!.getVisibleRegion();
-                // Usar o centro do mapa atual
-                final centerLat = (cameraPosition.northeast.latitude +
-                        cameraPosition.southwest.latitude) /
-                    2;
-                final centerLng = (cameraPosition.northeast.longitude +
-                        cameraPosition.southwest.longitude) /
-                    2;
-                targetPos = LatLng(centerLat, centerLng);
-                debugPrint('📍 Centralizando na posição atual do mapa');
-
-                AppSnackBar.showInfo(context, 'GPS indisponível. Movendo para área atual do mapa.');
-              } catch (e) {
-                // Estratégia 5: Usar posição padrão de SP como último recurso
-                targetPos = const LatLng(-23.55052, -46.633308);
-                debugPrint('📍 Usando posição padrão (São Paulo)');
-
-                AppSnackBar.showWarning(context, 'GPS indisponível. Ative o GPS para ver sua localização.');
+            // Estratégia 3: LastKnown do Geolocator
+            final lastPosition = await Geolocator.getLastKnownPosition();
+            if (lastPosition != null) {
+              targetPos = LatLng(lastPosition.latitude, lastPosition.longitude);
+              if (mounted) {
+                setState(() => _mapControllerWrapper.setCurrentPosition(targetPos!));
               }
+              debugPrint('📍 Usando última posição conhecida');
+              AppSnackBar.showInfo(context, 'GPS timeout. Usando última localização.');
             } else {
-              // Sem mapa disponível, usar SP como padrão
-              targetPos = const LatLng(-23.55052, -46.633308);
-              debugPrint('📍 Usando posição padrão (São Paulo)');
+              // Estratégia 4: Localização do perfil (sempre disponível)
+              final profile = _activeProfile;
+              final profileLocation = profile?.location;
+              if (profileLocation != null) {
+                targetPos = geoPointToLatLng(profileLocation);
+                debugPrint('📍 Usando localização do perfil');
+                AppSnackBar.showInfo(context, 'GPS indisponível. Usando local do perfil.');
+              }
+            }
+          }
+        } else {
+          // Permissões negadas ou GPS desativado - ir direto para perfil
+          final profile = _activeProfile;
+          final profileLocation = profile?.location;
+          if (profileLocation != null) {
+            targetPos = geoPointToLatLng(profileLocation);
+            debugPrint('📍 GPS não disponível, usando perfil');
+            
+            if (!serviceEnabled) {
+              AppSnackBar.showWarning(context, 'GPS desativado. Ative nas configurações.');
+            } else {
+              AppSnackBar.showWarning(context, 'Permissão de localização necessária');
             }
           }
         }
@@ -394,24 +402,15 @@ class _HomePageState extends ConsumerState<HomePage>
         await controller.animateCamera(
           CameraUpdate.newLatLngZoom(targetPos, 14),
         );
-        debugPrint('✅ Mapa centralizado com sucesso');
+        debugPrint('✅ Mapa centralizado');
+      } else {
+        AppSnackBar.showError(context, 'Não foi possível obter localização');
       }
     } catch (e) {
-      debugPrint('❌ Erro ao centralizar no usuário: $e');
-
-      // Mensagem amigável baseada no tipo de erro
-      var errorMessage = 'Erro ao obter localização';
-      if (e.toString().contains('TimeoutException')) {
-        errorMessage = 'GPS não respondeu. Tente novamente.';
-      } else if (e.toString().contains('Location services are disabled')) {
-        errorMessage = 'Serviços de localização desativados';
-      } else if (e.toString().contains('denied')) {
-        errorMessage = 'Permissão de localização negada';
-      }
-
-      // Não mostrar snackbar para erro de canal - é esperado durante inicialização
+      debugPrint('❌ Erro ao centralizar: $e');
+      
       if (!e.toString().contains('channel-error')) {
-        AppSnackBar.showError(context, errorMessage);
+        AppSnackBar.showError(context, 'Erro ao obter localização');
       }
     } finally {
       if (mounted) {
@@ -560,6 +559,7 @@ class _HomePageState extends ConsumerState<HomePage>
                           'seekingMusicians': post.seekingMusicians,
                           'level': post.level,
                           'photoUrl': post.photoUrl,
+                          'photoUrls': post.photoUrls, // Carrossel completo
                           'youtubeLink': post.youtubeLink,
                           'location': GeoPoint(
                               post.location.latitude, post.location.longitude),
@@ -649,13 +649,27 @@ class _HomePageState extends ConsumerState<HomePage>
       // Mostrar loading
       AppSnackBar.showInfo(context, 'Deletando post...');
 
-      // Deletar foto do Storage se existir
-      if (post.photoUrl != null && post.photoUrl!.isNotEmpty) {
+      // Deletar TODAS as fotos do Storage se existirem (carrossel)
+      for (final photoUrl in post.photoUrls) {
+        if (photoUrl.isNotEmpty) {
+          try {
+            final ref = FirebaseStorage.instance.refFromURL(photoUrl);
+            await ref.delete();
+            debugPrint('✅ Foto deletada: $photoUrl');
+          } catch (e) {
+            debugPrint('⚠️ Erro ao deletar foto: $e');
+          }
+        }
+      }
+      // Fallback: deletar photoUrl antigo se existir e não estiver em photoUrls
+      if (post.photoUrl != null && 
+          post.photoUrl!.isNotEmpty && 
+          !post.photoUrls.contains(post.photoUrl)) {
         try {
           final ref = FirebaseStorage.instance.refFromURL(post.photoUrl!);
           await ref.delete();
         } catch (e) {
-          debugPrint('Erro ao deletar foto: $e');
+          debugPrint('⚠️ Erro ao deletar foto legada: $e');
         }
       }
 
@@ -683,9 +697,6 @@ class _HomePageState extends ConsumerState<HomePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    // Ler providers sem observar mudanças para evitar rebuild loops
-    final postsAsync = ref.read(postNotifierProvider);
-    final profileAsync = ref.read(profileProvider);
 
     return Theme(
       data: AppTheme.light,
@@ -694,6 +705,13 @@ class _HomePageState extends ConsumerState<HomePage>
           backgroundColor: const Color(0xFFE47911), // Brand Orange
           foregroundColor: const Color(0xFFFAFAFA), // Off-white
           elevation: 2,
+          leading: IconButton(
+            icon: const Icon(Iconsax.tag),
+            tooltip: 'WeGig',
+            onPressed: () {
+              // Ação futura (ex: animação, Easter egg, etc.)
+            },
+          ),
           title: Image.asset(
             'assets/Logo/WeGig.png',
             height: 53.6, // 46.6 * 1.15 = 53.59 (arredondado para 53.6)
@@ -712,20 +730,9 @@ class _HomePageState extends ConsumerState<HomePage>
             ),
           ],
         ),
-        body: postsAsync.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-            ),
-          ),
-          error: (err, stack) {
-            debugPrintStack(stackTrace: stack, label: err.toString());
-            return Center(child: Text('Erro ao carregar posts: $err'));
-          },
-          data: (posts) {
-            return Stack(
-              children: [
-                _buildMapView(),
+        body: Stack(
+          children: [
+            _buildMapView(),
                 // Máscara Airbnb - Vinheta nas bordas com gradientes visíveis
                 Positioned.fill(
                   child: IgnorePointer(
@@ -807,7 +814,16 @@ class _HomePageState extends ConsumerState<HomePage>
                           decoration: InputDecoration(
                             hintText:
                                 'Buscar localização (cidade, bairro, endereço...)',
-                            prefixIcon: const Icon(Iconsax.location),
+                            prefixIcon: const Icon(Iconsax.location, color: AppColors.primary),
+                            suffixIcon: controller.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Iconsax.close_circle, color: AppColors.textSecondary),
+                                    onPressed: () {
+                                      controller.clear();
+                                      focusNode.unfocus();
+                                    },
+                                  )
+                                : null,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(24),
                               borderSide: BorderSide.none,
@@ -820,11 +836,50 @@ class _HomePageState extends ConsumerState<HomePage>
                           ),
                         );
                       },
-                      itemBuilder: (context, suggestion) {
+                      itemBuilder: (BuildContext context, Map<String, dynamic> suggestion) {
+                        final address = suggestion['address'] as Map<String, dynamic>? ?? {};
+
+                        // Extrai os componentes com fallback
+                        final road = (address['road'] ?? address['pedestrian'] ?? '') as String;
+                        final houseNumber = (address['house_number'] ?? '') as String;
+                        final neighbourhood = (address['neighbourhood'] ??
+                            address['suburb'] ??
+                            address['quarter'] ??
+                            '') as String;
+                        final city = (address['city'] ??
+                            address['town'] ??
+                            address['village'] ??
+                            address['municipality'] ??
+                            '') as String;
+                        final state = (address['state'] ?? '') as String;
+
+                        // Monta a linha principal (rua + número)
+                        final streetLine = [road, houseNumber].where((e) => e.isNotEmpty).join(', ');
+
+                        // Monta a linha secundária (bairro • cidade • estado)
+                        final List<String> secondaryParts = [];
+                        if (neighbourhood.isNotEmpty) secondaryParts.add(neighbourhood);
+                        if (city.isNotEmpty) secondaryParts.add(city);
+                        if (state.isNotEmpty) secondaryParts.add(state);
+
+                        final secondaryLine = secondaryParts.join(' • ');
+
                         return ListTile(
-                          leading: const Icon(Iconsax.location),
+                          leading: const Icon(Iconsax.location, color: AppColors.primary, size: 20),
                           title: Text(
-                              (suggestion['display_name'] as String?) ?? ''),
+                            streetLine.isNotEmpty ? streetLine : (suggestion['display_name'] as String?)?.split(',').first ?? 'Localização',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: secondaryLine.isNotEmpty
+                              ? Text(
+                                  secondaryLine,
+                                  style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : null,
                         );
                       },
                       onSelected: _onAddressSelected,
@@ -918,11 +973,9 @@ class _HomePageState extends ConsumerState<HomePage>
                       ),
                     ),
                   ),
-                // Card flutuante (só aparece quando um pin é clicado)
-                if (_activePostId != null) _buildFloatingCard(),
-              ],
-            );
-          },
+            // Card flutuante (só aparece quando um pin é clicado)
+            if (_activePostId != null) _buildFloatingCard(),
+          ],
         ),
       ),
     );
@@ -976,8 +1029,6 @@ class _HomePageState extends ConsumerState<HomePage>
               }
             }
           }
-
-          await _maybeCenterOnActiveProfile();
         },
         markers: _markers,
         onCameraMove: (pos) {
@@ -1100,74 +1151,69 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  Future<void> _determinePosition() async {
+  /// Inicializa posição do mapa na ordem: GPS atual → Perfil → Cache GPS
+  Future<void> _initializeMap() async {
     try {
-      debugPrint(
-          '📍 _determinePosition: Iniciando verificação de localização...');
+      debugPrint('📍 _initializeMap: Iniciando...');
 
+      // Estratégia 1: Tentar GPS atual (instantâneo, sem timeout)
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        debugPrint(
-            '⚠️ _determinePosition: Serviços de localização desativados');
-        return;
-      }
-
-      var permission = await Geolocator.checkPermission();
-      debugPrint('📍 _determinePosition: Permissão atual: $permission');
-
-      if (permission == LocationPermission.denied) {
-        debugPrint('📍 _determinePosition: Solicitando permissão...');
-        permission = await Geolocator.requestPermission();
-        debugPrint('📍 _determinePosition: Nova permissão: $permission');
-
+      if (serviceEnabled) {
+        var permission = await Geolocator.checkPermission();
+        
         if (permission == LocationPermission.denied) {
-          debugPrint('⚠️ _determinePosition: Permissão negada pelo usuário');
-          return;
+          permission = await Geolocator.requestPermission();
+        }
+
+        if (permission != LocationPermission.denied &&
+            permission != LocationPermission.deniedForever) {
+          try {
+            final position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high,
+            ).timeout(const Duration(seconds: 3));
+
+            final gpsPos = LatLng(position.latitude, position.longitude);
+            if (mounted) {
+              setState(() => _mapControllerWrapper.setCurrentPosition(gpsPos));
+            }
+            await GpsCacheService.updateCache(gpsPos);
+            debugPrint('✅ _initializeMap: GPS atual obtido');
+            return;
+          } catch (e) {
+            debugPrint('⚠️ _initializeMap: GPS timeout/erro: $e');
+          }
         }
       }
 
-      if (permission == LocationPermission.deniedForever) {
-        debugPrint('⚠️ _determinePosition: Permissão negada permanentemente');
+      // Estratégia 2: Usar localização do perfil (SEMPRE disponível)
+      final profile = _activeProfile;
+      final profileLocation = profile?.location;
+      if (profileLocation != null) {
+        final profilePos = geoPointToLatLng(profileLocation);
+        if (mounted) {
+          setState(() => _mapControllerWrapper.setCurrentPosition(profilePos));
+        }
+        debugPrint('✅ _initializeMap: Usando localização do perfil');
         return;
       }
 
-      debugPrint('📍 _determinePosition: Obtendo posição atual...');
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      ).timeout(const Duration(seconds: 10));
-
-      debugPrint(
-          '✅ _determinePosition: Posição obtida: ${position.latitude}, ${position.longitude}');
-
-      final newPos = LatLng(position.latitude, position.longitude);
+      // Estratégia 3: Fallback para cache GPS (<24h)
+      final cachedPos = await GpsCacheService.getLastKnownPosition();
       if (mounted) {
-        setState(() {
-          _mapControllerWrapper.setCurrentPosition(newPos);
-        });
-
-        // Animar câmera apenas se o mapa já estiver pronto
-        if (_mapControllerWrapper.controller != null && !_hasCenteredOnce) {
-          await _mapControllerWrapper.controller!
-            .animateCamera(CameraUpdate.newLatLng(newPos));
-          _hasCenteredOnce = true;
-          debugPrint(
-            '✅ _determinePosition: Câmera animada para posição inicial');
-        }
+        setState(() => _mapControllerWrapper.setCurrentPosition(cachedPos));
       }
+      debugPrint('✅ _initializeMap: Usando cache GPS');
+      
     } catch (e) {
-      debugPrint('❌ _determinePosition: Erro ao obter localização: $e');
-
-      // Tentar usar última posição conhecida como fallback
-      try {
-        final lastPosition = await Geolocator.getLastKnownPosition();
-        if (lastPosition != null && mounted) {
-          debugPrint('📍 _determinePosition: Usando última posição conhecida');
-          setState(() {
-            _mapControllerWrapper.setCurrentPosition(LatLng(lastPosition.latitude, lastPosition.longitude));
-          });
-        }
-      } catch (e2) {
-        debugPrint('❌ _determinePosition: Erro ao obter última posição: $e2');
+      debugPrint('❌ _initializeMap: Erro inesperado: $e');
+      
+      // Último recurso: localização do perfil
+      final profile = _activeProfile;
+      final profileLocation = profile?.location;
+      if (profileLocation != null && mounted) {
+        setState(() => _mapControllerWrapper.setCurrentPosition(
+          geoPointToLatLng(profileLocation)
+        ));
       }
     }
   }
@@ -1181,38 +1227,7 @@ class _HomePageState extends ConsumerState<HomePage>
     }
   }
 
-  Future<void> _maybeCenterOnActiveProfile({bool force = false}) async {
-    if (_isDisposed || !mounted || _isCenteringProfileCamera) return;
-    final profile = _activeProfile;
-    final location = profile?.location;
-    if (profile == null || location == null) return;
 
-    final profileId = profile.profileId;
-    final mapCenterNotifier = ref.read(mapCenterProvider.notifier);
-    final alreadyCentered = mapCenterNotifier.hasCentered(profileId);
-    final shouldCenter = force || !alreadyCentered || !_hasCenteredOnce;
-
-    if (!shouldCenter) {
-      return;
-    }
-
-    final controller = await _waitForMapController();
-    if (controller == null) return;
-
-    _isCenteringProfileCamera = true;
-    try {
-      await controller.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          geoPointToLatLng(location),
-          _mapControllerWrapper.currentZoom,
-        ),
-      );
-      mapCenterNotifier.markCentered(profileId);
-      _hasCenteredOnce = true;
-    } finally {
-      _isCenteringProfileCamera = false;
-    }
-  }
 
   Future<GoogleMapController?> _waitForMapController() async {
     if (_mapControllerWrapper.controller != null) {
@@ -1343,7 +1358,9 @@ class PostCard extends StatelessWidget {
                 Hero(
                   tag: 'post-photo-${post.id}',
                   child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: () {
+                      debugPrint('📍 PostCard: Tap na foto do post ${post.id}');
                       context.pushPostDetail(post.id);
                     },
                     child: ClipRRect(
@@ -1355,9 +1372,9 @@ class PostCard extends StatelessWidget {
                         width: double.infinity,
                         height: double.infinity,
                         child:
-                            (post.photoUrl != null && post.photoUrl!.isNotEmpty)
+                            (post.firstPhotoUrl != null && post.firstPhotoUrl!.isNotEmpty)
                                 ? CachedNetworkImage(
-                                    imageUrl: post.photoUrl!,
+                                    imageUrl: post.firstPhotoUrl!,
                                     fit: BoxFit.cover,
                                     memCacheWidth: 400,
                                     placeholder: (_, __) =>
@@ -1421,13 +1438,16 @@ class PostCard extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Nome do perfil + botões
                   Row(
                     children: [
                       Expanded(
                         child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
                           onTap: () {
+                            debugPrint('📍 PostCard: Tap no nome do perfil ${post.authorProfileId}');
                             context.pushProfile(post.authorProfileId);
                           },
                           child: Row(
@@ -1484,7 +1504,9 @@ class PostCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   // Header clicável
                   GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: () {
+                      debugPrint('📍 PostCard: Tap no header do post ${post.id}');
                       context.pushPostDetail(post.id);
                     },
                     child: Row(

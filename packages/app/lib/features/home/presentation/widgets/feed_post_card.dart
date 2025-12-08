@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/widgets/mention_text.dart';
@@ -81,9 +82,10 @@ class FeedPostCard extends StatelessWidget {
                         width: double.infinity,
                         height: double.infinity,
                         child:
-                            (post.photoUrl != null && post.photoUrl!.isNotEmpty)
+                            (post.firstPhotoUrl != null && post.firstPhotoUrl!.isNotEmpty)
                                 ? CachedNetworkImage(
-                                    imageUrl: post.photoUrl!,
+                                    cacheManager: WeGigImageCacheManager.instance,
+                                    imageUrl: post.firstPhotoUrl!,
                                     fit: BoxFit.cover,
                                     memCacheWidth: 400,
                                     placeholder: (_, __) =>
@@ -147,6 +149,7 @@ class FeedPostCard extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Nome do perfil + botões
                   Row(
