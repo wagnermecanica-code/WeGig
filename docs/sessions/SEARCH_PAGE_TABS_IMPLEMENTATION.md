@@ -8,9 +8,11 @@
 ## 📦 Arquivos Criados/Modificados
 
 ### **1. search_params.dart** (ATUALIZADO)
+
 **Path**: `packages/core_ui/lib/models/search_params.dart`
 
 **Mudanças**:
+
 - ✅ Adicionados 6 novos campos opcionais para filtros de sales:
   - `String? salesType` - Tipo de anúncio (Gravação, Ensaios, etc)
   - `double? minPrice` - Preço mínimo
@@ -20,9 +22,11 @@
   - `String? searchUsername` - Busca por @username
 
 ### **2. search_page_new.dart** (CRIADO)
+
 **Path**: `packages/app/lib/features/home/presentation/pages/search_page_new.dart`
 
 **Funcionalidades**:
+
 - ✅ Sistema de abas com TabController (Músicos/Bandas + Anúncios)
 - ✅ Ícones: `Iconsax.user` (Músicos/Bandas) e `Iconsax.tag` (Anúncios)
 - ✅ Busca por @username (comum a todas abas)
@@ -46,6 +50,7 @@
 ## 🎨 UI/UX
 
 ### **Abas**
+
 ```
 ┌─────────────────────────────────────┐
 │ Filtros de Busca         [Limpar]   │
@@ -61,6 +66,7 @@
 ```
 
 ### **Cores**
+
 - Primária: `AppColors.primary` (#37475A)
 - Seleção: `AppColors.primary.withOpacity(0.1)`
 - Checkmark: `AppColors.primary`
@@ -117,42 +123,42 @@ Query<Map<String, dynamic>> _applyFiltersToQuery(
   // ✅ FILTROS DE SALES
   if (params.postType == 'sales') {
     query = query.where('type', isEqualTo: 'sales');
-    
+
     // Tipo de anúncio
     if (params.salesType != null) {
       query = query.where('salesType', isEqualTo: params.salesType);
     }
-    
+
     // Faixa de preço mínimo
     if (params.minPrice != null && params.minPrice! > 0) {
       query = query.where('price', isGreaterThanOrEqualTo: params.minPrice);
     }
-    
+
     // Faixa de preço máximo
     if (params.maxPrice != null && params.maxPrice! < 5000) {
       query = query.where('price', isLessThanOrEqualTo: params.maxPrice);
     }
-    
+
     // Apenas com desconto
     if (params.onlyWithDiscount == true) {
       query = query.where('discountMode', whereIn: ['percentage', 'fixed']);
     }
-    
+
     // Apenas promoções ativas
     if (params.onlyActivePromos == true) {
       query = query.where('promoEndDate', isGreaterThan: Timestamp.now());
     }
   }
-  
+
   // ✅ FILTROS DE MÚSICOS/BANDAS (já existentes)
   else {
     if (params.postType != null) {
       query = query.where('type', isEqualTo: params.postType);
     }
-    
+
     // ... outros filtros existentes
   }
-  
+
   return query;
 }
 ```
@@ -165,9 +171,9 @@ Username search precisa ser feito na memória (após query Firestore):
 List<PostEntity> _filterPostsByUsername(List<PostEntity> posts) {
   final params = _searchNotifier.value;
   if (params?.searchUsername == null) return posts;
-  
+
   final username = params!.searchUsername!.toLowerCase().replaceAll('@', '');
-  
+
   return posts.where((post) {
     // Assume que você tem authorName no PostEntity
     final authorName = (post.authorName ?? '').toLowerCase();
@@ -233,6 +239,7 @@ Adicione ao `.config/firestore.indexes.json`:
 ```
 
 **Deploy**:
+
 ```bash
 cd .config
 firebase deploy --only firestore:indexes --project wegig-dev
@@ -262,6 +269,7 @@ firebase deploy --only firestore:indexes --project wegig-dev
 ## 🧪 Testes Manuais
 
 ### **Teste 1: Navegação entre Abas**
+
 1. Abrir SearchPageNew
 2. Selecionar filtros na aba "Músicos/Bandas"
 3. Trocar para aba "Anúncios"
@@ -270,6 +278,7 @@ firebase deploy --only firestore:indexes --project wegig-dev
 6. Verificar que apenas filtros da aba ativa são aplicados
 
 ### **Teste 2: Filtros de Anúncios**
+
 1. Ir para aba "Anúncios"
 2. Selecionar "Gravação" em Tipo de anúncio
 3. Ajustar preço: R$ 500 - R$ 2000
@@ -278,17 +287,20 @@ firebase deploy --only firestore:indexes --project wegig-dev
 6. Verificar HomePage mostra apenas anúncios de gravação com preço entre R$ 500-2000 e com desconto
 
 ### **Teste 3: Busca por Username**
+
 1. Digitar "@joao" no campo de busca (qualquer aba)
 2. Aplicar filtros
 3. Verificar que apenas posts de perfis com "joao" aparecem
 
 ### **Teste 4: RangeSlider**
+
 1. Aba Anúncios
 2. Arrastar slider de preço
 3. Verificar que label atualiza dinamicamente
 4. Aplicar e verificar filtro funciona
 
 ### **Teste 5: Limpar Filtros**
+
 1. Selecionar múltiplos filtros em ambas abas
 2. Clicar "Limpar"
 3. Verificar que todos campos resetam
@@ -298,15 +310,15 @@ firebase deploy --only firestore:indexes --project wegig-dev
 
 ## 📊 Estatísticas
 
-| Item | Quantidade |
-|------|------------|
-| Arquivos modificados | 2 |
-| Arquivos criados | 1 |
-| Linhas de código | ~800 |
-| Novos campos SearchParams | 6 |
-| Índices Firestore | 4 |
-| Filtros implementados | 11 |
-| Abas | 2 |
+| Item                      | Quantidade |
+| ------------------------- | ---------- |
+| Arquivos modificados      | 2          |
+| Arquivos criados          | 1          |
+| Linhas de código          | ~800       |
+| Novos campos SearchParams | 6          |
+| Índices Firestore         | 4          |
+| Filtros implementados     | 11         |
+| Abas                      | 2          |
 
 ---
 
@@ -317,10 +329,11 @@ firebase deploy --only firestore:indexes --project wegig-dev
 3. **Deploy índices Firestore** (aguardar 5-10min)
 4. **Testes end-to-end** em dispositivo físico
 5. **Commit** com mensagem descritiva:
+
    ```bash
    git add .
    git commit -m "feat(search): adicionar abas e filtros de anúncios sales
-   
+
    - SearchParams: 6 novos campos (salesType, preços, desconto, promoção ativa, username)
    - SearchPageNew: sistema de abas (Músicos/Bandas + Anúncios)
    - Filtros sales: tipo, faixa de preço (R\$ 0-5000), desconto, promoções ativas

@@ -39,7 +39,7 @@ class NotificationsRemoteDataSource implements INotificationsRemoteDataSource {
   }) async {
     try {
       debugPrint(
-          '📝 NotificationsDataSource: getNotifications for profile $profileId (uid: $recipientUid, type: $type)');
+          '� NotificationsDataSource: getNotifications for profile $profileId (uid: $recipientUid, type: $type)');
 
       // ✅ FIX: Query por recipientUid (UID) para match com Security Rules
       // Depois filtramos por recipientProfileId no client-side

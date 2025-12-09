@@ -42,7 +42,7 @@ class MarkerCacheService {
     debugPrint('MarkerCache: Cache limpo');
   }
 
-  /// Pré-carrega todos os 4 tipos de markers
+  /// Pré-carrega todos os 6 tipos de markers
   /// 
   /// Deve ser chamado no initState da HomePage para warming
   Future<void> warmupCache() async {
@@ -54,6 +54,8 @@ class MarkerCacheService {
       getMarker('musician', true),
       getMarker('band', false),
       getMarker('band', true),
+      getMarker('sales', false),
+      getMarker('sales', true),
     ]);
 
     final duration = DateTime.now().difference(start);
@@ -70,7 +72,15 @@ class MarkerCacheService {
     final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, pinSize, pinSize));
 
     // Define cor baseada no tipo
-    final Color pinColor = type == 'band' ? AppColors.accent : AppColors.primary;
+    final Color pinColor;
+    switch (type) {
+      case 'band':
+        pinColor = AppColors.accent;      // Laranja para bandas
+      case 'sales':
+        pinColor = AppColors.salesBlue;   // Azul para anúncios
+      default:
+        pinColor = AppColors.primary;     // Cinza escuro para músicos
+    }
     
     // Círculo de fundo (mais brilhante se ativo)
     final paint = Paint()
@@ -93,7 +103,15 @@ class MarkerCacheService {
     }
 
     // Ícone centralizado (Material Design)
-    final icon = type == 'band' ? Iconsax.people : Iconsax.musicnote;
+    final IconData icon;
+    switch (type) {
+      case 'band':
+        icon = Iconsax.people;      // Grupo para bandas
+      case 'sales':
+        icon = Iconsax.tag;         // Tag para anúncios/vendas
+      default:
+        icon = Iconsax.musicnote;   // Nota musical para músicos
+    }
     final textPainter = TextPainter(
       text: TextSpan(
         text: String.fromCharCode(icon.codePoint),
@@ -131,8 +149,8 @@ class MarkerCacheService {
     return {
       'cacheSize': _cache.length,
       'cachedKeys': _cache.keys.toList(),
-      'maxSize': 4, // musician/band x normal/active
-      'hitRate': _cache.length / 4, // 0.0-1.0
+      'maxSize': 6, // musician/band/sales x normal/active
+      'hitRate': _cache.length / 6, // 0.0-1.0
     };
   }
 }

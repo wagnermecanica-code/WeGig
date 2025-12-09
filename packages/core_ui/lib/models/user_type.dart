@@ -1,25 +1,56 @@
 import 'package:flutter/foundation.dart';
 
 /// Representa os tipos de perfis suportados no app.
-enum UserType { band, musician }
+enum UserType { band, musician, sales }
 
 extension UserTypeParsing on UserType {
   /// Valor em string usado pelos documentos do Firestore.
-  String get firestoreValue => this == UserType.band ? 'band' : 'musician';
+  String get firestoreValue {
+    switch (this) {
+      case UserType.band:
+        return 'band';
+      case UserType.sales:
+        return 'sales';
+      case UserType.musician:
+        return 'musician';
+    }
+  }
 
   bool get isBand => this == UserType.band;
   bool get isMusician => this == UserType.musician;
+  bool get isSales => this == UserType.sales;
 
   static UserType fromFirestore(String? value) {
-    return value == 'band' ? UserType.band : UserType.musician;
+    switch (value) {
+      case 'band':
+        return UserType.band;
+      case 'sales':
+        return UserType.sales;
+      default:
+        return UserType.musician;
+    }
   }
 }
 
 /// Helpers estáticos sem depender de [extension] externa.
 UserType userTypeFromPostType(String type) {
-  return type == 'band' ? UserType.band : UserType.musician;
+  switch (type) {
+    case 'band':
+      return UserType.band;
+    case 'sales':
+      return UserType.sales;
+    default:
+      return UserType.musician;
+  }
 }
 
 String userTypeToPostType(UserType type) {
-  return describeEnum(type) == 'band' ? 'band' : 'musician';
+  switch (type) {
+    case UserType.band:
+      return 'band';
+    case UserType.sales:
+      return 'sales';
+    case UserType.musician:
+      return 'musician';
+  }
 }

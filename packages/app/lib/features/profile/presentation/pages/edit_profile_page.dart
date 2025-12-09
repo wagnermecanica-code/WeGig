@@ -116,7 +116,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     'Viola',
     'Cello',
     'Contrabaixo Acústico',
-    'Voz (cantor)',
+    'Voz',
     'Voz (Soprano)',
     'Voz (Contralto)',
     'Voz (Tenor)',
@@ -1108,13 +1108,14 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   }
 
   Widget _buildEssentialBlock() {
-    final usernameValue = (_accountUsername ?? _profile?.username)?.trim();
+    final activeProfile = ref.watch(profileProvider).value?.activeProfile;
+    final usernameValue = (activeProfile?.username ?? _profile?.username ?? _accountUsername)?.trim();
     final hasUsername = usernameValue != null && usernameValue.isNotEmpty;
     final sanitizedUsername = hasUsername
-        ? (usernameValue.startsWith('@')
-            ? usernameValue.substring(1)
-            : usernameValue)
-        : null;
+      ? (usernameValue.startsWith('@')
+        ? usernameValue.substring(1)
+        : usernameValue)
+      : null;
 
     return Column(
       children: [

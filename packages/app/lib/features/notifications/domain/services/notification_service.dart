@@ -327,15 +327,27 @@ class NotificationService {
     final activeProfile = _profileState.activeProfile;
     if (activeProfile == null) return Stream.value(0);
 
+    // ✅ FIX: Query por recipientUid para match com Security Rules
     return _firestore
         .collection('notifications')
-        .where('recipientProfileId', isEqualTo: activeProfile.profileId)
+        .where('recipientUid', isEqualTo: activeProfile.uid)
         .where('read', isEqualTo: false)
         .snapshots()
+        .handleError((error) {
+          // ✅ FIX: Tratar erros retornando 0 (melhor UX)
+          debugPrint('📊 Badge Counter: Erro na query (retornando 0): $error');
+          return 0;
+        })
         .debounceTime(const Duration(milliseconds: 50)) // ⚡ Debounce mínimo
         .map((snapshot) {
-      // Filtrar expiradas
+      // Filtrar por profileId e expiradas (client-side)
       final unreadCount = snapshot.docs.where((doc) {
+        // ✅ FIX: Filtro client-side por recipientProfileId
+        final recipientProfileId = doc.data()['recipientProfileId'] as String?;
+        if (recipientProfileId != activeProfile.profileId) {
+          return false;
+        }
+        // Filtrar expiradas
         final expiresAt = doc.data()['expiresAt'] as Timestamp?;
         if (expiresAt != null && expiresAt.toDate().isBefore(DateTime.now())) {
           return false;

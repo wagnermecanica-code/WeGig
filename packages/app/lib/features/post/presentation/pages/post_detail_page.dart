@@ -18,6 +18,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
+import 'package:wegig_app/features/post/data/models/interest_document.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
@@ -164,33 +165,37 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         final data = interestDoc.data();
         final interestedProfileId = data['interestedProfileId'] as String?;
 
+        // ✅ VALIDAÇÃO: Filtrar profileIds vazios
+        if (interestedProfileId == null || interestedProfileId.isEmpty) {
+          debugPrint('⚠️ Interesse sem interestedProfileId válido, pulando...');
+          continue;
+        }
+
         debugPrint('👤 Carregando perfil: $interestedProfileId');
 
-        if (interestedProfileId != null) {
-          try {
-            // Buscar perfil do interessado
-            final profileDoc = await FirebaseFirestore.instance
-                .collection('profiles')
-                .doc(interestedProfileId)
-                .get();
+        try {
+          // Buscar perfil do interessado
+          final profileDoc = await FirebaseFirestore.instance
+              .collection('profiles')
+              .doc(interestedProfileId)
+              .get();
 
-            if (profileDoc.exists) {
-              final profileData = profileDoc.data()!;
-              users.add({
-                'profileId': interestedProfileId,
-                'userId': data['interestedUid'] as String,
-                'name': profileData['name'] as String? ?? 'Usuário',
-                'photoUrl': profileData['photoUrl'] as String? ?? '',
-                'isBand': profileData['isBand'] as bool? ?? false,
-                'createdAt': data['createdAt'] as Timestamp?,
-              });
-              debugPrint('✅ Perfil carregado: ${profileData['name']}');
-            } else {
-              debugPrint('⚠️ Perfil não encontrado: $interestedProfileId');
-            }
-          } catch (e) {
-            debugPrint('❌ Erro ao buscar perfil do interessado: $e');
+          if (profileDoc.exists) {
+            final profileData = profileDoc.data()!;
+            users.add({
+              'profileId': interestedProfileId,
+              'userId': data['interestedUid'] as String,
+              'name': profileData['name'] as String? ?? 'Usuário',
+              'photoUrl': profileData['photoUrl'] as String? ?? '',
+              'isBand': profileData['isBand'] as bool? ?? false,
+              'createdAt': data['createdAt'] as Timestamp?,
+            });
+            debugPrint('✅ Perfil carregado: ${profileData['name']}');
+          } else {
+            debugPrint('⚠️ Perfil não encontrado: $interestedProfileId');
           }
+        } catch (e) {
+          debugPrint('❌ Erro ao buscar perfil do interessado: $e');
         }
       }
 
@@ -277,71 +282,86 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
-  /// Demonstra interesse no post
+  /// Demonstra interesse no post (Abordagem Otimista)
   Future<void> _showInterest() async {
     if (_post == null) return;
 
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final profileState = ref.read(profileProvider);
+    final activeProfile = profileState.value?.activeProfile;
+    if (activeProfile == null) return;
+
+    // 1. Estado Otimista: Atualiza UI imediatamente
+    setState(() {
+      _hasInterest = true;
+    });
+
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return;
+      // ✅ Usar factory padronizada
+      final interestData = InterestDocumentFactory.create(
+        postId: _post!.id,
+        postAuthorUid: _post!.authorUid,
+        postAuthorProfileId: _post!.authorProfileId,
+        currentUserUid: currentUser.uid,
+        activeProfileUid: activeProfile.uid,
+        activeProfileId: activeProfile.profileId,
+        activeProfileName: activeProfile.name,
+        activeProfilePhotoUrl: activeProfile.photoUrl,
+      );
 
-      final profileState = ref.read(profileProvider);
-      final activeProfile = profileState.value?.activeProfile;
-      if (activeProfile == null) return;
+      // 2. Chamada ao Firebase
+      final docRef = await FirebaseFirestore.instance
+          .collection('interests')
+          .add(interestData);
 
-      // Criar documento de interesse
-      final docRef =
-          await FirebaseFirestore.instance.collection('interests').add({
-        'postId': _post!.id,
-        'postAuthorUid': _post!.authorUid,
-        'postAuthorProfileId': _post!.authorProfileId,
-        'profileUid': activeProfile.uid,
-        'interestedUid': currentUser.uid,
-        'interestedProfileId': activeProfile.profileId,
-        'interestedProfileName': activeProfile.name, // ✅ Cloud Function expects this
-        'interestedProfilePhotoUrl': activeProfile.photoUrl, // ✅ Used in notification
-        'createdAt': FieldValue.serverTimestamp(),
-        'read': false,
-      });
+      // Atualiza o ID do interesse confirmado
+      if (mounted) {
+        setState(() {
+          _interestId = docRef.id;
+        });
+      }
 
-      setState(() {
-        _hasInterest = true;
-        _interestId = docRef.id;
-      });
-
+      // 3. Notificações e Feedback (em background)
       final distance = _calculateDistance(activeProfile);
-
-      await ref.read(notificationServiceProvider).createInterestReceivedNotification(
+      
+      // Não usamos await aqui para não bloquear a UI, deixamos rodar em paralelo
+      ref.read(notificationServiceProvider).createInterestReceivedNotification(
             postId: _post!.id,
             postOwnerProfileId: _post!.authorProfileId,
             postOwnerUid: _post!.authorUid,
             interestedProfileId: activeProfile.profileId,
             interestedUserName: activeProfile.name,
             interestedUserPhoto: activeProfile.photoUrl ?? '',
-        interestedUserUsername: activeProfile.username,
+            interestedUserUsername: activeProfile.username,
             city: _post!.city,
             distanceKm: distance,
-          );
+          ).ignore(); // ignore() para tratar a Future sem await
 
-      // Aguardar 500ms para garantir que o Firestore processou o serverTimestamp
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-
-      // Recarregar lista de interessados
-      debugPrint('🔄 Recarregando interessados após demonstrar interesse...');
-      await _loadInterestedUsers();
-      debugPrint(
-          '✅ Interessados recarregados - _interestedUsers.length: ${_interestedUsers.length}');
-
+      // Aguardar confirmação do Firestore para garantir consistência antes de recarregar lista
+      await docRef.get();
+      
       if (mounted) {
+        // Recarregar lista silenciosamente
+        _loadInterestedUsers();
+        
         AppSnackBar.showSuccess(
           context, 
-          _post!.type == 'sales' ? 'Anúncio salvo! 📌' : 'Interesse demonstrado! 💙',
+          _post!.type == 'sales' ? 'Anúncio salvo!' : 'Interesse demonstrado!',
         );
       }
+
     } catch (e) {
-      debugPrint('Erro ao demonstrar interesse: $e');
+      debugPrint('❌ Erro ao demonstrar interesse: $e');
+      
+      // 4. Rollback em caso de erro
       if (mounted) {
-        AppSnackBar.showError(context, 'Erro ao demonstrar interesse');
+        setState(() {
+          _hasInterest = false;
+          _interestId = null;
+        });
+        AppSnackBar.showError(context, 'Erro ao salvar interesse. Verifique sua conexão.');
       }
     }
   }
@@ -357,35 +377,42 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
-  /// Remove interesse
+  /// Remove interesse (Abordagem Otimista)
   Future<void> _removeInterest() async {
     if (_interestId == null) return;
 
+    // Guardar ID para caso de rollback
+    final idToRemove = _interestId!;
+
+    // 1. Estado Otimista: Remove da UI imediatamente
+    setState(() {
+      _hasInterest = false;
+      _interestId = null;
+    });
+
     try {
+      // 2. Chamada ao Firebase
       await FirebaseFirestore.instance
           .collection('interests')
-          .doc(_interestId)
+          .doc(idToRemove)
           .delete();
-
-      setState(() {
-        _hasInterest = false;
-        _interestId = null;
-      });
-
-      // Aguardar 500ms para garantir que o Firestore processou a exclusão
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-
-      // Recarregar lista de interessados
-      debugPrint('🔄 Recarregando interessados após remover interesse...');
-      await _loadInterestedUsers();
-      debugPrint(
-          '✅ Interessados recarregados - _interestedUsers.length: ${_interestedUsers.length}');
 
       if (mounted) {
         AppSnackBar.showInfo(context, 'Interesse removido');
+        // Recarregar lista
+        _loadInterestedUsers();
       }
     } catch (e) {
-      debugPrint('Erro ao remover interesse: $e');
+      debugPrint('❌ Erro ao remover interesse: $e');
+      
+      // 3. Rollback em caso de erro
+      if (mounted) {
+        setState(() {
+          _hasInterest = true;
+          _interestId = idToRemove;
+        });
+        AppSnackBar.showError(context, 'Erro ao remover interesse.');
+      }
     }
   }
 
@@ -767,18 +794,32 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                       existingPostData: {
                         'postId': _post!.id,
                         'content': _post!.content,
-                        'instruments': _post!.instruments,
-                        'genres': _post!.genres,
-                        'seekingMusicians': _post!.seekingMusicians,
-                        'level': _post!.level,
+                        // Common fields
                         'city': _post!.city,
                         'neighborhood': _post!.neighborhood,
                         'state': _post!.state,
                         'photoUrls': _post!.photoUrls,
-                        'photoUrl': _post!.photoUrl, // fallback para compatibilidade
+                        'photoUrl': _post!.photoUrl, // fallback
                         'youtubeLink': _post!.youtubeLink,
                         'location': GeoPoint(_post!.location.latitude,
                             _post!.location.longitude),
+                        'createdAt': _post!.createdAt,
+                        'expiresAt': _post!.expiresAt,
+                        // Musician/Band fields
+                        'instruments': _post!.instruments,
+                        'genres': _post!.genres,
+                        'seekingMusicians': _post!.seekingMusicians,
+                        'level': _post!.level,
+                        'availableFor': _post!.availableFor,
+                        // Sales fields
+                        'title': _post!.title,
+                        'salesType': _post!.salesType,
+                        'price': _post!.price,
+                        'discountMode': _post!.discountMode,
+                        'discountValue': _post!.discountValue,
+                        'promoStartDate': _post!.promoStartDate,
+                        'promoEndDate': _post!.promoEndDate,
+                        'whatsappNumber': _post!.whatsappNumber,
                       },
                     ),
                   ),
@@ -805,6 +846,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
   /// Mostra opções de interesse
   void _showInterestOptions() {
+    final isSalesPost = _post?.type == 'sales';
+    
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -814,14 +857,29 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             ListTile(
-              leading: const Icon(Iconsax.heart, color: Colors.red),
-              title: const Text('Remover interesse'),
+              leading: Icon(
+                isSalesPost ? Iconsax.tag : Iconsax.heart,
+                color: isSalesPost ? AppColors.primary : Colors.red,
+                size: 24,
+              ),
+              title: Text(isSalesPost ? 'Remover dos Salvos' : 'Remover interesse'),
               onTap: () {
                 Navigator.pop(context);
                 _removeInterest();
               },
             ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -1175,12 +1233,12 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                               : IconButton(
                                   icon: Icon(
                                     _hasInterest
-                                        ? (_post!.type == 'sales' ? Iconsax.archive_tick5 : Iconsax.heart5)
-                                        : (_post!.type == 'sales' ? Iconsax.archive_add : Iconsax.heart),
+                                        ? (_post!.type == 'sales' ? Iconsax.tag5 : Iconsax.heart5)
+                                        : (_post!.type == 'sales' ? Iconsax.tag : Iconsax.heart),
                                     color: _hasInterest
-                                        ? (_post!.type == 'sales' ? AppColors.primary : Colors.red)
+                                        ? Colors.pink
                                         : Colors.white,
-                                    size: 18,
+                                    size: 20,
                                   ),
                                   padding: const EdgeInsets.all(8),
                                   constraints: const BoxConstraints(),

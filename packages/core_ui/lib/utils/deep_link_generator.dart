@@ -3,7 +3,7 @@ import 'location_utils.dart';
 /// Gerador de deep links para compartilhamento
 class DeepLinkGenerator {
   // Base URL do app (ajustar quando tiver domínio registrado)
-  static const String baseUrl = 'https://tosembanda.app';
+  static const String baseUrl = 'https://wegig.app';
   
   /// Gera link para perfil
   static String generateProfileLink({

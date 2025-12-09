@@ -1,11 +1,15 @@
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
+import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
+import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
+import 'package:wegig_app/features/notifications/presentation/providers/push_notification_provider.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
@@ -146,6 +150,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               title: 'Notificações', icon: Iconsax.notification),
           const SizedBox(height: 12),
           _buildNotificationSettings(),
+
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 24),
+
+          // Seção: Push Notifications (FCM)
+          const SettingsSection(
+              title: 'Push Notifications', icon: Iconsax.notification_bing),
+          const SizedBox(height: 12),
+          _buildPushNotificationsCard(activeProfile),
 
           const SizedBox(height: 32),
           const Divider(),
@@ -458,6 +472,219 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
       ),
     );
+  }
+
+  /// Card de Push Notifications (FCM) - status de permissão e botão de teste
+  Widget _buildPushNotificationsCard(ProfileEntity? activeProfile) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Status de Permissão FCM
+            FutureBuilder<NotificationSettings>(
+              future: FirebaseMessaging.instance.getNotificationSettings(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    ),
+                  );
+                }
+                
+                final status = snapshot.data!.authorizationStatus;
+                final isAuthorized = status == AuthorizationStatus.authorized;
+                final statusText = _getPermissionStatusText(status);
+                
+                return Column(
+                  children: [
+                    // Status atual
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: (isAuthorized ? AppColors.success : AppColors.error)
+                              .withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          isAuthorized ? Iconsax.tick_circle : Iconsax.danger,
+                          color: isAuthorized ? AppColors.success : AppColors.error,
+                          size: 24,
+                        ),
+                      ),
+                      title: Text(
+                        'Status das Notificações',
+                        style: AppTypography.titleMedium.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        statusText,
+                        style: AppTypography.caption.copyWith(
+                          color: isAuthorized ? AppColors.success : AppColors.error,
+                        ),
+                      ),
+                    ),
+                    
+                    // Botão solicitar permissão (se não autorizado)
+                    if (!isAuthorized) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _requestPushPermission(activeProfile),
+                          icon: const Icon(Iconsax.notification),
+                          label: const Text('Solicitar Permissão'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    
+                    // Botão de Teste
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Iconsax.send_2,
+                          color: AppColors.primary,
+                          size: 24,
+                        ),
+                      ),
+                      title: Text(
+                        'Testar Notificações',
+                        style: AppTypography.titleMedium.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Envie uma notificação de teste',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      trailing: TextButton(
+                        onPressed: isAuthorized
+                            ? () => _sendTestNotification(activeProfile)
+                            : null,
+                        child: Text(
+                          'Enviar',
+                          style: TextStyle(
+                            color: isAuthorized
+                                ? AppColors.primary
+                                : AppColors.textHint,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Retorna texto legível do status de permissão FCM
+  String _getPermissionStatusText(AuthorizationStatus status) {
+    switch (status) {
+      case AuthorizationStatus.authorized:
+        return 'Notificações habilitadas ✅';
+      case AuthorizationStatus.denied:
+        return 'Permissão negada ❌';
+      case AuthorizationStatus.notDetermined:
+        return 'Aguardando permissão ⏳';
+      case AuthorizationStatus.provisional:
+        return 'Permissão provisória 📱';
+    }
+  }
+
+  /// Solicita permissão de push notifications (FCM)
+  Future<void> _requestPushPermission(ProfileEntity? activeProfile) async {
+    if (!mounted) return;
+
+    try {
+      final pushService = ref.read(pushNotificationServiceProvider);
+      final settings = await pushService.requestPermission();
+
+      if (!mounted) return;
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        // Salvar token para perfil ativo
+        if (activeProfile != null) {
+          await pushService.saveTokenForProfile(activeProfile.profileId);
+        }
+
+        AppSnackBar.showSuccess(context, '✅ Permissão concedida!');
+        
+        // Rebuild UI para atualizar status
+        setState(() {});
+      } else {
+        AppSnackBar.showError(context, '❌ Permissão negada');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.showError(context, 'Erro: $e');
+    }
+  }
+
+  /// Envia notificação de teste
+  Future<void> _sendTestNotification(ProfileEntity? activeProfile) async {
+    if (!mounted || activeProfile == null) return;
+
+    try {
+      // Criar notificação in-app de teste usando NotificationService
+      final notificationService = ref.read(notificationServiceProvider);
+      await notificationService.create(
+        recipientProfileId: activeProfile.profileId,
+        type: 'system',
+        title: '🧪 Notificação de Teste',
+        body: 'Push notifications estão funcionando perfeitamente!',
+        data: {
+          'test': true,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+
+      if (!mounted) return;
+
+      AppSnackBar.showSuccess(
+        context,
+        '✅ Notificação de teste enviada! Verifique a aba de notificações.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.showError(context, 'Erro ao enviar teste: $e');
+    }
   }
 
   /// Compartilha o deep link do perfil via WhatsApp, Instagram, etc

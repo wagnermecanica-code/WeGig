@@ -30,7 +30,10 @@ class CustomMarkerWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBand = type == 'band';
-    final primaryColor = isBand ? AppColors.accent : AppColors.primary;
+    final isSales = type == 'sales';
+    final primaryColor = isSales 
+        ? AppColors.salesBlue 
+        : (isBand ? AppColors.accent : AppColors.primary);
     
     return Stack(
       alignment: Alignment.center,
@@ -145,7 +148,7 @@ class CustomMarkerWidget extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    isBand ? Iconsax.people : Iconsax.musicnote,
+                    isSales ? Iconsax.tag : (isBand ? Iconsax.people : Iconsax.musicnote),
                     size: 12,
                     color: primaryColor,
                   ),
@@ -169,13 +172,22 @@ class CustomMarkerWidget extends StatelessWidget {
   }
 
   Widget _buildDefaultIcon(bool isBand, bool isActive) {
+    final isSales = type == 'sales';
+    final backgroundColor = isSales
+        ? AppColors.salesBlue.withValues(alpha: 0.2)
+        : (isBand 
+            ? AppColors.accent.withValues(alpha: 0.2)
+            : AppColors.primary.withValues(alpha: 0.2));
+    
+    final iconData = isSales
+        ? Iconsax.tag
+        : (isBand ? Icons.group : Icons.music_note);
+    
     return Container(
-      color: isBand 
-          ? AppColors.accent.withValues(alpha: 0.2)
-          : AppColors.primary.withValues(alpha: 0.2),
+      color: backgroundColor,
       child: Center(
         child: Icon(
-          isBand ? Icons.group : Icons.music_note,
+          iconData,
           size: isActive ? 28 : 24,
           color: Colors.white,
         ),
@@ -200,8 +212,9 @@ class SimpleMarkerWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBand = type == 'band';
+    final isSales = type == 'sales';
     final color = customColor ?? 
-        (isBand ? AppColors.accent : AppColors.primary);
+        (isSales ? AppColors.salesBlue : (isBand ? AppColors.accent : AppColors.primary));
     
     return Container(
       width: isActive ? 50 : 40,
@@ -228,7 +241,7 @@ class SimpleMarkerWidget extends StatelessWidget {
         ],
       ),
       child: Icon(
-        isBand ? Icons.group : Icons.music_note,
+        isSales ? Iconsax.tag : (isBand ? Icons.group : Icons.music_note),
         size: isActive ? 24 : 20,
         color: Colors.white,
       ),

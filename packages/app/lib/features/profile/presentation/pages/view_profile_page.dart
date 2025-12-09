@@ -145,7 +145,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       final gallery =
           (doc.data()?['gallery'] as List<dynamic>?)?.cast<String>() ??
               <String>[];
-      _gallery = gallery.take(9).toList(); // Limitar a 9 fotos para performance
+      _gallery = gallery.take(12).toList(); // Limitar a 12 fotos para performance
 
       // Preparar YouTube controller se link válido
       final videoId = _extractYoutubeVideoId(profile.youtubeLink);
@@ -1019,68 +1019,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
                               // ===== CAMPOS ESPECÍFICOS DE ESPAÇO =====
                               if (_profile!.isSpace) ...[
-                                // Telefone/WhatsApp
-                                if (_profile!.phone != null && _profile!.phone!.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: Row(
-                                      children: [
-                                        // Botão de ligar
-                                        Expanded(
-                                          child: InkWell(
-                                            onTap: () => _launchUrl('tel:${_profile!.phone}'),
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                                              decoration: BoxDecoration(
-                                                border: Border.all(color: AppColors.primary),
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  const Icon(Iconsax.call, size: 18, color: AppColors.primary),
-                                                  const SizedBox(width: 8),
-                                                  Flexible(
-                                                    child: Text(
-                                                      _profile!.phone!,
-                                                      style: const TextStyle(
-                                                        fontSize: 14,
-                                                        color: AppColors.primary,
-                                                        fontWeight: FontWeight.w600,
-                                                      ),
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        // Botão WhatsApp
-                                        InkWell(
-                                          onTap: () {
-                                            final phone = _profile!.phone!.replaceAll(RegExp(r'[^\d]'), '');
-                                            final phoneWithCountry = phone.startsWith('55') ? phone : '55$phone';
-                                            _launchUrl('https://wa.me/$phoneWithCountry');
-                                          },
-                                          child: Container(
-                                            padding: const EdgeInsets.all(10),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF25D366),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: const Icon(
-                                              Icons.chat,
-                                              size: 20,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
                                 // Horário de funcionamento
                                 if (_profile!.operatingHours != null && _profile!.operatingHours!.isNotEmpty)
                                   Padding(
@@ -1153,8 +1091,70 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                   ),
                               ],
 
-                              // Social Links Block
+                              // Social Links Block (YouTube, TikTok, Instagram)
                               if (_hasSocialLinks()) _buildSocialLinksBlock(),
+
+                              // Telefone/WhatsApp (posicionado APÓS os links sociais)
+                              if (_profile!.isSpace && _profile!.phone != null && _profile!.phone!.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8, bottom: 8),
+                                  child: Row(
+                                    children: [
+                                      // Botão de ligar
+                                      Expanded(
+                                        child: InkWell(
+                                          onTap: () => _launchUrl('tel:${_profile!.phone}'),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(color: AppColors.primary),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Iconsax.call, size: 18, color: AppColors.primary),
+                                                const SizedBox(width: 8),
+                                                Flexible(
+                                                  child: Text(
+                                                    _profile!.phone!,
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      color: AppColors.primary,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // Botão WhatsApp
+                                      InkWell(
+                                        onTap: () {
+                                          final phone = _profile!.phone!.replaceAll(RegExp(r'[^\d]'), '');
+                                          final phoneWithCountry = phone.startsWith('55') ? phone : '55$phone';
+                                          _launchUrl('https://wa.me/$phoneWithCountry');
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF25D366),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(
+                                            Icons.chat,
+                                            size: 20,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
 
                               // Botões de ação (Mensagem e Compartilhar) - estilo Instagram
                               if (!isOwnProfile) ...[
@@ -2281,7 +2281,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
     AppSnackBar.showSuccess(
       context,
-      'Interesse enviado! 🎵',
+      'Interesse enviado!',
     );
 
     try {
@@ -2318,7 +2318,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
     AppSnackBar.showInfo(
       context,
-      'Interesse removido 🎵',
+      'Interesse removido',
     );
 
     try {
@@ -2352,6 +2352,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       bool isInterestSent, bool isOwner) {
     final type = (data['type'] as String?) ?? '';
     final authorProfileId = (data['authorProfileId'] as String?) ?? '';
+    final isSalesPost = type == 'sales';
 
     showModalBottomSheet<void>(
       context: context,
@@ -2384,7 +2385,35 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                     MaterialPageRoute<void>(
                       builder: (_) => PostPage(
                         postType: type,
-                        existingPostData: {'postId': postId, ...data},
+                        existingPostData: {
+                          'postId': postId,
+                          'content': data['content'],
+                          // Common fields
+                          'city': data['city'],
+                          'neighborhood': data['neighborhood'],
+                          'state': data['state'],
+                          'photoUrls': data['photoUrls'],
+                          'photoUrl': data['photoUrl'], // fallback
+                          'youtubeLink': data['youtubeLink'],
+                          'location': data['location'],
+                          'createdAt': data['createdAt'],
+                          'expiresAt': data['expiresAt'],
+                          // Musician/Band fields
+                          'instruments': data['instruments'],
+                          'genres': data['genres'],
+                          'seekingMusicians': data['seekingMusicians'],
+                          'level': data['level'],
+                          'availableFor': data['availableFor'],
+                          // Sales fields
+                          'title': data['title'],
+                          'salesType': data['salesType'],
+                          'price': data['price'],
+                          'discountMode': data['discountMode'],
+                          'discountValue': data['discountValue'],
+                          'promoStartDate': data['promoStartDate'],
+                          'promoEndDate': data['promoEndDate'],
+                          'whatsappNumber': data['whatsappNumber'],
+                        },
                       ),
                     ),
                   );
@@ -2472,8 +2501,11 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             else ...[
               if (isInterestSent)
                 ListTile(
-                  leading: const Icon(Iconsax.heart, color: Colors.red),
-                  title: const Text('Remover Interesse'),
+                  leading: Icon(
+                    isSalesPost ? Iconsax.tag5 : Iconsax.heart,
+                    color: isSalesPost ? AppColors.primary : Colors.red,
+                  ),
+                  title: Text(isSalesPost ? 'Remover dos Salvos' : 'Remover Interesse'),
                   onTap: () {
                     Navigator.pop(ctx);
                     _removeInterestOptimistically(postId, authorProfileId);
@@ -2481,8 +2513,11 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 )
               else
                 ListTile(
-                  leading: const Icon(Iconsax.heart5, color: Colors.pink),
-                  title: const Text('Demonstrar Interesse'),
+                  leading: Icon(
+                    isSalesPost ? Iconsax.tag : Iconsax.heart5,
+                    color: isSalesPost ? AppColors.primary : Colors.pink,
+                  ),
+                  title: Text(isSalesPost ? 'Salvar Anúncio' : 'Demonstrar Interesse'),
                   onTap: () {
                     Navigator.pop(ctx);
                     _sendInterestOptimistically(postId, authorProfileId, type);
@@ -2703,7 +2738,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               ),
             ),
 
-            // Botão de interesse (canto superior direito) ou menu (canto inferior direito)
+            // Botão de interesse (alinhado com topo da foto) ou menu (canto inferior direito)
             if (isOwner)
               Positioned(
                 bottom: 8,
@@ -2720,7 +2755,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               )
             else
               Positioned(
-                top: 8,
+                top: 16, // Alinhado com contentPadding top do ListTile
                 right: 8,
                 child: GestureDetector(
                   onTap: () => _showInterestOptionsDialog(
@@ -2730,13 +2765,13 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                     decoration: BoxDecoration(
                       color: isInterestSent
                           ? Colors.pink.withValues(alpha: 0.15)
-                          : primaryColor.withValues(alpha: 0.1),
+                          : AppColors.primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       isInterestSent
-                          ? Iconsax.heart5
-                          : Iconsax.heart,
+                          ? (type == 'sales' ? Iconsax.tag5 : Iconsax.heart5)
+                          : (type == 'sales' ? Iconsax.tag : Iconsax.heart),
                       size: 16,
                       color: isInterestSent ? Colors.pink : primaryColor,
                     ),

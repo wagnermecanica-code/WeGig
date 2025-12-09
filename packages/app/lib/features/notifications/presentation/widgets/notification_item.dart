@@ -1,5 +1,4 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
@@ -7,12 +6,10 @@ import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/widgets/mention_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:wegig_app/app/router/app_router.dart';
-import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
 import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
-import 'package:wegig_app/features/notifications/presentation/providers/notifications_providers.dart';
+import 'package:wegig_app/features/notifications/presentation/utils/notification_action_handler.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:wegig_app/features/notifications/presentation/widgets/notification_location_row.dart';
 
@@ -255,134 +252,9 @@ class NotificationItem extends ConsumerWidget {
   }
 
   Future<void> _handleNotificationTap(BuildContext context, WidgetRef ref) async {
-    // Marcar como lida
-    if (!notification.read) {
-      try {
-        await ref
-            .read(notificationServiceProvider)
-            .markAsRead(notification.notificationId);
-      } catch (e) {
-        // Não bloqueia a navegação
-      }
-    }
-
-    if (!context.mounted) return;
-
-    // Executar ação baseada no tipo
-    switch (notification.actionType) {
-      case NotificationActionType.viewProfile:
-        final userId = notification.actionData?['userId'] as String?;
-        final profileId = notification.actionData?['profileId'] as String?;
-        if (userId != null) {
-          context.pushProfile(profileId ?? userId);
-        }
-        return;
-
-      case NotificationActionType.openChat:
-        final conversationId =
-            notification.actionData?['conversationId'] as String?;
-        final otherUserId = notification.actionData?['otherUserId'] as String?;
-        final otherProfileId =
-            notification.actionData?['otherProfileId'] as String?;
-
-        if (conversationId != null &&
-            otherUserId != null &&
-            otherProfileId != null) {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => ChatDetailPage(
-                conversationId: conversationId,
-                otherUserId: otherUserId,
-                otherProfileId: otherProfileId,
-                otherUserName: notification.senderName ?? 'Usuário',
-                otherUserPhoto: notification.senderPhoto ?? '',
-              ),
-            ),
-          );
-        }
-        return;
-
-      case NotificationActionType.viewPost:
-        final postId = notification.targetId;
-        if (postId != null) {
-          await _openPostDetail(context, ref, postId);
-        }
-        return;
-
-      case NotificationActionType.renewPost:
-        final postId = notification.actionData?['postId'] as String?;
-        if (postId != null) {
-          debugPrint('🔄 NotificationItem: Solicitando renovação de post $postId');
-          
-          // Renovar post (atualizar expiresAt para +30 dias)
-          try {
-            final now = DateTime.now();
-            final newExpiresAt = now.add(const Duration(days: 30));
-            
-            await FirebaseFirestore.instance
-                .collection('posts')
-                .doc(postId)
-                .update({
-              'expiresAt': Timestamp.fromDate(newExpiresAt),
-              'renewedAt': Timestamp.now(),
-              'renewCount': FieldValue.increment(1),
-            });
-            
-            debugPrint('✅ Post $postId renovado até ${newExpiresAt.toIso8601String()}');
-            
-            if (context.mounted) {
-              AppSnackBar.showSuccess(
-                context,
-                'Post renovado por mais 30 dias! 🎉',
-              );
-            }
-            
-            // Marcar notificação como lida após renovação
-            await ref.read(markNotificationAsReadUseCaseProvider)(
-              notificationId: notification.notificationId,
-              profileId: notification.recipientProfileId,
-            );
-          } catch (e) {
-            debugPrint('❌ Erro ao renovar post: $e');
-            if (context.mounted) {
-              AppSnackBar.showError(
-                context,
-                'Erro ao renovar post: $e',
-              );
-            }
-          }
-        }
-        return;
-
-      default:
-        break;
-    }
-
-    // Fallback: notificações de interesse sempre abrem o post
-    if (notification.type == NotificationType.interest) {
-      final postId = notification.targetId;
-      if (postId != null) {
-        await _openPostDetail(context, ref, postId);
-      }
-    }
-  }
-
-  Future<void> _openPostDetail(
-    BuildContext context,
-    WidgetRef ref,
-    String postId,
-  ) async {
-    debugPrint('📍 NotificationItem: Navegando para post $postId');
-    context.push(AppRoutes.postDetail(postId));
-
-    try {
-      await ref.read(markNotificationAsReadUseCaseProvider)(
-        notificationId: notification.notificationId,
-        profileId: notification.recipientProfileId,
-      );
-    } catch (e) {
-      debugPrint('⚠️ Erro ao marcar notificação como lida: $e');
-    }
+    // ✅ Delegar para handler centralizado
+    final handler = NotificationActionHandler(ref: ref, context: context);
+    await handler.handle(notification);
   }
 
   String _formatTimeAgo(DateTime dateTime) {

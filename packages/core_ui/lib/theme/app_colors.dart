@@ -15,6 +15,7 @@ class AppColors {
   // Branding (novos tokens)
   static const Color brandPrimary = Color(0xFFE47911); // Laranja
   static const Color utilityLink = Color(0xFF007EB9); // Azul para links
+  static const Color salesBlue = Color(0xFF007EB9); // Azul para anúncios (sales)
 
   // Neutros
   static const Color background = Color(0xFFFAFAFA);

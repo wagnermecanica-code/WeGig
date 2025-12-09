@@ -169,6 +169,63 @@ class NotificationEntity with _$NotificationEntity {
     return null;
   }
 
+  // ============================================================================
+  // HELPERS TIPADOS PARA actionData (evita casts manuais)
+  // ============================================================================
+
+  /// Extrai userId de actionData com fallback para senderUid
+  String? get actionUserId {
+    final userId = actionData?['userId'];
+    if (userId is String && userId.isNotEmpty) return userId;
+    return senderUid;
+  }
+
+  /// Extrai profileId de actionData com fallback para senderProfileId
+  String? get actionProfileId {
+    final profileId = actionData?['profileId'];
+    if (profileId is String && profileId.isNotEmpty) return profileId;
+    return senderProfileId;
+  }
+
+  /// Extrai conversationId de actionData
+  String? get actionConversationId {
+    final conversationId = actionData?['conversationId'];
+    if (conversationId is String && conversationId.isNotEmpty) {
+      return conversationId;
+    }
+    return null;
+  }
+
+  /// Extrai otherUserId de actionData com fallback para senderUid
+  String? get actionOtherUserId {
+    final otherUserId = actionData?['otherUserId'];
+    if (otherUserId is String && otherUserId.isNotEmpty) return otherUserId;
+    return senderUid;
+  }
+
+  /// Extrai otherProfileId de actionData com fallback para senderProfileId
+  String? get actionOtherProfileId {
+    final otherProfileId = actionData?['otherProfileId'];
+    if (otherProfileId is String && otherProfileId.isNotEmpty) {
+      return otherProfileId;
+    }
+    return senderProfileId;
+  }
+
+  /// Extrai postId de actionData com fallback para targetId
+  String? get actionPostId {
+    final postId = actionData?['postId'];
+    if (postId is String && postId.isNotEmpty) return postId;
+    return targetId;
+  }
+
+  /// Extrai route de actionData (para NotificationActionType.navigate)
+  String? get actionRoute {
+    final route = actionData?['route'];
+    if (route is String && route.isNotEmpty) return route;
+    return null;
+  }
+
   /// Ícone baseado no tipo
   String get iconName {
     switch (type) {

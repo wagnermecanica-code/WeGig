@@ -27,7 +27,9 @@ import 'package:wegig_app/features/home/presentation/widgets/map/map_controller.
 import 'package:wegig_app/features/home/presentation/widgets/map/marker_builder.dart';
 import 'package:wegig_app/features/home/presentation/widgets/search/search_service.dart';
 import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
+import 'package:wegig_app/features/post/data/models/interest_document.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
+import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/home/data/datasources/gps_cache_service.dart';
@@ -63,7 +65,6 @@ class _HomePageState extends ConsumerState<HomePage>
   
   // State
   List<PostEntity> _visiblePosts = [];
-  final Set<String> _sentInterests = <String>{};
   Set<Marker> _markers = {};
   String? _activePostId;
   bool _isCenteringLocation = false;
@@ -228,6 +229,7 @@ class _HomePageState extends ConsumerState<HomePage>
   // ========================= MÉTODOS DE LÓGICA =========================
 
   void _onSearchChanged() {
+    debugPrint('🔍 HomePage._onSearchChanged: searchNotifier.value = ${widget.searchNotifier?.value}');
     if (mounted) {
       setState(_onMapIdle);
     }
@@ -335,7 +337,6 @@ class _HomePageState extends ConsumerState<HomePage>
       if (_mapControllerWrapper.currentPosition != null) {
         targetPos = _mapControllerWrapper.currentPosition;
         debugPrint('📍 Usando posição em cache');
-        AppSnackBar.showInfo(context, 'Mapa centralizado!');
       } else {
         // Estratégia 2: GPS atual com timeout de 10s
         final permission = await Geolocator.checkPermission();
@@ -402,7 +403,6 @@ class _HomePageState extends ConsumerState<HomePage>
         await controller.animateCamera(
           CameraUpdate.newLatLngZoom(targetPos, 14),
         );
-        debugPrint('✅ Mapa centralizado');
       } else {
         AppSnackBar.showError(context, 'Não foi possível obter localização');
       }
@@ -426,30 +426,76 @@ class _HomePageState extends ConsumerState<HomePage>
   Future<void> _sendInterestNotification(PostEntity post) async {
     final currentUser = FirebaseAuth.instance.currentUser;
     final activeProfile = _activeProfile;
+    
     if (currentUser == null || activeProfile == null) {
       throw Exception('Usuário não autenticado ou perfil não ativo.');
     }
 
-    await FirebaseFirestore.instance.collection('interests').add({
-      'postId': post.id,
-      'postAuthorUid': post.authorUid,
-      'postAuthorProfileId': post.authorProfileId,
-      'profileUid': activeProfile.uid,
-      'interestedUid': currentUser.uid,
-      'interestedProfileId': activeProfile.profileId,
-      'interestedProfileName': activeProfile.name, // ✅ Cloud Function expects this field
-      'interestedProfilePhotoUrl': activeProfile.photoUrl, // ✅ Used in notification
-      'interestedName': activeProfile.name, // ⚠️ Deprecated but kept for backwards compat
-      'createdAt': FieldValue.serverTimestamp(),
-      'read': false,
-    });
+    // ✅ VALIDAÇÃO CRÍTICA: Verificar se post tem authorUid
+    String authorUid = post.authorUid;
+    
+    if (authorUid.isEmpty) {
+      debugPrint('⚠️ AVISO: post.authorUid vazio, tentando recuperar do Firestore...');
+      
+      try {
+        // Tentar recarregar o post do Firestore para obter authorUid
+        final postDoc = await FirebaseFirestore.instance
+            .collection('posts')
+            .doc(post.id)
+            .get();
+        
+        if (!postDoc.exists) {
+          throw Exception('Post ${post.id} não encontrado no Firestore');
+        }
+        
+        final postData = postDoc.data()!;
+        authorUid = postData['authorUid'] as String? ?? '';
+        
+        if (authorUid.isEmpty) {
+          throw Exception('Post ${post.id} não tem authorUid no Firestore');
+        }
+        
+        debugPrint('✅ authorUid recuperado do Firestore: $authorUid');
+      } catch (e) {
+        debugPrint('❌ Erro ao recuperar authorUid: $e');
+        throw Exception('Post sem informações de autor válidas');
+      }
+    }
+
+    // Validar campos obrigatórios
+    if (post.id.isEmpty) throw Exception('postId está vazio');
+    if (post.authorProfileId.isEmpty) throw Exception('postAuthorProfileId está vazio');
+    if (activeProfile.profileId.isEmpty) throw Exception('interestedProfileId está vazio');
+    if (activeProfile.name.isEmpty) throw Exception('interestedProfileName está vazio');
+
+    debugPrint('✅ Criando documento de interesse:');
+    debugPrint('  - postId: ${post.id}');
+    debugPrint('  - postAuthorUid: $authorUid');
+    debugPrint('  - postAuthorProfileId: ${post.authorProfileId}');
+    debugPrint('  - interestedProfileId: ${activeProfile.profileId}');
+
+    // ✅ Usar factory padronizada para garantir estrutura consistente
+    final interestData = InterestDocumentFactory.create(
+      postId: post.id,
+      postAuthorUid: authorUid,
+      postAuthorProfileId: post.authorProfileId,
+      currentUserUid: currentUser.uid,
+      activeProfileUid: activeProfile.uid,
+      activeProfileId: activeProfile.profileId,
+      activeProfileName: activeProfile.name,
+      activeProfilePhotoUrl: activeProfile.photoUrl,
+    );
+
+    await FirebaseFirestore.instance.collection('interests').add(interestData);
+
+    debugPrint('✅ Documento de interesse criado com sucesso');
 
     final distance = _calculateDistanceToPost(post, activeProfile);
 
     await ref.read(notificationServiceProvider).createInterestReceivedNotification(
           postId: post.id,
           postOwnerProfileId: post.authorProfileId,
-          postOwnerUid: post.authorUid,
+          postOwnerUid: authorUid, // ✅ Usar authorUid validado
           interestedProfileId: activeProfile.profileId,
           interestedUserName: activeProfile.name,
           interestedUserPhoto: activeProfile.photoUrl ?? '',
@@ -457,6 +503,8 @@ class _HomePageState extends ConsumerState<HomePage>
           city: post.city,
           distanceKm: distance,
         );
+    
+    debugPrint('✅ Notificação in-app criada com sucesso');
   }
 
   double? _calculateDistanceToPost(PostEntity post, ProfileEntity profile) {
@@ -472,54 +520,125 @@ class _HomePageState extends ConsumerState<HomePage>
 
   Future<void> _sendInterestOptimistically(PostEntity post) async {
     if (!mounted) return;
-    setState(() => _sentInterests.add(post.id));
 
-    AppSnackBar.showSuccess(context, 'Interesse enviado! 🎵');
+    // ✅ LOG 1: Validação prévia
+    debugPrint('🔍 _sendInterestOptimistically: postId=${post.id}');
+    debugPrint('🔍 authorProfileId=${post.authorProfileId}');
+    debugPrint('🔍 authorUid=${post.authorUid}');
 
+    // ✅ VALIDAÇÃO PRÉVIA: Verificar se post tem dados necessários
+    if (post.id.isEmpty) {
+      AppSnackBar.showError(context, 'Erro: Post inválido (ID vazio)');
+      return;
+    }
+    if (post.authorProfileId.isEmpty) {
+      AppSnackBar.showError(context, 'Erro: Post sem autor');
+      return;
+    }
+
+    // ✅ MUDANÇA: Usar provider global ao invés de Set local
+    final interestNotifier = ref.read(interestNotifierProvider.notifier);
+    
+    // ✅ Verificar se já não demonstrou interesse (evitar duplicatas)
+    if (interestNotifier.hasInterest(post.id)) {
+      AppSnackBar.showInfo(context, 'Você já demonstrou interesse neste post');
+      return;
+    }
+
+    final isSalesPost = post.type == 'sales';
+    
     try {
-      await _sendInterestNotification(post);
-    } catch (e) {
-      debugPrint('Erro no envio otimista de interesse: $e');
+      // ✅ Chamar provider global (Optimistic Update já incluído)
+      await interestNotifier.addInterest(
+        postId: post.id,
+        postAuthorUid: post.authorUid,
+        postAuthorProfileId: post.authorProfileId,
+      );
+
+      // ✅ Criar notificação in-app
+      final activeProfile = _activeProfile;
+      if (activeProfile != null) {
+        final distance = _calculateDistanceToPost(post, activeProfile);
+        
+        await ref.read(notificationServiceProvider).createInterestReceivedNotification(
+          postId: post.id,
+          postOwnerProfileId: post.authorProfileId,
+          postOwnerUid: post.authorUid,
+          interestedProfileId: activeProfile.profileId,
+          interestedUserName: activeProfile.name,
+          interestedUserPhoto: activeProfile.photoUrl ?? '',
+          interestedUserUsername: activeProfile.username,
+          city: post.city,
+          distanceKm: distance,
+        );
+      }
+
       if (mounted) {
-        setState(() => _sentInterests.remove(post.id));
-        AppSnackBar.showError(context, 'Erro ao enviar interesse: $e');
+        AppSnackBar.showSuccess(
+          context,
+          isSalesPost ? 'Anúncio salvo!' : 'Interesse enviado!',
+        );
+      }
+      
+      debugPrint('Interesse registrado com sucesso para post ${post.id}');
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Erro ao enviar interesse: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      if (mounted) {
+        // Mensagem de erro específica baseada no tipo de exceção
+        String errorMessage = 'Erro ao enviar interesse';
+        if (e.toString().contains('authorUid') || e.toString().contains('autor')) {
+          errorMessage = 'Erro: Post sem informações de autor';
+        } else if (e.toString().contains('permission')) {
+          errorMessage = 'Erro: Sem permissão para criar interesse';
+        } else if (e.toString().contains('network') || e.toString().contains('connection')) {
+          errorMessage = 'Erro: Verifique sua conexão com a internet';
+        }
+        
+        AppSnackBar.showError(context, errorMessage);
       }
     }
   }
 
+  /// Remove interesse de um post (Abordagem Otimista)
   Future<void> _removeInterestOptimistically(PostEntity post) async {
     if (!mounted) return;
-    setState(() => _sentInterests.remove(post.id));
-
-    AppSnackBar.showInfo(context, 'Interesse removido');
 
     try {
-      final activeProfile = _activeProfile;
-      if (activeProfile == null) throw Exception('Perfil ativo não encontrado');
+      // ✅ MUDANÇA: Usar provider global
+      await ref.read(interestNotifierProvider.notifier).removeInterest(
+        postId: post.id,
+      );
 
-      final notificationsQuery = await FirebaseFirestore.instance
-          .collection('notifications')
-          .where('type', isEqualTo: 'interest')
-          .where('senderProfileId', isEqualTo: activeProfile.profileId)
-          .where('postId', isEqualTo: post.id)
-          .get();
-
-      for (final doc in notificationsQuery.docs) {
-        await doc.reference.delete();
-      }
-    } catch (e) {
-      debugPrint('Erro ao remover interesse: $e');
       if (mounted) {
-        setState(() => _sentInterests.add(post.id));
-        AppSnackBar.showError(context, 'Erro ao remover interesse: $e');
+        AppSnackBar.showInfo(context, 'Interesse removido');
+      }
+      
+      debugPrint('Interesse removido com sucesso do Firestore');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Erro ao remover interesse: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      if (mounted) {
+        String errorMessage = 'Erro ao remover interesse';
+        if (e.toString().contains('permission')) {
+          errorMessage = 'Erro: Sem permissão para remover interesse';
+        } else if (e.toString().contains('not-found')) {
+          errorMessage = 'Interesse não encontrado';
+        }
+        
+        AppSnackBar.showError(context, errorMessage);
       }
     }
   }
 
   void _showInterestOptionsDialog(PostEntity post) {
-    final isInterestSent = _sentInterests.contains(post.id);
+    final isInterestSent = ref.read(interestNotifierProvider).contains(post.id);
     final isOwner = post.authorProfileId.isNotEmpty &&
         post.authorProfileId == _activeProfile?.profileId;
+    final isSalesPost = post.type == 'sales';
 
     showModalBottomSheet<void>(
       context: context,
@@ -552,18 +671,35 @@ class _HomePageState extends ConsumerState<HomePage>
                       builder: (_) => PostPage(
                         postType: post.type,
                         existingPostData: {
+                          // ✅ CAMPOS COMUNS A TODOS OS TIPOS
                           'postId': post.id,
                           'content': post.content,
-                          'instruments': post.instruments,
-                          'genres': post.genres,
-                          'seekingMusicians': post.seekingMusicians,
-                          'level': post.level,
-                          'photoUrl': post.photoUrl,
-                          'photoUrls': post.photoUrls, // Carrossel completo
+                          'photoUrls': post.photoUrls,
                           'youtubeLink': post.youtubeLink,
                           'location': GeoPoint(
                               post.location.latitude, post.location.longitude),
                           'city': post.city,
+                          'neighborhood': post.neighborhood,
+                          'state': post.state,
+                          'createdAt': post.createdAt,
+                          'expiresAt': post.expiresAt,
+                          
+                          // ✅ CAMPOS ESPECÍFICOS DE MUSICIAN/BAND
+                          'instruments': post.instruments,
+                          'genres': post.genres,
+                          'seekingMusicians': post.seekingMusicians,
+                          'level': post.level,
+                          'availableFor': post.availableFor,
+                          
+                          // ✅ CAMPOS ESPECÍFICOS DE SALES
+                          'title': post.title,
+                          'salesType': post.salesType,
+                          'price': post.price,
+                          'discountMode': post.discountMode,
+                          'discountValue': post.discountValue,
+                          'promoStartDate': post.promoStartDate,
+                          'promoEndDate': post.promoEndDate,
+                          'whatsappNumber': post.whatsappNumber,
                         },
                       ),
                     ),
@@ -587,8 +723,12 @@ class _HomePageState extends ConsumerState<HomePage>
             else ...[
               if (isInterestSent)
                 ListTile(
-                  leading: const Icon(Iconsax.heart, color: Colors.red),
-                  title: const Text('Remover Interesse'),
+                    leading: Icon(
+                    isSalesPost ? Iconsax.tag5 : Iconsax.heart5,
+                    color: isSalesPost ? AppColors.primary : Colors.pink,
+                    size: 24,
+                    ),
+                  title: Text(isSalesPost ? 'Remover dos Salvos' : 'Remover Interesse'),
                   onTap: () {
                     Navigator.pop(ctx);
                     _removeInterestOptimistically(post);
@@ -596,8 +736,12 @@ class _HomePageState extends ConsumerState<HomePage>
                 )
               else
                 ListTile(
-                  leading: const Icon(Iconsax.heart5, color: Colors.pink),
-                  title: const Text('Demonstrar Interesse'),
+                  leading: Icon(
+                    isSalesPost ? Iconsax.tag : Iconsax.heart5,
+                    color: isSalesPost ? AppColors.primary : Colors.pink,
+                    size: 24,
+                  ),
+                  title: Text(isSalesPost ? 'Salvar Anúncio' : 'Demonstrar Interesse'),
                   onTap: () {
                     Navigator.pop(ctx);
                     _sendInterestOptimistically(post);
@@ -705,13 +849,6 @@ class _HomePageState extends ConsumerState<HomePage>
           backgroundColor: const Color(0xFFE47911), // Brand Orange
           foregroundColor: const Color(0xFFFAFAFA), // Off-white
           elevation: 2,
-          leading: IconButton(
-            icon: const Icon(Iconsax.tag),
-            tooltip: 'WeGig',
-            onPressed: () {
-              // Ação futura (ex: animação, Easter egg, etc.)
-            },
-          ),
           title: Image.asset(
             'assets/Logo/WeGig.png',
             height: 53.6, // 46.6 * 1.15 = 53.59 (arredondado para 53.6)
@@ -1077,6 +1214,7 @@ class _HomePageState extends ConsumerState<HomePage>
       final visible = allPosts.where(
         (post) {
           final postLocation = post.location;
+          if (postLocation == null) return false;
           return _latLngInBounds(geoPointToLatLng(postLocation), bounds) &&
               _matchesFilters(post);
         },
@@ -1143,7 +1281,7 @@ class _HomePageState extends ConsumerState<HomePage>
           post: activePost,
           isActive: true,
           currentActiveProfileId: _activeProfile?.profileId,
-          isInterestSent: _sentInterests.contains(activePost.id),
+          isInterestSent: ref.watch(interestNotifierProvider).contains(activePost.id),
           onOpenOptions: () => _showInterestOptionsDialog(activePost),
           onClose: _closeCard,
         ),
@@ -1246,19 +1384,88 @@ class _HomePageState extends ConsumerState<HomePage>
     final params = widget.searchNotifier?.value;
     if (params == null) return true;
 
+    debugPrint('🔍 HomePage._matchesFilters: Checking post ${post.id} (type: ${post.type})');
+    debugPrint('🔍 Params: postType=${params.postType}, salesType=${params.salesType}, minPrice=${params.minPrice}, maxPrice=${params.maxPrice}');
+
+    // ✅ FILTROS DE SALES (Anúncios)
+    if (params.postType == 'sales') {
+      debugPrint('🔍 Applying SALES filters');
+      
+      // Tipo deve ser 'sales'
+      if (post.type != 'sales') {
+        debugPrint('🔍 Post rejected: type is ${post.type}, expected sales');
+        return false;
+      }
+      
+      // Tipo de anúncio (Gravação, Ensaios, etc)
+      if (params.salesType != null && params.salesType!.isNotEmpty) {
+        if (post.salesType != params.salesType) {
+          debugPrint('🔍 Post rejected: salesType is ${post.salesType}, expected ${params.salesType}');
+          return false;
+        }
+      }
+      
+      // Faixa de preço mínima
+      if (params.minPrice != null && params.minPrice! > 0) {
+        if (post.price == null || post.price! < params.minPrice!) {
+          debugPrint('🔍 Post rejected: price ${post.price} < minPrice ${params.minPrice}');
+          return false;
+        }
+      }
+      
+      // Faixa de preço máxima
+      if (params.maxPrice != null && params.maxPrice! < 5000) {
+        if (post.price == null || post.price! > params.maxPrice!) {
+          debugPrint('🔍 Post rejected: price ${post.price} > maxPrice ${params.maxPrice}');
+          return false;
+        }
+      }
+      
+      // Apenas com desconto
+      if (params.onlyWithDiscount == true) {
+        if (post.discountMode == null || post.discountMode!.isEmpty) {
+          debugPrint('🔍 Post rejected: no discount mode');
+          return false;
+        }
+      }
+      
+      // Apenas promoções ativas (não expiradas)
+      if (params.onlyActivePromos == true) {
+        if (post.promoEndDate == null || post.promoEndDate!.isBefore(DateTime.now())) {
+          debugPrint('🔍 Post rejected: promo expired or null');
+          return false;
+        }
+      }
+      
+      debugPrint('🔍 Post ${post.id} PASSED sales filters');
+      return true;
+    }
+
+    // ✅ FILTROS DE MÚSICOS/BANDAS (existente)
+    debugPrint('🔍 Applying MUSICIAN/BAND filters');
+    
     // Filtro: tipo de post (Banda ou Músico)
     if (params.postType != null && params.postType!.isNotEmpty) {
-      if (post.type != params.postType) return false;
+      if (post.type != params.postType) {
+        debugPrint('🔍 Post rejected: type mismatch');
+        return false;
+      }
     }
 
     // Filtro: nível
     if (params.level != null && params.level!.isNotEmpty) {
-      if (post.level != params.level) return false;
+      if (post.level != params.level) {
+        debugPrint('🔍 Post rejected: level mismatch');
+        return false;
+      }
     }
 
     // Filtro: YouTube
     if (params.hasYoutube ?? false) {
-      if (post.youtubeLink == null || post.youtubeLink!.isEmpty) return false;
+      if (post.youtubeLink == null || post.youtubeLink!.isEmpty) {
+        debugPrint('🔍 Post rejected: no YouTube link');
+        return false;
+      }
     }
 
     // Filtro: gêneros
@@ -1266,7 +1473,10 @@ class _HomePageState extends ConsumerState<HomePage>
       final hasGenreMatch = post.genres.any(
         params.genres.contains,
       );
-      if (!hasGenreMatch) return false;
+      if (!hasGenreMatch) {
+        debugPrint('🔍 Post rejected: genre mismatch');
+        return false;
+      }
     }
 
     // Filtro: instrumentos
@@ -1276,17 +1486,26 @@ class _HomePageState extends ConsumerState<HomePage>
       final hasInstrumentMatch = postInstruments.any(
         params.instruments.contains,
       );
-      if (!hasInstrumentMatch) return false;
+      if (!hasInstrumentMatch) {
+        debugPrint('🔍 Post rejected: instrument mismatch');
+        return false;
+      }
     }
 
     // Filtro: availableFor (disponível para)
     if (params.availableFor != null && params.availableFor!.isNotEmpty) {
-      // Verifica se o post tem algum item da lista availableFor que corresponda
-      if (post.availableFor.isEmpty) return false;
+      if (post.availableFor.isEmpty) {
+        debugPrint('🔍 Post rejected: empty availableFor');
+        return false;
+      }
       final hasAvailableForMatch = post.availableFor.contains(params.availableFor);
-      if (!hasAvailableForMatch) return false;
+      if (!hasAvailableForMatch) {
+        debugPrint('🔍 Post rejected: availableFor mismatch');
+        return false;
+      }
     }
 
+    debugPrint('🔍 Post ${post.id} PASSED musician/band filters');
     return true;
   }
 }
@@ -1313,8 +1532,7 @@ class PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor =
-        post.type == 'band' ? AppColors.accent : AppColors.primary;
+    final primaryColor = post.type == 'band' ? AppColors.accent : AppColors.primary;
     final lightColor = primaryColor.withValues(alpha: 0.1);
     const textSecondary = AppColors.textSecondary;
 
@@ -1385,9 +1603,9 @@ class PostCard extends StatelessWidget {
                                         child: Icon(
                                           post.type == 'band'
                                               ? Iconsax.people
-                                              : Iconsax.user,
+                                              : (post.type == 'sales' ? Iconsax.bookmark : Iconsax.user),
                                           size: 40,
-                                          color: primaryColor,
+                                          color: AppColors.primary,
                                         ),
                                       ),
                                     ),
@@ -1398,9 +1616,9 @@ class PostCard extends StatelessWidget {
                                       child: Icon(
                                         post.type == 'band'
                                             ? Iconsax.people
-                                            : Iconsax.user,
+                                            : (post.type == 'sales' ? Iconsax.bookmark : Iconsax.user),
                                         size: 40,
-                                        color: primaryColor,
+                                        color: AppColors.primary,
                                       ),
                                     ),
                                   ),
@@ -1460,7 +1678,7 @@ class PostCard extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
-                                    color: primaryColor,
+                                    color: AppColors.primary,
                                     decoration: TextDecoration.none,
                                   ),
                                   maxLines: 1,
@@ -1486,23 +1704,22 @@ class PostCard extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: isInterestSent
                                   ? Colors.pink.withValues(alpha: 0.15)
-                                  : primaryColor.withValues(alpha: 0.1),
+                                  : AppColors.primary.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
-                              isInterestSent
-                                  ? Iconsax.heart5
-                                  : Iconsax.heart,
+                              isInterestSent 
+                                  ? (post.type == 'sales' ? Iconsax.tag5 : Iconsax.heart5)
+                                  : (post.type == 'sales' ? Iconsax.tag : Iconsax.heart),
                               size: 18,
-                              color:
-                                  isInterestSent ? Colors.pink : primaryColor,
+                              color: isInterestSent ? Colors.pink : AppColors.primary,
                             ),
                           ),
                         ),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  // Header clicável
+                  // ✅ Header clicável: Tipo/Título
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () {
@@ -1512,22 +1729,22 @@ class PostCard extends StatelessWidget {
                     child: Row(
                       children: [
                         Icon(
-                          post.type == 'band'
-                              ? Iconsax.search_favorite
-                              : Iconsax.musicnote,
-                          size: 12,
-                          color: primaryColor,
+                          post.type == 'sales' 
+                              ? Iconsax.tag 
+                              : (post.type == 'band' ? Iconsax.search_favorite : Iconsax.musicnote),
+                          size: 14,
+                          color: AppColors.primary,
                         ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            post.type == 'band'
-                                ? 'Busca músico'
-                                : 'Busca banda',
+                            post.type == 'sales'
+                                ? (post.title ?? 'Anúncio')
+                                : (post.type == 'band' ? 'Busca músico' : 'Busca banda'),
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
-                              color: primaryColor,
+                              color: AppColors.primary,
                               decoration: TextDecoration.none,
                             ),
                             maxLines: 1,
@@ -1537,63 +1754,68 @@ class PostCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // Instrumentos em scroll horizontal
-                  if (post.type == 'musician' && post.instruments.isNotEmpty)
-                    _buildHorizontalChips(
-                      icon: Iconsax.music,
-                      items: post.instruments,
-                      color: primaryColor,
-                    )
-                  else if (post.type == 'band' &&
-                      post.seekingMusicians.isNotEmpty)
-                    _buildHorizontalChips(
-                      icon: Iconsax.search_favorite,
-                      items: post.seekingMusicians,
-                      color: primaryColor,
-                    ),
-                  const SizedBox(height: 3),
-                  // Nível
-                  if (post.level.isNotEmpty)
-                    _buildInfoRow(Iconsax.star, post.level,
-                        primaryColor, textSecondary),
-                  // Mensagem do post
-                  if (post.content.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Iconsax.message,
-                          size: 16, color: textSecondary),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: MentionText(
-                            text: post.content,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: textSecondary,
-                              height: 1.35,
+                  // ✅ Conteúdo condicional: Sales vs Musician/Band
+                  if (post.type == 'sales')
+                    _buildSalesContent()
+                  else ...[
+                    // Instrumentos em scroll horizontal
+                    if (post.type == 'musician' && post.instruments.isNotEmpty)
+                      _buildHorizontalChips(
+                        icon: Iconsax.music,
+                        items: post.instruments,
+                        color: AppColors.primary,
+                      )
+                    else if (post.type == 'band' &&
+                        post.seekingMusicians.isNotEmpty)
+                      _buildHorizontalChips(
+                        icon: Iconsax.search_favorite,
+                        items: post.seekingMusicians,
+                        color: AppColors.primary,
+                      ),
+                    const SizedBox(height: 3),
+                    // Nível
+                    if (post.level.isNotEmpty)
+                      _buildInfoRow(Iconsax.star, post.level,
+                          AppColors.primary, textSecondary),
+                    // Mensagem do post
+                    if (post.content.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Iconsax.message,
+                            size: 16, color: textSecondary),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: MentionText(
+                              text: post.content,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: textSecondary,
+                                height: 1.35,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              onMentionTap: (username) {
+                                context.pushProfileByUsername(username);
+                              },
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            onMentionTap: (username) {
-                              context.pushProfileByUsername(username);
-                            },
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ],
                   const Spacer(),
                   // Footer: distância + tempo
                   Row(
                     children: [
                         Icon(Iconsax.location,
-                          size: 16, color: primaryColor),
+                          size: 16, color: AppColors.primary),
                       const SizedBox(width: 3),
                       Text(
                         '${post.distanceKm?.toStringAsFixed(1) ?? '0.0'}km',
                         style: TextStyle(
                           fontSize: 14,
-                          color: primaryColor,
+                          color: AppColors.primary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -1691,6 +1913,121 @@ class PostCard extends StatelessWidget {
     if (diff.inDays > 0) return '${diff.inDays}d';
     if (diff.inHours > 0) return '${diff.inHours}h';
     return '${diff.inMinutes}m';
+  }
+
+  // ✅ Conteúdo específico para Sales
+  Widget _buildSalesContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. Ícone + Preço atual
+        Row(
+          children: [
+            const Icon(Iconsax.dollar_circle, size: 16, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text(
+              'R\$ ${(post.price ?? 0.0).toStringAsFixed(2).replaceAll('.', ',')}',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 4),
+        
+        // 2. Ícone + Preço riscado + Desconto (se houver)
+        if (_hasDiscount()) ...[
+          Row(
+            children: [
+              Icon(Iconsax.percentage_circle, size: 14, color: Colors.grey[600]),
+              const SizedBox(width: 8),
+              
+              // Preço original riscado
+              Text(
+                'R\$ ${_calculateOriginalPrice().toStringAsFixed(2).replaceAll('.', ',')}',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  decoration: TextDecoration.lineThrough,
+                ),
+              ),
+              
+              const SizedBox(width: 8),
+              const Text('•', style: TextStyle(color: Colors.grey)),
+              const SizedBox(width: 8),
+              
+              // Badge de desconto
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  _getDiscountLabel(),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ] else
+          const SizedBox(height: 8),
+        
+        // 3. Conteúdo/mensagem do post
+        if (post.content.isNotEmpty)
+          Text(
+            post.content,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              height: 1.35,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+      ],
+    );
+  }
+
+  bool _hasDiscount() {
+    final discountMode = post.discountMode;
+    final discountValue = post.discountValue ?? 0.0;
+    return discountMode != null && 
+           discountMode != 'none' && 
+           discountValue > 0;
+  }
+
+  double _calculateOriginalPrice() {
+    final price = post.price ?? 0.0;
+    final discountMode = post.discountMode ?? 'none';
+    final discountValue = post.discountValue ?? 0.0;
+    
+    if (discountMode == 'percentage' && discountValue > 0) {
+      return price / (1 - discountValue / 100);
+    } else if (discountMode == 'fixed' && discountValue > 0) {
+      return price + discountValue;
+    }
+    return price;
+  }
+
+  String _getDiscountLabel() {
+    final discountMode = post.discountMode ?? 'none';
+    final discountValue = post.discountValue ?? 0.0;
+    
+    if (discountMode == 'percentage') {
+      return '-${discountValue.toStringAsFixed(0)}%';
+    } else if (discountMode == 'fixed') {
+      return '-R\$ ${discountValue.toStringAsFixed(2).replaceAll('.', ',')}';
+    }
+    return '';
   }
 }
 

@@ -33,8 +33,11 @@ class WeGigPinWidget extends StatelessWidget {
 
   static const double _heightRatio = 1.28;
 
-  Color get _primaryColor =>
-      userType.isBand ? AppColors.accent : AppColors.primary;
+  Color get _primaryColor => switch (userType) {
+    UserType.band => AppColors.accent,
+    UserType.sales => AppColors.salesBlue,
+    UserType.musician => AppColors.primary,
+  };
 
   @override
   Widget build(BuildContext context) {

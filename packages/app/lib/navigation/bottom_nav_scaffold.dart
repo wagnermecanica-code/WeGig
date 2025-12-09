@@ -14,12 +14,13 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/home/presentation/pages/home_page.dart';
-import 'package:wegig_app/features/home/presentation/pages/search_page.dart';
+import 'package:wegig_app/features/home/presentation/pages/search_page_new.dart';
 import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
 import 'package:wegig_app/features/messages/presentation/pages/messages_page.dart';
 import 'package:wegig_app/features/messages/presentation/providers/messages_providers.dart';
 import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
 import 'package:wegig_app/features/notifications/presentation/pages/notifications_page.dart';
+import 'package:wegig_app/features/notifications/presentation/utils/notification_action_handler.dart';
 import 'package:wegig_app/features/notifications/presentation/widgets/notification_location_row.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
@@ -98,7 +99,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     Navigator.push<void>(
       context,
       MaterialPageRoute<void>(
-        builder: (context) => SearchPage(
+        builder: (context) => SearchPageNew(
           searchNotifier: _searchNotifier,
           onApply: () {
             // Fecha a tela de filtros e volta para HomePage
@@ -538,23 +539,43 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
           Expanded(
             child: Consumer(
               builder: (context, ref, child) {
-                final profileState = ref.read(profileProvider);
+                // ✅ FIX: Usar watch() para reatividade ao trocar perfil
+                final profileState = ref.watch(profileProvider);
                 final activeProfile = profileState.value?.activeProfile;
                 if (activeProfile == null) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 // ...existing code for notifications...
                 return StreamBuilder<List<NotificationEntity>>(
+                  // ✅ FIX: Key baseada em profileId para forçar rebuild ao trocar perfil
+                  key: ValueKey('notifications_modal_${activeProfile.profileId}'),
                   stream: ref.read(notificationServiceProvider).streamActiveProfileNotifications(),
                   builder: (context, snapshot) {
                     // ✅ FIX: Mostrar loading apenas no primeiro carregamento
                     if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                       return const Center(child: CircularProgressIndicator());
                     }
-                    // ✅ FIX: Tratar erros como estado vazio (melhor UX)
+                    // ✅ FIX: Tratar erros com UI de retry
                     if (snapshot.hasError) {
                       debugPrint('NotificationsModal: Erro no stream: ${snapshot.error}');
-                      // Fallback para estado vazio
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Iconsax.warning_2, size: 48, color: Colors.orange.shade300),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Erro ao carregar notificações',
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () => ref.invalidate(notificationServiceProvider),
+                              child: const Text('Tentar novamente'),
+                            ),
+                          ],
+                        ),
+                      );
                     }
                     final notifications = snapshot.data ?? [];
                     final recentNotifications = notifications.take(10).toList();
@@ -729,125 +750,12 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
   }
 
   Future<void> _handleNotificationTap(NotificationEntity notification) async {
-    final router = GoRouter.of(context);
     // Close modal first
     Navigator.pop(context);
 
-    // Mark as read
-    if (!notification.read) {
-      try {
-        await ref
-            .read(notificationServiceProvider)
-            .markAsRead(notification.notificationId);
-      } catch (e) {
-        debugPrint('Erro ao marcar notificação como lida: $e');
-      }
-    }
-
-    // Execute action based on type
-    if (!mounted) return;
-
-    bool handledNavigation = false;
-
-    switch (notification.actionType) {
-      case NotificationActionType.viewProfile:
-        final userId = notification.actionData?['userId'] as String?;
-        final profileId = notification.actionData?['profileId'] as String?;
-        if (userId != null) {
-          Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(
-              builder: (_) => ViewProfilePage(
-                userId: userId,
-                profileId: profileId ?? userId,
-              ),
-            ),
-          );
-          handledNavigation = true;
-        }
-        break;
-
-      case NotificationActionType.openChat:
-        final conversationId =
-            notification.actionData?['conversationId'] as String?;
-        final otherUserId = notification.actionData?['otherUserId'] as String?;
-        final otherProfileId =
-            notification.actionData?['otherProfileId'] as String?;
-
-        if (conversationId != null &&
-            otherUserId != null &&
-            otherProfileId != null) {
-          Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(
-              builder: (_) => ChatDetailPage(
-                conversationId: conversationId,
-                otherUserId: otherUserId,
-                otherProfileId: otherProfileId,
-                otherUserName: notification.senderName ?? 'Usuário',
-                otherUserPhoto: notification.senderPhoto ?? '',
-              ),
-            ),
-          );
-          handledNavigation = true;
-        }
-        break;
-
-      case NotificationActionType.viewPost:
-        final postId = notification.targetId;
-        if (postId != null && mounted) {
-          // Navegar usando GoRouter
-          router.push('/post/$postId');
-          handledNavigation = true;
-        }
-        break;
-
-      case NotificationActionType.renewPost:
-        final postId = notification.actionData?['postId'] as String?;
-        if (postId != null && mounted) {
-          try {
-            final now = DateTime.now();
-            final newExpiresAt = now.add(const Duration(days: 30));
-            
-            await FirebaseFirestore.instance
-                .collection('posts')
-                .doc(postId)
-                .update({
-              'expiresAt': Timestamp.fromDate(newExpiresAt),
-              'renewedAt': Timestamp.now(),
-              'renewCount': FieldValue.increment(1),
-            });
-            
-            if (mounted) {
-              AppSnackBar.showSuccess(context, 'Post renovado por mais 30 dias! 🎉');
-            }
-            
-            // Marcar como lida
-            final profileState = ref.read(profileProvider);
-            final activeProfile = profileState.value?.activeProfile;
-            if (activeProfile != null) {
-              await ref.read(notificationServiceProvider).markAsRead(
-                notification.notificationId,
-              );
-            }
-            handledNavigation = true;
-          } catch (e) {
-            if (mounted) {
-              AppSnackBar.showError(context, 'Erro ao renovar: $e');
-            }
-            debugPrint('⚠️ Erro ao renovar post: $e');
-          }
-        }
-        break;
-
-      default:
-        break;
-    }
-
-    if (notification.type == NotificationType.interest && !handledNavigation) {
-      final postId = notification.targetId;
-      if (postId != null) {
-        router.push('/post/$postId');
-      }
-    }
+    // ✅ Delegar para handler centralizado
+    final handler = NotificationActionHandler(ref: ref, context: context);
+    await handler.handle(notification);
   }
 
   String _formatTimeAgo(DateTime dateTime) {
@@ -958,7 +866,7 @@ extension on _BottomNavScaffoldState {
               icon: Iconsax.tag,
               title: 'Anúncio',
               subtitle: 'Oferecer produto ou serviço',
-              color: const Color(0xFF007eb9), // Cor azul para anúncios
+              color: AppColors.salesBlue, // Cor azul para anúncios
               onTap: () async {
                 Navigator.pop(context);
                 final result = await Navigator.push<bool>(

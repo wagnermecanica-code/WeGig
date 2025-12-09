@@ -40,6 +40,7 @@ class WeGigPinDescriptorBuilder {
     await Future.wait([
       getDescriptor(UserType.band),
       getDescriptor(UserType.musician),
+      getDescriptor(UserType.sales),
     ]);
   }
 
@@ -76,8 +77,11 @@ class WeGigPinDescriptorBuilder {
       return _tintedSvgCache[userType]!;
     }
 
-    final Color primaryColor =
-      userType.isBand ? AppColors.accent : AppColors.primary;
+    final Color primaryColor = switch (userType) {
+      UserType.band => AppColors.accent,
+      UserType.sales => AppColors.salesBlue,
+      UserType.musician => AppColors.primary,
+    };
 
     String tinted = _baseSvg!;
 

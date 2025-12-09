@@ -348,6 +348,78 @@ class _PostPageState extends ConsumerState<PostPage> {
         _photoPaths = [photoUrl];
       }
     });
+
+    // ✅ SALES FIELDS - Carregar campos específicos de anúncios
+    if (_postType == 'sales') {
+      _titleController.text = (data['title'] as String?) ?? '';
+      _salesType = (data['salesType'] as String?) ?? 'Venda';
+      _whatsappController.text = (data['whatsappNumber'] as String?) ?? '';
+      
+      // Preço
+      final price = data['price'];
+      if (price != null) {
+        if (price is num) {
+          // Converter para centavos (formato esperado pelo _CurrencyInputFormatter)
+          final priceInCents = (price * 100).toInt();
+          _priceController.text = priceInCents.toString();
+        } else if (price is String) {
+          // Se vier como string já formatada (ex: "150,00")
+          final cleanedPrice = price.replaceAll(RegExp(r'[^\d]'), '');
+          _priceController.text = cleanedPrice.isEmpty ? '' : cleanedPrice;
+        }
+      }
+      
+      // Modo de desconto e valor
+      _discountMode = (data['discountMode'] as String?) ?? 'none';
+      final discountValue = data['discountValue'];
+      if (discountValue != null && _discountMode != 'none') {
+        if (discountValue is num) {
+          if (_discountMode == 'fixed') {
+            // Desconto fixo: converter para centavos
+            final discountInCents = (discountValue * 100).toInt();
+            _discountController.text = discountInCents.toString();
+          } else if (_discountMode == 'percentage') {
+            // Percentual: já é número inteiro (ex: 20 para 20%)
+            _discountController.text = discountValue.toInt().toString();
+          }
+        } else if (discountValue is String) {
+          final cleaned = discountValue.replaceAll(RegExp(r'[^\d]'), '');
+          _discountController.text = cleaned.isEmpty ? '' : cleaned;
+        }
+      }
+      
+      // Datas da promoção
+      if (data['promoStartDate'] != null) {
+        if (data['promoStartDate'] is Timestamp) {
+          _promoStartDate = (data['promoStartDate'] as Timestamp).toDate();
+        } else if (data['promoStartDate'] is DateTime) {
+          _promoStartDate = data['promoStartDate'] as DateTime;
+        }
+      }
+      
+      if (data['promoEndDate'] != null) {
+        if (data['promoEndDate'] is Timestamp) {
+          _promoEndDate = (data['promoEndDate'] as Timestamp).toDate();
+        } else if (data['promoEndDate'] is DateTime) {
+          _promoEndDate = data['promoEndDate'] as DateTime;
+        }
+      }
+      
+      // Recalcular preço final após carregar dados
+      _calculateFinalPrice();
+      
+      debugPrint('''
+✅ Sales fields loaded:
+   Title: ${_titleController.text}
+   Sales Type: $_salesType
+   Price: ${_priceController.text}
+   Discount Mode: $_discountMode
+   Discount Value: ${_discountController.text}
+   WhatsApp: ${_whatsappController.text}
+   Promo Start: $_promoStartDate
+   Promo End: $_promoEndDate
+''');
+    }
   }
 
   Future<void> _fetchFullAddress(double lat, double lon) async {
@@ -864,10 +936,10 @@ class _PostPageState extends ConsumerState<PostPage> {
       const SizedBox(height: 12),
       TextFormField(
         controller: _titleController,
-        maxLength: 80,
+        maxLength: 25,
         decoration: InputDecoration(
           hintText: 'Ex: Estúdio de gravação profissional',
-          counterText: '${_titleController.text.length}/80',
+          counterText: '${_titleController.text.length}/25',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           filled: true,
           fillColor: Colors.grey[50],

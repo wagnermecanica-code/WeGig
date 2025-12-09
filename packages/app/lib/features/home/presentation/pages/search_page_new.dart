@@ -137,9 +137,15 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
   void _applyFilters() {
     final isAnunciosTab = _tabController.index == 1;
     
+    debugPrint('🔍 SearchPageNew._applyFilters: isAnunciosTab = $isAnunciosTab');
+    debugPrint('🔍 SearchPageNew._applyFilters: _selectedSalesType = $_selectedSalesType');
+    debugPrint('🔍 SearchPageNew._applyFilters: _priceRange = $_priceRange');
+    debugPrint('🔍 SearchPageNew._applyFilters: _onlyWithDiscount = $_onlyWithDiscount');
+    debugPrint('🔍 SearchPageNew._applyFilters: _onlyActivePromos = $_onlyActivePromos');
+    
     final currentParams = widget.searchNotifier.value;
     
-    widget.searchNotifier.value = SearchParams(
+    final searchParams = SearchParams(
       // Campos obrigatórios mantidos do anterior
       city: currentParams?.city ?? '',
       maxDistanceKm: currentParams?.maxDistanceKm ?? 20.0,
@@ -165,8 +171,13 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
       onlyActivePromos: isAnunciosTab ? (_onlyActivePromos ? true : null) : null,
     );
     
+    debugPrint('🔍 SearchPageNew: SearchParams.postType = ${searchParams.postType}');
+    debugPrint('🔍 SearchPageNew: SearchParams.salesType = ${searchParams.salesType}');
+    debugPrint('🔍 SearchPageNew: SearchParams.minPrice = ${searchParams.minPrice}');
+    debugPrint('🔍 SearchPageNew: SearchParams.maxPrice = ${searchParams.maxPrice}');
+    
+    widget.searchNotifier.value = searchParams;
     widget.onApply();
-    Navigator.of(context).pop();
   }
 
   void _clearFilters() {
@@ -235,12 +246,10 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
           labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           tabs: const [
             Tab(
-              icon: Icon(Iconsax.user),
-              text: 'Músicos/Bandas',
+              icon: Icon(Iconsax.people),
             ),
             Tab(
               icon: Icon(Iconsax.tag),
-              text: 'Anúncios',
             ),
           ],
         ),

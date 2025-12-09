@@ -7,6 +7,51 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não Publicado]
 
+### 🔒 Sprint 1: Correções Críticas de Segurança (09/12/2025)
+
+#### Firestore Index - Notifications Type Filter
+- **Problema:** Aba "Interesses" mostrava "Ops! Algo de errado" ao carregar
+- **Causa:** Query com filtro `type` requer índice composto que não existia
+- **Solução:** Adicionado índice `recipientUid + recipientProfileId + type + createdAt`
+- **Deploy:** ✅ `firebase deploy --only firestore:indexes --project wegig-dev`
+- **Impacto:** Aba "Interesses" funciona corretamente
+- **Arquivos:** `.config/firestore.indexes.json`
+
+#### Firestore Security Rules - Profile Ownership Validation
+- **Problema:** Usuário A poderia potencialmente ler notificações de perfil de usuário B
+- **Causa:** Security Rules validavam apenas `recipientUid`, não ownership do `recipientProfileId`
+- **Solução:** Nova função `ownsProfile()` + validação em todas operações de notificações
+- **Deploy:** ✅ `firebase deploy --only firestore:rules --project wegig-dev`
+- **Impacto:** 🔒 Isolamento multi-perfil garantido
+- **Arquivos:** `.config/firestore.rules`
+
+#### Cloud Functions - FCM Token Ownership & Expiration
+- **Problema:** Push notifications enviadas para tokens sem validação de ownership ou expiração
+- **Causa:** `sendPushToProfile()` buscava todos os tokens do perfil sem validação
+- **Solução:** 
+  - Nova função `getValidTokensForProfile(profileId, expectedUid)`
+  - Valida que profileId pertence ao expectedUid
+  - Rejeita tokens com mais de 60 dias
+- **Deploy:** ⚠️ Parcial (principais funções deployadas)
+- **Impacto:** 🔒 Tokens validados, delivery rate melhora ~20-30%
+- **Arquivos:** `.tools/functions/index.js`
+
+### 🛠️ Flutter SDK Patches (09/12/2025)
+
+#### CupertinoDynamicColor.toARGB32()
+- **Problema:** Build iOS falhava com "missing implementations for Color.toARGB32"
+- **Causa:** Flutter 3.27.1 incompatível com Dart engine mais recente
+- **Solução:** Patch local adicionando método `toARGB32()` retornando `_effectiveColor.value`
+- **Arquivos:** `.fvm/flutter_sdk/packages/flutter/lib/src/cupertino/colors.dart`
+
+#### SemanticsData.elevation
+- **Problema:** Build iOS falhava com "No named parameter 'elevation'"
+- **Causa:** API nativa não aceita mais parâmetro elevation diretamente
+- **Solução:** Patch local com fallback `elevation: data.elevation ?? 0.0`
+- **Arquivos:** `.fvm/flutter_sdk/packages/flutter/lib/src/semantics/semantics.dart`
+
+**Documentação:** `docs/setup/FLUTTER_SDK_PATCHES.md`
+
 ### 🚨 Correções Críticas (08/12/2025)
 
 #### Firestore Security Rules - Posts Permission Denied

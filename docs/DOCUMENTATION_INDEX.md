@@ -4,7 +4,7 @@ Este documento organiza toda a documentação técnica do projeto por categoria.
 
 ## 📁 Estrutura
 
-### `/sessions/` - Notas de Desenvolvimento (15 arquivos)
+### `/sessions/` - Notas de Desenvolvimento (16 arquivos)
 
 Logs cronológicos de sessões de desenvolvimento com decisões técnicas, bugs resolvidos e evoluções do código.
 
@@ -19,6 +19,7 @@ Logs cronológicos de sessões de desenvolvimento com decisões técnicas, bugs 
 - `SESSION_13_AUTH_REFACTORING.md` - Refatoração de autenticação
 - `SESSION_14_MULTI_PROFILE_REFACTORING.md` - Refatoração multi-perfil
 - `SESSION_15_BADGE_COUNTER_BEST_PRACTICES.md` - Melhores práticas para contadores de badges
+- `SESSION_15_NOTIFICATIONS_SECURITY_AUDIT.md` - **🆕** Auditoria de segurança + Sprint 1
 - `SESSION_16_MESSAGES_MIGRATION.md` - Migração de mensagens
 - `SESSION_17_NOTIFICATIONS_MIGRATION.md` - Migração de notificações
 - `SESSION_18_HOME_MIGRATION.md` - Migração da home
@@ -77,6 +78,15 @@ Instruções de deployment, Cloud Functions e notificações.
 - `DEPLOY_CLOUD_FUNCTIONS.md` - Deploy de Cloud Functions
 - `DEPLOY_GUIDE_WEGIG.md` - Guia de deploy do WeGig
 - `NEARBY_POST_NOTIFICATIONS.md` - Notificações de posts próximos
+
+### `/setup/` - Configuração do Ambiente (4 arquivos)
+
+Guias de configuração inicial e setup do ambiente de desenvolvimento.
+
+- `DEEP_LINKING_GUIDE.md` - Configuração de Deep Links e Universal Links
+- `FLUTTER_SDK_PATCHES.md` - **🆕** Patches necessários para Flutter 3.27.1
+- `CODE_SIGNING_SETUP.md` - Configuração de assinatura de código iOS
+- `GITHUB_SECRETS_SETUP.md` - Configuração de secrets do GitHub
 
 ### `/security/` - Documentação de Segurança (4 arquivos)
 

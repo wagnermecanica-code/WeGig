@@ -289,25 +289,20 @@ async function sendPushNotificationsForNearbyPost(
   const tokens = [];
   const tokenToProfile = {}; // Map token -> profileId para debug
 
-  // Coletar tokens FCM de todos os perfis
+  // 🔒 SECURITY FIX: Coletar apenas tokens válidos com ownership verificado
   for (const notification of notifications) {
     const profileId = notification.recipientProfileId;
+    const recipientUid = notification.recipientUid;
 
-    try {
-      const tokensSnap = await db
-        .collection("profiles")
-        .doc(profileId)
-        .collection("fcmTokens")
-        .get();
+    const profileTokens = await getValidTokensForProfile(
+      profileId,
+      recipientUid
+    );
 
-      tokensSnap.docs.forEach((tokenDoc) => {
-        const token = tokenDoc.data().token;
-        tokens.push(token);
-        tokenToProfile[token] = profileId;
-      });
-    } catch (error) {
-      console.log(`⚠️ Erro ao buscar tokens do perfil ${profileId}: ${error}`);
-    }
+    profileTokens.forEach((token) => {
+      tokens.push(token);
+      tokenToProfile[token] = profileId;
+    });
   }
 
   if (tokens.length === 0) {
@@ -395,6 +390,73 @@ async function sendPushNotificationsForNearbyPost(
 }
 
 /**
+ * 🔒 SECURITY HELPER: Valida ownership e busca tokens FCM válidos para um perfil
+ *
+ * @param {string} profileId - ID do perfil
+ * @param {string} expectedUid - UID esperado do dono do perfil (validação de ownership)
+ * @return {Promise<string[]>} Array de tokens FCM válidos (não expirados)
+ */
+async function getValidTokensForProfile(profileId, expectedUid) {
+  try {
+    // Validar que o profileId pertence ao expectedUid
+    const profileDoc = await db.collection("profiles").doc(profileId).get();
+    if (!profileDoc.exists) {
+      console.log(`⚠️ Perfil ${profileId} não encontrado`);
+      return [];
+    }
+
+    const profileData = profileDoc.data();
+    if (profileData.uid !== expectedUid) {
+      console.log(
+        `🚨 SECURITY: Perfil ${profileId} não pertence ao usuário ${expectedUid}`
+      );
+      return [];
+    }
+
+    // Buscar tokens FCM
+    const tokensSnap = await db
+      .collection("profiles")
+      .doc(profileId)
+      .collection("fcmTokens")
+      .get();
+
+    if (tokensSnap.empty) {
+      console.log(`📭 Nenhum token FCM encontrado para perfil ${profileId}`);
+      return [];
+    }
+
+    // Filtrar tokens válidos (não expirados)
+    const now = Date.now();
+    const SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000; // 60 dias
+    const validTokens = [];
+
+    tokensSnap.docs.forEach((tokenDoc) => {
+      const tokenData = tokenDoc.data();
+      const token = tokenData.token;
+      const updatedAt = tokenData.updatedAt?.toMillis() || 0;
+
+      // Validar idade do token
+      const tokenAgeMs = now - updatedAt;
+      if (tokenAgeMs > SIXTY_DAYS_MS) {
+        const tokenAgeDays = Math.floor(tokenAgeMs / (24 * 60 * 60 * 1000));
+        console.log(`⏰ Token expirado (${tokenAgeDays} dias), pulando...`);
+        return; // Skip
+      }
+
+      validTokens.push(token);
+    });
+
+    console.log(
+      `✅ ${validTokens.length} tokens válidos encontrados para perfil ${profileId}`
+    );
+    return validTokens;
+  } catch (error) {
+    console.log(`❌ Erro ao buscar tokens do perfil ${profileId}: ${error}`);
+    return [];
+  }
+}
+
+/**
  * Helper: Remove tokens FCM inválidos do Firestore
  */
 async function removeInvalidTokens(tokens, tokenToProfile) {
@@ -459,10 +521,22 @@ exports.sendInterestNotification = functions
 
     console.log(`💙 Novo interesse: ${interestedProfileName} → post ${postId}`);
 
+    // 🔒 SECURITY: Buscar UID do perfil autor para validação
+    const postAuthorProfile = await db
+      .collection("profiles")
+      .doc(postAuthorProfileId)
+      .get();
+    if (!postAuthorProfile.exists) {
+      console.log(`⚠️ Perfil autor ${postAuthorProfileId} não encontrado`);
+      return null;
+    }
+    const recipientUid = postAuthorProfile.data().uid;
+
     // Criar notificação in-app
     await db.collection("notifications").add({
       recipientProfileId: postAuthorProfileId,
-      profileUid: postAuthorProfileId, // CRITICAL: Isolamento de perfil
+      recipientUid: recipientUid, // 🔒 SECURITY: UID do dono do perfil
+      profileUid: postAuthorProfileId, // LEGACY: manter para compatibilidade
       type: "interest",
       priority: "high",
       title: "Novo interesse!",
@@ -485,6 +559,7 @@ exports.sendInterestNotification = functions
     // Enviar push notification
     await sendPushToProfile(
       postAuthorProfileId,
+      recipientUid, // 🔒 SECURITY: passar UID para validação
       {
         title: "Novo interesse!",
         body: `${interestedProfileName} demonstrou interesse em seu post`,
@@ -644,6 +719,7 @@ exports.sendMessageNotification = functions
     // Enviar push notification
     await sendPushToProfile(
       recipientProfileId,
+      recipientUid, // 🔒 SECURITY: passar UID para validação
       {
         title: senderName,
         body: messageText,
@@ -663,21 +739,18 @@ exports.sendMessageNotification = functions
  *
  * Busca todos os tokens FCM do perfil e envia notificação
  */
-async function sendPushToProfile(profileId, notification, data) {
+async function sendPushToProfile(profileId, recipientUid, notification, data) {
   try {
-    // Buscar tokens FCM do perfil
-    const tokensSnap = await db
-      .collection("profiles")
-      .doc(profileId)
-      .collection("fcmTokens")
-      .get();
+    // 🔒 SECURITY: Buscar apenas tokens válidos com ownership verificado
+    const tokens = await getValidTokensForProfile(profileId, recipientUid);
 
-    if (tokensSnap.empty) {
-      console.log(`📭 Nenhum token FCM encontrado para perfil ${profileId}`);
+    if (tokens.length === 0) {
+      console.log(
+        `📭 Nenhum token FCM válido encontrado para perfil ${profileId}`
+      );
       return;
     }
 
-    const tokens = tokensSnap.docs.map((doc) => doc.data().token);
     console.log(
       `📤 Enviando push para ${tokens.length} dispositivo(s) do perfil ${profileId}`
     );
@@ -716,7 +789,7 @@ async function sendPushToProfile(profileId, notification, data) {
       `✅ Push enviado: ${response.successCount} sucesso, ${response.failureCount} falhas`
     );
 
-    // Remover tokens inválidos
+    // Remover tokens inválidos (podem ter expirado entre busca e envio)
     if (response.failureCount > 0) {
       const tokensToRemove = [];
       response.responses.forEach((resp, idx) => {
@@ -731,18 +804,10 @@ async function sendPushToProfile(profileId, notification, data) {
         }
       });
 
-      // Remover tokens inválidos
-      const batch = db.batch();
-      for (const token of tokensToRemove) {
-        const tokenRef = db
-          .collection("profiles")
-          .doc(profileId)
-          .collection("fcmTokens")
-          .doc(token);
-        batch.delete(tokenRef);
-      }
-      await batch.commit();
-      console.log(`🗑️ Removidos ${tokensToRemove.length} tokens inválidos`);
+      // Usar helper para remover tokens (mantém consistência)
+      const tokenToProfile = {};
+      tokensToRemove.forEach((token) => (tokenToProfile[token] = profileId));
+      await removeInvalidTokens(tokensToRemove, tokenToProfile);
     }
   } catch (error) {
     console.log(`❌ Erro ao enviar push para perfil ${profileId}: ${error}`);

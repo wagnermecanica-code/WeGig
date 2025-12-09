@@ -23,6 +23,12 @@ service cloud.firestore {
       );
     }
 
+    // Verifica se o profileId pertence ao usuário autenticado
+    function ownsProfile(profileId) {
+      let profile = get(/databases/$(database)/documents/profiles/$(profileId));
+      return profile.exists() && profile.data.uid == request.auth.uid;
+    }
+
     // ============================================
     // PROFILES - Perfis de usuários (multi-perfil)
     // ============================================
@@ -103,13 +109,21 @@ service cloud.firestore {
     // ============================================
     // NOTIFICATIONS - Notificações push/in-app
     // ============================================
+    // SECURITY FIX: Valida que recipientProfileId pertence ao recipientUid
+    // Previne ataques onde usuário A tenta ler notificações do profileId de usuário B
 
     match /notifications/{notificationId} {
-      allow read: if isSignedIn() && resource.data.recipientUid == request.auth.uid;
+      allow read: if isSignedIn() 
+        && resource.data.recipientUid == request.auth.uid
+        && ownsProfile(resource.data.recipientProfileId);
       allow create: if isSignedIn()
         && request.resource.data.recipientProfileId != null
-        && request.resource.data.recipientUid != null;
-      allow update, delete: if isSignedIn() && resource.data.recipientUid == request.auth.uid;
+        && request.resource.data.recipientUid != null
+        && request.resource.data.recipientUid == request.auth.uid
+        && ownsProfile(request.resource.data.recipientProfileId);
+      allow update, delete: if isSignedIn() 
+        && resource.data.recipientUid == request.auth.uid
+        && ownsProfile(resource.data.recipientProfileId);
     }
 
     // ============================================
