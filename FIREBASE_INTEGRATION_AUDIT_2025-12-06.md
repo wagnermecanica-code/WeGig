@@ -230,6 +230,7 @@ match /posts/{postId} {
 ```
 
 **Campos esperados vs reais**:
+
 - ❌ `uid` → ✅ `authorUid`
 - ❌ `profileUid` → ✅ `authorProfileId`
 

@@ -23,6 +23,7 @@ export 'widgets/mention_text.dart';
 
 // Domain Entities
 export 'features/profile/domain/entities/profile_entity.dart';
+export 'features/profile/domain/entities/profile_type.dart';
 export 'features/post/domain/entities/post_entity.dart';
 export 'features/messages/domain/entities/message_entity.dart';
 export 'features/messages/domain/entities/conversation_entity.dart';

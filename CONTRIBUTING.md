@@ -400,6 +400,139 @@ cd functions && firebase deploy --only functions
 
 ---
 
+## ⚠️ Práticas Críticas (OBRIGATÓRIAS)
+
+### 🔥 Firebase Multi-Ambiente
+
+**NUNCA** hardcode project IDs. Sempre use a configuração correta por flavor:
+
+```dart
+// ✅ CORRETO
+await bootstrapCoreServices(
+  firebaseOptions: DefaultFirebaseOptions.currentPlatform,
+  flavorLabel: 'dev',
+  expectedProjectId: 'wegig-dev',  // Validação em runtime
+);
+
+// ❌ ERRADO
+const projectId = 'to-sem-banda-83e19';  // Hardcoded!
+```
+
+**Checklist antes de commit:**
+
+- [ ] `main_dev.dart` → `expectedProjectId: 'wegig-dev'`
+- [ ] `main_staging.dart` → `expectedProjectId: 'wegig-staging'`
+- [ ] `main_prod.dart` → `expectedProjectId: 'to-sem-banda-83e19'`
+- [ ] `firebase_options_*.dart` com `projectId` correto
+
+### 🎭 Multi-Profile
+
+**SEMPRE** leia o perfil ativo do Riverpod, NUNCA use cache local:
+
+```dart
+// ✅ CORRETO
+final profileState = ref.read(profileProvider);
+final activeProfile = profileState.value?.activeProfile;
+
+// ❌ ERRADO
+final profileId = SharedPreferences.getString('activeProfileId');
+```
+
+**Após troca de perfil:**
+
+```dart
+// ✅ CRITICAL: Invalidar todos os providers
+ref.invalidate(profileProvider);
+ref.invalidate(postNotifierProvider);
+ref.invalidate(messagesProvider);
+ref.invalidate(notificationsProvider);
+```
+
+### 🗺️ GoRouter Navigation
+
+**NUNCA** redirecione todas as rotas para home. Apenas rotas iniciais:
+
+```dart
+// ✅ CORRETO
+if (isGoingToAuth || isGoingToSplash || isGoingToCreateProfile) {
+  return AppRoutes.home;
+}
+return null;  // Permite /profile/:id, /post/:id, etc
+
+// ❌ ERRADO
+if (isLoggedIn && hasProfiles) {
+  return AppRoutes.home;  // Bloqueia TUDO!
+}
+```
+
+### 🔔 Notificações & Streams
+
+**SEMPRE** adicione `handleError()` em streams Firestore:
+
+```dart
+// ✅ CORRETO
+return query.snapshots()
+    .handleError((error) {
+      debugPrint('Error: $error');
+      return <T>[];  // Fallback gracioso
+    })
+    .debounceTime(const Duration(milliseconds: 50));
+
+// ❌ ERRADO
+return query.snapshots();  // Crash em permission-denied
+```
+
+**Debounce guidelines:**
+
+- UI crítica: 50ms
+- Background sync: 300ms
+- Search/autocomplete: 500ms
+
+### 🧹 Memory Management
+
+**SEMPRE** dispose de recursos:
+
+```dart
+// ✅ CORRETO
+@override
+void dispose() {
+  _controller.dispose();  // Já remove listeners
+  _subscription.cancel();
+  super.dispose();
+}
+
+// ❌ ERRADO - Esqueceu dispose
+@override
+void dispose() {
+  super.dispose();
+}
+
+// ❌ ERRADO - ref.read() no dispose
+@override
+void dispose() {
+  ref.read(myProvider);  // Pode crashar!
+  super.dispose();
+}
+```
+
+### 📝 Code Review Checklist
+
+Antes de abrir PR, verifique:
+
+- [ ] `flutter analyze` sem warnings
+- [ ] `flutter test` todos passando
+- [ ] Memory leaks verificados
+- [ ] Debug prints removidos/com flag
+- [ ] Empty states implementados
+- [ ] Error handling completo
+- [ ] Navigation testada manualmente
+- [ ] Multi-profile isolation verificado
+- [ ] CHANGELOG.md atualizado
+
+**Veja:** `BEST_PRACTICES.md` para detalhes completos
+
+---
+
 ## 📚 Recursos
 
 ### Documentação Interna

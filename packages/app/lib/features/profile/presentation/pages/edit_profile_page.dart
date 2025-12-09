@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_type.dart';
 import 'package:core_ui/profile_result.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
@@ -52,12 +53,19 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   final _youtubeController = TextEditingController();
   final _instagramController = TextEditingController();
   final _tiktokController = TextEditingController();
+  // Space-specific controllers
+  final _phoneController = TextEditingController();
+  final _operatingHoursController = TextEditingController();
+  final _websiteController = TextEditingController();
 
   bool _isSaving = false;
   bool _isLoadingProfile = true;
   ProfileEntity? _profile;
   String? _photoUrl;
-  bool? _isBand;
+  ProfileType? _profileType;
+  // Space-specific state
+  String? _selectedSpaceType;
+  Set<String> _selectedAmenities = {};
   final _locationDebouncer = Debouncer(milliseconds: 500);
   String? _selectedLevel;
   Set<String> _selectedInstruments = {};
@@ -89,7 +97,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     'Profissional',
   ];
 
-  // ✨ EXPANDIDO: Lista completa de instrumentos com opção "Outros"
   static const List<String> _instrumentOptions = [
     'Violão',
     'Guitarra',
@@ -255,6 +262,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     _youtubeController.dispose();
     _instagramController.dispose();
     _tiktokController.dispose();
+    // Space-specific controllers
+    _phoneController.dispose();
+    _operatingHoursController.dispose();
+    _websiteController.dispose();
     _locationDebouncer.dispose(); // ✅ Cancela Timer pendente
     super.dispose();
   }
@@ -319,10 +330,16 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           _instagramController.text = profile.instagramLink ?? '';
           _tiktokController.text = profile.tiktokLink ?? '';
           _photoUrl = profile.photoUrl;
-          _isBand = profile.isBand;
+          _profileType = profile.profileType;
           _selectedLevel = profile.level;
           _selectedInstruments = {...?profile.instruments};
           _selectedGenres = {...?profile.genres};
+          // Space-specific fields
+          _selectedSpaceType = profile.spaceType;
+          _phoneController.text = profile.phone ?? '';
+          _operatingHoursController.text = profile.operatingHours ?? '';
+          _websiteController.text = profile.website ?? '';
+          _selectedAmenities = {...?profile.amenities};
         }
       } else {
         // Carrega perfil ativo
@@ -352,10 +369,16 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           _instagramController.text = activeProfile.instagramLink ?? '';
           _tiktokController.text = activeProfile.tiktokLink ?? '';
           _photoUrl = activeProfile.photoUrl;
-          _isBand = activeProfile.isBand;
+          _profileType = activeProfile.profileType;
           _selectedLevel = activeProfile.level;
           _selectedInstruments = {...?activeProfile.instruments};
           _selectedGenres = {...?activeProfile.genres};
+          // Space-specific fields
+          _selectedSpaceType = activeProfile.spaceType;
+          _phoneController.text = activeProfile.phone ?? '';
+          _operatingHoursController.text = activeProfile.operatingHours ?? '';
+          _websiteController.text = activeProfile.website ?? '';
+          _selectedAmenities = {...?activeProfile.amenities};
         }
       }
     } catch (e) {
@@ -466,8 +489,13 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             toolbarTitle: 'Editar Foto de Perfil',
             toolbarColor: AppColors.primary,
             toolbarWidgetColor: Colors.white,
+            statusBarColor: AppColors.primary,
             backgroundColor: Colors.black,
             activeControlsWidgetColor: AppColors.primary,
+            hideBottomControls: false,
+            cropFrameColor: AppColors.primary,
+            cropGridColor: Colors.white24,
+            dimmedLayerColor: Colors.black.withValues(alpha: 0.8),
             initAspectRatio: CropAspectRatioPreset.square,
             aspectRatioPresets: [
               CropAspectRatioPreset.square,
@@ -482,6 +510,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             title: 'Editar Foto de Perfil',
             minimumAspectRatio: 0.5,
             aspectRatioLockDimensionSwapEnabled: true,
+            rotateButtonsHidden: false,
+            resetButtonHidden: false,
             aspectRatioPresets: [
               CropAspectRatioPreset.square,
               CropAspectRatioPreset.ratio3x2,
@@ -602,12 +632,30 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     if (!_formKey.currentState!.validate()) return;
 
     // Validar tipo de perfil (obrigatório na primeira edição)
-    if (_isBand == null) {
+    if (_profileType == null) {
       AppSnackBar.showWarning(
         context,
-        'Por favor, selecione o tipo de perfil (Músico ou Banda)',
+        'Por favor, selecione o tipo de perfil (Músico, Banda ou Espaço)',
       );
       return;
+    }
+
+    // Validar campos específicos de Espaço
+    if (_profileType == ProfileType.space) {
+      if (_phoneController.text.trim().isEmpty) {
+        AppSnackBar.showWarning(
+          context,
+          'Por favor, informe um telefone/WhatsApp para contato',
+        );
+        return;
+      }
+      if (_selectedSpaceType == null) {
+        AppSnackBar.showWarning(
+          context,
+          'Por favor, selecione o tipo de espaço',
+        );
+        return;
+      }
     }
 
     debugPrint('📝 EditProfile: Iniciando salvamento de perfil...');
@@ -701,8 +749,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           neighborhood: _selectedNeighborhood,
           state: _selectedState,
           photoUrl: uploadedPhotoUrl,
-          isBand: _isBand!,
-          level: !_isBand! ? _selectedLevel : null,
+          isBand: _profileType == ProfileType.band,
+          profileType: _profileType!,
+          level: _profileType == ProfileType.musician ? _selectedLevel : null,
           instruments: _selectedInstruments.toList(),
           genres: _selectedGenres.toList(),
           youtubeLink: _youtubeController.text.trim().isEmpty
@@ -714,6 +763,20 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           tiktokLink: _tiktokController.text.trim().isEmpty
               ? null
               : _tiktokController.text.trim(),
+          // Space-specific fields
+          spaceType: _selectedSpaceType,
+          phone: _phoneController.text.trim().isEmpty
+              ? null
+              : _phoneController.text.trim(),
+          operatingHours: _operatingHoursController.text.trim().isEmpty
+              ? null
+              : _operatingHoursController.text.trim(),
+          website: _websiteController.text.trim().isEmpty
+              ? null
+              : _websiteController.text.trim(),
+          amenities: _selectedAmenities.isEmpty
+              ? null
+              : _selectedAmenities.toList(),
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
@@ -791,8 +854,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           neighborhood: _selectedNeighborhood,
           state: _selectedState,
           photoUrl: uploadedPhotoUrl,
-          isBand: _isBand ?? false,
-          level: !(_isBand ?? false) ? _selectedLevel : null,
+          isBand: _profileType == ProfileType.band,
+          profileType: _profileType ?? ProfileType.musician,
+          level: _profileType == ProfileType.musician ? _selectedLevel : null,
           instruments: _selectedInstruments.toList(),
           genres: _selectedGenres.toList(),
           youtubeLink: _youtubeController.text.trim().isEmpty
@@ -804,6 +868,20 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           tiktokLink: _tiktokController.text.trim().isEmpty
               ? null
               : _tiktokController.text.trim(),
+          // Space-specific fields
+          spaceType: _selectedSpaceType,
+          phone: _phoneController.text.trim().isEmpty
+              ? null
+              : _phoneController.text.trim(),
+          operatingHours: _operatingHoursController.text.trim().isEmpty
+              ? null
+              : _operatingHoursController.text.trim(),
+          website: _websiteController.text.trim().isEmpty
+              ? null
+              : _websiteController.text.trim(),
+          amenities: _selectedAmenities.isEmpty
+              ? null
+              : _selectedAmenities.toList(),
           updatedAt: DateTime.now(),
         );
 
@@ -920,7 +998,17 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                         : Iconsax.close_circle,
                     color: Colors.black,
                   ),
-                  onPressed: () => Navigator.of(context).maybePop(),
+                  onPressed: () async {
+                    if (widget.isNewProfile) {
+                      // Novo perfil após autenticação: fazer logout e voltar para auth
+                      await ref.read(authServiceProvider).signOut();
+                      if (mounted) {
+                        context.go(AppRoutes.auth);
+                      }
+                    } else {
+                      Navigator.of(context).maybePop();
+                    }
+                  },
                 ),
           title: Text(
             widget.isNewProfile
@@ -951,9 +1039,16 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                     _buildEssentialBlock(),
                     const SizedBox(height: 24),
 
-                    // C. Bloco de Habilidades (adaptável)
-                    _buildSkillsBlock(),
-                    const SizedBox(height: 24),
+                    // C. Bloco de Habilidades (apenas músicos/bandas) ou Espaço
+                    if (_profileType == ProfileType.musician ||
+                        _profileType == ProfileType.band) ...[
+                      _buildSkillsBlock(),
+                      const SizedBox(height: 24),
+                    ],
+                    if (_profileType == ProfileType.space) ...[
+                      _buildSpaceDetailsBlock(),
+                      const SizedBox(height: 24),
+                    ],
 
                     // D. Bloco de Links Sociais e Mídia
                     _buildSocialLinksBlock(),
@@ -1126,7 +1221,11 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           controller: _nameController,
           decoration: InputDecoration(
             labelText: 'Nome',
-            hintText: _isBand ?? false ? 'Nome da banda' : 'Seu nome',
+            hintText: _profileType == ProfileType.band
+                ? 'Nome da banda'
+                : _profileType == ProfileType.space
+                    ? 'Nome do espaço'
+                    : 'Seu nome',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -1148,9 +1247,11 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           maxLength: maxBioLength,
           decoration: InputDecoration(
             labelText: 'Biografia',
-            hintText: _isBand ?? false
+            hintText: _profileType == ProfileType.band
                 ? 'Conte sobre a banda, estilo, história...'
-                : 'Conte sobre você, experiência, objetivos...',
+                : _profileType == ProfileType.space
+                    ? 'Descreva o espaço, serviços, diferenciais...'
+                    : 'Conte sobre você, experiência, objetivos...',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -1167,16 +1268,22 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           decoration: InputDecoration(
-            labelText:
-                _isBand ?? false ? 'Ano de formação' : 'Ano de nascimento',
-            hintText: _isBand ?? false
+            labelText: _profileType == ProfileType.band
+                ? 'Ano de formação'
+                : _profileType == ProfileType.space
+                    ? 'Ano de fundação'
+                    : 'Ano de nascimento',
+            hintText: _profileType == ProfileType.band
                 ? 'Quando a banda foi formada'
-                : 'Seu ano de nascimento',
+                : _profileType == ProfileType.space
+                    ? 'Ano de fundação do espaço'
+                    : 'Seu ano de nascimento',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            prefixIcon:
-                Icon(_isBand ?? false ? Iconsax.calendar : Iconsax.cake),
+            prefixIcon: Icon(
+              _profileType == ProfileType.musician ? Iconsax.cake : Iconsax.calendar,
+            ),
           ),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
@@ -1192,8 +1299,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
             final currentYear = DateTime.now().year;
 
-            if (_isBand ?? false) {
-              // BANDAS: Validação de ano de formação
+            if (_profileType == ProfileType.band || _profileType == ProfileType.space) {
+              // BANDAS/ESPAÇOS: Validação de ano de formação/fundação
               if (year < 1900) {
                 return 'Ano muito antigo (mínimo: 1900)';
               }
@@ -1235,59 +1342,75 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           ),
         ),
         const SizedBox(height: 12),
-        TypeAheadField<Map<String, dynamic>>(
-          controller: _locationController,
-          focusNode: _locationFocusNode,
-          suggestionsCallback: _fetchAddressSuggestions,
-          builder: (context, controller, focusNode) {
-            return TextFormField(
-              controller: controller,
-              focusNode: focusNode,
-              decoration: InputDecoration(
-                hintText: 'Buscar localização (cidade, bairro, endereço...)',
-                prefixIcon:
-                    const Icon(Iconsax.location, color: AppColors.primary),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 2,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 2,
-                  ),
-                ),
+          TypeAheadField<Map<String, dynamic>>(
+            controller: _locationController,
+            focusNode: _locationFocusNode,
+            debounceDuration: const Duration(milliseconds: 600), // nativo!
+            suggestionsCallback: _fetchAddressSuggestions,
+            loadingBuilder: (context) => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+            emptyBuilder: (context) => Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Iconsax.search_normal, color: Colors.grey[400]),
+                  const SizedBox(width: 8),
+                  Text('Digite para buscar endereço', style: TextStyle(color: Colors.grey[600])),
+                ],
               ),
-              validator: (v) => _selectedLocation == null
-                  ? 'Selecione uma localização'
-                  : null,
-            );
-          },
-          itemBuilder: (BuildContext context, Map<String, dynamic> suggestion) {
-            return ListTile(
-              leading: const Icon(Iconsax.location, color: AppColors.primary),
-              title: Text(
-                (suggestion['display_name'] as String?) ?? '',
-                style: const TextStyle(fontSize: 14),
-              ),
-            );
-          },
-          onSelected: _onAddressSelected,
-          emptyBuilder: (context) => const Padding(
-            padding: EdgeInsets.all(8),
-            child: Text('Nenhum endereço encontrado'),
+            ),
+            builder: (context, controller, focusNode) {
+              return TextFormField(
+                controller: controller,
+                focusNode: focusNode,
+                decoration: InputDecoration(
+                  hintText: 'Buscar localização (cidade, bairro, endereço...)',
+                  prefixIcon: const Icon(Iconsax.location, color: AppColors.primary),
+                  suffixIcon: controller.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Iconsax.close_circle, color: AppColors.textSecondary),
+                          onPressed: () {
+                            controller.clear();
+                            setState(() {
+                              _selectedLocation = null;
+                              _selectedCity = null;
+                              _selectedNeighborhood = null;
+                              _selectedState = null;
+                            });
+                            focusNode.unfocus();
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.primary),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                  ),
+                ),
+                validator: (_) => _selectedLocation == null ? 'Selecione uma localização' : null,
+              );
+            },
+            itemBuilder: (context, suggestion) {
+              final displayName = suggestion['display_name'] as String? ?? '';
+              return ListTile(
+                leading: const Icon(Iconsax.location, color: AppColors.primary),
+                title: Text(
+                  displayName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              );
+            },
+            onSelected: _onAddressSelected,
           ),
-        ),
       ],
     );
   }
@@ -1304,7 +1427,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           ),
         ),
         const SizedBox(height: 8),
-        if (_isBand == null)
+        if (_profileType == null)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1332,8 +1455,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
               child: _buildTypeCard(
                 icon: Iconsax.user,
                 label: 'Músico',
-                isSelected: _isBand == false,
-                onTap: () => setState(() => _isBand = false),
+                isSelected: _profileType == ProfileType.musician,
+                onTap: () => setState(() => _profileType = ProfileType.musician),
               ),
             ),
             const SizedBox(width: 12),
@@ -1341,8 +1464,17 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
               child: _buildTypeCard(
                 icon: Iconsax.people,
                 label: 'Banda',
-                isSelected: _isBand ?? false,
-                onTap: () => setState(() => _isBand = true),
+                isSelected: _profileType == ProfileType.band,
+                onTap: () => setState(() => _profileType = ProfileType.band),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildTypeCard(
+                icon: Iconsax.building,
+                label: 'Espaço',
+                isSelected: _profileType == ProfileType.space,
+                onTap: () => setState(() => _profileType = ProfileType.space),
               ),
             ),
           ],
@@ -1426,7 +1558,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
         // Instrumentos
         MultiSelectField(
-          title: _isBand ?? false ? 'Instrumentação' : 'Instrumentos',
+          title: _profileType == ProfileType.band ? 'Instrumentação' : 'Instrumentos',
           placeholder: 'Selecione até 5 instrumentos',
           options: _instrumentOptions,
           selectedItems: _selectedInstruments,
@@ -1442,7 +1574,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         const SizedBox(height: 16),
 
         // Nível (apenas para músicos)
-        if (_isBand == false) ...[
+        if (_profileType == ProfileType.musician) ...[
           const Text(
             'Nível',
             style: TextStyle(
@@ -1478,6 +1610,201 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     );
   }
 
+  Widget _buildSpaceDetailsBlock() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Detalhes do Espaço',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Tipo de Espaço (obrigatório)
+        const Text(
+          'Tipo de Espaço *',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _selectedSpaceType,
+          items: SpaceType.values
+              .map(
+                (type) => DropdownMenuItem(
+                  value: type.value,
+                  child: Text(type.label),
+                ),
+              )
+              .toList(),
+          onChanged: (value) => setState(() => _selectedSpaceType = value),
+          decoration: InputDecoration(
+            hintText: 'Selecione o tipo de espaço',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: AppColors.primary,
+                width: 2,
+              ),
+            ),
+            prefixIcon: const Icon(Iconsax.building_4),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Tipo de espaço é obrigatório';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // Telefone/WhatsApp (obrigatório)
+        TextFormField(
+          controller: _phoneController,
+          keyboardType: TextInputType.phone,
+          decoration: InputDecoration(
+            labelText: 'Telefone/WhatsApp *',
+            hintText: '(11) 99999-9999',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            prefixIcon: const Icon(Iconsax.call),
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Telefone/WhatsApp é obrigatório';
+            }
+            // Remove caracteres não numéricos
+            final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
+            if (digitsOnly.length < 10 || digitsOnly.length > 11) {
+              return 'Telefone inválido';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // Horário de Funcionamento (opcional)
+        TextFormField(
+          controller: _operatingHoursController,
+          decoration: InputDecoration(
+            labelText: 'Horário de Funcionamento',
+            hintText: 'Ex: Seg-Sex 9h-18h',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            prefixIcon: const Icon(Iconsax.clock),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Website (opcional)
+        TextFormField(
+          controller: _websiteController,
+          keyboardType: TextInputType.url,
+          decoration: InputDecoration(
+            labelText: 'Website',
+            hintText: 'https://seusite.com.br',
+            suffixIcon: _websiteController.text.isEmpty
+                ? null
+                : _isValidWebsiteUrl(_websiteController.text)
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : const Icon(Icons.error_outline, color: Colors.red),
+            helperText: _websiteController.text.isNotEmpty
+                ? (_isValidWebsiteUrl(_websiteController.text)
+                    ? '✓ URL válida'
+                    : '✗ URL deve começar com http:// ou https://')
+                : null,
+            helperStyle: TextStyle(
+              color: _isValidWebsiteUrl(_websiteController.text)
+                  ? Colors.green
+                  : Colors.red,
+              fontSize: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            prefixIcon: const Icon(Iconsax.global),
+          ),
+          onChanged: (_) => setState(() {}),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) return null;
+            final url = value.trim();
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+              return 'URL deve começar com http:// ou https://';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // Comodidades (opcional)
+        const Text(
+          'Comodidades',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildAmenityChip('Wi-Fi grátis'),
+            _buildAmenityChip('Estacionamento'),
+            _buildAmenityChip('Ar-condicionado'),
+            _buildAmenityChip('Aberto 24 horas'),
+            _buildAmenityChip('Área para fumantes'),
+            _buildAmenityChip('Aceita pix'),
+            _buildAmenityChip('Técnico de som'),
+            _buildAmenityChip('Bebidas disponíveis'),
+            _buildAmenityChip('Comida disponível'),
+            _buildAmenityChip('Palco para apresentações'),
+            _buildAmenityChip('Live streaming'), 
+            _buildAmenityChip('Acessibilidade'),
+            _buildAmenityChip('Próximo ao metrô'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAmenityChip(String amenity) {
+    final isSelected = _selectedAmenities.contains(amenity);
+    return FilterChip(
+      label: Text(amenity),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          if (selected) {
+            _selectedAmenities.add(amenity);
+          } else {
+            _selectedAmenities.remove(amenity);
+          }
+        });
+      },
+      selectedColor: AppColors.primary.withValues(alpha: 0.2),
+      checkmarkColor: AppColors.primary,
+      labelStyle: TextStyle(
+        color: isSelected ? AppColors.primary : Colors.grey[700],
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+      ),
+      side: BorderSide(
+        color: isSelected ? AppColors.primary : Colors.grey[300]!,
+        width: isSelected ? 2 : 1,
+      ),
+    );
+  }
+
   bool _isValidInstagramUrl(String url) {
     if (url.trim().isEmpty) return false;
     final instagramRegex = RegExp(
@@ -1503,6 +1830,12 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       caseSensitive: false,
     );
     return youtubeRegex.hasMatch(url.trim());
+  }
+
+  bool _isValidWebsiteUrl(String url) {
+    if (url.trim().isEmpty) return false;
+    final trimmedUrl = url.trim();
+    return trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://');
   }
 
   Widget _buildSocialLinksBlock() {
@@ -1589,8 +1922,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             suffixIcon: _youtubeController.text.isEmpty
                 ? null
                 : _isValidYouTubeUrl(_youtubeController.text)
-                    ? const Icon(Iconsax.tick_circle, color: Colors.green)
-                    : const Icon(Iconsax.danger, color: Colors.red),
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : const Icon(Icons.error_outline, color: Colors.red),
             helperText: _youtubeController.text.isNotEmpty
                 ? (_isValidYouTubeUrl(_youtubeController.text)
                     ? '✓ Vídeo encontrado'

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
 import 'package:core_ui/models/search_params.dart';
@@ -165,9 +166,9 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     if (config.hasBadge) {
       // Badges: notificações ou mensagens
       if (config.label == 'Notificações') {
-        icon = _buildNotificationIcon();
+        icon = _buildNotificationIcon(isSelected: isSelected);
       } else if (config.label == 'Mensagens') {
-        icon = _buildMessagesIcon();
+        icon = _buildMessagesIcon(isSelected: isSelected);
       } else {
         icon = Icon(config.icon, size: 26);
       }
@@ -185,77 +186,73 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     );
   }
 
-  /// Ícone de notificações com badge reativo e modal
-  Widget _buildNotificationIcon() {
+  /// Ícone de notificações com badge reativo
+  Widget _buildNotificationIcon({bool isSelected = false}) {
     return StreamBuilder<int>(
       stream: ref.read(notificationServiceProvider).streamUnreadCount(),
       builder: (context, snapshot) {
         // Error state
         if (snapshot.hasError) {
-          return InkWell(
-            onTap: () => _showNotificationsModal(context),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              child: Icon(Iconsax.notification_bing, size: 28, color: Colors.grey),
+          return Container(
+            padding: const EdgeInsets.all(4),
+            child: Icon(
+              Iconsax.notification_bing,
+              size: 28,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
             ),
           );
         }
 
         // Loading state
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return InkWell(
-            onTap: () => _showNotificationsModal(context),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  const Icon(Iconsax.notification, size: 28),
-                  Positioned(
-                    right: -4,
-                    top: -4,
-                    child: SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 1.5),
-                    ),
+          return Container(
+            padding: const EdgeInsets.all(4),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  Iconsax.notification,
+                  size: 28,
+                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                ),
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 1.5),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           );
         }
 
         final unreadCount = snapshot.data ?? 0;
 
-        return InkWell(
-          onTap: () => _showNotificationsModal(context),
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(Icons.notifications, size: 26),
-                if (unreadCount > 0)
-                  Positioned(
-                    right: -4,
-                    top: -4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.badgeRed,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 20,
-                        minHeight: 20,
-                      ),
+        return Container(
+          padding: const EdgeInsets.all(4),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(
+                Iconsax.notification,
+                size: 26,
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              ),
+              if (unreadCount > 0)
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
                       child: Text(
                         unreadCount > 99 ? '99+' : unreadCount.toString(),
                         style: const TextStyle(
@@ -263,33 +260,42 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
-                        textAlign: TextAlign.center,
                       ),
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         );
       },
     );
   }
 
+
   /// Ícone de mensagens com badge reativo
-  Widget _buildMessagesIcon() {
+  Widget _buildMessagesIcon({bool isSelected = false}) {
     final profileState = ref.read(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
 
     if (activeProfile == null) {
-      return const Icon(Iconsax.message, size: 28);
+      return Icon(
+        Iconsax.message,
+        size: 28,
+        color: isSelected ? AppColors.primary : AppColors.textSecondary,
+      );
     }
 
     return StreamBuilder<int>(
-      stream: ref.read(unreadMessageCountForProfileProvider(activeProfile.profileId).future).asStream(),
+      // ✅ FIX: Passar uid para match com Security Rules
+      stream: ref.read(unreadMessageCountForProfileProvider(activeProfile.profileId, activeProfile.uid).future).asStream(),
       builder: (context, snapshot) {
         // Error state
         if (snapshot.hasError) {
-          return Icon(Iconsax.message, size: 28, color: Colors.grey);
+          return Icon(
+            Iconsax.message,
+            size: 28,
+            color: isSelected ? AppColors.primary : AppColors.textSecondary,
+          );
         }
 
         // Loading state
@@ -297,7 +303,11 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           return Stack(
             clipBehavior: Clip.none,
             children: [
-              const Icon(Iconsax.message, size: 28),
+              Icon(
+                Iconsax.message,
+                size: 28,
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              ),
               Positioned(
                 right: -4,
                 top: -4,
@@ -316,7 +326,11 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            const Icon(Icons.chat_bubble_outline, size: 26),
+            Icon(
+              Icons.chat_bubble_outline,
+              size: 26,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            ),
             if (unreadCount > 0)
               Positioned(
                 right: -4,
@@ -351,16 +365,6 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     );
   }
 
-  /// Mostra modal com notificações recentes
-  void _showNotificationsModal(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const NotificationsModal(),
-    );
-  }
-
   /// Avatar do perfil ativo com CachedNetworkImage (otimizado)
   /// Suporta long press para mostrar o ProfileSwitcherBottomSheet
   Widget _buildAvatarIcon(bool isSelected) {
@@ -385,7 +389,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           shape: BoxShape.circle,
           border: Border.all(
             color: isSelected
-                ? Theme.of(context).colorScheme.primary
+                ? AppColors.primary
                 : Colors.transparent,
             width: 2,
           ),
@@ -412,6 +416,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
         backgroundColor: Colors.grey[200],
         child: ClipOval(
           child: CachedNetworkImage(
+            cacheManager: WeGigImageCacheManager.instance,
             imageUrl: photoUrl,
             width: 28,
             height: 28,
@@ -542,24 +547,14 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                 return StreamBuilder<List<NotificationEntity>>(
                   stream: ref.read(notificationServiceProvider).streamActiveProfileNotifications(),
                   builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
+                    // ✅ FIX: Mostrar loading apenas no primeiro carregamento
+                    if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                       return const Center(child: CircularProgressIndicator());
                     }
+                    // ✅ FIX: Tratar erros como estado vazio (melhor UX)
                     if (snapshot.hasError) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Iconsax.danger,
-                                size: 48, color: Colors.red.shade300),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Erro ao carregar notificações',
-                              style: TextStyle(color: Colors.grey.shade600),
-                            ),
-                          ],
-                        ),
-                      );
+                      debugPrint('NotificationsModal: Erro no stream: ${snapshot.error}');
+                      // Fallback para estado vazio
                     }
                     final notifications = snapshot.data ?? [];
                     final recentNotifications = notifications.take(10).toList();
@@ -617,11 +612,13 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
         color: notification.read ? Colors.white : Colors.blue.shade50,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildNotificationIcon(notification),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   MentionText(
                     text: notification.title,
@@ -954,6 +951,30 @@ extension on _BottomNavScaffoldState {
               },
             ),
             const SizedBox(height: 20),
+
+            // Opção: Anúncio
+            _buildPostTypeOption(
+              context: context,
+              icon: Iconsax.tag,
+              title: 'Anúncio',
+              subtitle: 'Oferecer produto ou serviço',
+              color: const Color(0xFF007eb9), // Cor azul para anúncios
+              onTap: () async {
+                Navigator.pop(context);
+                final result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute<bool>(
+                    builder: (context) => PostPage(postType: 'sales'),
+                  ),
+                );
+                if (result == true) {
+                  // Post criado com sucesso - invalidar providers
+                  ref.invalidate(postNotifierProvider);
+                  ref.invalidate(profileProvider);
+                }
+              },
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -979,6 +1000,7 @@ extension on _BottomNavScaffoldState {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               padding: const EdgeInsets.all(12),
@@ -991,6 +1013,7 @@ extension on _BottomNavScaffoldState {
             const SizedBox(width: 16),
             Expanded(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
@@ -999,6 +1022,7 @@ extension on _BottomNavScaffoldState {
                       fontWeight: FontWeight.w600,
                       color: color,
                     ),
+                    textAlign: TextAlign.left,
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -1007,6 +1031,7 @@ extension on _BottomNavScaffoldState {
                       fontSize: 13,
                       color: Colors.grey[600],
                     ),
+                    textAlign: TextAlign.left,
                   ),
                 ],
               ),
@@ -1032,9 +1057,6 @@ extension on _BottomNavScaffoldState {
           // Invalidar providers quando perfil mudar
           ref.invalidate(profileProvider);
           ref.invalidate(postNotifierProvider);
-          // Voltar para home após trocar perfil
-          _currentIndexNotifier.value = 0;
-          // Fechar o bottom sheet
           Navigator.pop(context);
         },
       ),

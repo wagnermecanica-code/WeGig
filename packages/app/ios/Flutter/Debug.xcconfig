@@ -1,2 +1,5 @@
+// Include Pods config for all debug configurations
 #include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.debug.xcconfig"
+#include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.debug-dev.xcconfig"
+#include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.debug-staging.xcconfig"
 #include "Generated.xcconfig"

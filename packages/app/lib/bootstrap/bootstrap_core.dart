@@ -8,6 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:wegig_app/core/firebase/firebase_cache_config.dart';
+import 'package:wegig_app/core/firebase/firestore_cache_manager.dart';
 import 'package:wegig_app/features/notifications/data/services/push_notification_service.dart';
 import 'package:wegig_app/utils/firebase_context_logger.dart';
 
@@ -29,6 +31,7 @@ Future<void> bootstrapCoreServices({
   await _initHive();
 
   await _initEnv(printEnvOnDebug);
+  
   await _initializeFirebase(firebaseOptions);
 
   logFirebaseOptions(
@@ -36,6 +39,23 @@ Future<void> bootstrapCoreServices({
     options: firebaseOptions,
     expectedProjectId: expectedProjectId,
   );
+  
+  // ✅ VALIDAÇÃO CRÍTICA: Garantir que o projeto correto foi carregado
+  // Se o projeto estiver errado, dados irão para o ambiente errado!
+  if (expectedProjectId != null) {
+    FirebaseCacheConfig.validateEnvironment(
+      flavorLabel.toLowerCase(),
+      firebaseOptions.projectId,
+    );
+  }
+  
+  // ✅ Configurar cache Firestore DEPOIS de inicializar Firebase
+  // FirebaseFirestore.instance requer Firebase já inicializado
+  await FirebaseCacheConfig.configure(flavorLabel.toLowerCase());
+  
+  // ✅ Inicializar FirestoreCacheManager para limpar posts expirados
+  // Agenda limpeza automática 1x por dia
+  await FirestoreCacheManager.initialize();
 
   FirebaseMessaging.onBackgroundMessage(backgroundHandler);
 
@@ -91,6 +111,10 @@ Future<void> _initializeFirebase(FirebaseOptions options) async {
   try {
     await Firebase.initializeApp(options: options);
     debugPrint('✅ Firebase initialized successfully');
+    
+    // ✅ Validar que o projeto correto foi carregado
+    final actualProjectId = options.projectId;
+    debugPrint('   Project ID: $actualProjectId');
   } on FirebaseException catch (error, stackTrace) {
     if (error.code == 'duplicate-app') {
       debugPrint('ℹ️ Firebase already initialized (${error.message})');

@@ -80,11 +80,11 @@ App Flutter para conectar músicos e bandas usando arquitetura multi-perfil esti
 
 O projeto usa **flutter_flavorizr** para gerenciar 3 ambientes isolados:
 
-| Flavor      | App Name      | Bundle ID                 | Firebase             | Logs   | Obfuscation |
-| ----------- | ------------- | ------------------------- | -------------------- | ------ | ----------- |
-| **dev**     | WeGig DEV     | `com.wegig.wegig.dev`     | to-sem-banda-dev     | ✅ On  | ❌ Off      |
-| **staging** | WeGig STAGING | `com.wegig.wegig.staging` | to-sem-banda-staging | ✅ On  | ✅ On       |
-| **prod**    | WeGig         | `com.wegig.wegig`         | to-sem-banda-83e19   | ❌ Off | ✅ On       |
+| Flavor      | App Name      | Bundle ID (iOS)           | Package (Android)              | Firebase Project   | Logs   | Crashlytics |
+| ----------- | ------------- | ------------------------- | ------------------------------ | ------------------ | ------ | ----------- |
+| **dev**     | WeGig DEV     | `com.wegig.wegig.dev`     | `com.tosembanda.wegig.dev`     | wegig-dev          | ✅ On  | ❌ Off      |
+| **staging** | WeGig STAGING | `com.wegig.wegig.staging` | `com.tosembanda.wegig.staging` | wegig-staging      | ⚠️ On  | ✅ On       |
+| **prod**    | WeGig         | `com.wegig.wegig`         | `com.wegig.wegig`              | to-sem-banda-83e19 | ❌ Off | ✅ On       |
 
 **Rodar por flavor:**
 
@@ -135,7 +135,11 @@ final enableLogs = AppConfig.enableLogs;
 
 - **Android**: coloque cada `google-services.json` em `android/app/src/<flavor>/` (ex.: `src/dev/google-services.json`). Rode `flutter clean` após trocar arquivos para o Gradle detectar alterações.
 - **iOS**: o scheme `WeGig-dev` usa `ios/Flutter/Dev.xcconfig` com `PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig.dev`. O build phase `[CP] Copy GoogleService-Info.plist` agora copia automaticamente `ios/Firebase/GoogleService-Info-<flavor>.plist` para `WeGig/GoogleService-Info.plist` antes do build. Garanta que cada arquivo exista (`GoogleService-Info-dev.plist`, `-staging`, `-prod`).
-- **Firebase Projects**: confirme que a flavor `dev` aponta para `to-sem-banda-83e19` (mesmo projeto usado nos testes). Use o script abaixo para validar rapidamente.
+- **Firebase Projects**: ⚠️ **CRITICAL** - Cada flavor aponta para um projeto Firebase isolado:
+  - `dev` → `wegig-dev`
+  - `staging` → `wegig-staging`
+  - `prod` → `to-sem-banda-83e19`
+  - Validação em runtime via `expectedProjectId` no bootstrap para evitar dados cruzados.
 
 #### Script de sanidade do Firebase
 
@@ -535,15 +539,27 @@ gh pr create  # Executa ci.yml automaticamente
 - ✅ Monorepo migration (packages/app + packages/core_ui)
 - ✅ Firebase dependencies updated (4.x/6.x series)
 
-### Última Atualização (04/12/2025)
+### Última Atualização (06/12/2025)
 
-- ✅ **Monorepo:** Migração completa para estrutura packages/
-- ✅ **Firebase:** Dependencies atualizadas (20 packages)
-- ✅ **Deprecations:** APIs depreciadas corrigidas (Riverpod, Google Maps, Color)
-- ✅ **CI/CD:** Pipelines iOS + Android configurados
-- ✅ **Bundle ID:** Corrigido para `com.wegig.wegig.dev` (compatível com Firebase)
-- ✅ **Apple Sign-In:** Erro "invalid-credential" resolvido
-- ✅ **Code Signing:** Documentação e setup completo
+#### Correções Críticas
+
+- ✅ **GoRouter Navigation:** Corrigido redirect infinito - navegação para `/profile/:id` e `/post/:id` agora funciona
+- ✅ **Firebase Multi-Ambiente:** Auditoria completa - `main_prod.dart` corrigido para `to-sem-banda-83e19`
+- ✅ **Notificações:** Latência reduzida (300ms → 50ms), tratamento de erros melhorado
+- ✅ **NotificationsModal:** Bottom sheet não mostra mais erro para perfis sem notificações
+
+#### Melhorias de Performance
+
+- ⚡ **Debounce otimizado:** Streams de notificações com 50ms (antes 300ms)
+- ⚡ **Memory leaks:** Fixados 8 vazamentos (home_page dispose, profile_transition_overlay)
+- ⚡ **Query optimization:** `recipientUid` + filtro client-side por `profileId`
+
+#### Configuração Multi-Ambiente
+
+- ✅ **DEV:** `wegig-dev` (logs ON, Crashlytics OFF)
+- ✅ **STAGING:** `wegig-staging` (logs ON, Crashlytics ON)
+- ✅ **PROD:** `to-sem-banda-83e19` (logs OFF, Crashlytics ON)
+- ✅ **Validação:** Runtime check via `expectedProjectId` previne dados cruzados
 
 ---
 

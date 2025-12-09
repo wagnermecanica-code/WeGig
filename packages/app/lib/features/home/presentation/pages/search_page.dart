@@ -495,34 +495,19 @@ class SearchPageState extends State<SearchPage> {
                 ],
               ),
               const Divider(thickness: 0.5, height: 48),
-              Text('Disponível para', style: sectionTitleStyle),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: _selectedAvailableFor.isNotEmpty
-                    ? _selectedAvailableFor.first
-                    : null,
-                hint: const Text('Selecione uma opção'),
-                items: _availableForOptions
-                    .map(
-                      (option) =>
-                          DropdownMenuItem(value: option, child: Text(option)),
-                    )
-                    .toList(),
-                onChanged: (value) {
+              MultiSelectField(
+                title: 'Disponível para',
+                placeholder: 'Selecione suas disponibilidades',
+                options: _availableForOptions,
+                selectedItems: _selectedAvailableFor,
+                maxSelections: 8,
+                onSelectionChanged: (values) {
                   setState(() {
-                    _selectedAvailableFor.clear();
-                    if (value != null) {
-                      _selectedAvailableFor.add(value);
-                    }
+                    _selectedAvailableFor
+                      ..clear()
+                      ..addAll(values);
                   });
                 },
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: AppColors.primary, width: 2),
-                  ),
-                ),
               ),
               const Divider(thickness: 0.5, height: 48),
               MultiSelectField(

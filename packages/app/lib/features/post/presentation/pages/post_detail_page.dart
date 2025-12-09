@@ -13,7 +13,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
@@ -331,7 +333,10 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           '✅ Interessados recarregados - _interestedUsers.length: ${_interestedUsers.length}');
 
       if (mounted) {
-        AppSnackBar.showSuccess(context, 'Interesse demonstrado! 💙');
+        AppSnackBar.showSuccess(
+          context, 
+          _post!.type == 'sales' ? 'Anúncio salvo! 📌' : 'Interesse demonstrado! 💙',
+        );
       }
     } catch (e) {
       debugPrint('Erro ao demonstrar interesse: $e');
@@ -544,9 +549,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                     color: Colors.black87,
                   ),
                   children: [
-                    const TextSpan(
-                      text: 'Interessados: ',
-                      style: TextStyle(fontWeight: FontWeight.normal),
+                    TextSpan(
+                      text: _post!.type == 'sales' ? 'Salvaram: ' : 'Interessados: ',
+                      style: const TextStyle(fontWeight: FontWeight.normal),
                     ),
                     TextSpan(
                       text: _interestedUsers[0]['name'] as String,
@@ -1086,171 +1091,11 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                         // Seção de interessados (visível para todos)
                         _buildInterestedUsers(),
 
-                        // Título dinâmico do tipo de post
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _post!.type == 'musician'
-                                  ? 'Músico em busca de banda'
-                                  : 'Banda em busca de músico',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Card de informações
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Área de Interesse (Localização)
-                                _buildInfoRow(
-                                  Iconsax.location,
-                                  'Área de Interesse',
-                                  formatCleanLocation(
-                                    neighborhood: _post!.neighborhood,
-                                    city: _post!.city,
-                                    state: _post!.state,
-                                    fallback: 'Localização não disponível',
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                // Instrumentos (músico) ou Procurando (banda)
-                                if (_post!.type == 'musician' &&
-                                    _post!.instruments.isNotEmpty)
-                                  _buildInfoRow(
-                                    Iconsax.musicnote,
-                                    'Instrumentos',
-                                    _post!.instruments.join(', '),
-                                  )
-                                else if (_post!.type == 'band' &&
-                                    _post!.seekingMusicians.isNotEmpty)
-                                  _buildInfoRow(
-                                    Iconsax.search_favorite,
-                                    'Procurando',
-                                    _post!.seekingMusicians.join(', '),
-                                  ),
-                                if ((_post!.type == 'musician' &&
-                                        _post!.instruments.isNotEmpty) ||
-                                    (_post!.type == 'band' &&
-                                        _post!.seekingMusicians.isNotEmpty))
-                                  const SizedBox(height: 12),
-                                // Gêneros musicais
-                                if (_post!.genres.isNotEmpty)
-                                  _buildInfoRow(
-                                    Iconsax.music_library_2,
-                                    'Gêneros',
-                                    _post!.genres.join(', '),
-                                  ),
-                                if (_post!.genres.isNotEmpty)
-                                  const SizedBox(height: 12),
-                                // Nível de habilidade
-                                _buildInfoRow(
-                                  Iconsax.star,
-                                  'Nível',
-                                  _getSkillLevelLabel(_post!.level),
-                                ),
-                                // Disponível para
-                                if (_post!.availableFor.isNotEmpty) ...[
-                                  const SizedBox(height: 12),
-                                  _buildInfoRow(
-                                    Iconsax.calendar,
-                                    'Disponível para',
-                                    _post!.availableFor.join(', '),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // Card de mensagem
-                        if (_post!.content.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Row(
-                                    children: [
-                                      Icon(
-                                        Iconsax.message,
-                                        size: 18,
-                                        color: AppColors.primary,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Mensagem',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  MentionText(
-                                    text: _post!.content,
-                                    selectable: true,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      color: Colors.grey[800],
-                                      height: 1.5,
-                                    ),
-                                    onMentionTap: (username) {
-                                      context.pushProfileByUsername(username);
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                        const SizedBox(height: 16),
-
-                        // Card de vídeo do YouTube
-                        if (_youtubeController != null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: YoutubePlayer(
-                                  controller: _youtubeController!,
-                                  showVideoProgressIndicator: true,
-                                  progressIndicatorColor: AppColors.primary,
-                                ),
-                              ),
-                            ),
-                          ),
+                        // ✅ Renderização condicional por tipo de post
+                        if (_post!.type == 'sales')
+                          _buildSalesContent()
+                        else
+                          _buildMusicianBandContent(),
 
                         const SizedBox(height: 32),
                       ],
@@ -1330,10 +1175,10 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                               : IconButton(
                                   icon: Icon(
                                     _hasInterest
-                                        ? Iconsax.heart5
-                                        : Iconsax.heart,
+                                        ? (_post!.type == 'sales' ? Iconsax.archive_tick5 : Iconsax.heart5)
+                                        : (_post!.type == 'sales' ? Iconsax.archive_add : Iconsax.heart),
                                     color: _hasInterest
-                                        ? Colors.red
+                                        ? (_post!.type == 'sales' ? AppColors.primary : Colors.red)
                                         : Colors.white,
                                     size: 18,
                                   ),
@@ -1410,6 +1255,632 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         return 'Profissional';
       default:
         return level;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ✅ CONTEÚDO PARA MÚSICO/BANDA (código original extraído)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Conteúdo para posts de músico ou banda
+  Widget _buildMusicianBandContent() {
+    return Column(
+      children: [
+        // Título dinâmico do tipo de post
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _post!.type == 'musician'
+                  ? 'Músico em busca de banda'
+                  : 'Banda em busca de músico',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ),
+
+        // Card de informações
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Área de Interesse (Localização)
+                _buildInfoRow(
+                  Iconsax.location,
+                  'Área de Interesse',
+                  formatCleanLocation(
+                    neighborhood: _post!.neighborhood,
+                    city: _post!.city,
+                    state: _post!.state,
+                    fallback: 'Localização não disponível',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Instrumentos (músico) ou Procurando (banda)
+                if (_post!.type == 'musician' && _post!.instruments.isNotEmpty)
+                  _buildInfoRow(
+                    Iconsax.musicnote,
+                    'Instrumentos',
+                    _post!.instruments.join(', '),
+                  )
+                else if (_post!.type == 'band' && _post!.seekingMusicians.isNotEmpty)
+                  _buildInfoRow(
+                    Iconsax.search_favorite,
+                    'Procurando',
+                    _post!.seekingMusicians.join(', '),
+                  ),
+                if ((_post!.type == 'musician' && _post!.instruments.isNotEmpty) ||
+                    (_post!.type == 'band' && _post!.seekingMusicians.isNotEmpty))
+                  const SizedBox(height: 12),
+                // Gêneros musicais
+                if (_post!.genres.isNotEmpty)
+                  _buildInfoRow(
+                    Iconsax.music_library_2,
+                    'Gêneros',
+                    _post!.genres.join(', '),
+                  ),
+                if (_post!.genres.isNotEmpty) const SizedBox(height: 12),
+                // Nível de habilidade
+                _buildInfoRow(
+                  Iconsax.star,
+                  'Nível',
+                  _getSkillLevelLabel(_post!.level),
+                ),
+                // Disponível para
+                if (_post!.availableFor.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildInfoRow(
+                    Iconsax.calendar,
+                    'Disponível para',
+                    _post!.availableFor.join(', '),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Card de mensagem
+        if (_post!.content.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(
+                        Iconsax.message,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Mensagem',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  MentionText(
+                    text: _post!.content,
+                    selectable: true,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.grey[800],
+                      height: 1.5,
+                    ),
+                    onMentionTap: (username) {
+                      context.pushProfileByUsername(username);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        const SizedBox(height: 16),
+
+        // Card de vídeo do YouTube
+        if (_youtubeController != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: YoutubePlayer(
+                  controller: _youtubeController!,
+                  showVideoProgressIndicator: true,
+                  progressIndicatorColor: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ✅ CONTEÚDO PARA SALES (ANÚNCIOS DE ESPAÇOS)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Conteúdo principal para posts de sales (anúncios)
+  Widget _buildSalesContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Espaçamento adicional no topo
+        const SizedBox(height: 16),
+        
+        // 1. Badge de status da promoção
+        _buildPromotionStatusBadge(),
+        const SizedBox(height: 16),
+
+        // 2. Título do anúncio
+        _buildSalesTitle(),
+        const SizedBox(height: 16),
+
+        // 3. Bloco de preços Amazon-style
+        _buildPriceBlock(),
+        const SizedBox(height: 24),
+
+        // 4. Descrição (reaproveita message card)
+        _buildSalesDescriptionCard(),
+        const SizedBox(height: 16),
+
+        // 5. Localização + distância
+        _buildSalesLocation(),
+        const SizedBox(height: 16),
+
+        // 6. Validade da promoção
+        _buildPromoValidity(),
+        const SizedBox(height: 24),
+
+        // 7. Botões de ação rápida
+        _buildSalesActionButtons(),
+        const SizedBox(height: 24),
+
+        // 8. Tipo do anúncio
+        _buildSalesTypeSection(),
+      ],
+    );
+  }
+
+  /// Badge de status da promoção (ATIVA / EXPIRA EM X DIAS / EXPIRADA)
+  Widget _buildPromotionStatusBadge() {
+    final now = DateTime.now();
+    final expiresAt = _post!.expiresAt;
+    final daysRemaining = expiresAt.difference(now).inDays;
+
+    final isUrgent = daysRemaining <= 3 && daysRemaining >= 0;
+    final isExpired = daysRemaining < 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isExpired
+              ? Colors.red.shade50
+              : isUrgent
+                  ? Colors.orange.shade50
+                  : Colors.green.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isExpired
+                ? Colors.red.shade300
+                : isUrgent
+                    ? Colors.orange.shade300
+                    : Colors.green.shade300,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Iconsax.clock,
+              size: 16,
+              color: isExpired
+                  ? Colors.red
+                  : isUrgent
+                      ? Colors.orange
+                      : Colors.green,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              isExpired
+                  ? 'PROMOÇÃO EXPIRADA'
+                  : isUrgent
+                      ? 'EXPIRA EM ${daysRemaining + 1} ${daysRemaining == 0 ? 'DIA' : 'DIAS'}'
+                      : 'PROMOÇÃO ATIVA',
+              style: TextStyle(
+                color: isExpired
+                    ? Colors.red
+                    : isUrgent
+                        ? Colors.orange
+                        : Colors.green,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Título do anúncio
+  Widget _buildSalesTitle() {
+    // Usar campo 'title' da entidade ou primeira linha do content
+    final title = _post!.title ?? 
+        (_post!.content.isNotEmpty 
+            ? _post!.content.split('\n').first 
+            : 'Anúncio');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          height: 1.3,
+        ),
+      ),
+    );
+  }
+
+  /// Bloco de preços Amazon-style com desconto
+  Widget _buildPriceBlock() {
+    final price = _post!.price;
+    final discountMode = _post!.discountMode;
+    final discountValue = _post!.discountValue;
+
+    // Se não tem preço, não mostra o bloco
+    if (price == null || price <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    double originalPrice = price;
+    double finalPrice = price;
+    String? discountLabel;
+
+    // Calcular preço original baseado no desconto
+    if (discountMode == 'percentage' && discountValue != null && discountValue > 0) {
+      // Se preço informado é o final e desconto é %, calcular original
+      originalPrice = price / (1 - discountValue / 100);
+      discountLabel = '-${discountValue.toStringAsFixed(0)}%';
+    } else if (discountMode == 'fixed' && discountValue != null && discountValue > 0) {
+      // Se desconto é valor fixo
+      originalPrice = price + discountValue;
+      discountLabel = 'R\$ ${discountValue.toStringAsFixed(2).replaceAll('.', ',')} OFF';
+    }
+
+    final hasDiscount = discountMode != null && 
+        discountMode != 'none' && 
+        discountValue != null && 
+        discountValue > 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.shade300),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (hasDiscount) ...[
+              Row(
+                children: [
+                  Text(
+                    'De R\$ ${originalPrice.toStringAsFixed(2).replaceAll('.', ',')}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (discountLabel != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        discountLabel,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  hasDiscount ? 'Por' : 'Preço',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.green,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'R\$ ${finalPrice.toStringAsFixed(2).replaceAll('.', ',')}',
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Card de descrição para sales
+  Widget _buildSalesDescriptionCard() {
+    if (_post!.content.isEmpty) return const SizedBox.shrink();
+
+    // Se tem título, pegar conteúdo sem a primeira linha (que é o título)
+    String description = _post!.content;
+    if (_post!.title == null && _post!.content.contains('\n')) {
+      final lines = _post!.content.split('\n');
+      if (lines.length > 1) {
+        description = lines.sublist(1).join('\n').trim();
+      }
+    }
+
+    if (description.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(
+                  Iconsax.document_text,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'Descrição',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            MentionText(
+              text: description,
+              selectable: true,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey[800],
+                height: 1.5,
+              ),
+              onMentionTap: (username) {
+                context.pushProfileByUsername(username);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Localização para sales
+  Widget _buildSalesLocation() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            _buildInfoRow(
+              Iconsax.location,
+              'Localização',
+              formatCleanLocation(
+                neighborhood: _post!.neighborhood,
+                city: _post!.city,
+                state: _post!.state,
+                fallback: 'Localização não disponível',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Validade da promoção
+  Widget _buildPromoValidity() {
+    final startDate = _post!.promoStartDate ?? _post!.createdAt;
+    final endDate = _post!.promoEndDate ?? _post!.expiresAt;
+
+    final dateFormat = DateFormat('dd/MM/yyyy');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: _buildInfoRow(
+          Iconsax.calendar,
+          'Válida de',
+          '${dateFormat.format(startDate)} até ${dateFormat.format(endDate)}',
+        ),
+      ),
+    );
+  }
+
+  /// Botões de ação rápida para sales
+  Widget _buildSalesActionButtons() {
+    final whatsapp = _post!.whatsappNumber;
+    final hasWhatsApp = whatsapp != null && whatsapp.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          // WhatsApp
+          if (hasWhatsApp)
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _launchWhatsApp(whatsapp),
+                icon: const Icon(Iconsax.message, size: 20),
+                label: const Text('WhatsApp'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF25D366),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+
+          if (hasWhatsApp) const SizedBox(width: 12),
+
+          // Compartilhar
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _sharePost,
+              icon: const Icon(Iconsax.share, size: 20),
+              label: const Text('Compartilhar'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tipo do anúncio
+  Widget _buildSalesTypeSection() {
+    final salesType = _post!.salesType;
+
+    if (salesType == null || salesType.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: _buildInfoRow(
+          Iconsax.tag,
+          'Categoria',
+          salesType,
+        ),
+      ),
+    );
+  }
+
+  /// Abre WhatsApp com mensagem pré-definida
+  Future<void> _launchWhatsApp(String phone) async {
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    final title = _post!.title ?? 'no WeGig';
+    final message = Uri.encodeComponent(
+      'Olá! Vi seu anúncio "$title" e tenho interesse.',
+    );
+    final url = 'https://wa.me/55$cleanPhone?text=$message';
+
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          AppSnackBar.showError(context, 'Não foi possível abrir o WhatsApp');
+        }
+      }
+    } catch (e) {
+      debugPrint('Erro ao abrir WhatsApp: $e');
+      if (mounted) {
+        AppSnackBar.showError(context, 'Erro ao abrir WhatsApp');
+      }
     }
   }
 

@@ -13,6 +13,8 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
   @override
   Future<List<NotificationEntity>> getNotifications({
     required String profileId,
+    String? recipientUid,
+    NotificationType? type,
     int limit = 50,
     NotificationEntity? startAfter,
   }) async {
@@ -20,6 +22,8 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
       debugPrint('📝 NotificationsRepository: getNotifications');
       return await _remoteDataSource.getNotifications(
         profileId: profileId,
+        recipientUid: recipientUid,
+        type: type,
         limit: limit,
         startAfter: startAfter,
       );
@@ -57,10 +61,11 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
   @override
   Future<void> markAllAsRead({
     required String profileId,
+    String? recipientUid,
   }) async {
     try {
       debugPrint('📝 NotificationsRepository: markAllAsRead');
-      await _remoteDataSource.markAllAsRead(profileId);
+      await _remoteDataSource.markAllAsRead(profileId, recipientUid: recipientUid);
     } catch (e) {
       debugPrint('❌ NotificationsRepository: Erro em markAllAsRead - $e');
       rethrow;
@@ -105,10 +110,11 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
   @override
   Future<int> getUnreadCount({
     required String profileId,
+    String? recipientUid,
   }) async {
     try {
       debugPrint('📝 NotificationsRepository: getUnreadCount');
-      return await _remoteDataSource.getUnreadCount(profileId);
+      return await _remoteDataSource.getUnreadCount(profileId, recipientUid: recipientUid);
     } catch (e) {
       debugPrint('❌ NotificationsRepository: Erro em getUnreadCount - $e');
       return 0;
@@ -118,17 +124,19 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
   @override
   Stream<List<NotificationEntity>> watchNotifications({
     required String profileId,
+    String? recipientUid,
     int limit = 50,
   }) {
     debugPrint('📝 NotificationsRepository: watchNotifications (stream)');
-    return _remoteDataSource.watchNotifications(profileId, limit);
+    return _remoteDataSource.watchNotifications(profileId, limit, recipientUid: recipientUid);
   }
 
   @override
   Stream<int> watchUnreadCount({
     required String profileId,
+    String? recipientUid,
   }) {
     debugPrint('📝 NotificationsRepository: watchUnreadCount (stream)');
-    return _remoteDataSource.watchUnreadCount(profileId);
+    return _remoteDataSource.watchUnreadCount(profileId, recipientUid: recipientUid);
   }
 }

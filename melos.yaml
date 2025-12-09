@@ -24,4 +24,4 @@ scripts:
   build_runner:
     run: melos exec -- dart run build_runner build --delete-conflicting-outputs
     description: Run build_runner in all packages
-sdkPath: /Users/wagneroliveira/.fvm/versions/3.27.1
+sdkPath: .fvm/flutter_sdk

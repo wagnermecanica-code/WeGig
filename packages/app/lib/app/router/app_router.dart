@@ -14,6 +14,7 @@ import 'package:wegig_app/features/post/presentation/pages/post_detail_page.dart
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:wegig_app/features/settings/presentation/pages/settings_page.dart';
 
 part 'app_router.g.dart';
 
@@ -71,18 +72,39 @@ CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) {
     maintainState: true,
     child: child,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final Animation<double> fadeAnimation = CurvedAnimation(
+      // Apenas Slide - removido FadeTransition
+      final Animation<Offset> slideAnimation = CurvedAnimation(
         parent: animation,
         curve: Curves.easeOutCubic,
         reverseCurve: Curves.easeInCubic,
+      ).drive(slideTween);
+
+      return SlideTransition(
+        position: slideAnimation,
+        child: child,
       );
-      final Animation<Offset> slideAnimation = fadeAnimation.drive(slideTween);
-      return FadeTransition(
-        opacity: fadeAnimation,
-        child: SlideTransition(
-          position: slideAnimation,
-          child: child,
-        ),
+    },
+  );
+}
+
+// ✅ NOVA TRANSIÇÃO: Slide lateral completo (estilo nativo iOS/Android)
+CustomTransitionPage<void> _slideLeftPage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
+    child: child,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      const begin = Offset(1.0, 0.0); // Começa da direita
+      const end = Offset.zero;
+      const curve = Curves.easeInOut;
+
+      var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+      var offsetAnimation = animation.drive(tween);
+
+      return SlideTransition(
+        position: offsetAnimation,
+        child: child,
       );
     },
   );
@@ -110,10 +132,16 @@ GoRouter goRouter(Ref ref) {
       final hasProfileData = profileState is AsyncData<ProfileState>;
       final hasAnyProfile = (profileData?.profiles.isNotEmpty ?? false);
       final hasActiveProfile = profileData?.activeProfile != null;
+      
+      // ✅ FIX: Considerar como "checking" se:
+      // 1. Auth está carregando
+      // 2. Auth OK mas profile está carregando
+      // 3. Auth OK mas profile tem erro (pode ser transitório, tentar novamente)
       final isCheckingAuth = authState.isLoading ||
-          (isLoggedIn && profileState.isLoading);
+          (isLoggedIn && (profileState.isLoading || profileState.hasError));
 
       debugPrint('Router: authState.isLoading=${authState.isLoading}, authState.hasError=${authState.hasError}, user=$user');
+      debugPrint('Router: profileState.isLoading=${profileState.isLoading}, profileState.hasError=${profileState.hasError}');
       debugPrint('Router: isCheckingAuth=$isCheckingAuth, hasProfileData=$hasProfileData, hasAnyProfile=$hasAnyProfile, hasActiveProfile=$hasActiveProfile');
 
       if (isCheckingAuth) {
@@ -126,14 +154,22 @@ GoRouter goRouter(Ref ref) {
         return AppRoutes.auth;
       }
 
-      // Agora sabemos que está logado
+      // Agora sabemos que está logado E profileState carregou com sucesso
       if (hasProfileData && !hasAnyProfile) {
         debugPrint('Router: logged in but no profiles, returning createProfile');
         return AppRoutes.createProfile;
       }
 
-      debugPrint('Router: logged in with profiles, returning home');
-      return AppRoutes.home;
+      // Usuário logado com perfis - verificar se está em rota permitida
+      // Se está indo para auth/splash/createProfile, redireciona para home
+      if (isGoingToAuth || isGoingToSplash || isGoingToCreateProfile) {
+        debugPrint('Router: logged in with profiles, redirecting to home');
+        return AppRoutes.home;
+      }
+
+      // Rota atual é válida (home, profile, post, conversation, etc) - não redirecionar
+      debugPrint('Router: logged in with profiles, allowing current route: ${state.matchedLocation}');
+      return null;
     },
     routes: <RouteBase>[
       GoRoute(
@@ -194,6 +230,13 @@ GoRouter goRouter(Ref ref) {
             ),
           );
         },
+      ),
+      // ✅ NOVA ROTA: Settings com transição Slide
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        pageBuilder: (context, state) =>
+            _slideLeftPage(state, const SettingsPage()),
       ),
       GoRoute(
         path: '/profile/:profileId/edit',

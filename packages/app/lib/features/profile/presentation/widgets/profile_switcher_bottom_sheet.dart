@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_switcher_provider.dart';
 import 'package:wegig_app/features/profile/presentation/widgets/profile_transition_overlay.dart';
 import 'package:wegig_app/features/notifications/presentation/providers/notifications_providers.dart';
 import 'package:wegig_app/features/messages/presentation/providers/messages_providers.dart';
@@ -262,6 +263,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                               if (!isActive) ...[
                                 _UnifiedBadgeCounter(
                                   profileId: profile.profileId,
+                                  uid: profile.uid,
                                 ),
                                 const SizedBox(width: 12),
                               ],
@@ -375,11 +377,11 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                       },
                                     );
 
-                                    // Atualiza o perfil ativo usando ProfileRepository
-                                    // Faz isso em paralelo com a animação do overlay
+                                    // ✅ NOVO: Usar ProfileSwitcherNotifier centralizado
+                                    // Troca perfil + invalida TODOS os caches automaticamente
                                     await Future.wait(<Future<dynamic>>[
-                                      ref.read(profileProvider.notifier)
-                                          .switchProfile(profile.profileId),
+                                      ref.read(profileSwitcherNotifierProvider.notifier)
+                                          .switchToProfile(profile.profileId),
                                       Future<void>.delayed(const Duration(
                                         milliseconds: 1300,
                                       )), // Duração mínima do overlay
@@ -646,14 +648,17 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
 class _UnifiedBadgeCounter extends ConsumerWidget {
   const _UnifiedBadgeCounter({
     required this.profileId,
+    required this.uid,
   });
   final String profileId;
+  final String uid;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Soma de notificações + mensagens
-    final notificationsAsync = ref.watch(unreadNotificationCountForProfileProvider(profileId));
-    final messagesAsync = ref.watch(unreadMessageCountForProfileProvider(profileId));
+    // ✅ FIX: Passar uid para match com Security Rules
+    final notificationsAsync = ref.watch(unreadNotificationCountForProfileProvider(profileId, uid));
+    final messagesAsync = ref.watch(unreadMessageCountForProfileProvider(profileId, uid));
     
     // Aguardar ambos os providers carregarem
     if (notificationsAsync.isLoading || messagesAsync.isLoading) {

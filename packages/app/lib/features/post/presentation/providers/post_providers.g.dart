@@ -173,7 +173,7 @@ final postListProvider = AutoDisposeProvider<List<PostEntity>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef PostListRef = AutoDisposeProviderRef<List<PostEntity>>;
-String _$postNotifierHash() => r'e052534c4cc4b96972afbeeeb5811a2c0703afda';
+String _$postNotifierHash() => r'8d32353636f74c4128198ebcd3ad627711c3014b';
 
 /// PostNotifier - Gerencia estado de posts com Clean Architecture
 ///

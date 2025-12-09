@@ -88,6 +88,33 @@ class MockMessagesRepository implements MessagesRepository {
   }
 
   @override
+  Future<void> addReaction({
+    required String conversationId,
+    required String messageId,
+    required String userId,
+    required String reaction,
+  }) async {
+    // Mock implementation
+  }
+
+  @override
+  Future<void> removeReaction({
+    required String conversationId,
+    required String messageId,
+    required String userId,
+  }) async {
+    // Mock implementation
+  }
+
+  @override
+  Future<void> deleteMessage({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    // Mock implementation
+  }
+
+  @override
   Future<List<ConversationEntity>> getConversations({
     required String profileId,
     int limit = 20,
@@ -307,16 +334,20 @@ class MockMessagesRepository implements MessagesRepository {
   }
 
   @override
-  Stream<List<ConversationEntity>> watchConversations(String profileId, {String? profileUid}) {
+  Stream<List<ConversationEntity>> watchConversations(String profileId, {int limit = 20, String? profileUid}) {
     return Stream.value(
       _conversations.values
           .where((conv) => conv.participantProfiles.contains(profileId))
+          .take(limit)
           .toList(),
     );
   }
 
   @override
-  Stream<List<MessageEntity>> watchMessages(String conversationId, {String? profileUid}) {
+  Stream<List<MessageEntity>> watchMessages(
+    String conversationId, {
+    int limit = 20,
+  }) {
     return Stream.value(_messages[conversationId] ?? []);
   }
 

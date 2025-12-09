@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
@@ -207,6 +208,7 @@ class NotificationItem extends ConsumerWidget {
       return Stack(
         children: [
           CachedNetworkImage(
+            cacheManager: WeGigImageCacheManager.instance,
             imageUrl: notification.senderPhoto!,
             imageBuilder: (context, imageProvider) => CircleAvatar(
               radius: 28,

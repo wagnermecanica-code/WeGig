@@ -35,6 +35,12 @@ abstract class MessagesRepository {
     MessageEntity? startAfter,
   });
 
+  /// Observa mensagens de uma conversa em tempo real
+  Stream<List<MessageEntity>> watchMessages(
+    String conversationId, {
+    int limit = 20,
+  });
+
   /// Envia mensagem de texto
   Future<MessageEntity> sendMessage({
     required String conversationId,
@@ -52,6 +58,24 @@ abstract class MessagesRepository {
     required String imageUrl,
     String text = '',
     MessageReplyEntity? replyTo,
+  });
+
+  Future<void> addReaction({
+    required String conversationId,
+    required String messageId,
+    required String userId,
+    required String reaction,
+  });
+
+  Future<void> removeReaction({
+    required String conversationId,
+    required String messageId,
+    required String userId,
+  });
+
+  Future<void> deleteMessage({
+    required String conversationId,
+    required String messageId,
   });
 
   /// Marca mensagens como lidas
@@ -81,10 +105,7 @@ abstract class MessagesRepository {
 
   /// Stream de conversas (real-time updates)
   Stream<List<ConversationEntity>> watchConversations(String profileId,
-      {String? profileUid});
-
-  /// Stream de mensagens de uma conversa (real-time updates)
-  Stream<List<MessageEntity>> watchMessages(String conversationId);
+      {String? profileUid, int limit = 20});
 
   /// Stream de unread count (real-time badge counter)
   Stream<int> watchUnreadCount(String profileId, {String? profileUid});

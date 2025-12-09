@@ -85,7 +85,7 @@ class _PostPageState extends ConsumerState<PostPage> {
   final TextEditingController _discountController = TextEditingController();
   final TextEditingController _whatsappController = TextEditingController();
   
-  String _salesType = 'Gravação/Ensaios';
+  String _salesType = 'Venda';
   String _discountMode = 'none'; // 'none', 'percentage', 'fixed'
   double _calculatedFinalPrice = 0.0;
   DateTime _promoStartDate = DateTime.now();
@@ -97,12 +97,15 @@ class _PostPageState extends ConsumerState<PostPage> {
 
   // === Sales type options ===
   static const List<String> _salesTypeOptions = [
-    'Gravação/Ensaios',
+    'Venda',
+    'Gravação',
+    'Ensaios',
     'Aluguel',
     'Show/Evento',
     'Aula/Workshop',
     'Freela',
-    'Promoção de loja',
+    'Promoção',
+    'Manutenção/Reparo',
     'Outro',
   ];
 
@@ -502,12 +505,54 @@ class _PostPageState extends ConsumerState<PostPage> {
 
     // Validações específicas por tipo
     if (_postType == 'sales') {
+      // Sales: fotos, título, descrição, tipo, preço, localização (SEM gêneros/instrumentos)
       if (_photoPaths.isEmpty) {
         _showSnackBar('Adicione pelo menos uma foto do produto/serviço.', isError: true);
         return;
       }
+      if (_titleController.text.trim().isEmpty) {
+        _showSnackBar('Título é obrigatório para anúncios.', isError: true);
+        return;
+      }
+      if (_messageController.text.trim().isEmpty) {
+        _showSnackBar('Descrição é obrigatória para anúncios.', isError: true);
+        return;
+      }
+      if (_priceController.text.isEmpty || _calculatedFinalPrice <= 0) {
+        _showSnackBar('Preço deve ser maior que zero.', isError: true);
+        return;
+      }
       if (_promoEndDate.isBefore(_promoStartDate)) {
         _showSnackBar('Data de fim deve ser após a data de início.', isError: true);
+        return;
+      }
+      // Sales NÃO precisa de gêneros ou instrumentos
+    } else if (_postType == 'musician') {
+      // Musician: instrumentos, gêneros, descrição, localização
+      if (_selectedInstruments.isEmpty) {
+        _showSnackBar('Selecione pelo menos um instrumento.', isError: true);
+        return;
+      }
+      if (_selectedGenres.isEmpty) {
+        _showSnackBar('Selecione pelo menos um gênero musical.', isError: true);
+        return;
+      }
+      if (_messageController.text.trim().isEmpty) {
+        _showSnackBar('Mensagem é obrigatória.', isError: true);
+        return;
+      }
+    } else if (_postType == 'band') {
+      // Band: músicos procurados, gêneros, descrição, localização
+      if (_selectedInstruments.isEmpty) {
+        _showSnackBar('Selecione pelo menos um instrumento/músico procurado.', isError: true);
+        return;
+      }
+      if (_selectedGenres.isEmpty) {
+        _showSnackBar('Selecione pelo menos um gênero musical.', isError: true);
+        return;
+      }
+      if (_messageController.text.trim().isEmpty) {
+        _showSnackBar('Mensagem é obrigatória.', isError: true);
         return;
       }
     }
@@ -1030,6 +1075,11 @@ class _PostPageState extends ConsumerState<PostPage> {
         'Validade da promoção *',
         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
       ),
+      const SizedBox(height: 8),
+      Text(
+        'Datas desabilitadas ficam acinzentadas no calendário',
+        style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
+      ),
       const SizedBox(height: 12),
       Row(
         children: [
@@ -1040,12 +1090,33 @@ class _PostPageState extends ConsumerState<PostPage> {
                   context: context,
                   initialDate: _promoStartDate,
                   firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                  lastDate: DateTime.now().add(const Duration(days: 30)),
+                  helpText: 'Data de início (até 30 dias)',
+                  cancelText: 'Cancelar',
+                  confirmText: 'OK',
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: AppColors.primary,
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
                 );
-                if (date != null) setState(() => _promoStartDate = date);
+                if (date != null) {
+                  setState(() {
+                    _promoStartDate = date;
+                    // Ajusta data de término automaticamente se necessário
+                    if (_promoEndDate.isBefore(date) || _promoEndDate.isAfter(date.add(const Duration(days: 30)))) {
+                      _promoEndDate = date.add(const Duration(days: 30));
+                    }
+                  });
+                }
               },
               icon: const Icon(Icons.calendar_today),
-              label: Text('De: ${_promoStartDate.day}/${_promoStartDate.month}/${_promoStartDate.year}'),
+              label: Text('De: ${_promoStartDate.day}/${_promoStartDate.month}/${_promoStartDate.year.toString().substring(2)}'),
             ),
           ),
           const SizedBox(width: 8),
@@ -1054,17 +1125,53 @@ class _PostPageState extends ConsumerState<PostPage> {
               onPressed: () async {
                 final date = await showDatePicker(
                   context: context,
-                  initialDate: _promoEndDate,
+                  initialDate: _promoEndDate.isAfter(_promoStartDate.add(const Duration(days: 30)))
+                      ? _promoStartDate.add(const Duration(days: 30))
+                      : _promoEndDate,
                   firstDate: _promoStartDate,
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                  lastDate: _promoStartDate.add(const Duration(days: 30)),
+                  helpText: 'Data de término (máx: 30 dias após início)',
+                  cancelText: 'Cancelar',
+                  confirmText: 'OK',
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: AppColors.primary,
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
                 );
                 if (date != null) setState(() => _promoEndDate = date);
               },
               icon: const Icon(Icons.calendar_today),
-              label: Text('Até: ${_promoEndDate.day}/${_promoEndDate.month}/${_promoEndDate.year}'),
+              label: Text('Até: ${_promoEndDate.day}/${_promoEndDate.month}/${_promoEndDate.year.toString().substring(2)}'),
             ),
           ),
         ],
+      ),
+      const SizedBox(height: 8),
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, size: 18, color: Colors.blue.shade700),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Início: até 30 dias de hoje • Término: até 30 dias após início',
+                style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+              ),
+            ),
+          ],
+        ),
       ),
       const Divider(height: 48, thickness: 0.5),
 

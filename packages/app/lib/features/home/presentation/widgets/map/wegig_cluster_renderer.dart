@@ -58,7 +58,7 @@ class WeGigClusterRenderer {
     gm_cluster.Cluster<WeGigClusterItem> cluster,
   ) async {
     final color = _dominantColor(cluster);
-    final key = _ClusterCacheKey(cluster.count, color.toARGB32());
+    final key = _ClusterCacheKey(cluster.count, color.value);
     if (_clusterBadgeCache.containsKey(key)) {
       return _clusterBadgeCache[key]!;
     }

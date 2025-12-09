@@ -12,7 +12,7 @@ Future<void> main() async {
   await bootstrapCoreServices(
     firebaseOptions: DefaultFirebaseOptions.currentPlatform,
     flavorLabel: 'prod',
-    expectedProjectId: 'wegig-dev',
+    expectedProjectId: 'to-sem-banda-83e19',
     backgroundHandler: _firebaseMessagingBackgroundHandler,
     enableCrashlytics: true,
     printEnvOnDebug: false,

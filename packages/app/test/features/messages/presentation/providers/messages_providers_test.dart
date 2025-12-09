@@ -19,13 +19,25 @@ import 'package:wegig_app/features/messages/presentation/providers/messages_prov
 
 class _MockMessagesRemoteDataSource implements IMessagesRemoteDataSource {
   @override
+  Future<void> addReaction(String conversationId, String messageId, String userId, String reaction) async {}
+
+  @override
+  Future<void> removeReaction(String conversationId, String messageId, String userId) async {}
+
+  @override
+  Future<void> deleteMessage(String conversationId, String messageId) async {}
+
+  @override
   Stream<List<ConversationEntity>> watchConversations(String profileId,
-      {String? profileUid}) {
+      {int limit = 20, String? profileUid}) {
     return Stream.value([]);
   }
 
   @override
-  Stream<List<MessageEntity>> watchMessages(String conversationId) {
+  Stream<List<MessageEntity>> watchMessages(
+    String conversationId, {
+    int limit = 20,
+  }) {
     return Stream.value([]);
   }
 
@@ -109,13 +121,37 @@ class _MockMessagesRemoteDataSource implements IMessagesRemoteDataSource {
 
 class _MockMessagesRepository implements MessagesRepository {
   @override
+  Future<void> addReaction({
+    required String conversationId,
+    required String messageId,
+    required String userId,
+    required String reaction,
+  }) async {}
+
+  @override
+  Future<void> removeReaction({
+    required String conversationId,
+    required String messageId,
+    required String userId,
+  }) async {}
+
+  @override
+  Future<void> deleteMessage({
+    required String conversationId,
+    required String messageId,
+  }) async {}
+
+  @override
   Stream<List<ConversationEntity>> watchConversations(String profileId,
-      {String? profileUid}) {
+      {int limit = 20, String? profileUid}) {
     return Stream.value([]);
   }
 
   @override
-  Stream<List<MessageEntity>> watchMessages(String conversationId) {
+  Stream<List<MessageEntity>> watchMessages(
+    String conversationId, {
+    int limit = 20,
+  }) {
     return Stream.value([]);
   }
 
@@ -362,7 +398,7 @@ void main() {
   group('Messages Providers - Stream Providers', () {
     test('conversationsStreamProvider can be read without errors', () {
       // StreamProvider with @riverpod annotation
-      expect(() => container.read(conversationsStreamProvider('profile-123')),
+      expect(() => container.read(conversationsStreamProvider(profileId: 'profile-123', profileUid: 'uid-123')),
           returnsNormally,
           reason: 'Should be able to read conversations stream provider');
     });
@@ -376,7 +412,7 @@ void main() {
     test('unreadMessageCountForProfileProvider can be read without errors', () {
       expect(
           () => container
-              .read(unreadMessageCountForProfileProvider('profile-123')),
+              .read(unreadMessageCountForProfileProvider('profile-123', 'uid-123')),
           returnsNormally,
           reason: 'Should be able to read unread count stream provider');
     });

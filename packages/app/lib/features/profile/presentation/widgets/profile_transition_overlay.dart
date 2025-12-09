@@ -78,16 +78,21 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
     // Inicia animação e fecha após completar
     _controller.forward().then((_) {
       Future<void>.delayed(const Duration(milliseconds: 500), () {
+        // ✅ FIX: Verificar mounted ANTES de acessar Navigator.of(context)
         if (!mounted) return;
-        Navigator.of(context).pop();
-        widget.onComplete();
+        // Usando try-catch para evitar exceção se o widget já foi descartado
+        try {
+          Navigator.of(context).pop();
+          widget.onComplete();
+        } catch (e) {
+          debugPrint('ProfileTransitionOverlay: Navegação já foi descartada: $e');
+        }
       });
     });
   }
 
   @override
   void dispose() {
-    if (!mounted) return;
     _controller.dispose();
     super.dispose();
   }

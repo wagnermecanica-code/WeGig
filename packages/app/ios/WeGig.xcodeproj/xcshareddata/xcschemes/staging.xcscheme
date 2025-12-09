@@ -16,9 +16,9 @@
                   <BuildableReference
                      BuildableIdentifier = "primary"
                      BlueprintIdentifier = "97C146ED1CF9000F007C117D"
-                     BuildableName = "Runner.app"
-                     BlueprintName = "Runner"
-                     ReferencedContainer = "container:../Runner.xcodeproj">
+                     BuildableName = "WeGig.app"
+                     BlueprintName = "WeGig"
+                     ReferencedContainer = "container:WeGig.xcodeproj">
                   </BuildableReference>
                </EnvironmentBuildable>
             </ActionContent>
@@ -53,6 +53,20 @@
                ReferencedContainer = "container:../Runner.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "97C146ED1CF9000F007C117D"
+               BuildableName = "WeGig.app"
+               BlueprintName = "WeGig"
+               ReferencedContainer = "container:WeGig.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -63,7 +77,7 @@
       shouldAutocreateTestPlan = "YES">
    </TestAction>
    <LaunchAction
-      buildConfiguration = "Debug"
+      buildConfiguration = "Debug-staging"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       launchStyle = "0"
@@ -77,19 +91,29 @@
             ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
             <ActionContent
                title = "Run Script"
-               scriptText = "#!/bin/bash&#10;echo &quot;&#x1f527; Configurando Firebase para STAGING...&quot;&#10;cp &quot;${SRCROOT}/Firebase/GoogleService-Info-staging.plist&quot; &quot;${SRCROOT}/Runner/GoogleService-Info.plist&quot;&#10;echo &quot;&#x2705; STAGING Firebase configurado&quot;&#10;">
+               scriptText = "&#10;">
                <EnvironmentBuildable>
                   <BuildableReference
                      BuildableIdentifier = "primary"
                      BlueprintIdentifier = "97C146ED1CF9000F007C117D"
-                     BuildableName = "Runner.app"
-                     BlueprintName = "Runner"
-                     ReferencedContainer = "container:../Runner.xcodeproj">
+                     BuildableName = "WeGig.app"
+                     BlueprintName = "WeGig"
+                     ReferencedContainer = "container:WeGig.xcodeproj">
                   </BuildableReference>
                </EnvironmentBuildable>
             </ActionContent>
          </ExecutionAction>
       </PreActions>
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "97C146ED1CF9000F007C117D"
+            BuildableName = "WeGig.app"
+            BlueprintName = "WeGig"
+            ReferencedContainer = "container:WeGig.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
             argument = "--dart-define=FLAVOR=staging"

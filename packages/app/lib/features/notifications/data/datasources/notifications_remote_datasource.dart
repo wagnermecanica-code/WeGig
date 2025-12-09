@@ -6,19 +6,21 @@ import 'package:flutter/foundation.dart';
 abstract class INotificationsRemoteDataSource {
   Future<List<NotificationEntity>> getNotifications({
     required String profileId,
+    String? recipientUid,
+    NotificationType? type,
     int limit = 50,
     NotificationEntity? startAfter,
   });
   Future<NotificationEntity?> getNotificationById(String notificationId);
   Future<void> markAsRead(String notificationId, String profileId);
-  Future<void> markAllAsRead(String profileId);
+  Future<void> markAllAsRead(String profileId, {String? recipientUid});
   Future<void> deleteNotification(String notificationId, String profileId);
   Future<NotificationEntity> createNotification(
       NotificationEntity notification);
-  Future<int> getUnreadCount(String profileId);
+  Future<int> getUnreadCount(String profileId, {String? recipientUid});
   Stream<List<NotificationEntity>> watchNotifications(
-      String profileId, int limit);
-  Stream<int> watchUnreadCount(String profileId);
+      String profileId, int limit, {String? recipientUid});
+  Stream<int> watchUnreadCount(String profileId, {String? recipientUid});
 }
 
 /// DataSource para Notifications - Firebase Firestore operations
@@ -30,36 +32,74 @@ class NotificationsRemoteDataSource implements INotificationsRemoteDataSource {
   @override
   Future<List<NotificationEntity>> getNotifications({
     required String profileId,
+    String? recipientUid,
+    NotificationType? type,
     int limit = 50,
     NotificationEntity? startAfter,
   }) async {
     try {
       debugPrint(
-          '📝 NotificationsDataSource: getNotifications for profile $profileId');
+          '📝 NotificationsDataSource: getNotifications for profile $profileId (uid: $recipientUid, type: $type)');
+
+      // ✅ FIX: Query por recipientUid (UID) para match com Security Rules
+      // Depois filtramos por recipientProfileId no client-side
+      if (recipientUid == null || recipientUid.isEmpty) {
+        debugPrint('⚠️ NotificationsDataSource: recipientUid vazio');
+        return [];
+      }
 
       var query = _firestore
           .collection('notifications')
-          .where('recipientProfileId', isEqualTo: profileId)
-          .where('expiresAt', isGreaterThan: Timestamp.now())
+          .where('recipientUid', isEqualTo: recipientUid)
+          .where('expiresAt', isGreaterThan: Timestamp.now());
+
+      // Adicionar filtro de tipo se fornecido
+      if (type != null) {
+        // Nota: Isso requer índice composto (recipientUid + expiresAt + type)
+        // Se der erro de índice, remover e filtrar no client-side
+        query = query.where('type', isEqualTo: type.name);
+      }
+
+      query = query
           .orderBy('expiresAt')
           .orderBy('createdAt', descending: true)
-          .limit(limit);
+          .limit(limit * 2); // Aumentar limite para filtro client-side
 
       if (startAfter != null) {
-        final doc = await _firestore
-            .collection('notifications')
-            .doc(startAfter.notificationId)
-            .get();
-        if (doc.exists) {
-          query = query.startAfterDocument(doc);
+        // Optimization: Use startAfter values instead of fetching the document
+        // Order is: expiresAt (asc), createdAt (desc)
+        if (startAfter.expiresAt != null) {
+          query = query.startAfter([startAfter.expiresAt, startAfter.createdAt]);
+        } else {
+          // Fallback: Fetch document if expiresAt is missing (should not happen given the query)
+          final doc = await _firestore
+              .collection('notifications')
+              .doc(startAfter.notificationId)
+              .get();
+          if (doc.exists) {
+            query = query.startAfterDocument(doc);
+          }
         }
       }
 
       final snapshot = await query.get();
       debugPrint(
-          '📝 NotificationsDataSource: Encontradas ${snapshot.docs.length} notificações');
+          '📝 NotificationsDataSource: Encontradas ${snapshot.docs.length} notificações (pré-filtro)');
 
-      return snapshot.docs.map(NotificationEntity.fromFirestore).toList();
+      // Filtro client-side por profileId para isolamento multi-perfil
+      var notifications = snapshot.docs
+          .map(NotificationEntity.fromFirestore)
+          .where((n) => n.recipientProfileId == profileId);
+      
+      // Fallback: Filtro client-side por tipo se não filtrado na query (opcional)
+      // Mas como adicionamos na query, deve vir filtrado.
+      
+      final result = notifications.take(limit).toList();
+      
+      debugPrint(
+          '📝 NotificationsDataSource: Após filtro: ${result.length} notificações');
+
+      return result;
     } catch (e) {
       debugPrint('❌ NotificationsDataSource: Erro em getNotifications - $e');
       rethrow;
@@ -108,29 +148,53 @@ class NotificationsRemoteDataSource implements INotificationsRemoteDataSource {
   }
 
   @override
-  Future<void> markAllAsRead(String profileId) async {
+  Future<void> markAllAsRead(String profileId, {String? recipientUid}) async {
     try {
       debugPrint(
-          '📝 NotificationsDataSource: markAllAsRead for profile $profileId');
+          '📝 NotificationsDataSource: markAllAsRead for profile $profileId (uid: $recipientUid)');
+
+      // ✅ FIX: Query por recipientUid para match com Security Rules
+      if (recipientUid == null || recipientUid.isEmpty) {
+        debugPrint('⚠️ NotificationsDataSource: recipientUid vazio');
+        return;
+      }
 
       final snapshot = await _firestore
           .collection('notifications')
-          .where('recipientProfileId', isEqualTo: profileId)
+          .where('recipientUid', isEqualTo: recipientUid)
           .where('read', isEqualTo: false)
           .get();
 
-      debugPrint(
-          '📝 NotificationsDataSource: Marcando ${snapshot.docs.length} notificações como lidas');
+      // Filtro client-side por profileId
+      final docsToUpdate = snapshot.docs
+          .where((doc) => doc.data()['recipientProfileId'] == profileId)
+          .toList();
 
-      final batch = _firestore.batch();
-      for (final doc in snapshot.docs) {
-        batch.update(doc.reference, {
-          'read': true,
-          'readAt': FieldValue.serverTimestamp(),
-        });
+      debugPrint(
+          '📝 NotificationsDataSource: Marcando ${docsToUpdate.length} notificações como lidas');
+
+      if (docsToUpdate.isEmpty) return;
+
+      // Chunking logic to avoid batch limit (500 ops)
+      const int batchSize = 500;
+      for (var i = 0; i < docsToUpdate.length; i += batchSize) {
+        final batch = _firestore.batch();
+        final end = (i + batchSize < docsToUpdate.length)
+            ? i + batchSize
+            : docsToUpdate.length;
+        final chunk = docsToUpdate.sublist(i, end);
+
+        for (final doc in chunk) {
+          batch.update(doc.reference, {
+            'read': true,
+            'readAt': FieldValue.serverTimestamp(),
+          });
+        }
+        await batch.commit();
+        debugPrint(
+            '✅ NotificationsDataSource: Batch ${i ~/ batchSize + 1} commitado (${chunk.length} docs)');
       }
 
-      await batch.commit();
       debugPrint(
           '✅ NotificationsDataSource: Todas notificações marcadas como lidas');
     } catch (e) {
@@ -184,19 +248,27 @@ class NotificationsRemoteDataSource implements INotificationsRemoteDataSource {
   }
 
   @override
-  Future<int> getUnreadCount(String profileId) async {
+  Future<int> getUnreadCount(String profileId, {String? recipientUid}) async {
     try {
       debugPrint(
-          '📝 NotificationsDataSource: getUnreadCount for profile $profileId');
+          '📝 NotificationsDataSource: getUnreadCount for profile $profileId (uid: $recipientUid)');
+
+      // ✅ FIX: Query por recipientUid para match com Security Rules
+      if (recipientUid == null || recipientUid.isEmpty) {
+        return 0;
+      }
 
       final snapshot = await _firestore
           .collection('notifications')
-          .where('recipientProfileId', isEqualTo: profileId)
+          .where('recipientUid', isEqualTo: recipientUid)
           .where('read', isEqualTo: false)
           .where('expiresAt', isGreaterThan: Timestamp.now())
           .get();
 
-      final count = snapshot.docs.length;
+      // Filtro client-side por profileId
+      final count = snapshot.docs
+          .where((doc) => doc.data()['recipientProfileId'] == profileId)
+          .length;
       debugPrint('📝 NotificationsDataSource: $count notificações não lidas');
 
       return count;
@@ -208,38 +280,61 @@ class NotificationsRemoteDataSource implements INotificationsRemoteDataSource {
 
   @override
   Stream<List<NotificationEntity>> watchNotifications(
-      String profileId, int limit) {
+      String profileId, int limit, {String? recipientUid}) {
     debugPrint(
-        '📝 NotificationsDataSource: watchNotifications (stream) para profile $profileId');
+        '📝 NotificationsDataSource: watchNotifications (stream) para profile $profileId (uid: $recipientUid)');
+
+    // ✅ FIX: Query por recipientUid (UID) para match com Security Rules
+    if (recipientUid == null || recipientUid.isEmpty) {
+      debugPrint('⚠️ NotificationsDataSource: recipientUid vazio, retornando stream vazio');
+      return Stream.value([]);
+    }
 
     return _firestore
         .collection('notifications')
-        .where('recipientProfileId', isEqualTo: profileId)
+        .where('recipientUid', isEqualTo: recipientUid)
         .where('expiresAt', isGreaterThan: Timestamp.now())
         .orderBy('expiresAt')
         .orderBy('createdAt', descending: true)
-        .limit(limit)
+        .limit(limit * 2)
         .snapshots()
         .map((snapshot) {
       debugPrint(
-          '📝 NotificationsDataSource: Stream emitiu ${snapshot.docs.length} notificações');
-      return snapshot.docs.map(NotificationEntity.fromFirestore).toList();
+          '📝 NotificationsDataSource: Stream emitiu ${snapshot.docs.length} notificações (pré-filtro)');
+      // Filtro client-side por profileId
+      final notifications = snapshot.docs
+          .map(NotificationEntity.fromFirestore)
+          .where((n) => n.recipientProfileId == profileId)
+          .take(limit)
+          .toList();
+      debugPrint(
+          '📝 NotificationsDataSource: Após filtro: ${notifications.length} notificações');
+      return notifications;
     });
   }
 
   @override
-  Stream<int> watchUnreadCount(String profileId) {
+  Stream<int> watchUnreadCount(String profileId, {String? recipientUid}) {
     debugPrint(
-        '📝 NotificationsDataSource: watchUnreadCount (stream) para profile $profileId');
+        '📝 NotificationsDataSource: watchUnreadCount (stream) para profile $profileId (uid: $recipientUid)');
+
+    // ✅ FIX: Query por recipientUid (UID) para match com Security Rules
+    if (recipientUid == null || recipientUid.isEmpty) {
+      return Stream.value(0);
+    }
 
     return _firestore
         .collection('notifications')
-        .where('recipientProfileId', isEqualTo: profileId)
+        .where('recipientUid', isEqualTo: recipientUid)
         .where('read', isEqualTo: false)
         .where('expiresAt', isGreaterThan: Timestamp.now())
         .snapshots()
         .map((snapshot) {
-      final count = snapshot.docs.length;
+      // Filtro client-side por profileId
+      final count = snapshot.docs
+          .map((doc) => doc.data())
+          .where((data) => data['recipientProfileId'] == profileId)
+          .length;
       debugPrint(
           '📝 NotificationsDataSource: Stream emitiu $count notificações não lidas');
       return count;

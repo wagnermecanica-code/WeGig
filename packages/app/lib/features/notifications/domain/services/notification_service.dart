@@ -107,14 +107,20 @@ class NotificationService {
         return;
       }
 
+      // ✅ FIX: Query por recipientUid (UID) para match com Security Rules
       final batch = _firestore.batch();
       final notifications = await _firestore
           .collection('notifications')
-          .where('recipientProfileId', isEqualTo: activeProfile.profileId)
+          .where('recipientUid', isEqualTo: activeProfile.uid)
           .where('read', isEqualTo: false)
           .get();
 
-      for (final doc in notifications.docs) {
+      // Filtro client-side por profileId
+      final docsToUpdate = notifications.docs
+          .where((doc) => doc.data()['recipientProfileId'] == activeProfile.profileId)
+          .toList();
+
+      for (final doc in docsToUpdate) {
         batch.update(doc.reference, {
           'read': true,
           'readAt': FieldValue.serverTimestamp(),
@@ -151,9 +157,13 @@ class NotificationService {
     required String recipientProfileId,
     NotificationType? type,
   }) async {
+    // ✅ FIX: Query por recipientUid para match com Security Rules
+    final activeProfile = _profileState.activeProfile;
+    if (activeProfile == null) return;
+
     Query query = _firestore
         .collection('notifications')
-        .where('recipientProfileId', isEqualTo: recipientProfileId)
+        .where('recipientUid', isEqualTo: activeProfile.uid)
         .orderBy('createdAt', descending: true)
         .limit(1);
 
@@ -178,11 +188,20 @@ class NotificationService {
     int limit = 50,
     DocumentSnapshot? startAfter,
   }) {
+    // ✅ FIX: Obter UID do perfil ativo para match com Security Rules
+    final activeProfile = _profileState.activeProfile;
+    if (activeProfile == null || activeProfile.uid.isEmpty) {
+      debugPrint('NotificationService: Nenhum perfil ativo, retornando stream vazio');
+      return Stream.value([]);
+    }
+
+    debugPrint('NotificationService: Stream - Carregando notificações para ${activeProfile.name} ($currentProfileId)');
+
     Query query = _firestore
         .collection('notifications')
-        .where('recipientProfileId', isEqualTo: currentProfileId)
+        .where('recipientUid', isEqualTo: activeProfile.uid)
         .orderBy('createdAt', descending: true)
-        .limit(limit);
+        .limit(limit * 2); // Aumentar limite para filtro client-side
 
     if (type != null) {
       query = query.where('type', isEqualTo: type.name);
@@ -194,9 +213,15 @@ class NotificationService {
     }
 
     return query.snapshots()
-        .debounceTime(const Duration(milliseconds: 300)) // ⚡ Debounce para reduzir rebuilds
+        .handleError((error) {
+          // ✅ FIX: Tratar erros de permission-denied retornando lista vazia
+          // Isso evita que perfis sem notificações mostrem erro
+          debugPrint('NotificationService: Erro na query (retornando vazio): $error');
+          return <NotificationEntity>[];
+        })
+        .debounceTime(const Duration(milliseconds: 50)) // ⚡ Debounce mínimo
         .map((snapshot) {
-      return snapshot.docs
+      final results = snapshot.docs
           .map((doc) {
             try {
               return NotificationEntity.fromFirestore(doc);
@@ -208,6 +233,10 @@ class NotificationService {
           })
           .whereType<NotificationEntity>()
           .where((notif) {
+            // Filtro client-side por profileId
+            if (notif.recipientProfileId != currentProfileId) {
+              return false;
+            }
             // Filtrar expiradas
             if (notif.expiresAt != null &&
                 notif.expiresAt!.isBefore(DateTime.now())) {
@@ -215,7 +244,11 @@ class NotificationService {
             }
             return true;
           })
+          .take(limit)
           .toList();
+      
+      debugPrint('NotificationService: ${results.length} notificações carregadas');
+      return results;
     });
   }
 
@@ -242,13 +275,19 @@ class NotificationService {
         'NotificationService: Stream - Carregando notificações para ${activeProfile.name} (${activeProfile.profileId})');
 
     // Return real-time stream from Firestore
+    // ✅ FIX: Query por recipientUid para match com Security Rules
     return _firestore
         .collection('notifications')
-        .where('recipientProfileId', isEqualTo: activeProfile.profileId)
+        .where('recipientUid', isEqualTo: activeProfile.uid)
         .orderBy('createdAt', descending: true)
         .limit(100)
         .snapshots()
-        .debounceTime(const Duration(milliseconds: 300)) // ⚡ Debounce
+        .handleError((error) {
+          // ✅ FIX: Tratar erros retornando lista vazia (melhora UX)
+          debugPrint('NotificationService: Erro no stream (retornando vazio): $error');
+          return <NotificationEntity>[];
+        })
+        .debounceTime(const Duration(milliseconds: 50)) // ⚡ Debounce mínimo
         .map((snapshot) {
       final notifications = snapshot.docs
           .map((doc) {
@@ -262,6 +301,10 @@ class NotificationService {
           })
           .whereType<NotificationEntity>()
           .where((notif) {
+            // ✅ FIX: Filtro client-side por profileId
+            if (notif.recipientProfileId != activeProfile.profileId) {
+              return false;
+            }
             // Filtrar expiradas (client-side por enquanto)
             if (notif.expiresAt != null &&
                 notif.expiresAt!.isBefore(DateTime.now())) {
@@ -289,7 +332,7 @@ class NotificationService {
         .where('recipientProfileId', isEqualTo: activeProfile.profileId)
         .where('read', isEqualTo: false)
         .snapshots()
-        .debounceTime(const Duration(milliseconds: 300)) // ⚡ Debounce
+        .debounceTime(const Duration(milliseconds: 50)) // ⚡ Debounce mínimo
         .map((snapshot) {
       // Filtrar expiradas
       final unreadCount = snapshot.docs.where((doc) {

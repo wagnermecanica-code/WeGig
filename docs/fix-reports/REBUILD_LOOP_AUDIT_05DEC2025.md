@@ -51,6 +51,7 @@ grep -rn "ref\.watch" packages/app/lib/navigation/*.dart
 ### 3. Critérios de Identificação
 
 Um problema foi identificado se:
+
 - `ref.watch()` estava dentro de um método `build()`
 - `ref.listen()` estava dentro de um método `build()`
 - `setState()` era chamado em resposta a `ref.watch()`
@@ -78,7 +79,7 @@ Widget build(BuildContext context) {
   // ❌ LISTEN dentro do build() - ERRO FATAL
   ref.listen<AsyncValue<ProfileState>>(profileProvider, (previous, next) {
     next.whenData((profileState) {
-      if (profileState.activeProfile != null && 
+      if (profileState.activeProfile != null &&
           _visiblePosts.isNotEmpty &&
           mounted) {
         _updatePostDistances();
@@ -170,6 +171,7 @@ Widget build(BuildContext context) {
 #### Problema
 
 Quando o usuário clicava no botão "Salvar Post":
+
 1. `_isSaving` mudava para `true` → `setState()` disparado
 2. `build()` executava novamente
 3. `ref.watch(profileProvider)` re-registrava listener
@@ -210,7 +212,7 @@ Widget build(BuildContext context) {
 
 ---
 
-### **Problema 3: bottom_nav_scaffold.dart - _buildMessagesIcon**
+### **Problema 3: bottom_nav_scaffold.dart - \_buildMessagesIcon**
 
 **Severidade:** 🔴 CRÍTICA  
 **Linhas:** 280  
@@ -289,7 +291,7 @@ Widget _buildMessagesIcon() {
 
 ---
 
-### **Problema 4: bottom_nav_scaffold.dart - _buildAvatarIcon**
+### **Problema 4: bottom_nav_scaffold.dart - \_buildAvatarIcon**
 
 **Severidade:** 🔴 CRÍTICA  
 **Linhas:** 367  
@@ -334,6 +336,7 @@ Widget _buildAvatarIcon(bool isSelected) {
 #### Problema
 
 Mesmo padrão do `_buildMessagesIcon()`:
+
 - Chamado por `_buildNavItem()` dentro de `List.generate()` no `build()`
 - `ref.watch()` registra listener toda vez que tab é selecionada
 - Perfil muda → todos os itens da bottom nav rebuildam → loop
@@ -437,7 +440,7 @@ Expanded(
 
 ---
 
-### **Problema 6: bottom_nav_scaffold.dart - _buildNotificationIcon StreamBuilder**
+### **Problema 6: bottom_nav_scaffold.dart - \_buildNotificationIcon StreamBuilder**
 
 **Severidade:** ⚠️ MODERADA  
 **Linhas:** 191  
@@ -460,6 +463,7 @@ Widget _buildNotificationIcon() {
 #### Problema
 
 Não causa loop, mas:
+
 - `ref.watch()` re-cria o stream toda vez que `_buildNotificationIcon()` rebuilda
 - StreamBuilder perde conexão com stream anterior
 - Possível perda de eventos do stream
@@ -484,27 +488,27 @@ Widget _buildNotificationIcon() {
 
 ### Antes (Com Problemas)
 
-| Arquivo | Linha | Padrão Problemático | Severidade |
-|---------|-------|---------------------|------------|
-| `home_page.dart` | 686-699 | `ref.watch()` + `ref.listen()` no build() | 🔴 CRÍTICA |
-| `post_page.dart` | 633 | `ref.watch()` no build() | 🔴 CRÍTICA |
-| `bottom_nav_scaffold.dart` | 280 | `ref.watch()` em `_buildMessagesIcon()` | 🔴 CRÍTICA |
-| `bottom_nav_scaffold.dart` | 367 | `ref.watch()` em `_buildAvatarIcon()` | 🔴 CRÍTICA |
-| `bottom_nav_scaffold.dart` | 536-543 | `ref.watch()` em Consumer + StreamBuilder | 🔴 CRÍTICA |
-| `bottom_nav_scaffold.dart` | 191 | `ref.watch()` em StreamBuilder | ⚠️ MODERADA |
+| Arquivo                    | Linha   | Padrão Problemático                       | Severidade  |
+| -------------------------- | ------- | ----------------------------------------- | ----------- |
+| `home_page.dart`           | 686-699 | `ref.watch()` + `ref.listen()` no build() | 🔴 CRÍTICA  |
+| `post_page.dart`           | 633     | `ref.watch()` no build()                  | 🔴 CRÍTICA  |
+| `bottom_nav_scaffold.dart` | 280     | `ref.watch()` em `_buildMessagesIcon()`   | 🔴 CRÍTICA  |
+| `bottom_nav_scaffold.dart` | 367     | `ref.watch()` em `_buildAvatarIcon()`     | 🔴 CRÍTICA  |
+| `bottom_nav_scaffold.dart` | 536-543 | `ref.watch()` em Consumer + StreamBuilder | 🔴 CRÍTICA  |
+| `bottom_nav_scaffold.dart` | 191     | `ref.watch()` em StreamBuilder            | ⚠️ MODERADA |
 
 **Total:** 6 problemas (5 críticos, 1 moderado)
 
 ### Depois (Corrigido)
 
-| Arquivo | Linha | Solução | Status |
-|---------|-------|---------|--------|
-| `home_page.dart` | 686-699 | `ref.read()` + listeners em `initState()` | ✅ CORRIGIDO |
-| `post_page.dart` | 633 | `ref.read()` | ✅ CORRIGIDO |
-| `bottom_nav_scaffold.dart` | 280 | `ref.read()` | ✅ CORRIGIDO |
-| `bottom_nav_scaffold.dart` | 367 | `ref.read()` | ✅ CORRIGIDO |
-| `bottom_nav_scaffold.dart` | 536-543 | `ref.read()` | ✅ CORRIGIDO |
-| `bottom_nav_scaffold.dart` | 191 | `ref.read()` | ✅ CORRIGIDO |
+| Arquivo                    | Linha   | Solução                                   | Status       |
+| -------------------------- | ------- | ----------------------------------------- | ------------ |
+| `home_page.dart`           | 686-699 | `ref.read()` + listeners em `initState()` | ✅ CORRIGIDO |
+| `post_page.dart`           | 633     | `ref.read()`                              | ✅ CORRIGIDO |
+| `bottom_nav_scaffold.dart` | 280     | `ref.read()`                              | ✅ CORRIGIDO |
+| `bottom_nav_scaffold.dart` | 367     | `ref.read()`                              | ✅ CORRIGIDO |
+| `bottom_nav_scaffold.dart` | 536-543 | `ref.read()`                              | ✅ CORRIGIDO |
+| `bottom_nav_scaffold.dart` | 191     | `ref.read()`                              | ✅ CORRIGIDO |
 
 **Total:** 6 correções implementadas
 
@@ -569,7 +573,7 @@ void initState() {
 @override
 void initState() {
   super.initState();
-  
+
   // ✅ OK - listener registrado uma vez
   _subscription = ref.listenManual(
     profileProvider,
@@ -629,22 +633,22 @@ Widget _buildItem() {
 
 ### Métricas de Performance
 
-| Métrica | Antes | Depois | Melhoria |
-|---------|-------|--------|----------|
-| CPU durante loop | 100% | 15-20% | **-80%** |
-| Memória (crescimento/min) | +50 MB | +2 MB | **-96%** |
-| Rebuilds por segundo | ~1000 | 1-5 | **-99.5%** |
-| Logs por segundo | ~500 | 0 | **-100%** |
-| Tempo até crash | 30s | ∞ (não crasha) | **N/A** |
+| Métrica                   | Antes  | Depois         | Melhoria   |
+| ------------------------- | ------ | -------------- | ---------- |
+| CPU durante loop          | 100%   | 15-20%         | **-80%**   |
+| Memória (crescimento/min) | +50 MB | +2 MB          | **-96%**   |
+| Rebuilds por segundo      | ~1000  | 1-5            | **-99.5%** |
+| Logs por segundo          | ~500   | 0              | **-100%**  |
+| Tempo até crash           | 30s    | ∞ (não crasha) | **N/A**    |
 
 ### Impacto na UX
 
-| Aspecto | Antes | Depois |
-|---------|-------|--------|
-| Criar post | ❌ Trava sem feedback | ✅ Salva + confirmação |
-| Abrir Home | ❌ Loop infinito | ✅ Carrega normalmente |
-| Trocar tabs | ❌ Lag de 2-3s | ✅ Instantâneo |
-| Bateria | ❌ Drena 30%/min | ✅ Normal (~5%/h) |
+| Aspecto     | Antes                 | Depois                 |
+| ----------- | --------------------- | ---------------------- |
+| Criar post  | ❌ Trava sem feedback | ✅ Salva + confirmação |
+| Abrir Home  | ❌ Loop infinito      | ✅ Carrega normalmente |
+| Trocar tabs | ❌ Lag de 2-3s        | ✅ Instantâneo         |
+| Bateria     | ❌ Drena 30%/min      | ✅ Normal (~5%/h)      |
 
 ---
 
@@ -653,18 +657,22 @@ Widget _buildItem() {
 ### Cenários Testados
 
 1. **✅ Criar novo post com foto**
+
    - Resultado: Salvou, mostrou "Post criado com sucesso!", voltou para home
    - Logs: Limpos, sem erros
 
 2. **✅ Acessar Home após criar post**
+
    - Resultado: Mapa carregou, posts visíveis, sem loop
    - CPU: 15-18% (normal)
 
 3. **✅ Trocar entre tabs rapidamente (stress test)**
+
    - Repetir 20x: Home → Notificações → Mensagens → Perfil → Home
    - Resultado: Sem lag, sem loop, memória estável
 
 4. **✅ Abrir modal de notificações**
+
    - Resultado: Lista carregou, badge atualizado corretamente
    - Logs: Sem warnings de listeners duplicados
 
@@ -675,6 +683,7 @@ Widget _buildItem() {
 ### Logs Antes vs Depois
 
 **ANTES (Loop Infinito):**
+
 ```
 flutter: [dev] Flutter Error: TooltipState is a SingleTickerProviderStateMixin but multiple tickers were created.
 flutter: #0 SingleTickerProviderStateMixin.createTicker.<anonymous closure>
@@ -685,6 +694,7 @@ flutter: #3 TooltipState._controller
 ```
 
 **DEPOIS (Limpo):**
+
 ```
 flutter: 🚀 Bootstrapping services for dev
 flutter: ✅ Hive initialized successfully
@@ -714,11 +724,11 @@ flutter: ✅ Posts loaded successfully
 
 ### 1. Riverpod: watch vs read vs listen
 
-| API | Quando Usar | Onde Usar | Comportamento |
-|-----|-------------|-----------|---------------|
-| `ref.watch()` | Observar mudanças | Providers, ConsumerWidget | Re-executa build() quando provider muda |
-| `ref.read()` | Leitura pontual | Event handlers, StatefulWidget.build() | Lê valor atual, não observa |
-| `ref.listen()` | Side effects | initState(), didChangeDependencies() | Executa callback quando muda |
+| API            | Quando Usar       | Onde Usar                              | Comportamento                           |
+| -------------- | ----------------- | -------------------------------------- | --------------------------------------- |
+| `ref.watch()`  | Observar mudanças | Providers, ConsumerWidget              | Re-executa build() quando provider muda |
+| `ref.read()`   | Leitura pontual   | Event handlers, StatefulWidget.build() | Lê valor atual, não observa             |
+| `ref.listen()` | Side effects      | initState(), didChangeDependencies()   | Executa callback quando muda            |
 
 ### 2. StatefulWidget vs ConsumerWidget
 
@@ -744,7 +754,7 @@ class _ComplexPageState extends ConsumerState<ComplexPage> {
     final data = ref.read(dataProvider);  // ✅ OK - tem estado local
     return ListView(children: _buildItems(data));
   }
-  
+
   @override
   void initState() {
     super.initState();
@@ -786,13 +796,13 @@ ref.watch(streamProvider).when(
 ```dart
 class _MyPageState extends ConsumerState<MyPage> {
   ProviderSubscription? _subscription;
-  
+
   @override
   void initState() {
     super.initState();
     _subscription = ref.listenManual(myProvider, (prev, next) { /* ... */ });
   }
-  
+
   @override
   void dispose() {
     _subscription?.close();  // ✅ CRÍTICO: sempre cancelar
@@ -831,7 +841,7 @@ linter:
 // Adicionar teste que detecta rebuild loops
 testWidgets('HomePage não deve entrar em rebuild loop', (tester) async {
   int buildCount = 0;
-  
+
   await tester.pumpWidget(
     ProviderScope(
       child: MaterialApp(
@@ -844,9 +854,9 @@ testWidgets('HomePage não deve entrar em rebuild loop', (tester) async {
       ),
     ),
   );
-  
+
   await tester.pump(Duration(seconds: 2));
-  
+
   expect(buildCount, lessThan(10), reason: 'Muitos rebuilds detectados');
 });
 ```
@@ -854,6 +864,7 @@ testWidgets('HomePage não deve entrar em rebuild loop', (tester) async {
 ### 4. Documentação Interna
 
 Criar `docs/RIVERPOD_BEST_PRACTICES.md` com:
+
 - Quando usar watch vs read vs listen
 - Padrões de StatefulWidget + Riverpod
 - Anti-padrões comuns e como evitar
@@ -864,6 +875,7 @@ Criar `docs/RIVERPOD_BEST_PRACTICES.md` com:
 ## 📝 Commits Relacionados
 
 1. **5ff6df0** - `fix: corrigir loop infinito ao salvar post (TooltipState ticker)`
+
    - Corrigiu `post_page.dart` linha 633
    - Substituiu `ref.watch()` por `ref.read()`
 

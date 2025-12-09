@@ -188,7 +188,7 @@ final getUnreadNotificationCountUseCaseProvider =
 typedef GetUnreadNotificationCountUseCaseRef
     = AutoDisposeProviderRef<GetUnreadNotificationCount>;
 String _$notificationsStreamHash() =>
-    r'87928495b0794effe4fe13454d2ffb1ec76852be';
+    r'db0dabb7a760425dc4f558fcee2e8e7fd6f4eb93';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -212,29 +212,35 @@ class _SystemHash {
 }
 
 /// Stream de notificações em tempo real
+/// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
 ///
 /// Copied from [notificationsStream].
 @ProviderFor(notificationsStream)
 const notificationsStreamProvider = NotificationsStreamFamily();
 
 /// Stream de notificações em tempo real
+/// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
 ///
 /// Copied from [notificationsStream].
 class NotificationsStreamFamily
     extends Family<AsyncValue<List<NotificationEntity>>> {
   /// Stream de notificações em tempo real
+  /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
   ///
   /// Copied from [notificationsStream].
   const NotificationsStreamFamily();
 
   /// Stream de notificações em tempo real
+  /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
   ///
   /// Copied from [notificationsStream].
   NotificationsStreamProvider call(
     String profileId,
+    String recipientUid,
   ) {
     return NotificationsStreamProvider(
       profileId,
+      recipientUid,
     );
   }
 
@@ -244,6 +250,7 @@ class NotificationsStreamFamily
   ) {
     return call(
       provider.profileId,
+      provider.recipientUid,
     );
   }
 
@@ -263,19 +270,23 @@ class NotificationsStreamFamily
 }
 
 /// Stream de notificações em tempo real
+/// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
 ///
 /// Copied from [notificationsStream].
 class NotificationsStreamProvider
     extends AutoDisposeStreamProvider<List<NotificationEntity>> {
   /// Stream de notificações em tempo real
+  /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
   ///
   /// Copied from [notificationsStream].
   NotificationsStreamProvider(
     String profileId,
+    String recipientUid,
   ) : this._internal(
           (ref) => notificationsStream(
             ref as NotificationsStreamRef,
             profileId,
+            recipientUid,
           ),
           from: notificationsStreamProvider,
           name: r'notificationsStreamProvider',
@@ -287,6 +298,7 @@ class NotificationsStreamProvider
           allTransitiveDependencies:
               NotificationsStreamFamily._allTransitiveDependencies,
           profileId: profileId,
+          recipientUid: recipientUid,
         );
 
   NotificationsStreamProvider._internal(
@@ -297,9 +309,11 @@ class NotificationsStreamProvider
     required super.debugGetCreateSourceHash,
     required super.from,
     required this.profileId,
+    required this.recipientUid,
   }) : super.internal();
 
   final String profileId;
+  final String recipientUid;
 
   @override
   Override overrideWith(
@@ -316,6 +330,7 @@ class NotificationsStreamProvider
         allTransitiveDependencies: null,
         debugGetCreateSourceHash: null,
         profileId: profileId,
+        recipientUid: recipientUid,
       ),
     );
   }
@@ -327,13 +342,16 @@ class NotificationsStreamProvider
 
   @override
   bool operator ==(Object other) {
-    return other is NotificationsStreamProvider && other.profileId == profileId;
+    return other is NotificationsStreamProvider &&
+        other.profileId == profileId &&
+        other.recipientUid == recipientUid;
   }
 
   @override
   int get hashCode {
     var hash = _SystemHash.combine(0, runtimeType.hashCode);
     hash = _SystemHash.combine(hash, profileId.hashCode);
+    hash = _SystemHash.combine(hash, recipientUid.hashCode);
 
     return _SystemHash.finish(hash);
   }
@@ -345,6 +363,9 @@ mixin NotificationsStreamRef
     on AutoDisposeStreamProviderRef<List<NotificationEntity>> {
   /// The parameter `profileId` of this provider.
   String get profileId;
+
+  /// The parameter `recipientUid` of this provider.
+  String get recipientUid;
 }
 
 class _NotificationsStreamProviderElement
@@ -354,12 +375,16 @@ class _NotificationsStreamProviderElement
 
   @override
   String get profileId => (origin as NotificationsStreamProvider).profileId;
+  @override
+  String get recipientUid =>
+      (origin as NotificationsStreamProvider).recipientUid;
 }
 
 String _$unreadNotificationCountForProfileHash() =>
-    r'2630f0abaf95b8616ea0327e1fe4c10bbe0433d3';
+    r'0a864b5f06c6754e6c8047935b55d723957b587c';
 
 /// Stream de contador de não lidas para BottomNav badge
+/// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
 ///
 /// Copied from [unreadNotificationCountForProfile].
 @ProviderFor(unreadNotificationCountForProfile)
@@ -367,22 +392,27 @@ const unreadNotificationCountForProfileProvider =
     UnreadNotificationCountForProfileFamily();
 
 /// Stream de contador de não lidas para BottomNav badge
+/// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
 ///
 /// Copied from [unreadNotificationCountForProfile].
 class UnreadNotificationCountForProfileFamily extends Family<AsyncValue<int>> {
   /// Stream de contador de não lidas para BottomNav badge
+  /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
   ///
   /// Copied from [unreadNotificationCountForProfile].
   const UnreadNotificationCountForProfileFamily();
 
   /// Stream de contador de não lidas para BottomNav badge
+  /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
   ///
   /// Copied from [unreadNotificationCountForProfile].
   UnreadNotificationCountForProfileProvider call(
     String profileId,
+    String recipientUid,
   ) {
     return UnreadNotificationCountForProfileProvider(
       profileId,
+      recipientUid,
     );
   }
 
@@ -392,6 +422,7 @@ class UnreadNotificationCountForProfileFamily extends Family<AsyncValue<int>> {
   ) {
     return call(
       provider.profileId,
+      provider.recipientUid,
     );
   }
 
@@ -411,19 +442,23 @@ class UnreadNotificationCountForProfileFamily extends Family<AsyncValue<int>> {
 }
 
 /// Stream de contador de não lidas para BottomNav badge
+/// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
 ///
 /// Copied from [unreadNotificationCountForProfile].
 class UnreadNotificationCountForProfileProvider
     extends AutoDisposeStreamProvider<int> {
   /// Stream de contador de não lidas para BottomNav badge
+  /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
   ///
   /// Copied from [unreadNotificationCountForProfile].
   UnreadNotificationCountForProfileProvider(
     String profileId,
+    String recipientUid,
   ) : this._internal(
           (ref) => unreadNotificationCountForProfile(
             ref as UnreadNotificationCountForProfileRef,
             profileId,
+            recipientUid,
           ),
           from: unreadNotificationCountForProfileProvider,
           name: r'unreadNotificationCountForProfileProvider',
@@ -435,6 +470,7 @@ class UnreadNotificationCountForProfileProvider
           allTransitiveDependencies: UnreadNotificationCountForProfileFamily
               ._allTransitiveDependencies,
           profileId: profileId,
+          recipientUid: recipientUid,
         );
 
   UnreadNotificationCountForProfileProvider._internal(
@@ -445,9 +481,11 @@ class UnreadNotificationCountForProfileProvider
     required super.debugGetCreateSourceHash,
     required super.from,
     required this.profileId,
+    required this.recipientUid,
   }) : super.internal();
 
   final String profileId;
+  final String recipientUid;
 
   @override
   Override overrideWith(
@@ -463,6 +501,7 @@ class UnreadNotificationCountForProfileProvider
         allTransitiveDependencies: null,
         debugGetCreateSourceHash: null,
         profileId: profileId,
+        recipientUid: recipientUid,
       ),
     );
   }
@@ -475,13 +514,15 @@ class UnreadNotificationCountForProfileProvider
   @override
   bool operator ==(Object other) {
     return other is UnreadNotificationCountForProfileProvider &&
-        other.profileId == profileId;
+        other.profileId == profileId &&
+        other.recipientUid == recipientUid;
   }
 
   @override
   int get hashCode {
     var hash = _SystemHash.combine(0, runtimeType.hashCode);
     hash = _SystemHash.combine(hash, profileId.hashCode);
+    hash = _SystemHash.combine(hash, recipientUid.hashCode);
 
     return _SystemHash.finish(hash);
   }
@@ -493,6 +534,9 @@ mixin UnreadNotificationCountForProfileRef
     on AutoDisposeStreamProviderRef<int> {
   /// The parameter `profileId` of this provider.
   String get profileId;
+
+  /// The parameter `recipientUid` of this provider.
+  String get recipientUid;
 }
 
 class _UnreadNotificationCountForProfileProviderElement
@@ -503,6 +547,9 @@ class _UnreadNotificationCountForProfileProviderElement
   @override
   String get profileId =>
       (origin as UnreadNotificationCountForProfileProvider).profileId;
+  @override
+  String get recipientUid =>
+      (origin as UnreadNotificationCountForProfileProvider).recipientUid;
 }
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

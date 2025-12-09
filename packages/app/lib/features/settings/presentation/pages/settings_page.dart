@@ -25,19 +25,26 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
+  // Variável para rastrear posição inicial do swipe (Swipe to go back)
+  double _swipeStartX = 0;
+
   @override
   void initState() {
     super.initState();
-    // Load settings when page initializes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final profileState = ref.read(profileProvider);
-      final activeProfile = profileState.value?.activeProfile;
-      if (activeProfile != null) {
-        ref
-            .read(userSettingsProvider.notifier)
-            .loadSettings(activeProfile.profileId);
-      }
-    });
+    // ✅ FIX: Carregar settings imediatamente, sem aguardar frame
+    // Isso reduz a latência perceptível ao abrir a tela
+    _loadSettingsEagerly();
+  }
+  
+  void _loadSettingsEagerly() {
+    final profileState = ref.read(profileProvider);
+    final activeProfile = profileState.value?.activeProfile;
+    if (activeProfile != null) {
+      // Carregar diretamente sem addPostFrameCallback para reduzir latência
+      ref
+          .read(userSettingsProvider.notifier)
+          .loadSettings(activeProfile.profileId);
+    }
   }
 
   @override
@@ -45,55 +52,71 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final profileState = ref.read(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Configurações',
-            style: AppTypography.headlineMedium.copyWith(color: Colors.white)),
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-        children: [
-          // Seção: Perfil
-          const SettingsSection(title: 'Perfil', icon: Iconsax.user),
-          const SizedBox(height: 12),
-          SettingsTile(
-            icon: Iconsax.edit,
-            title: 'Editar Perfil',
-            subtitle: 'Atualize suas informações',
-            onTap: () async {
-              if (activeProfile == null) {
-                _showError('Perfil ativo não encontrado');
-                return;
-              }
+    return GestureDetector(
+      // Detecta início do swipe
+      onHorizontalDragStart: (details) {
+        _swipeStartX = details.globalPosition.dx;
+      },
+      // Detecta movimento do swipe
+      onHorizontalDragUpdate: (details) {
+        // Só permite swipe se começou da borda esquerda (primeiros 50px)
+        // E movimento para a direita (delta.dx > 0)
+        if (_swipeStartX < 50 && details.delta.dx > 10) {
+          // Executa o pop (volta para ViewProfilePage)
+          if (Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Configurações',
+              style: AppTypography.headlineMedium.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          centerTitle: true,
+        ),
+        body: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          children: [
+            // Seção: Perfil
+            const SettingsSection(title: 'Perfil', icon: Iconsax.user),
+            const SizedBox(height: 12),
+            SettingsTile(
+              icon: Iconsax.edit,
+              title: 'Editar Perfil',
+              subtitle: 'Atualize suas informações',
+              onTap: () async {
+                if (activeProfile == null) {
+                  _showError('Perfil ativo não encontrado');
+                  return;
+                }
 
-              // Capturar context antes de operação async
-              final navigator = Navigator.of(context);
-              final messenger = ScaffoldMessenger.of(context);
+                // Capturar context antes de operação async
+                final navigator = Navigator.of(context);
+                final messenger = ScaffoldMessenger.of(context);
 
-              final result = await navigator.push<String?>(
-                MaterialPageRoute<String?>(
-                  builder: (context) => EditProfilePage(
-                    profileIdToEdit: activeProfile.profileId,
+                final result = await navigator.push<String?>(
+                  MaterialPageRoute<String?>(
+                    builder: (context) => EditProfilePage(
+                      profileIdToEdit: activeProfile.profileId,
+                    ),
                   ),
-                ),
-              );
+                );
 
-              final didUpdateProfile = result is String && result.isNotEmpty;
-              if (!didUpdateProfile) {
-                return;
-              }
+                final didUpdateProfile = result is String && result.isNotEmpty;
+                if (!didUpdateProfile) {
+                  return;
+                }
 
-              await ref.read(profileProvider.notifier).refresh();
-              // Invalida posts para garantir que posts do perfil sejam atualizados
-              ref.invalidate(postNotifierProvider);
+                await ref.read(profileProvider.notifier).refresh();
+                // Invalida posts para garantir que posts do perfil sejam atualizados
+                ref.invalidate(postNotifierProvider);
 
-              if (mounted) {
-                messenger.showSnackBar(
-                  const SnackBar(
-                    content: Row(
+                if (mounted) {
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Row(
                       children: [
                         Icon(Iconsax.tick_circle, color: Colors.white),
                         SizedBox(width: 12),
@@ -144,6 +167,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const SizedBox(height: 40),
         ],
       ),
+    ),
     );
   }
 
@@ -192,15 +216,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                 ),
                 value: settings.notifyNearbyPosts,
+                // ✅ FIX: Melhorar cores dos toggles para maior visibilidade
+                activeColor: AppColors.primary,
                 thumbColor: WidgetStateProperty.resolveWith<Color?>(
                   (states) => states.contains(WidgetState.selected)
-                      ? AppColors.primary
-                      : AppColors.border,
+                      ? Colors.white  // Thumb branco quando ativo
+                      : AppColors.textSecondary.withValues(alpha: 0.6),
                 ),
                 trackColor: WidgetStateProperty.resolveWith<Color?>(
                   (states) => states.contains(WidgetState.selected)
-                      ? AppColors.primary.withValues(alpha: 0.2)
-                      : AppColors.surfaceVariant,
+                      ? AppColors.primary  // Track colorido quando ativo
+                      : AppColors.border,  // Track cinza quando inativo
+                ),
+                trackOutlineColor: WidgetStateProperty.resolveWith<Color?>(
+                  (states) => states.contains(WidgetState.selected)
+                      ? AppColors.primary
+                      : AppColors.border,
                 ),
                 thumbIcon: WidgetStateProperty.resolveWith<Icon?>(
                   (states) => null, // Thumb com sombra padrão
@@ -498,37 +529,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!mounted) return;
 
     // Capturar TUDO ANTES de operações async (crítico!)
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     final authService = ref.read(authServiceProvider);  // ✅ Capturar ANTES!
 
     try {
       debugPrint('🔓 SettingsPage: Iniciando processo de logout...');
 
-      // Invalidar providers ANTES de qualquer navegação
-      debugPrint('🧹 SettingsPage: Invalidando providers...');
-      ref.invalidate(profileProvider);
-      ref.invalidate(postNotifierProvider);
-
-      // Executar logout
+      // ✅ FIX: Executar logout PRIMEIRO, antes de qualquer invalidação
+      // Isso garante que o router redirecione para AuthPage antes de invalidar providers
       debugPrint('🔓 SettingsPage: Executando signOut...');
       await authService.signOut();
 
-      // Pop apenas DEPOIS do signOut (se widget ainda montado)
-      if (navigator.canPop() && mounted) {
-        debugPrint('🔙 SettingsPage: Fechando tela...');
-        navigator.pop();
-      }
-
-      debugPrint('✅ SettingsPage: Logout completo com sucesso!');
-      debugPrint(
-          '🔄 SettingsPage: authStateProvider detectará mudança e mostrará AuthPage automaticamente');
+      // ✅ FIX: Após signOut, o authStateProvider detectará a mudança
+      // e o GoRouter redirecionará para /auth automaticamente.
+      // NÃO invalidar providers aqui pois o widget pode já estar desmontado.
+      // O router fará o cleanup ao navegar para /auth.
+      
+      debugPrint('✅ SettingsPage: Logout completo - aguardando redirect automático do router');
     } catch (e) {
       debugPrint('❌ SettingsPage: Erro ao fazer logout: $e');
 
       // Tratar erro apenas se widget ainda estiver montado
       if (mounted) {
-        messenger.showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [

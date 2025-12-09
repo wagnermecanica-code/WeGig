@@ -29,17 +29,19 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.278498777601-v44sa0kclfb29cclsbrckaiicukk9kr8</string>
+				<string>com.googleusercontent.apps.963929089370-9vpki42g0itfkegtst8b149jtafm37cs</string>
 				<string>wegig</string>
 			</array>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>FirebaseCrashlyticsCollectionEnabled</key>
+	<false/>
 	<key>FlutterDeepLinkingEnabled</key>
 	<true/>
 	<key>GIDClientID</key>
-	<string>278498777601-v44sa0kclfb29cclsbrckaiicukk9kr8.apps.googleusercontent.com</string>
+	<string>963929089370-9vpki42g0itfkegtst8b149jtafm37cs.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
@@ -52,8 +54,6 @@
 	<string>Este app pode salvar fotos editadas na sua galeria.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Este app precisa acessar suas fotos para adicionar imagens ao perfil e posts.</string>
-	<key>FirebaseCrashlyticsCollectionEnabled</key>
-	<false/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

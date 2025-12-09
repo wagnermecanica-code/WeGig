@@ -49,7 +49,7 @@ class PostService {
       throw ArgumentError('Cidade obrigatória');
     }
 
-    if (!['musician', 'band'].contains(post.type)) {
+    if (!['musician', 'band', 'sales'].contains(post.type)) {
       throw ArgumentError('Tipo inválido: ${post.type}');
     }
 
@@ -63,6 +63,19 @@ class PostService {
 
     if (post.type == 'band' && post.seekingMusicians.isEmpty) {
       throw ArgumentError('Informe os músicos buscados');
+    }
+
+    // Validações específicas para sales
+    if (post.type == 'sales') {
+      if (post.title == null || post.title!.trim().isEmpty) {
+        throw ArgumentError('Título é obrigatório para anúncios');
+      }
+      if (post.salesType == null || post.salesType!.trim().isEmpty) {
+        throw ArgumentError('Tipo do anúncio é obrigatório');
+      }
+      if (post.price == null || post.price! <= 0) {
+        throw ArgumentError('Preço deve ser maior que zero');
+      }
     }
   }
 }

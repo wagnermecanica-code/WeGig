@@ -11,9 +11,13 @@ import 'package:wegig_app/features/messages/domain/usecases/delete_conversation.
 import 'package:wegig_app/features/messages/domain/usecases/load_conversations.dart';
 import 'package:wegig_app/features/messages/domain/usecases/load_messages.dart';
 import 'package:wegig_app/features/messages/domain/usecases/mark_as_read.dart';
+import 'package:wegig_app/features/messages/domain/usecases/add_reaction.dart';
+import 'package:wegig_app/features/messages/domain/usecases/delete_message.dart';
 import 'package:wegig_app/features/messages/domain/usecases/mark_as_unread.dart';
+import 'package:wegig_app/features/messages/domain/usecases/remove_reaction.dart';
 import 'package:wegig_app/features/messages/domain/usecases/send_image.dart';
 import 'package:wegig_app/features/messages/domain/usecases/send_message.dart';
+import 'package:wegig_app/features/messages/domain/usecases/watch_messages.dart';
 
 part 'messages_providers.g.dart';
 
@@ -86,6 +90,30 @@ DeleteConversation deleteConversationUseCase(Ref ref) {
   return DeleteConversation(repository);
 }
 
+@riverpod
+WatchMessages watchMessagesUseCase(Ref ref) {
+  final repository = ref.watch(messagesRepositoryNewProvider);
+  return WatchMessages(repository);
+}
+
+@riverpod
+AddReaction addReactionUseCase(Ref ref) {
+  final repository = ref.watch(messagesRepositoryNewProvider);
+  return AddReaction(repository);
+}
+
+@riverpod
+RemoveReaction removeReactionUseCase(Ref ref) {
+  final repository = ref.watch(messagesRepositoryNewProvider);
+  return RemoveReaction(repository);
+}
+
+@riverpod
+DeleteMessage deleteMessageUseCase(Ref ref) {
+  final repository = ref.watch(messagesRepositoryNewProvider);
+  return DeleteMessage(repository);
+}
+
 // ============================================================================
 // STREAM PROVIDERS FOR REAL-TIME UPDATES
 // ============================================================================
@@ -93,11 +121,13 @@ DeleteConversation deleteConversationUseCase(Ref ref) {
 /// Stream de conversas em tempo real
 @riverpod
 Stream<List<ConversationEntity>> conversationsStream(
-  Ref ref,
-  String profileId,
-) {
+  Ref ref, {
+  required String profileId,
+  required String profileUid,
+  int limit = 20,
+}) {
   final repository = ref.watch(messagesRepositoryNewProvider);
-  return repository.watchConversations(profileId);
+  return repository.watchConversations(profileId, profileUid: profileUid, limit: limit);
 }
 
 /// Stream de mensagens em tempo real
@@ -111,13 +141,15 @@ Stream<List<MessageEntity>> messagesStream(
 }
 
 /// Stream de contador de não lidas para BottomNav badge
+/// ✅ FIX: Agora requer profileUid (UID) para match com Security Rules
 @riverpod
 Stream<int> unreadMessageCountForProfile(
   Ref ref,
   String profileId,
+  String profileUid,
 ) {
   final repository = ref.watch(messagesRepositoryNewProvider);
-  return repository.watchUnreadCount(profileId);
+  return repository.watchUnreadCount(profileId, profileUid: profileUid);
 }
 
 // ============================================================================

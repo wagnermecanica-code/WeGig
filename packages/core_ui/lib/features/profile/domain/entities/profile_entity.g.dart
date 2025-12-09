@@ -15,6 +15,9 @@ _$ProfileEntityImpl _$$ProfileEntityImplFromJson(Map<String, dynamic> json) =>
       name: json['name'] as String,
       username: json['username'] as String?,
       isBand: json['isBand'] as bool,
+      profileType:
+          $enumDecodeNullable(_$ProfileTypeEnumMap, json['profileType']) ??
+              ProfileType.musician,
       city: json['city'] as String,
       location: const GeoPointConverter()
           .fromJson(json['location'] as Map<String, dynamic>),
@@ -41,6 +44,13 @@ _$ProfileEntityImpl _$$ProfileEntityImplFromJson(Map<String, dynamic> json) =>
       bandMembers: (json['bandMembers'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList(),
+      spaceType: json['spaceType'] as String?,
+      phone: json['phone'] as String?,
+      operatingHours: json['operatingHours'] as String?,
+      website: json['website'] as String?,
+      amenities: (json['amenities'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
       updatedAt: const NullableTimestampConverter().fromJson(json['updatedAt']),
     );
 
@@ -51,6 +61,7 @@ Map<String, dynamic> _$$ProfileEntityImplToJson(_$ProfileEntityImpl instance) =>
       'name': instance.name,
       'username': instance.username,
       'isBand': instance.isBand,
+      'profileType': _$ProfileTypeEnumMap[instance.profileType]!,
       'city': instance.city,
       'location': const GeoPointConverter().toJson(instance.location),
       'createdAt': const TimestampConverter().toJson(instance.createdAt),
@@ -68,6 +79,17 @@ Map<String, dynamic> _$$ProfileEntityImplToJson(_$ProfileEntityImpl instance) =>
       'neighborhood': instance.neighborhood,
       'state': instance.state,
       'bandMembers': instance.bandMembers,
+      'spaceType': instance.spaceType,
+      'phone': instance.phone,
+      'operatingHours': instance.operatingHours,
+      'website': instance.website,
+      'amenities': instance.amenities,
       'updatedAt':
           const NullableTimestampConverter().toJson(instance.updatedAt),
     };
+
+const _$ProfileTypeEnumMap = {
+  ProfileType.musician: 'musician',
+  ProfileType.band: 'band',
+  ProfileType.space: 'space',
+};

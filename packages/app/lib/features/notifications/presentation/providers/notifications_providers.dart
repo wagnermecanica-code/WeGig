@@ -82,23 +82,27 @@ GetUnreadNotificationCount getUnreadNotificationCountUseCase(Ref ref) {
 // ============================================================================
 
 /// Stream de notificações em tempo real
+/// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
 @riverpod
 Stream<List<NotificationEntity>> notificationsStream(
   Ref ref,
   String profileId,
+  String recipientUid,
 ) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
-  return repository.watchNotifications(profileId: profileId);
+  return repository.watchNotifications(profileId: profileId, recipientUid: recipientUid);
 }
 
 /// Stream de contador de não lidas para BottomNav badge
+/// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
 @riverpod
 Stream<int> unreadNotificationCountForProfile(
   Ref ref,
   String profileId,
+  String recipientUid,
 ) {
   final repository = ref.watch(notificationsRepositoryNewProvider);
-  return repository.watchUnreadCount(profileId: profileId);
+  return repository.watchUnreadCount(profileId: profileId, recipientUid: recipientUid);
 }
 
 // ============================================================================

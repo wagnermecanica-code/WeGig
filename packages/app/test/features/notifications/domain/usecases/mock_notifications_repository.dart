@@ -76,6 +76,8 @@ class MockNotificationsRepository implements NotificationsRepository {
     required String profileId,
     int limit = 50,
     NotificationEntity? startAfter,
+    String? recipientUid,
+    NotificationType? type,
   }) async {
     getNotificationsCalled = true;
 
@@ -85,6 +87,7 @@ class MockNotificationsRepository implements NotificationsRepository {
 
     return _notifications.values
         .where((n) => n.recipientProfileId == profileId)
+        .where((n) => type == null || n.type == type)
         .toList();
   }
 
@@ -131,6 +134,7 @@ class MockNotificationsRepository implements NotificationsRepository {
   @override
   Future<void> markAllAsRead({
     required String profileId,
+    String? recipientUid,
   }) async {
     markAllAsReadCalled = true;
     lastMarkAllAsReadProfileId = profileId;
@@ -203,6 +207,7 @@ class MockNotificationsRepository implements NotificationsRepository {
   @override
   Future<int> getUnreadCount({
     required String profileId,
+    String? recipientUid,
   }) async {
     return _unreadCounts[profileId] ?? 0;
   }
@@ -211,6 +216,7 @@ class MockNotificationsRepository implements NotificationsRepository {
   Stream<List<NotificationEntity>> watchNotifications({
     required String profileId,
     int limit = 50,
+    String? recipientUid,
   }) {
     return Stream.value(
       _notifications.values
@@ -222,6 +228,7 @@ class MockNotificationsRepository implements NotificationsRepository {
   @override
   Stream<int> watchUnreadCount({
     required String profileId,
+    String? recipientUid,
   }) {
     return Stream.value(_unreadCounts[profileId] ?? 0);
   }

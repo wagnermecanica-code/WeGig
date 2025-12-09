@@ -93,11 +93,17 @@ class WeGigPinDescriptorBuilder {
     return tinted;
   }
 
-  String _toRgb(Color color) => 'rgb(${color.r.toInt()},${color.g.toInt()},${color.b.toInt()})';
+  /// Converte Color para string RGB no formato 'rgb(R,G,B)'.
+  /// NOTA: No Flutter 3.x+, color.r/g/b retornam valores 0.0-1.0, não 0-255.
+  /// Usamos color.red/green/blue que retornam int 0-255.
+  String _toRgb(Color color) => 'rgb(${color.red},${color.green},${color.blue})';
 
+  /// Converte Color para string hexadecimal no formato '#RRGGBB'.
+  /// NOTA: No Flutter 3.x+, color.r/g/b retornam valores 0.0-1.0, não 0-255.
+  /// Usamos color.red/green/blue que retornam int 0-255.
   String _toHex(Color color) {
     String toHex(int value) => value.toRadixString(16).padLeft(2, '0');
-    return '#${toHex(color.r.toInt())}${toHex(color.g.toInt())}${toHex(color.b.toInt())}'
+    return '#${toHex(color.red)}${toHex(color.green)}${toHex(color.blue)}'
         .toUpperCase();
   }
 }

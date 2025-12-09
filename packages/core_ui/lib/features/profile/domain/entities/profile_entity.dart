@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:core_ui/core/json_converters.dart';
+import 'profile_type.dart';
 
 part 'profile_entity.freezed.dart';
 part 'profile_entity.g.dart';
@@ -16,7 +17,8 @@ class ProfileEntity with _$ProfileEntity {
     required String uid,
     required String name,
     String? username,
-    required bool isBand,
+    @Deprecated('Use profileType instead') required bool isBand,
+    @Default(ProfileType.musician) ProfileType profileType,
     required String city,
     @GeoPointConverter() required GeoPoint location,
     @TimestampConverter() required DateTime createdAt,
@@ -34,6 +36,12 @@ class ProfileEntity with _$ProfileEntity {
     String? neighborhood,
     String? state,
     List<String>? bandMembers,
+    // Space-specific fields
+    String? spaceType,
+    String? phone,
+    String? operatingHours,
+    String? website,
+    List<String>? amenities,
     @NullableTimestampConverter() DateTime? updatedAt,
   }) = _ProfileEntity;
 
@@ -72,12 +80,23 @@ class ProfileEntity with _$ProfileEntity {
       return const GeoPoint(0, 0);
     }
 
+    // Parse profile type with backward compatibility
+    ProfileType parseProfileType() {
+      if (data.containsKey('profileType')) {
+        return ProfileType.fromString(data['profileType'] as String);
+      }
+      // Backward compatibility: use isBand field
+      final isBand = (data['isBand'] as bool?) ?? false;
+      return isBand ? ProfileType.band : ProfileType.musician;
+    }
+
     return ProfileEntity(
       profileId: snapshot.id,
       uid: (data['uid'] as String?) ?? '',
       name: (data['name'] as String?) ?? '',
       username: data['username'] as String?,
       isBand: (data['isBand'] as bool?) ?? false,
+      profileType: parseProfileType(),
       city: (data['city'] as String?) ?? '',
       location: parseGeoPoint(data['location']),
       createdAt: parseTimestamp(data['createdAt']),
@@ -97,6 +116,11 @@ class ProfileEntity with _$ProfileEntity {
       neighborhood: data['neighborhood'] as String?,
       state: data['state'] as String?,
       bandMembers: (data['bandMembers'] as List<dynamic>?)?.cast<String>(),
+      spaceType: data['spaceType'] as String?,
+      phone: data['phone'] as String?,
+      operatingHours: data['operatingHours'] as String?,
+      website: data['website'] as String?,
+      amenities: (data['amenities'] as List<dynamic>?)?.cast<String>(),
       updatedAt:
           data['updatedAt'] != null ? parseTimestamp(data['updatedAt']) : null,
     );
@@ -110,6 +134,13 @@ class ProfileEntity with _$ProfileEntity {
   Map<String, dynamic> toFirestore() {
     final json = toJson();
     json.remove('profileId'); // ID vai no documento, não no data
+    
+    // Add profileType as string
+    json['profileType'] = profileType.value;
+    
+    // Maintain backward compatibility
+    json['isBand'] = profileType == ProfileType.band;
+    
     if (json['username'] is String &&
         (json['username'] as String).trim().isNotEmpty) {
       json['usernameLowercase'] =
@@ -126,7 +157,7 @@ class ProfileEntity with _$ProfileEntity {
       'profileId': profileId,
       'name': name,
       'photoUrl': photoUrl,
-      'type': isBand ? 'band' : 'musician',
+      'type': profileType.value,
       'city': city,
     };
   }
@@ -137,7 +168,17 @@ class ProfileEntity with _$ProfileEntity {
     return DateTime.now().year - birthYear!;
   }
 
-  String get ageLabel => isBand ? 'Tempo de formação' : 'Idade';
+  String get ageLabel {
+    switch (profileType) {
+      case ProfileType.band:
+        return 'Tempo de formação';
+      case ProfileType.space:
+        return 'Ano de fundação';
+      case ProfileType.musician:
+      default:
+        return 'Idade';
+    }
+  }
 
   /// Calcula idade (músicos) ou tempo de formação (bandas) em anos
   int? get ageOrYearsSinceFormation {
@@ -149,12 +190,25 @@ class ProfileEntity with _$ProfileEntity {
   String? get ageOrFormationText {
     final years = ageOrYearsSinceFormation;
     if (years == null) return null;
-    if (isBand) {
-      return years == 1 ? '$years ano de formação' : '$years anos de formação';
-    } else {
-      return years == 1 ? '$years ano' : '$years anos';
+    switch (profileType) {
+      case ProfileType.band:
+        return years == 1 ? '$years ano de formação' : '$years anos de formação';
+      case ProfileType.space:
+        return years == 1 ? '$years ano de fundação' : '$years anos de fundação';
+      case ProfileType.musician:
+      default:
+        return years == 1 ? '$years ano' : '$years anos';
     }
   }
+
+  /// Check if profile is a musician
+  bool get isMusician => profileType == ProfileType.musician;
+
+  /// Check if profile is a band (kept for backward compatibility)
+  bool get isBandProfile => profileType == ProfileType.band;
+
+  /// Check if profile is a space
+  bool get isSpace => profileType == ProfileType.space;
 
   double get latitude => location.latitude;
   double get longitude => location.longitude;

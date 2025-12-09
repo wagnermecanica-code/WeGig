@@ -194,8 +194,83 @@ final deleteConversationUseCaseProvider =
 // ignore: unused_element
 typedef DeleteConversationUseCaseRef
     = AutoDisposeProviderRef<DeleteConversation>;
+String _$watchMessagesUseCaseHash() =>
+    r'b45d187e8a74dcbea1242d3fb686218e4d2905be';
+
+/// See also [watchMessagesUseCase].
+@ProviderFor(watchMessagesUseCase)
+final watchMessagesUseCaseProvider =
+    AutoDisposeProvider<WatchMessages>.internal(
+  watchMessagesUseCase,
+  name: r'watchMessagesUseCaseProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$watchMessagesUseCaseHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef WatchMessagesUseCaseRef = AutoDisposeProviderRef<WatchMessages>;
+String _$addReactionUseCaseHash() =>
+    r'8100b688d58f10cb9b428b23222be7ee73896960';
+
+/// See also [addReactionUseCase].
+@ProviderFor(addReactionUseCase)
+final addReactionUseCaseProvider = AutoDisposeProvider<AddReaction>.internal(
+  addReactionUseCase,
+  name: r'addReactionUseCaseProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$addReactionUseCaseHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef AddReactionUseCaseRef = AutoDisposeProviderRef<AddReaction>;
+String _$removeReactionUseCaseHash() =>
+    r'52f2690cf2882e10c1e88906667c1848f793d32e';
+
+/// See also [removeReactionUseCase].
+@ProviderFor(removeReactionUseCase)
+final removeReactionUseCaseProvider =
+    AutoDisposeProvider<RemoveReaction>.internal(
+  removeReactionUseCase,
+  name: r'removeReactionUseCaseProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$removeReactionUseCaseHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef RemoveReactionUseCaseRef = AutoDisposeProviderRef<RemoveReaction>;
+String _$deleteMessageUseCaseHash() =>
+    r'4c641c66ef08e23b9b70641b1db72b699e20f14a';
+
+/// See also [deleteMessageUseCase].
+@ProviderFor(deleteMessageUseCase)
+final deleteMessageUseCaseProvider =
+    AutoDisposeProvider<DeleteMessage>.internal(
+  deleteMessageUseCase,
+  name: r'deleteMessageUseCaseProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$deleteMessageUseCaseHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef DeleteMessageUseCaseRef = AutoDisposeProviderRef<DeleteMessage>;
 String _$conversationsStreamHash() =>
-    r'8a0ddf8c5543771a553c319adf1df04c2d9e6bd7';
+    r'7b97c2eea0242233086e3e458f2ef7e3a107842a';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -237,11 +312,15 @@ class ConversationsStreamFamily
   /// Stream de conversas em tempo real
   ///
   /// Copied from [conversationsStream].
-  ConversationsStreamProvider call(
-    String profileId,
-  ) {
+  ConversationsStreamProvider call({
+    required String profileId,
+    required String profileUid,
+    int limit = 20,
+  }) {
     return ConversationsStreamProvider(
-      profileId,
+      profileId: profileId,
+      profileUid: profileUid,
+      limit: limit,
     );
   }
 
@@ -250,7 +329,9 @@ class ConversationsStreamFamily
     covariant ConversationsStreamProvider provider,
   ) {
     return call(
-      provider.profileId,
+      profileId: provider.profileId,
+      profileUid: provider.profileUid,
+      limit: provider.limit,
     );
   }
 
@@ -277,12 +358,16 @@ class ConversationsStreamProvider
   /// Stream de conversas em tempo real
   ///
   /// Copied from [conversationsStream].
-  ConversationsStreamProvider(
-    String profileId,
-  ) : this._internal(
+  ConversationsStreamProvider({
+    required String profileId,
+    required String profileUid,
+    int limit = 20,
+  }) : this._internal(
           (ref) => conversationsStream(
             ref as ConversationsStreamRef,
-            profileId,
+            profileId: profileId,
+            profileUid: profileUid,
+            limit: limit,
           ),
           from: conversationsStreamProvider,
           name: r'conversationsStreamProvider',
@@ -294,6 +379,8 @@ class ConversationsStreamProvider
           allTransitiveDependencies:
               ConversationsStreamFamily._allTransitiveDependencies,
           profileId: profileId,
+          profileUid: profileUid,
+          limit: limit,
         );
 
   ConversationsStreamProvider._internal(
@@ -304,9 +391,13 @@ class ConversationsStreamProvider
     required super.debugGetCreateSourceHash,
     required super.from,
     required this.profileId,
+    required this.profileUid,
+    required this.limit,
   }) : super.internal();
 
   final String profileId;
+  final String profileUid;
+  final int limit;
 
   @override
   Override overrideWith(
@@ -323,6 +414,8 @@ class ConversationsStreamProvider
         allTransitiveDependencies: null,
         debugGetCreateSourceHash: null,
         profileId: profileId,
+        profileUid: profileUid,
+        limit: limit,
       ),
     );
   }
@@ -334,13 +427,18 @@ class ConversationsStreamProvider
 
   @override
   bool operator ==(Object other) {
-    return other is ConversationsStreamProvider && other.profileId == profileId;
+    return other is ConversationsStreamProvider &&
+        other.profileId == profileId &&
+        other.profileUid == profileUid &&
+        other.limit == limit;
   }
 
   @override
   int get hashCode {
     var hash = _SystemHash.combine(0, runtimeType.hashCode);
     hash = _SystemHash.combine(hash, profileId.hashCode);
+    hash = _SystemHash.combine(hash, profileUid.hashCode);
+    hash = _SystemHash.combine(hash, limit.hashCode);
 
     return _SystemHash.finish(hash);
   }
@@ -352,6 +450,12 @@ mixin ConversationsStreamRef
     on AutoDisposeStreamProviderRef<List<ConversationEntity>> {
   /// The parameter `profileId` of this provider.
   String get profileId;
+
+  /// The parameter `profileUid` of this provider.
+  String get profileUid;
+
+  /// The parameter `limit` of this provider.
+  int get limit;
 }
 
 class _ConversationsStreamProviderElement
@@ -361,6 +465,10 @@ class _ConversationsStreamProviderElement
 
   @override
   String get profileId => (origin as ConversationsStreamProvider).profileId;
+  @override
+  String get profileUid => (origin as ConversationsStreamProvider).profileUid;
+  @override
+  int get limit => (origin as ConversationsStreamProvider).limit;
 }
 
 String _$messagesStreamHash() => r'53d85537f9bbb5befbab58fdcacb56a9fbafa182';
@@ -510,9 +618,10 @@ class _MessagesStreamProviderElement
 }
 
 String _$unreadMessageCountForProfileHash() =>
-    r'271e3bc160cfbf5c694121ab39ba49fe291c7fd1';
+    r'4b5ed1632a7be71b51ed897a994c0e8bfb13bfac';
 
 /// Stream de contador de não lidas para BottomNav badge
+/// ✅ FIX: Agora requer profileUid (UID) para match com Security Rules
 ///
 /// Copied from [unreadMessageCountForProfile].
 @ProviderFor(unreadMessageCountForProfile)
@@ -520,22 +629,27 @@ const unreadMessageCountForProfileProvider =
     UnreadMessageCountForProfileFamily();
 
 /// Stream de contador de não lidas para BottomNav badge
+/// ✅ FIX: Agora requer profileUid (UID) para match com Security Rules
 ///
 /// Copied from [unreadMessageCountForProfile].
 class UnreadMessageCountForProfileFamily extends Family<AsyncValue<int>> {
   /// Stream de contador de não lidas para BottomNav badge
+  /// ✅ FIX: Agora requer profileUid (UID) para match com Security Rules
   ///
   /// Copied from [unreadMessageCountForProfile].
   const UnreadMessageCountForProfileFamily();
 
   /// Stream de contador de não lidas para BottomNav badge
+  /// ✅ FIX: Agora requer profileUid (UID) para match com Security Rules
   ///
   /// Copied from [unreadMessageCountForProfile].
   UnreadMessageCountForProfileProvider call(
     String profileId,
+    String profileUid,
   ) {
     return UnreadMessageCountForProfileProvider(
       profileId,
+      profileUid,
     );
   }
 
@@ -545,6 +659,7 @@ class UnreadMessageCountForProfileFamily extends Family<AsyncValue<int>> {
   ) {
     return call(
       provider.profileId,
+      provider.profileUid,
     );
   }
 
@@ -564,19 +679,23 @@ class UnreadMessageCountForProfileFamily extends Family<AsyncValue<int>> {
 }
 
 /// Stream de contador de não lidas para BottomNav badge
+/// ✅ FIX: Agora requer profileUid (UID) para match com Security Rules
 ///
 /// Copied from [unreadMessageCountForProfile].
 class UnreadMessageCountForProfileProvider
     extends AutoDisposeStreamProvider<int> {
   /// Stream de contador de não lidas para BottomNav badge
+  /// ✅ FIX: Agora requer profileUid (UID) para match com Security Rules
   ///
   /// Copied from [unreadMessageCountForProfile].
   UnreadMessageCountForProfileProvider(
     String profileId,
+    String profileUid,
   ) : this._internal(
           (ref) => unreadMessageCountForProfile(
             ref as UnreadMessageCountForProfileRef,
             profileId,
+            profileUid,
           ),
           from: unreadMessageCountForProfileProvider,
           name: r'unreadMessageCountForProfileProvider',
@@ -588,6 +707,7 @@ class UnreadMessageCountForProfileProvider
           allTransitiveDependencies:
               UnreadMessageCountForProfileFamily._allTransitiveDependencies,
           profileId: profileId,
+          profileUid: profileUid,
         );
 
   UnreadMessageCountForProfileProvider._internal(
@@ -598,9 +718,11 @@ class UnreadMessageCountForProfileProvider
     required super.debugGetCreateSourceHash,
     required super.from,
     required this.profileId,
+    required this.profileUid,
   }) : super.internal();
 
   final String profileId;
+  final String profileUid;
 
   @override
   Override overrideWith(
@@ -616,6 +738,7 @@ class UnreadMessageCountForProfileProvider
         allTransitiveDependencies: null,
         debugGetCreateSourceHash: null,
         profileId: profileId,
+        profileUid: profileUid,
       ),
     );
   }
@@ -628,13 +751,15 @@ class UnreadMessageCountForProfileProvider
   @override
   bool operator ==(Object other) {
     return other is UnreadMessageCountForProfileProvider &&
-        other.profileId == profileId;
+        other.profileId == profileId &&
+        other.profileUid == profileUid;
   }
 
   @override
   int get hashCode {
     var hash = _SystemHash.combine(0, runtimeType.hashCode);
     hash = _SystemHash.combine(hash, profileId.hashCode);
+    hash = _SystemHash.combine(hash, profileUid.hashCode);
 
     return _SystemHash.finish(hash);
   }
@@ -645,6 +770,9 @@ class UnreadMessageCountForProfileProvider
 mixin UnreadMessageCountForProfileRef on AutoDisposeStreamProviderRef<int> {
   /// The parameter `profileId` of this provider.
   String get profileId;
+
+  /// The parameter `profileUid` of this provider.
+  String get profileUid;
 }
 
 class _UnreadMessageCountForProfileProviderElement
@@ -655,6 +783,9 @@ class _UnreadMessageCountForProfileProviderElement
   @override
   String get profileId =>
       (origin as UnreadMessageCountForProfileProvider).profileId;
+  @override
+  String get profileUid =>
+      (origin as UnreadMessageCountForProfileProvider).profileUid;
 }
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

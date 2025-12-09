@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:flutter/material.dart';
@@ -166,6 +167,7 @@ class MessageBubble extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: CachedNetworkImage(
+                cacheManager: WeGigImageCacheManager.instance,
                 imageUrl: replyImage,
                 width: 40,
                 height: 40,
@@ -197,6 +199,7 @@ class MessageBubble extends StatelessWidget {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
       child: CachedNetworkImage(
+        cacheManager: WeGigImageCacheManager.instance,
         imageUrl: imageUrl,
         fit: BoxFit.cover,
         memCacheWidth: 600,

@@ -12,7 +12,7 @@ Future<void> main() async {
   await bootstrapCoreServices(
     firebaseOptions: DefaultFirebaseOptions.currentPlatform,
     flavorLabel: 'staging',
-    expectedProjectId: 'to-sem-banda-staging',
+    expectedProjectId: 'wegig-staging',
     backgroundHandler: _firebaseMessagingBackgroundHandler,
     enableCrashlytics: true,
     printEnvOnDebug: false,

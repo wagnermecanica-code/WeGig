@@ -121,15 +121,22 @@ class SettingsSwitchTile extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
+        // ✅ FIX: Melhorar cores dos toggles para maior visibilidade
+        activeColor: AppColors.primary,
         thumbColor: WidgetStateProperty.resolveWith<Color?>(
           (states) => states.contains(WidgetState.selected)
-              ? AppColors.primary
-              : AppColors.border,
+              ? Colors.white  // Thumb branco quando ativo
+              : AppColors.textSecondary.withValues(alpha: 0.6),
         ),
         trackColor: WidgetStateProperty.resolveWith<Color?>(
           (states) => states.contains(WidgetState.selected)
-              ? AppColors.primary.withValues(alpha: 0.2)
-              : AppColors.surfaceVariant,
+              ? AppColors.primary  // Track colorido quando ativo
+              : AppColors.border,  // Track cinza quando inativo
+        ),
+        trackOutlineColor: WidgetStateProperty.resolveWith<Color?>(
+          (states) => states.contains(WidgetState.selected)
+              ? AppColors.primary
+              : AppColors.border,
         ),
         thumbIcon: WidgetStateProperty.resolveWith<Icon?>(
           (states) => null, // Thumb com sombra padrão

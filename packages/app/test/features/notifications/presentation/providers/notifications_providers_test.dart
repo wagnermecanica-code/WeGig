@@ -22,6 +22,8 @@ class _MockNotificationsRemoteDataSource
     required String profileId,
     int limit = 50,
     NotificationEntity? startAfter,
+    String? recipientUid,
+    NotificationType? type,
   }) async {
     return [];
   }
@@ -35,7 +37,7 @@ class _MockNotificationsRemoteDataSource
   Future<void> markAsRead(String notificationId, String profileId) async {}
 
   @override
-  Future<void> markAllAsRead(String profileId) async {}
+  Future<void> markAllAsRead(String profileId, {String? recipientUid}) async {}
 
   @override
   Future<void> deleteNotification(
@@ -48,18 +50,18 @@ class _MockNotificationsRemoteDataSource
   }
 
   @override
-  Future<int> getUnreadCount(String profileId) async {
+  Future<int> getUnreadCount(String profileId, {String? recipientUid}) async {
     return 0;
   }
 
   @override
   Stream<List<NotificationEntity>> watchNotifications(
-      String profileId, int limit) {
+      String profileId, int limit, {String? recipientUid}) {
     return Stream.value([]);
   }
 
   @override
-  Stream<int> watchUnreadCount(String profileId) {
+  Stream<int> watchUnreadCount(String profileId, {String? recipientUid}) {
     return Stream.value(0);
   }
 }
@@ -70,6 +72,8 @@ class _MockNotificationsRepository implements NotificationsRepository {
     required String profileId,
     int limit = 50,
     NotificationEntity? startAfter,
+    String? recipientUid,
+    NotificationType? type,
   }) async {
     return [];
   }
@@ -88,6 +92,7 @@ class _MockNotificationsRepository implements NotificationsRepository {
   @override
   Future<void> markAllAsRead({
     required String profileId,
+    String? recipientUid,
   }) async {}
 
   @override
@@ -105,6 +110,7 @@ class _MockNotificationsRepository implements NotificationsRepository {
   @override
   Future<int> getUnreadCount({
     required String profileId,
+    String? recipientUid,
   }) async {
     return 0;
   }
@@ -113,6 +119,7 @@ class _MockNotificationsRepository implements NotificationsRepository {
   Stream<List<NotificationEntity>> watchNotifications({
     required String profileId,
     int limit = 50,
+    String? recipientUid,
   }) {
     return Stream.value([]);
   }
@@ -120,6 +127,7 @@ class _MockNotificationsRepository implements NotificationsRepository {
   @override
   Stream<int> watchUnreadCount({
     required String profileId,
+    String? recipientUid,
   }) {
     return Stream.value(0);
   }
@@ -286,7 +294,7 @@ void main() {
   group('Notifications Providers - Stream Providers', () {
     test('notificationsStreamProvider can be read without errors', () {
       // StreamProvider with @riverpod annotation
-      expect(() => container.read(notificationsStreamProvider('profile-123')),
+      expect(() => container.read(notificationsStreamProvider('profile-123', 'uid-123')),
           returnsNormally,
           reason: 'Should be able to read notifications stream provider');
     });
@@ -296,7 +304,7 @@ void main() {
         () {
       expect(
           () => container
-              .read(unreadNotificationCountForProfileProvider('profile-123')),
+              .read(unreadNotificationCountForProfileProvider('profile-123', 'uid-123')),
           returnsNormally,
           reason:
               'Should be able to read unread notification count stream provider');

@@ -8,15 +8,15 @@
 
 /* Begin PBXBuildFile section */
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
-		15CA3671DC413A056A0AC92E /* Pods_WeGigTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E34EE7B795081FD114B6E886 /* Pods_WeGigTests.framework */; };
 		331C808B294A63AB00263BE5 /* WeGigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* WeGigTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
+		975E2D1C4E9E6B654AF4E4EB /* Pods_WeGig.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1FC67375D3937D9B5D8C3C80 /* Pods_WeGig.framework */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		9EE626EC2EB7FF9900FDFFEC /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 9EE626EB2EB7FF9900FDFFEC /* GoogleService-Info.plist */; };
-		AF2D36DFBA1E9B3F8A06CF4D /* Pods_WeGig.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B74AF527432F367DC2923D65 /* Pods_WeGig.framework */; };
+		B0F43377F9BCDC658DD3822B /* Pods_WeGigTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8BC2B6A03CC065234B7EA793 /* Pods_WeGigTests.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,23 +43,30 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		04100D6437A7C734A6183834 /* Pods-WeGig.debug-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.debug-staging.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.debug-staging.xcconfig"; sourceTree = "<group>"; };
+		110B2EABEC81ABB5783489BD /* Pods-WeGig.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.debug.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.debug.xcconfig"; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
-		17C891D8AFE7344EEECA58A1 /* Pods-WeGigTests.profile-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.profile-staging.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.profile-staging.xcconfig"; sourceTree = "<group>"; };
-		1B5ECEC09C4929072155732E /* Pods-WeGig.debug-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.debug-dev.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.debug-dev.xcconfig"; sourceTree = "<group>"; };
-		2208288B10E8F4B6C6170985 /* Pods-WeGig.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.debug.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.debug.xcconfig"; sourceTree = "<group>"; };
-		233C73AD3090CCAA41C47BE1 /* Pods-WeGigTests.release-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.release-dev.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.release-dev.xcconfig"; sourceTree = "<group>"; };
+		1FC67375D3937D9B5D8C3C80 /* Pods_WeGig.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_WeGig.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		2FEA69690E899F6F3AF9E774 /* Pods-WeGig.release-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.release-staging.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.release-staging.xcconfig"; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* WeGigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeGigTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* WeGigTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WeGigTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		34BB97B0591B9008DF4495F6 /* Pods-WeGigTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.profile.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.profile.xcconfig"; sourceTree = "<group>"; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
+		4B0B06007D9ED984BC3F73C4 /* Pods-WeGigTests.profile-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.profile-dev.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.profile-dev.xcconfig"; sourceTree = "<group>"; };
+		5044180837001F812A4390D2 /* Pods-WeGig.debug-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.debug-dev.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.debug-dev.xcconfig"; sourceTree = "<group>"; };
+		5E8EBABE6D2784A1D54E1536 /* Pods-WeGigTests.release-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.release-staging.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.release-staging.xcconfig"; sourceTree = "<group>"; };
+		6659536A61C7F89A77862AD2 /* Pods-WeGig.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.release.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.release.xcconfig"; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
-		7E62E75F5A38AF3BEA0C7DC8 /* Pods-WeGigTests.profile-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.profile-dev.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.profile-dev.xcconfig"; sourceTree = "<group>"; };
-		8C78CBCDD9F291DCC169EE04 /* Pods-WeGig.profile-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.profile-staging.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.profile-staging.xcconfig"; sourceTree = "<group>"; };
-		8FEA8770327A6FBAFD8A1EBA /* Pods-WeGigTests.release-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.release-staging.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.release-staging.xcconfig"; sourceTree = "<group>"; };
+		7BF210631C8F869D9ECAB269 /* Pods-WeGig.profile-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.profile-staging.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.profile-staging.xcconfig"; sourceTree = "<group>"; };
+		897A79DAC224E2F6EC1B548F /* Pods-WeGigTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.debug.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.debug.xcconfig"; sourceTree = "<group>"; };
+		8BC2B6A03CC065234B7EA793 /* Pods_WeGigTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_WeGigTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		96E2CCE21AD85E8470B7B62B /* Pods-WeGigTests.release-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.release-dev.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.release-dev.xcconfig"; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
+		9757DC5983EDA2491E318F23 /* Pods-WeGig.profile-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.profile-dev.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.profile-dev.xcconfig"; sourceTree = "<group>"; };
 		97C146EE1CF9000F007C117D /* WeGig.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WeGig.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		97C146FB1CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -68,19 +75,12 @@
 		9E30A26F2ED689A00032ED2D /* RunnerDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RunnerDebug.entitlements; sourceTree = "<group>"; };
 		9E30A2702ED68A360032ED2D /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
 		9EE626EB2EB7FF9900FDFFEC /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
-		9F76A4A0F6F9FB08F22B2777 /* Pods-WeGig.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.release.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.release.xcconfig"; sourceTree = "<group>"; };
-		A413875A35CEFF368E672132 /* Pods-WeGigTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.debug.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.debug.xcconfig"; sourceTree = "<group>"; };
-		A83EE38DC4684AF054870CBF /* Pods-WeGigTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.release.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.release.xcconfig"; sourceTree = "<group>"; };
-		ACB7C9975C94EEE8CBBFA48A /* Pods-WeGig.release-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.release-staging.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.release-staging.xcconfig"; sourceTree = "<group>"; };
-		AE593E2513966EAA6AB947A1 /* Pods-WeGigTests.debug-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.debug-dev.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.debug-dev.xcconfig"; sourceTree = "<group>"; };
-		B4B261F2DD69697193585B79 /* Pods-WeGig.profile-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.profile-dev.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.profile-dev.xcconfig"; sourceTree = "<group>"; };
-		B74AF527432F367DC2923D65 /* Pods_WeGig.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_WeGig.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		D6DF0452A0C303A01E3D4137 /* Pods-WeGigTests.debug-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.debug-staging.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.debug-staging.xcconfig"; sourceTree = "<group>"; };
-		DB3CA247A55B333F0D2D48F0 /* Pods-WeGig.release-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.release-dev.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.release-dev.xcconfig"; sourceTree = "<group>"; };
-		DE3075327C0A23F24A7ADA45 /* Pods-WeGig.debug-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.debug-staging.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.debug-staging.xcconfig"; sourceTree = "<group>"; };
-		E34EE7B795081FD114B6E886 /* Pods_WeGigTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_WeGigTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		EAA25F54CADBEC4EAF998714 /* Pods-WeGigTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.profile.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.profile.xcconfig"; sourceTree = "<group>"; };
-		EFCB94A71BF8520ED2BAEE2F /* Pods-WeGig.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.profile.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.profile.xcconfig"; sourceTree = "<group>"; };
+		AA62EC637C3C6B7369F08D35 /* Pods-WeGigTests.debug-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.debug-staging.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.debug-staging.xcconfig"; sourceTree = "<group>"; };
+		CBAA6EB219F70A01BF9802B9 /* Pods-WeGigTests.profile-staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.profile-staging.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.profile-staging.xcconfig"; sourceTree = "<group>"; };
+		CC62A4CC3FB9BC515D43E5B0 /* Pods-WeGigTests.debug-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.debug-dev.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.debug-dev.xcconfig"; sourceTree = "<group>"; };
+		DAB98DF1161136209E6FE937 /* Pods-WeGigTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGigTests.release.xcconfig"; path = "Target Support Files/Pods-WeGigTests/Pods-WeGigTests.release.xcconfig"; sourceTree = "<group>"; };
+		F7F2EDE87CF658A02EAEC5C1 /* Pods-WeGig.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.profile.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.profile.xcconfig"; sourceTree = "<group>"; };
+		FD139F2C99B95D37215BF0A5 /* Pods-WeGig.release-dev.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeGig.release-dev.xcconfig"; path = "Target Support Files/Pods-WeGig/Pods-WeGig.release-dev.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -88,7 +88,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				15CA3671DC413A056A0AC92E /* Pods_WeGigTests.framework in Frameworks */,
+				B0F43377F9BCDC658DD3822B /* Pods_WeGigTests.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -96,7 +96,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AF2D36DFBA1E9B3F8A06CF4D /* Pods_WeGig.framework in Frameworks */,
+				975E2D1C4E9E6B654AF4E4EB /* Pods_WeGig.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -106,24 +106,24 @@
 		0454CAFE24033642E4F49564 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				2208288B10E8F4B6C6170985 /* Pods-WeGig.debug.xcconfig */,
-				9F76A4A0F6F9FB08F22B2777 /* Pods-WeGig.release.xcconfig */,
-				EFCB94A71BF8520ED2BAEE2F /* Pods-WeGig.profile.xcconfig */,
-				1B5ECEC09C4929072155732E /* Pods-WeGig.debug-dev.xcconfig */,
-				DB3CA247A55B333F0D2D48F0 /* Pods-WeGig.release-dev.xcconfig */,
-				B4B261F2DD69697193585B79 /* Pods-WeGig.profile-dev.xcconfig */,
-				DE3075327C0A23F24A7ADA45 /* Pods-WeGig.debug-staging.xcconfig */,
-				ACB7C9975C94EEE8CBBFA48A /* Pods-WeGig.release-staging.xcconfig */,
-				8C78CBCDD9F291DCC169EE04 /* Pods-WeGig.profile-staging.xcconfig */,
-				A413875A35CEFF368E672132 /* Pods-WeGigTests.debug.xcconfig */,
-				A83EE38DC4684AF054870CBF /* Pods-WeGigTests.release.xcconfig */,
-				EAA25F54CADBEC4EAF998714 /* Pods-WeGigTests.profile.xcconfig */,
-				AE593E2513966EAA6AB947A1 /* Pods-WeGigTests.debug-dev.xcconfig */,
-				233C73AD3090CCAA41C47BE1 /* Pods-WeGigTests.release-dev.xcconfig */,
-				7E62E75F5A38AF3BEA0C7DC8 /* Pods-WeGigTests.profile-dev.xcconfig */,
-				D6DF0452A0C303A01E3D4137 /* Pods-WeGigTests.debug-staging.xcconfig */,
-				8FEA8770327A6FBAFD8A1EBA /* Pods-WeGigTests.release-staging.xcconfig */,
-				17C891D8AFE7344EEECA58A1 /* Pods-WeGigTests.profile-staging.xcconfig */,
+				110B2EABEC81ABB5783489BD /* Pods-WeGig.debug.xcconfig */,
+				6659536A61C7F89A77862AD2 /* Pods-WeGig.release.xcconfig */,
+				F7F2EDE87CF658A02EAEC5C1 /* Pods-WeGig.profile.xcconfig */,
+				5044180837001F812A4390D2 /* Pods-WeGig.debug-dev.xcconfig */,
+				FD139F2C99B95D37215BF0A5 /* Pods-WeGig.release-dev.xcconfig */,
+				9757DC5983EDA2491E318F23 /* Pods-WeGig.profile-dev.xcconfig */,
+				04100D6437A7C734A6183834 /* Pods-WeGig.debug-staging.xcconfig */,
+				2FEA69690E899F6F3AF9E774 /* Pods-WeGig.release-staging.xcconfig */,
+				7BF210631C8F869D9ECAB269 /* Pods-WeGig.profile-staging.xcconfig */,
+				897A79DAC224E2F6EC1B548F /* Pods-WeGigTests.debug.xcconfig */,
+				DAB98DF1161136209E6FE937 /* Pods-WeGigTests.release.xcconfig */,
+				34BB97B0591B9008DF4495F6 /* Pods-WeGigTests.profile.xcconfig */,
+				CC62A4CC3FB9BC515D43E5B0 /* Pods-WeGigTests.debug-dev.xcconfig */,
+				96E2CCE21AD85E8470B7B62B /* Pods-WeGigTests.release-dev.xcconfig */,
+				4B0B06007D9ED984BC3F73C4 /* Pods-WeGigTests.profile-dev.xcconfig */,
+				AA62EC637C3C6B7369F08D35 /* Pods-WeGigTests.debug-staging.xcconfig */,
+				5E8EBABE6D2784A1D54E1536 /* Pods-WeGigTests.release-staging.xcconfig */,
+				CBAA6EB219F70A01BF9802B9 /* Pods-WeGigTests.profile-staging.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -134,6 +134,15 @@
 				331C807B294A618700263BE5 /* WeGigTests.swift */,
 			);
 			path = WeGigTests;
+			sourceTree = "<group>";
+		};
+		83511C9251C00AA164478753 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1FC67375D3937D9B5D8C3C80 /* Pods_WeGig.framework */,
+				8BC2B6A03CC065234B7EA793 /* Pods_WeGigTests.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 		9740EEB11CF90186004384FC /* Flutter */ = {
@@ -156,7 +165,7 @@
 				97C146EF1CF9000F007C117D /* Products */,
 				331C8082294A63A400263BE5 /* WeGigTests */,
 				0454CAFE24033642E4F49564 /* Pods */,
-				C23EDBF0A110E0E062921C45 /* Frameworks */,
+				83511C9251C00AA164478753 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -186,15 +195,6 @@
 			path = Runner;
 			sourceTree = "<group>";
 		};
-		C23EDBF0A110E0E062921C45 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				B74AF527432F367DC2923D65 /* Pods_WeGig.framework */,
-				E34EE7B795081FD114B6E886 /* Pods_WeGigTests.framework */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -202,7 +202,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 331C8087294A63A400263BE5 /* Build configuration list for PBXNativeTarget "WeGigTests" */;
 			buildPhases = (
-				C48BAF57E84DBA9B8BBEEE01 /* [CP] Check Pods Manifest.lock */,
+				ECCEA7CAD0E180210C15204B /* [CP] Check Pods Manifest.lock */,
 				331C807D294A63A400263BE5 /* Sources */,
 				331C807F294A63A400263BE5 /* Resources */,
 				45B8EA8298446808792FB892 /* Frameworks */,
@@ -221,7 +221,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "WeGig" */;
 			buildPhases = (
-				905AA7B3675977A2DCE85FF3 /* [CP] Check Pods Manifest.lock */,
+				6664A897F49520095DB6D279 /* [CP] Check Pods Manifest.lock */,
 				B9C1E4B42D1F992C00A1A6F1 /* [CP] Copy GoogleService-Info.plist */,
 				9740EEB61CF901F6004384FC /* Run Script */,
 				97C146EA1CF9000F007C117D /* Sources */,
@@ -230,7 +230,7 @@
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				4A4D1CEF9891D9641A01266A /* FlutterFire: "flutterfire upload-crashlytics-symbols" */,
-				5FF8A8EF36771B3FDD32B8F1 /* [CP] Copy Pods Resources */,
+				E8BF2660960742C9F5EC6039 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -270,8 +270,6 @@
 				Base,
 			);
 			mainGroup = 97C146E51CF9000F007C117D;
-			packageReferences = (
-			);
 			productRefGroup = 97C146EF1CF9000F007C117D /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -339,24 +337,7 @@
 			shellPath = /bin/sh;
 			shellScript = "\n#!/bin/bash\nPATH=\"${PATH}:$FLUTTER_ROOT/bin:${PUB_CACHE}/bin:$HOME/.pub-cache/bin\"\n\nif [ -z \"$PODS_ROOT\" ] || [ ! -d \"$PODS_ROOT/FirebaseCrashlytics\" ]; then\n  # Cannot use \"BUILD_DIR%/Build/*\" as per Firebase documentation, it points to \"flutter-project/build/ios/*\" path which doesn't have run script\n  DERIVED_DATA_PATH=$(echo \"$BUILD_ROOT\" | sed -E 's|(.*DerivedData/[^/]+).*|\\1|')\n  PATH_TO_CRASHLYTICS_UPLOAD_SCRIPT=\"${DERIVED_DATA_PATH}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\nelse\n  PATH_TO_CRASHLYTICS_UPLOAD_SCRIPT=\"$PODS_ROOT/FirebaseCrashlytics/run\"\nfi\n\n# Command to upload symbols script used to upload symbols to Firebase server\nflutterfire upload-crashlytics-symbols --upload-symbols-script-path=\"$PATH_TO_CRASHLYTICS_UPLOAD_SCRIPT\" --platform=ios --apple-project-path=\"${SRCROOT}\" --env-platform-name=\"${PLATFORM_NAME}\" --env-configuration=\"${CONFIGURATION}\" --env-project-dir=\"${PROJECT_DIR}\" --env-built-products-dir=\"${BUILT_PRODUCTS_DIR}\" --env-dwarf-dsym-folder-path=\"${DWARF_DSYM_FOLDER_PATH}\" --env-dwarf-dsym-file-name=\"${DWARF_DSYM_FILE_NAME}\" --env-infoplist-path=\"${INFOPLIST_PATH}\" --default-config=default\n";
 		};
-		5FF8A8EF36771B3FDD32B8F1 /* [CP] Copy Pods Resources */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-WeGig/Pods-WeGig-resources-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Copy Pods Resources";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-WeGig/Pods-WeGig-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-WeGig/Pods-WeGig-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		905AA7B3675977A2DCE85FF3 /* [CP] Check Pods Manifest.lock */ = {
+		6664A897F49520095DB6D279 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -409,9 +390,26 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nFIREBASE_DIR=\"${SRCROOT}/Firebase\"\nTARGET_PLIST=\"${SRCROOT}/Runner/GoogleService-Info.plist\"\ncase \"$CONFIGURATION\" in\n  *dev*) SOURCE_PLIST=\"$FIREBASE_DIR/GoogleService-Info-dev.plist\" ;;\n  *staging*) SOURCE_PLIST=\"$FIREBASE_DIR/GoogleService-Info-staging.plist\" ;;\n  *) SOURCE_PLIST=\"$FIREBASE_DIR/GoogleService-Info-prod.plist\" ;;\nesac\nif [ ! -f \"$SOURCE_PLIST\" ]; then\n  echo \"error: Missing Firebase plist for $CONFIGURATION ($SOURCE_PLIST)\" >&2\n  exit 1\nfi\nif [ -f \"$TARGET_PLIST\" ] && cmp -s \"$SOURCE_PLIST\" \"$TARGET_PLIST\"; then\n  echo \"GoogleService-Info.plist already up to date\"\nelse\n  cp \"$SOURCE_PLIST\" \"$TARGET_PLIST\"\n  echo \"Copied ${SOURCE_PLIST##*/} to Runner/GoogleService-Info.plist\"\nfi\n";
+			shellScript = "set -euo pipefail\nFIREBASE_DIR=\"${SRCROOT}/Firebase\"\nTARGET_PLIST=\"${SRCROOT}/GoogleService-Info.plist\"\nINFO_PLIST=\"${SRCROOT}/Runner/Info.plist\"\n\n# Selecionar plist baseado na configuração\ncase \"$CONFIGURATION\" in\n  *dev*) SOURCE_PLIST=\"$FIREBASE_DIR/GoogleService-Info-dev.plist\" ;;\n  *staging*) SOURCE_PLIST=\"$FIREBASE_DIR/GoogleService-Info-staging.plist\" ;;\n  *) SOURCE_PLIST=\"$FIREBASE_DIR/GoogleService-Info-prod.plist\" ;;\nesac\n\nif [ ! -f \"$SOURCE_PLIST\" ]; then\n  echo \"error: Missing Firebase plist for $CONFIGURATION ($SOURCE_PLIST)\" >&2\n  exit 1\nfi\n\n# Copiar GoogleService-Info.plist\nif [ -f \"$TARGET_PLIST\" ] && cmp -s \"$SOURCE_PLIST\" \"$TARGET_PLIST\"; then\n  echo \"GoogleService-Info.plist already up to date\"\nelse\n  cp \"$SOURCE_PLIST\" \"$TARGET_PLIST\"\n  echo \"Copied ${SOURCE_PLIST##*/} to GoogleService-Info.plist\"\nfi\n\n# Atualizar Info.plist com CLIENT_ID e REVERSED_CLIENT_ID do Google Sign-In\nCLIENT_ID=$(/usr/libexec/PlistBuddy -c \"Print :CLIENT_ID\" \"$SOURCE_PLIST\")\nREVERSED_CLIENT_ID=$(/usr/libexec/PlistBuddy -c \"Print :REVERSED_CLIENT_ID\" \"$SOURCE_PLIST\")\n\nif [ -n \"$CLIENT_ID\" ] && [ -n \"$REVERSED_CLIENT_ID\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :GIDClientID $CLIENT_ID\" \"$INFO_PLIST\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :GIDClientID string $CLIENT_ID\" \"$INFO_PLIST\"\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleURLTypes:0:CFBundleURLSchemes:0 $REVERSED_CLIENT_ID\" \"$INFO_PLIST\"\n  echo \"Updated Info.plist with Google Sign-In config for $CONFIGURATION\"\n  echo \"  GIDClientID: $CLIENT_ID\"\n  echo \"  URL Scheme: $REVERSED_CLIENT_ID\"\nfi\n";
 		};
-		C48BAF57E84DBA9B8BBEEE01 /* [CP] Check Pods Manifest.lock */ = {
+		E8BF2660960742C9F5EC6039 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-WeGig/Pods-WeGig-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-WeGig/Pods-WeGig-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-WeGig/Pods-WeGig-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		ECCEA7CAD0E180210C15204B /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -552,10 +550,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WeGig;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -563,6 +564,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -628,10 +630,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WeGig;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -639,6 +644,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -647,7 +653,7 @@
 		};
 		331C8088294A63A400263BE5 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = A413875A35CEFF368E672132 /* Pods-WeGigTests.debug.xcconfig */;
+			baseConfigurationReference = 897A79DAC224E2F6EC1B548F /* Pods-WeGigTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -666,7 +672,7 @@
 		};
 		331C8089294A63A400263BE5 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = A83EE38DC4684AF054870CBF /* Pods-WeGigTests.release.xcconfig */;
+			baseConfigurationReference = DAB98DF1161136209E6FE937 /* Pods-WeGigTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -683,7 +689,7 @@
 		};
 		331C808A294A63A400263BE5 /* Profile */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = EAA25F54CADBEC4EAF998714 /* Pods-WeGigTests.profile.xcconfig */;
+			baseConfigurationReference = 34BB97B0591B9008DF4495F6 /* Pods-WeGigTests.profile.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -767,10 +773,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WeGig;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -778,6 +787,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -969,10 +979,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/RunnerDebug.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WeGig;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -980,6 +993,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -994,10 +1008,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WeGig;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1005,6 +1022,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -1013,7 +1031,7 @@
 		};
 		9EF6AE1F2EE241830066F8A8 /* Debug-dev */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AE593E2513966EAA6AB947A1 /* Pods-WeGigTests.debug-dev.xcconfig */;
+			baseConfigurationReference = CC62A4CC3FB9BC515D43E5B0 /* Pods-WeGigTests.debug-dev.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
@@ -1023,7 +1041,7 @@
 		};
 		9EF6AE202EE241830066F8A8 /* Release-dev */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 233C73AD3090CCAA41C47BE1 /* Pods-WeGigTests.release-dev.xcconfig */;
+			baseConfigurationReference = 96E2CCE21AD85E8470B7B62B /* Pods-WeGigTests.release-dev.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
@@ -1033,7 +1051,7 @@
 		};
 		9EF6AE212EE241830066F8A8 /* Profile-dev */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 7E62E75F5A38AF3BEA0C7DC8 /* Pods-WeGigTests.profile-dev.xcconfig */;
+			baseConfigurationReference = 4B0B06007D9ED984BC3F73C4 /* Pods-WeGigTests.profile-dev.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
@@ -1043,7 +1061,7 @@
 		};
 		9EF6AE222EE241830066F8A8 /* Debug-staging */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = D6DF0452A0C303A01E3D4137 /* Pods-WeGigTests.debug-staging.xcconfig */;
+			baseConfigurationReference = AA62EC637C3C6B7369F08D35 /* Pods-WeGigTests.debug-staging.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
@@ -1053,7 +1071,7 @@
 		};
 		9EF6AE232EE241830066F8A8 /* Release-staging */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8FEA8770327A6FBAFD8A1EBA /* Pods-WeGigTests.release-staging.xcconfig */;
+			baseConfigurationReference = 5E8EBABE6D2784A1D54E1536 /* Pods-WeGigTests.release-staging.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
@@ -1063,7 +1081,7 @@
 		};
 		9EF6AE242EE241830066F8A8 /* Profile-staging */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 17C891D8AFE7344EEECA58A1 /* Pods-WeGigTests.profile-staging.xcconfig */;
+			baseConfigurationReference = CBAA6EB219F70A01BF9802B9 /* Pods-WeGigTests.profile-staging.xcconfig */;
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
@@ -1140,10 +1158,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WeGig;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1151,6 +1172,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -1164,10 +1186,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/RunnerDebug.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WeGig;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1175,6 +1200,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -1189,10 +1215,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WeGig;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1200,6 +1229,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -1213,10 +1243,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 6PP9UL45V7;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WeGig;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1224,6 +1257,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -1411,8 +1445,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-
 	};
 	rootObject = 97C146E61CF9000F007C117D /* Project object */;
 }

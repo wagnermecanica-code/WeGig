@@ -3,16 +3,19 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
-import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/widgets/empty_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
+import 'package:wegig_app/features/notifications/presentation/controllers/notifications_controller.dart';
+import 'package:wegig_app/features/notifications/presentation/providers/notifications_providers.dart';
+import 'package:wegig_app/features/notifications/presentation/widgets/notification_error_state.dart';
 import 'package:wegig_app/features/notifications/presentation/widgets/notification_item.dart';
-import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
+import 'package:wegig_app/features/notifications/presentation/widgets/notification_skeleton_tile.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 /// Tela de notificações unificada
@@ -29,10 +32,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage>
   with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  // Pagination state
-  final Map<String, bool> _hasMore = {'tab_0': true, 'tab_1': true};
-  final Map<String, bool> _isLoadingMore = {'tab_0': false, 'tab_1': false};
-  final Map<String, List<NotificationEntity>> _notifications = {'tab_0': [], 'tab_1': []};
+  // Scroll controllers for each tab
   final Map<String, ScrollController> _scrollControllers = {};
 
   @override
@@ -43,7 +43,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage>
     // Initialize timeago locale to Portuguese
     timeago.setLocaleMessages('pt_BR', timeago.PtBrMessages());
 
-    // Initialize scroll controllers for each tab (3 tabs agora)
+    // Initialize scroll controllers for each tab
     for (var i = 0; i < 2; i++) {
       final controller = ScrollController();
       _scrollControllers['tab_$i'] = controller;
@@ -51,25 +51,14 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage>
     }
   }
 
-  Future<void> _handleRefresh(
-    String profileId,
-    NotificationType? type,
-  ) async {
-    final tabIndex = type == null ? 0 : (type == NotificationType.interest ? 1 : 2);
-    final key = 'tab_$tabIndex';
-
-    setState(() {
-      _hasMore[key] = true;
-      _notifications[key] = [];
-    });
-
-    await ref.read(notificationServiceProvider).refreshNotifications(
-          recipientProfileId: profileId,
-          type: type,
-        );
-
-    // Recria o serviço para garantir nova assinatura
-    ref.invalidate(notificationServiceProvider);
+  @override
+  void dispose() {
+    _tabController.dispose();
+    // Dispose scroll controllers
+    for (final controller in _scrollControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   void _onScroll(int tabIndex) {
@@ -80,83 +69,15 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage>
     // Load more when scrolled to 80% of the list
     if (controller.position.pixels >=
         controller.position.maxScrollExtent * 0.8) {
-      final hasMore = _hasMore[key] ?? true;
-      final isLoadingMore = _isLoadingMore[key] ?? false;
       
-      if (hasMore && !isLoadingMore) {
-        _loadMore(tabIndex);
-      }
-    }
-  }
-
-  /// Carrega mais notificações (paginação)
-  Future<void> _loadMore(int tabIndex) async {
-    final key = 'tab_$tabIndex';
-    final currentNotifications = _notifications[key] ?? [];
-    
-    if (currentNotifications.isEmpty) return;
-
-    setState(() {
-      _isLoadingMore[key] = true;
-    });
-
-    try {
       final profileState = ref.read(profileProvider);
       final activeProfile = profileState.value?.activeProfile;
       if (activeProfile == null) return;
 
-      // Determinar tipo baseado na tab
       final type = tabIndex == 1 ? NotificationType.interest : null;
       
-      // Pegar último documento para cursor
-      final lastNotification = currentNotifications.last;
-      final lastDoc = lastNotification.document;
-      
-      // Buscar mais notificações com cursor-based pagination
-      final newNotifications = await ref
-          .read(notificationServiceProvider)
-          .getNotifications(
-            activeProfile.profileId,
-            type: type,
-            limit: 20,
-            startAfter: lastDoc,
-          )
-          .first;
-
-      if (!mounted) return;
-
-      setState(() {
-        if (newNotifications.length < 20) {
-          _hasMore[key] = false;
-        }
-        _notifications[key] = [...currentNotifications, ...newNotifications];
-        _isLoadingMore[key] = false;
-      });
-
-      debugPrint('📄 Paginação: Carregadas ${newNotifications.length} notificações (tab $tabIndex)');
-    } catch (e) {
-      debugPrint('❌ Erro ao carregar mais notificações: $e');
-      if (!mounted) return;
-      setState(() {
-        _isLoadingMore[key] = false;
-      });
+      ref.read(notificationsControllerProvider(activeProfile.profileId, type: type).notifier).loadMore();
     }
-  }
-
-  @override
-  void dispose() {
-    if (!mounted) return;
-    _tabController.dispose();
-
-    // Remove listeners and dispose scroll controllers
-    // ✅ FIX: Não podemos remover listener inline pois cada tab tem closure diferente
-    // A solução aqui é criar listeners nomeados OU simplesmente dispose (dispose já limpa)
-    for (final entry in _scrollControllers.entries) {
-      // ScrollController.dispose() já remove automaticamente todos os listeners
-      entry.value.dispose();
-    }
-
-    super.dispose();
   }
 
   @override
@@ -206,31 +127,32 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage>
               final profileState = ref.watch(profileProvider);
               final activeProfile = profileState.value?.activeProfile;
               if (activeProfile == null) return const SizedBox.shrink();
-              return StreamBuilder<int>(
-                stream: FirebaseFirestore.instance
-                    .collection('profiles')
-                    .doc(activeProfile.profileId)
-                    .collection('notifications')
-                    .where('read', isEqualTo: false)
-                    .snapshots()
-                    .map((snap) => snap.size),
-                builder: (context, snapshot) {
-                  final count = snapshot.data ?? 0;
-                  final hasUnread = count > 0;
-                  return IconButton(
-                    icon: Icon(
-                      Iconsax.tick_circle,
-                      color: hasUnread
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.5),
-                    ),
+              
+              final unreadCountAsync = ref.watch(unreadNotificationCountForProfileProvider(
+                activeProfile.profileId,
+                activeProfile.uid,
+              ));
+              
+              final count = unreadCountAsync.value ?? 0;
+              final hasUnread = count > 0;
+              
+              return IconButton(
+                icon: Icon(
+                  Iconsax.tick_circle,
+                  color: hasUnread
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.5),
+                ),
                     tooltip: 'Marcar todas como lidas',
                     onPressed: hasUnread
                         ? () async {
                             try {
                               await ref
-                                  .read(notificationServiceProvider)
-                                  .markAllAsRead();
+                                  .read(notificationsRepositoryNewProvider)
+                                  .markAllAsRead(
+                                    profileId: activeProfile.profileId,
+                                    recipientUid: activeProfile.uid,
+                                  );
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
@@ -254,8 +176,6 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage>
                           }
                         : null,
                   );
-                },
-              );
             },
           ),
         ),
@@ -292,96 +212,47 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage>
     final key = 'tab_$tabIndex';
     final controller = _scrollControllers[key];
 
-    return StreamBuilder<List<NotificationEntity>>(
-      stream: ref
-          .read(notificationServiceProvider)
-          .getNotifications(currentProfileId, type: type),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          );
-        }
+    final stateAsync = ref.watch(notificationsControllerProvider(currentProfileId, type: type));
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Iconsax.danger, size: 68, color: Colors.red.shade300),
-                const SizedBox(height: 16),
-                Text(
-                  'Erro ao carregar notificações',
-                  style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  snapshot.error.toString(),
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          );
-        }
-
-        final notifications = snapshot.data ?? [];
-
-        // Atualizar cache de notificações
-          if (notifications.isNotEmpty) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && (_notifications[key]?.isEmpty ?? false)) {
-                setState(() {
-                  _notifications[key] = notifications;
-                });
-              }
-            });
-        }
-
-        if (notifications.isEmpty) {
+    return stateAsync.when(
+      loading: () => ListView.builder(
+        itemCount: 10,
+        itemBuilder: (context, index) => const NotificationSkeletonTile(),
+      ),
+      error: (error, stack) {
+        debugPrint('NotificationsPage: Erro no controller: $error');
+        return NotificationErrorState(
+          message: 'Não foi possível carregar suas notificações. Verifique sua conexão e tente novamente.',
+          onRetry: () {
+            ref.invalidate(notificationsControllerProvider(currentProfileId, type: type));
+          },
+        );
+      },
+      data: (state) {
+        if (state.notifications.isEmpty) {
           return _buildEmptyState(type);
         }
 
-        // Usar notificações do cache se houver paginação ativa
-          final displayNotifications = (_notifications[key]?.isNotEmpty ?? false)
-            ? _notifications[key]!
-            : notifications;
-
         return RefreshIndicator(
           onRefresh: () async {
-            await _handleRefresh(currentProfileId, type);
-
-            final refreshController = controller;
-            if (refreshController != null) {
-              try {
-                await refreshController.animateTo(
-                  0,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
-              } catch (_) {}
-            }
+            await ref.read(notificationsControllerProvider(currentProfileId, type: type).notifier).refresh();
           },
           color: AppColors.primary,
           child: ListView.builder(
             controller: controller,
             physics: const AlwaysScrollableScrollPhysics(),
-              itemCount:
-                  displayNotifications.length + ((_isLoadingMore[key] ?? false) ? 1 : 0),
+            itemCount: state.notifications.length + (state.isLoadingMore ? 1 : 0),
             itemBuilder: (context, index) {
-            // Loading indicator no final
-            if (index == displayNotifications.length) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-              );
-            }
-            
-            // ⚡ PERFORMANCE: Widget extraído para melhor manutenibilidade
-            return NotificationItem(notification: displayNotifications[index]);
-          },
+              if (index == state.notifications.length) {
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  ),
+                );
+              }
+              return NotificationItem(notification: state.notifications[index]);
+            },
           ),
         );
       },
@@ -390,49 +261,28 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage>
 
   Widget _buildEmptyState(NotificationType? type) {
     if (type == NotificationType.interest) {
-      return EmptyState(
+      return const EmptyState(
         icon: Iconsax.heart,
         title: 'Nenhum interesse ainda',
         subtitle:
             'Quando alguém demonstrar interesse em seus posts, você será notificado aqui.',
-        actionLabel: 'Criar novo post',
-        onActionPressed: () => showPostModal(context, 'musician'),
       );
     }
 
     if (type == NotificationType.newMessage) {
-      return EmptyState(
+      return const EmptyState(
         icon: Iconsax.message,
         title: 'Nenhuma mensagem nova',
         subtitle:
-            'Você ainda não recebeu mensagens. Inicie uma conversa para começar a trocar ideias!',
-        actionLabel: 'Iniciar nova conversa',
-        onActionPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => Scaffold(
-                appBar: AppBar(title: const Text('Nova Conversa')),
-                body: const Center(child: Text('Em desenvolvimento')),
-              ),
-            ),
-          );
-        },
+            'Você ainda não recebeu mensagens.',
       );
     }
 
-    return EmptyState(
+    return const EmptyState(
       icon: Iconsax.notification,
       title: 'Nenhuma notificação',
       subtitle:
-          'Ative as notificações para não perder novidades e oportunidades.',
-      actionLabel: 'Ativar notificações',
-      onActionPressed: () {
-        // Aqui pode abrir configurações ou mostrar instrução
-        AppSnackBar.showInfo(
-          context,
-          'Ajuste as permissões de notificação nas configurações do sistema.',
-        );
-      },
+          'Você ainda não tem notificações.',
     );
   }
 }

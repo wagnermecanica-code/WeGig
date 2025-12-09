@@ -5,6 +5,8 @@ abstract class NotificationsRepository {
   /// Busca todas as notificações de um perfil
   Future<List<NotificationEntity>> getNotifications({
     required String profileId,
+    String? recipientUid,
+    NotificationType? type,
     int limit = 50,
     NotificationEntity? startAfter,
   });
@@ -21,6 +23,7 @@ abstract class NotificationsRepository {
   /// Marca todas as notificações como lidas
   Future<void> markAllAsRead({
     required String profileId,
+    String? recipientUid,
   });
 
   /// Deleta uma notificação
@@ -36,16 +39,19 @@ abstract class NotificationsRepository {
   /// Conta notificações não lidas
   Future<int> getUnreadCount({
     required String profileId,
+    String? recipientUid,
   });
 
   /// Stream de notificações em tempo real
   Stream<List<NotificationEntity>> watchNotifications({
     required String profileId,
+    String? recipientUid,
     int limit = 50,
   });
 
   /// Stream de contador de não lidas em tempo real
   Stream<int> watchUnreadCount({
     required String profileId,
+    String? recipientUid,
   });
 }

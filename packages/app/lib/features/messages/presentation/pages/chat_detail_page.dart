@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:core_ui/core_ui.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -19,6 +20,8 @@ import 'package:linkify/linkify.dart';
 import 'package:path/path.dart' as path;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/features/messages/presentation/controllers/chat_controller.dart';
+import 'package:core_ui/features/messages/domain/entities/message_entity.dart';
 import 'package:wegig_app/features/messages/presentation/providers/messages_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/messages/utils/mention_linkifier.dart';
@@ -79,20 +82,11 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-      _messagesSubscription;
-  List<Map<String, dynamic>> _messages = [];
-  bool _isLoading = true;
+  
   bool _isUploading = false;
-  Map<String, dynamic>? _replyingTo;
+  MessageEntity? _replyingTo;
   ProfileEntity? _activeProfile;
   ProviderSubscription<ProfileEntity?>? _activeProfileSubscription;
-
-  // Pagination state
-  DocumentSnapshot? _lastMessageDoc;
-  bool _hasMoreMessages = true;
-  final int _messagesPerPage = 20;
-  bool _isLoadingMore = false;
 
   // Paleta de cores Airbnb-style
   static const Color _primaryColor = AppColors.primary;
@@ -106,7 +100,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     if (_scrollController.hasClients) {
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent * 0.9) {
-        _loadMoreMessages();
+        ref.read(chatControllerProvider(widget.conversationId).notifier).loadMore();
       }
     }
   }
@@ -136,8 +130,6 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       }
     });
 
-    _loadMessages();
-
     if (_activeProfile?.profileId != null) {
       _markConversationAsRead(profileIdOverride: _activeProfile!.profileId);
     }
@@ -148,10 +140,6 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
 
   @override
   void dispose() {
-    // ✅ FIX: Cancelar subscription primeiro para evitar setState após dispose
-    _messagesSubscription?.cancel();
-    _messagesSubscription = null;
-
     // ✅ FIX: Remover scroll listener antes de dispose (usa mesma referência)
     _scrollController.removeListener(_onScroll);
     _activeProfileSubscription?.close();
@@ -160,122 +148,6 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     _scrollController.dispose();
     _messageFocusNode.dispose();
     super.dispose();
-  }
-
-  /// Carrega mensagens em tempo real com paginação
-  void _loadMessages() {
-    _messagesSubscription = FirebaseFirestore.instance
-        .collection('conversations')
-        .doc(widget.conversationId)
-        .collection('messages')
-        .orderBy('timestamp', descending: true)
-        .limit(_messagesPerPage)
-        .snapshots()
-        .listen((snapshot) {
-      final messages = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return <String, dynamic>{
-          'messageId': doc.id,
-          'senderId': data['senderId'] ?? '',
-          'senderProfileId': data['senderProfileId'] ??
-              data['senderId'] ??
-              '', // Fallback para mensagens antigas
-          'text': data['text'] ?? '',
-          'imageUrl': data['imageUrl'] ?? '',
-          'replyTo': data['replyTo'],
-            'reactions':
-              (data['reactions'] as Map?)?.cast<String, dynamic>() ??
-                <String, dynamic>{},
-          'timestamp': data['timestamp'] as Timestamp?,
-          'read': data['read'] ?? false,
-        };
-      }).toList();
-
-      if (mounted) {
-        setState(() {
-          _messages = messages;
-          _isLoading = false;
-          if (snapshot.docs.isNotEmpty) {
-            _lastMessageDoc = snapshot.docs.last;
-          }
-        });
-
-        // Auto-scroll para o final quando novas mensagens chegam
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              0,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-      }
-    });
-  }
-
-  /// Carrega mais mensagens antigas (paginação)
-  Future<void> _loadMoreMessages() async {
-    if (_isLoadingMore || !_hasMoreMessages || _lastMessageDoc == null) {
-      return;
-    }
-
-    if (!mounted) return;
-    setState(() => _isLoadingMore = true);
-
-    try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('conversations')
-          .doc(widget.conversationId)
-          .collection('messages')
-          .orderBy('timestamp', descending: true)
-          .startAfterDocument(_lastMessageDoc!)
-          .limit(_messagesPerPage)
-          .get();
-
-      if (querySnapshot.docs.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _hasMoreMessages = false;
-            _isLoadingMore = false;
-          });
-        }
-        return;
-      }
-
-      final newMessages = querySnapshot.docs.map((doc) {
-        final data = doc.data();
-        return <String, dynamic>{
-          'messageId': doc.id,
-          'senderId': data['senderId'] ?? '',
-          'senderProfileId': data['senderProfileId'] ?? data['senderId'] ?? '',
-          'text': data['text'] ?? '',
-          'imageUrl': data['imageUrl'] ?? '',
-          'replyTo': data['replyTo'],
-            'reactions':
-              (data['reactions'] as Map?)?.cast<String, dynamic>() ??
-                <String, dynamic>{},
-          'timestamp': data['timestamp'] as Timestamp?,
-          'read': data['read'] ?? false,
-        };
-      }).toList();
-
-      if (mounted) {
-        setState(() {
-          _messages.addAll(newMessages);
-          _lastMessageDoc = querySnapshot.docs.last;
-          _isLoadingMore = false;
-          if (querySnapshot.docs.length < _messagesPerPage) {
-            _hasMoreMessages = false;
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('Erro ao carregar mais mensagens: $e');
-      if (mounted) {
-        setState(() => _isLoadingMore = false);
-      }
-    }
   }
 
   /// Marca conversa como lida usando o MessageService
@@ -323,7 +195,16 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
       return;
     }
 
-    final replyTo = _replyingTo;
+    final replyToMessage = _replyingTo;
+    MessageReplyEntity? replyTo;
+    if (replyToMessage != null) {
+      replyTo = MessageReplyEntity(
+        messageId: replyToMessage.messageId,
+        text: replyToMessage.text,
+        senderId: replyToMessage.senderId,
+      );
+    }
+
     if (!mounted) return;
     setState(() {
       _messageController.clear();
@@ -331,50 +212,12 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     });
 
     try {
-      final messageData = <String, dynamic>{
-        'senderId': currentUser.uid,
-        'senderProfileId': currentProfileId,
-        'profileUid': currentUser.uid,
-        'text': text,
-        'timestamp': FieldValue.serverTimestamp(),
-        'read': false,
-        'reactions': <String, dynamic>{},
-      };
-
-      if (replyTo != null) {
-        messageData['replyTo'] = <String, dynamic>{
-          'messageId': replyTo['messageId'],
-          'text': replyTo['text'],
-          'senderId': replyTo['senderId'],
-        };
-      }
-
-      await FirebaseFirestore.instance
-          .collection('conversations')
-          .doc(widget.conversationId)
-          .collection('messages')
-          .add(messageData);
-
-      await FirebaseFirestore.instance
-          .collection('conversations')
-          .doc(widget.conversationId)
-          .update({
-        'lastMessage': text,
-        'lastMessageTimestamp': FieldValue.serverTimestamp(),
-      });
-
-      // Atualiza unreadCount do destinatário de forma segura
-      await FirebaseFirestore.instance
-          .collection('conversations')
-          .doc(widget.conversationId)
-          .set({
-        'unreadCount': {
-          widget.otherProfileId: FieldValue.increment(1),
-        },
-      }, SetOptions(merge: true));
-
-      // Notificação de nova mensagem é enviada automaticamente pela Cloud Function sendMessageNotification
-      // Ver: functions/index.js - onCreate messages/{conversationId}/messages/{messageId}
+      await ref.read(chatControllerProvider(widget.conversationId).notifier).sendMessage(
+        text,
+        currentUser.uid,
+        currentProfileId,
+        replyTo: replyTo,
+      );
 
       // Mantém o foco no input
       _messageFocusNode.requestFocus();
@@ -509,14 +352,11 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     if (currentUser == null) return;
 
     try {
-      await FirebaseFirestore.instance
-          .collection('conversations')
-          .doc(widget.conversationId)
-          .collection('messages')
-          .doc(messageId)
-          .update({
-        'reactions.${currentUser.uid}': emoji,
-      });
+      await ref.read(chatControllerProvider(widget.conversationId).notifier).addReaction(
+        messageId,
+        currentUser.uid,
+        emoji,
+      );
     } catch (e) {
       debugPrint('Erro ao adicionar reação: $e');
     }
@@ -528,14 +368,10 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
     if (currentUser == null) return;
 
     try {
-      await FirebaseFirestore.instance
-          .collection('conversations')
-          .doc(widget.conversationId)
-          .collection('messages')
-          .doc(messageId)
-          .update({
-        'reactions.${currentUser.uid}': FieldValue.delete(),
-      });
+      await ref.read(chatControllerProvider(widget.conversationId).notifier).removeReaction(
+        messageId,
+        currentUser.uid,
+      );
     } catch (e) {
       debugPrint('Erro ao remover reação: $e');
     }
@@ -559,12 +395,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   /// Deleta uma mensagem
   Future<void> _deleteMessage(String messageId) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('conversations')
-          .doc(widget.conversationId)
-          .collection('messages')
-          .doc(messageId)
-          .delete();
+      await ref.read(chatControllerProvider(widget.conversationId).notifier).deleteMessage(messageId);
 
       if (mounted) {
         AppSnackBar.showSuccess(context, 'Mensagem deletada', duration: const Duration(seconds: 1));
@@ -576,6 +407,8 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final chatState = ref.watch(chatControllerProvider(widget.conversationId));
+
     return Scaffold(
       backgroundColor: _backgroundColor,
       appBar: _buildAppBar(),
@@ -583,52 +416,56 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
         children: [
           // Lista de mensagens
           Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-                    ),
-                  )
-                : _messages.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Iconsax.message,
-                              size: 64,
-                              color: Colors.grey.shade400,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Nenhuma mensagem ainda',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Comece a conversa!',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
+            child: chatState.when(
+              data: (messages) {
+                if (messages.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Iconsax.message,
+                          size: 64,
+                          color: Colors.grey.shade400,
                         ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        reverse: true,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) {
-                          final message = _messages[index];
-                          return _buildMessageBubble(message);
-                        },
-                      ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Nenhuma mensagem ainda',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Comece a conversa!',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  controller: _scrollController,
+                  reverse: true,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final message = messages[index];
+                    return _buildMessageBubble(message);
+                  },
+                );
+              },
+              loading: () => const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+                ),
+              ),
+              error: (error, stack) => Center(child: Text('Erro: $error')),
+            ),
           ),
 
           // Input de mensagem
@@ -743,24 +580,21 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   }
 
   /// Bolha de mensagem individual (estilo Instagram Direct)
-  Widget _buildMessageBubble(Map<String, dynamic> message) {
+  Widget _buildMessageBubble(MessageEntity message) {
     final currentUser = FirebaseAuth.instance.currentUser;
     final myProfileId = _activeProfile?.profileId;
     final isMyMessage =
-      myProfileId != null && message['senderProfileId'] == myProfileId;
-    final timestamp = message['timestamp'] as Timestamp?;
-    final imageUrl = (message['imageUrl'] as String?) ?? '';
-    final replyTo = message['replyTo'] as Map<String, dynamic>?;
-    final reactions =
-        (message['reactions'] as Map?)?.cast<String, String>() ?? {};
-    final messageId = (message['messageId'] as String?) ?? '';
+      myProfileId != null && message.senderProfileId == myProfileId;
+    final timestamp = message.timestamp;
+    final imageUrl = message.imageUrl ?? '';
+    final replyTo = message.replyTo;
+    final reactions = message.reactions;
+    final messageId = message.messageId;
 
     var timeString = '';
-    if (timestamp != null) {
-      final date = timestamp.toDate();
-      timeString =
-          '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    }
+    final date = timestamp;
+    timeString =
+        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
 
     return GestureDetector(
       onLongPress: () {
@@ -848,7 +682,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        replyTo['senderProfileId'] ==
+                                        replyTo?.senderProfileId ==
                                                 myProfileId
                                             ? 'Você'
                                             : widget.otherUserName,
@@ -861,7 +695,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                                         ),
                                       ),
                                       Text(
-                                        (replyTo['text'] as String?) ?? '',
+                                        replyTo?.text ?? '',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: isMyMessage
@@ -884,6 +718,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: CachedNetworkImage(
+                              cacheManager: WeGigImageCacheManager.instance,
                               imageUrl: imageUrl,
                               fit: BoxFit.cover,
                               placeholder: (context, url) => Container(
@@ -910,7 +745,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                           ),
 
                         // Texto da mensagem
-                        if (message['text'].toString().isNotEmpty)
+                        if ((message.text ?? '').toString().isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -945,7 +780,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                                   }
                                 }
                               },
-                              text: (message['text'] as String?) ?? '',
+                              text: message.text ?? '',
                               style: TextStyle(
                                 fontSize: 15,
                                 color:
@@ -1027,11 +862,11 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
   }
 
   /// Mostra opções ao segurar mensagem (estilo Instagram)
-  void _showMessageOptions(Map<String, dynamic> message) {
+  void _showMessageOptions(MessageEntity message) {
     final myProfileId = _activeProfile?.profileId;
     final isMyMessage =
-      myProfileId != null && message['senderProfileId'] == myProfileId;
-    final messageId = (message['messageId'] as String?) ?? '';
+      myProfileId != null && message.senderProfileId == myProfileId;
+    final messageId = message.messageId;
 
     showModalBottomSheet<void>(
       context: context,
@@ -1096,13 +931,13 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
             ),
 
             // Copiar
-            if (message['text'].toString().isNotEmpty)
+            if ((message.text ?? '').toString().isNotEmpty)
               ListTile(
                 leading: const Icon(Iconsax.copy),
                 title: const Text('Copiar'),
                 onTap: () {
                   Navigator.pop(context);
-                  _copyMessage((message['text'] as String?) ?? '');
+                  _copyMessage(message.text ?? '');
                 },
               ),
 
@@ -1184,9 +1019,10 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Respondendo para ${_replyingTo!['senderProfileId'] == _activeProfile?.profileId ? 'você mesmo' : widget.otherUserName}',
+                          'Respondendo para ${_replyingTo!.senderProfileId == _activeProfile?.profileId ? 'você mesmo' : widget.otherUserName}',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -1195,7 +1031,7 @@ class _ChatDetailPageState extends ConsumerState<ChatDetailPage> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          (_replyingTo!['text'] as String?) ?? '📷 Foto',
+                          _replyingTo!.text.isNotEmpty ? _replyingTo!.text : '📷 Foto',
                           style: const TextStyle(
                             fontSize: 13,
                             color: Colors.black54,

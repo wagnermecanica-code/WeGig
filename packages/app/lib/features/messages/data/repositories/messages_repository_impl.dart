@@ -110,6 +110,14 @@ class MessagesRepositoryImpl implements MessagesRepository {
   }
 
   @override
+  Stream<List<MessageEntity>> watchMessages(
+    String conversationId, {
+    int limit = 20,
+  }) {
+    return _remoteDataSource.watchMessages(conversationId);
+  }
+
+  @override
   Future<MessageEntity> sendImageMessage({
     required String conversationId,
     required String senderId,
@@ -130,6 +138,48 @@ class MessagesRepositoryImpl implements MessagesRepository {
       );
     } catch (e) {
       debugPrint('❌ MessagesRepository: Erro em sendImageMessage - $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> addReaction({
+    required String conversationId,
+    required String messageId,
+    required String userId,
+    required String reaction,
+  }) async {
+    try {
+      await _remoteDataSource.addReaction(conversationId, messageId, userId, reaction);
+    } catch (e) {
+      debugPrint('❌ MessagesRepository: Erro em addReaction - $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> removeReaction({
+    required String conversationId,
+    required String messageId,
+    required String userId,
+  }) async {
+    try {
+      await _remoteDataSource.removeReaction(conversationId, messageId, userId);
+    } catch (e) {
+      debugPrint('❌ MessagesRepository: Erro em removeReaction - $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> deleteMessage({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    try {
+      await _remoteDataSource.deleteMessage(conversationId, messageId);
+    } catch (e) {
+      debugPrint('❌ MessagesRepository: Erro em deleteMessage - $e');
       rethrow;
     }
   }
@@ -192,16 +242,12 @@ class MessagesRepositoryImpl implements MessagesRepository {
 
   @override
   Stream<List<ConversationEntity>> watchConversations(String profileId,
-      {String? profileUid}) {
+      {String? profileUid, int limit = 20}) {
     return _remoteDataSource.watchConversations(
       profileId,
       profileUid: profileUid,
+      limit: limit,
     );
-  }
-
-  @override
-  Stream<List<MessageEntity>> watchMessages(String conversationId) {
-    return _remoteDataSource.watchMessages(conversationId);
   }
 
   @override

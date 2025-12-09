@@ -567,6 +567,33 @@ exports.sendMessageNotification = functions
       return null;
     }
 
+    // ✅ FIX: Buscar UID do destinatário para permissões (Security Rules)
+    const recipientProfileDoc = await db
+      .collection("profiles")
+      .doc(recipientProfileId)
+      .get();
+    const recipientUid = recipientProfileDoc.exists
+      ? recipientProfileDoc.data().uid
+      : null;
+
+    if (!recipientUid) {
+      console.log(`⚠️ UID não encontrado para perfil ${recipientProfileId}`);
+      return null;
+    }
+
+    // ✅ FIX: Incrementar contador de mensagens não lidas
+    try {
+      await db
+        .collection("conversations")
+        .doc(conversationId)
+        .update({
+          [`unreadCount.${recipientProfileId}`]:
+            admin.firestore.FieldValue.increment(1),
+        });
+    } catch (error) {
+      console.error(`Erro ao atualizar unreadCount: ${error}`);
+    }
+
     // Verificar se já existe notificação não lida desta conversa (agregação)
     const existingNotifications = await db
       .collection("notifications")
@@ -592,7 +619,7 @@ exports.sendMessageNotification = functions
       // Criar nova notificação
       await db.collection("notifications").add({
         recipientProfileId: recipientProfileId,
-        profileUid: recipientProfileId, // CRITICAL: Isolamento de perfil
+        recipientUid: recipientUid, // ✅ FIX: Auth UID para Security Rules
         type: "newMessage",
         priority: "high",
         title: "Nova mensagem",

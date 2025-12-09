@@ -25,6 +25,7 @@ match /posts/{postId} {
 ```
 
 **Campos importantes (PostEntity):**
+
 - `authorUid` - UID do usuário autenticado (dono do perfil)
 - `authorProfileId` - ID do perfil que criou o post
 
