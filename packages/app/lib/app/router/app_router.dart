@@ -15,6 +15,7 @@ import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/settings/presentation/pages/settings_page.dart';
+import 'package:wegig_app/features/notifications_new/presentation/pages/notifications_new_page.dart';
 
 part 'app_router.g.dart';
 
@@ -50,6 +51,9 @@ class AppRoutes {
 
   /// Edit profile route template
   static String editProfile(String profileId) => '/profile/$profileId/edit';
+
+  /// Notifications new route path
+  static const String notificationsNew = '/notifications-new';
 }
 
 // ============================================
@@ -230,6 +234,13 @@ GoRouter goRouter(Ref ref) {
             ),
           );
         },
+      ),
+      // ✅ NOVA ROTA: Notifications New (substituindo a antiga)
+      GoRoute(
+        path: '/notifications-new',
+        name: 'notificationsNew',
+        pageBuilder: (context, state) =>
+            _slideLeftPage(state, const NotificationsNewPage()),
       ),
       // ✅ NOVA ROTA: Settings com transição Slide
       GoRoute(

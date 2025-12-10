@@ -10,7 +10,7 @@ import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_switcher_provider.dart';
 import 'package:wegig_app/features/profile/presentation/widgets/profile_transition_overlay.dart';
-import 'package:wegig_app/features/notifications/presentation/providers/notifications_providers.dart';
+import 'package:wegig_app/features/notifications_new/presentation/providers/notifications_new_providers.dart';
 import 'package:wegig_app/features/messages/presentation/providers/messages_providers.dart';
 
 /// BottomSheet para alternar entre perfis do usuário
@@ -657,7 +657,7 @@ class _UnifiedBadgeCounter extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Soma de notificações + mensagens
     // ✅ FIX: Passar uid para match com Security Rules
-    final notificationsAsync = ref.watch(unreadNotificationCountForProfileProvider(profileId, uid));
+    final notificationsAsync = ref.watch(unreadNotificationCountNewStreamProvider(profileId, uid));
     final messagesAsync = ref.watch(unreadMessageCountForProfileProvider(profileId, uid));
     
     // Aguardar ambos os providers carregarem

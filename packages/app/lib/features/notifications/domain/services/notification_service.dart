@@ -436,6 +436,21 @@ class NotificationService {
       return;
     }
 
+    // Verificar se já existe notificação de interesse para este post e remetente
+    final existing = await _firestore
+        .collection('notifications')
+        .where('recipientProfileId', isEqualTo: postAuthorProfileId)
+        .where('type', isEqualTo: 'interest')
+        .where('data.postId', isEqualTo: postId)
+        .where('senderProfileId', isEqualTo: activeProfile.profileId)
+        .limit(1)
+        .get();
+
+    if (existing.docs.isNotEmpty) {
+      debugPrint('NotificationService: Notificação de interesse já existe, pulando');
+      return;
+    }
+
     await create(
       recipientProfileId: postAuthorProfileId,
       type: 'interest',

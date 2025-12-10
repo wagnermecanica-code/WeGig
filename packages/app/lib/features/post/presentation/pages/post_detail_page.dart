@@ -17,7 +17,6 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
-import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
 import 'package:wegig_app/features/post/data/models/interest_document.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
@@ -308,6 +307,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         activeProfileUid: activeProfile.uid,
         activeProfileId: activeProfile.profileId,
         activeProfileName: activeProfile.name,
+        activeProfileUsername: activeProfile.username,
         activeProfilePhotoUrl: activeProfile.photoUrl,
       );
 
@@ -323,22 +323,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         });
       }
 
-      // 3. Notificações e Feedback (em background)
-      final distance = _calculateDistance(activeProfile);
-      
-      // Não usamos await aqui para não bloquear a UI, deixamos rodar em paralelo
-      ref.read(notificationServiceProvider).createInterestReceivedNotification(
-            postId: _post!.id,
-            postOwnerProfileId: _post!.authorProfileId,
-            postOwnerUid: _post!.authorUid,
-            interestedProfileId: activeProfile.profileId,
-            interestedUserName: activeProfile.name,
-            interestedUserPhoto: activeProfile.photoUrl ?? '',
-            interestedUserUsername: activeProfile.username,
-            city: _post!.city,
-            distanceKm: distance,
-          ).ignore(); // ignore() para tratar a Future sem await
-
+      // ⚠️ REMOVIDO: Notificação duplicada - a Cloud Function `sendInterestNotification`
+      // já cria a notificação automaticamente via trigger onCreate em interests/{interestId}
       // Aguardar confirmação do Firestore para garantir consistência antes de recarregar lista
       await docRef.get();
       

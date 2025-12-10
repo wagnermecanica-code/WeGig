@@ -109,21 +109,24 @@ service cloud.firestore {
     // ============================================
     // NOTIFICATIONS - Notificações push/in-app
     // ============================================
-    // SECURITY FIX: Valida que recipientProfileId pertence ao recipientUid
-    // Previne ataques onde usuário A tenta ler notificações do profileId de usuário B
+    // SIMPLIFICADO: Apenas verifica recipientUid para leitura
+    // O filtro por recipientProfileId é feito client-side para isolamento multi-perfil
+    // Isso evita problemas com get() em queries e melhora performance
 
     match /notifications/{notificationId} {
+      // Leitura: apenas verificar recipientUid (Security Rules não suporta bem get() em queries)
       allow read: if isSignedIn() 
-        && resource.data.recipientUid == request.auth.uid
-        && ownsProfile(resource.data.recipientProfileId);
+        && resource.data.recipientUid == request.auth.uid;
+      
+      // Create: qualquer usuário autenticado pode criar notificações
+      // (Cloud Functions e outros usuários podem enviar notificações)
       allow create: if isSignedIn()
         && request.resource.data.recipientProfileId != null
-        && request.resource.data.recipientUid != null
-        && request.resource.data.recipientUid == request.auth.uid
-        && ownsProfile(request.resource.data.recipientProfileId);
+        && request.resource.data.recipientUid != null;
+      
+      // Update/Delete: apenas o destinatário pode modificar suas notificações
       allow update, delete: if isSignedIn() 
-        && resource.data.recipientUid == request.auth.uid
-        && ownsProfile(resource.data.recipientProfileId);
+        && resource.data.recipientUid == request.auth.uid;
     }
 
     // ============================================

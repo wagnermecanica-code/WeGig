@@ -8,8 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
-import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
-import 'package:wegig_app/features/notifications/presentation/providers/push_notification_provider.dart';
+import 'package:wegig_app/features/notifications_new/domain/services/notification_service.dart';
+import 'package:wegig_app/features/notifications_new/presentation/providers/push_notification_new_provider.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
@@ -633,7 +633,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!mounted) return;
 
     try {
-      final pushService = ref.read(pushNotificationServiceProvider);
+      final pushService = ref.read(pushNotificationNewServiceProvider);
       final settings = await pushService.requestPermission();
 
       if (!mounted) return;

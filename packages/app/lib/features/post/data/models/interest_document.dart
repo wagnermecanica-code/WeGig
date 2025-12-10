@@ -7,7 +7,7 @@ class InterestDocumentFactory {
   /// 
   /// Estrutura garantida:
   /// - Post info (quem RECEBE): postId, postAuthorUid, postAuthorProfileId
-  /// - Interested user info (quem ENVIA): profileUid, interestedUid, interestedProfileId, interestedProfileName, interestedProfilePhotoUrl
+  /// - Interested user info (quem ENVIA): profileUid, interestedUid, interestedProfileId, interestedProfileName, interestedProfileUsername, interestedProfilePhotoUrl
   /// - Metadata: createdAt, read
   static Map<String, dynamic> create({
     required String postId,
@@ -17,6 +17,7 @@ class InterestDocumentFactory {
     required String activeProfileUid,
     required String activeProfileId,
     required String activeProfileName,
+    String? activeProfileUsername,
     String? activeProfilePhotoUrl,
   }) {
     // Validações
@@ -39,6 +40,7 @@ class InterestDocumentFactory {
       'interestedUid': currentUserUid,           // UID do usuário (compatibilidade/redundância)
       'interestedProfileId': activeProfileId,    // ID do perfil ativo
       'interestedProfileName': activeProfileName, // Nome do perfil
+      'interestedProfileUsername': activeProfileUsername ?? '', // Username do perfil
       'interestedProfilePhotoUrl': activeProfilePhotoUrl ?? '', // Foto (default vazio)
       
       // Metadata

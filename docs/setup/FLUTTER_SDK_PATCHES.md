@@ -15,17 +15,20 @@ Se você reinstalar o Flutter ou mudar de versão, **re-aplique os patches**.
 ## Patch 1: CupertinoDynamicColor.toARGB32()
 
 ### Arquivo
+
 ```
 .fvm/flutter_sdk/packages/flutter/lib/src/cupertino/colors.dart
 ```
 
 ### Problema
+
 ```
 Error: The non-abstract class 'CupertinoDynamicColor' is missing implementations for these members:
  - Color.toARGB32
 ```
 
 ### Solução
+
 Adicione este método no final da classe `CupertinoDynamicColor` (antes do `}`):
 
 ```dart
@@ -34,6 +37,7 @@ Adicione este método no final da classe `CupertinoDynamicColor` (antes do `}`):
 ```
 
 ### Localização Exata
+
 Após o método `withValues()`, aproximadamente linha 1213.
 
 ---
@@ -41,28 +45,34 @@ Após o método `withValues()`, aproximadamente linha 1213.
 ## Patch 2: SemanticsData.elevation
 
 ### Arquivo
+
 ```
 .fvm/flutter_sdk/packages/flutter/lib/src/semantics/semantics.dart
 ```
 
 ### Problema
+
 ```
 Error: No named parameter with the name 'elevation'.
     elevation: data.elevation,
 ```
 
 ### Solução
+
 Substitua:
+
 ```dart
 elevation: data.elevation,
 ```
 
 Por:
+
 ```dart
 elevation: data.elevation ?? 0.0,
 ```
 
 ### Localização Exata
+
 Linha 2920 aproximadamente, dentro do método que cria `SemanticsUpdateBuilder`.
 
 ---
@@ -110,7 +120,7 @@ Para verificar se os patches estão aplicados:
 # Patch 1
 grep -n "toARGB32" .fvm/flutter_sdk/packages/flutter/lib/src/cupertino/colors.dart
 
-# Patch 2  
+# Patch 2
 grep -n "elevation: data.elevation" .fvm/flutter_sdk/packages/flutter/lib/src/semantics/semantics.dart
 ```
 
@@ -120,6 +130,7 @@ grep -n "elevation: data.elevation" .fvm/flutter_sdk/packages/flutter/lib/src/se
 
 O Flutter 3.27.1 foi lançado em dezembro de 2024, mas a API do Dart engine evoluiu.
 Há incompatibilidades entre:
+
 - `dart:ui` Color API (adicionou `toARGB32()` como abstract)
 - Semantics API (removeu parâmetro `elevation` em algumas construções)
 

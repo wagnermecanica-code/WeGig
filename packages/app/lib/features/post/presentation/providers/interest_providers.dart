@@ -92,6 +92,7 @@ class InterestNotifier extends _$InterestNotifier {
         activeProfileUid: activeProfile.uid,
         activeProfileId: activeProfile.profileId,
         activeProfileName: activeProfile.name,
+        activeProfileUsername: activeProfile.username,
         activeProfilePhotoUrl: activeProfile.photoUrl,
       );
 

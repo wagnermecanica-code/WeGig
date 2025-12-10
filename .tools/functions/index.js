@@ -108,10 +108,11 @@ exports.notifyNearbyPosts = functions
     const postId = snap.id;
 
     // Validação: Post deve ter location (GeoPoint)
+    // NOTA: Firebase Admin SDK v12+ usa .latitude/.longitude (sem underscore)
     if (
       !post.location ||
-      !post.location._latitude ||
-      !post.location._longitude
+      (post.location._latitude === undefined &&
+        post.location.latitude === undefined)
     ) {
       console.log(`Post ${postId} ignorado: sem localização válida`);
       return null;
@@ -138,12 +139,17 @@ exports.notifyNearbyPosts = functions
       }
     }
 
-    const postLat = post.location._latitude;
-    const postLng = post.location._longitude;
+    // Firebase Admin SDK v12+ usa .latitude/.longitude (sem underscore)
+    const postLat = post.location.latitude ?? post.location._latitude;
+    const postLng = post.location.longitude ?? post.location._longitude;
     const postCity = post.city || "cidade desconhecida";
     const postType = post.type === "band" ? "banda" : "músico";
     const authorName = post.authorName || "Alguém";
+    const authorUsername = post.authorUsername || "";
     const authorProfileId = post.authorProfileId;
+
+    // Usa username se disponível, senão usa nome (para exibição no body)
+    const displayAuthor = authorUsername || authorName;
 
     console.log(
       `📍 Novo post criado em ${postCity}: ${authorName} (${postType})`
@@ -167,12 +173,13 @@ exports.notifyNearbyPosts = functions
     for (const doc of profilesSnap.docs) {
       const profile = doc.data();
       const profileId = doc.id;
+      const profileUid = profile.uid; // UID do dono do perfil para push notifications
 
       // Filtro 1: Perfil deve ter location
       if (
         !profile.location ||
-        !profile.location._latitude ||
-        !profile.location._longitude
+        (profile.location._latitude === undefined &&
+          profile.location.latitude === undefined)
       ) {
         continue;
       }
@@ -182,8 +189,9 @@ exports.notifyNearbyPosts = functions
         continue;
       }
 
-      const userLat = profile.location._latitude;
-      const userLng = profile.location._longitude;
+      // Firebase Admin SDK v12+ usa .latitude/.longitude (sem underscore)
+      const userLat = profile.location.latitude ?? profile.location._latitude;
+      const userLng = profile.location.longitude ?? profile.location._longitude;
       const radius = profile.notificationRadius || 20; // CAMPO CORRETO
 
       // Cálculo Haversine para distância em km
@@ -209,13 +217,20 @@ exports.notifyNearbyPosts = functions
           )}...): ${distanceStr} km (raio: ${radius} km)`
         );
 
+        // Mensagem personalizada baseada no tipo de post
+        const nearbyBody =
+          post.type === "sales"
+            ? `@${displayAuthor} • anunciou perto de você`
+            : `@${displayAuthor} • postou perto de você`;
+
         notifications.push({
           recipientProfileId: profileId,
+          recipientUid: profileUid, // 🔒 SECURITY: UID do dono do perfil para push
           profileUid: profileId, // CRITICAL: Isolamento de perfil
           type: "nearbyPost",
           priority: "medium",
           title: "Novo post próximo!",
-          body: `${authorName} está procurando ${postType} a ${distanceStr} km de você em ${postCity}`,
+          body: nearbyBody,
           actionType: "viewPost",
           actionData: {
             postId: postId,
@@ -226,6 +241,7 @@ exports.notifyNearbyPosts = functions
             authorProfileId: authorProfileId,
           },
           senderName: authorName,
+          senderUsername: authorUsername, // Username para navegação ao perfil
           senderPhoto: post.authorPhotoUrl || null,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           read: false,
@@ -498,7 +514,31 @@ exports.sendInterestNotification = functions
     const interest = snap.data();
     const postAuthorProfileId = interest.postAuthorProfileId;
     const interestedProfileName = interest.interestedProfileName || "Alguém";
+    const interestedProfileUsername = interest.interestedProfileUsername || "";
     const postId = interest.postId;
+
+    // Buscar dados do post para personalizar mensagem
+    let postType = "unknown";
+    let postCity = "";
+    try {
+      const postDoc = await db.collection("posts").doc(postId).get();
+      if (postDoc.exists) {
+        const postData = postDoc.data();
+        postType = postData.type || "unknown";
+        postCity = postData.city || "";
+      }
+    } catch (err) {
+      console.log(`⚠️ Erro ao buscar post ${postId}:`, err.message);
+    }
+
+    // Usa username se disponível, senão usa nome
+    const displayName = interestedProfileUsername || interestedProfileName;
+
+    // Mensagem personalizada baseada no tipo de post
+    const interestBody =
+      postType === "sales"
+        ? `@${displayName} • salvou seu anúncio`
+        : `@${displayName} • demonstrou interesse no seu post`;
 
     // Rate limiting: 50 interesses por dia por perfil (proteção contra spam)
     const interestedProfileId = interest.interestedProfileId;
@@ -540,14 +580,17 @@ exports.sendInterestNotification = functions
       type: "interest",
       priority: "high",
       title: "Novo interesse!",
-      body: `${interestedProfileName} demonstrou interesse em seu post`,
+      body: interestBody,
       actionType: "viewPost",
       actionData: {
         postId: postId,
         interestedProfileId: interest.interestedProfileId,
         interestedProfileName: interestedProfileName,
+        postType: postType,
+        city: postCity,
       },
       senderName: interestedProfileName,
+      senderUsername: interestedProfileUsername, // Username para navegação ao perfil
       senderPhoto: interest.interestedProfilePhotoUrl || null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       read: false,
@@ -562,12 +605,13 @@ exports.sendInterestNotification = functions
       recipientUid, // 🔒 SECURITY: passar UID para validação
       {
         title: "Novo interesse!",
-        body: `${interestedProfileName} demonstrou interesse em seu post`,
+        body: interestBody,
       },
       {
         type: "interest",
         postId: postId,
         interestedProfileId: interest.interestedProfileId,
+        postType: postType,
       }
     );
 

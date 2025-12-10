@@ -26,7 +26,6 @@ import 'package:wegig_app/features/home/presentation/widgets/feed/interest_servi
 import 'package:wegig_app/features/home/presentation/widgets/map/map_controller.dart';
 import 'package:wegig_app/features/home/presentation/widgets/map/marker_builder.dart';
 import 'package:wegig_app/features/home/presentation/widgets/search/search_service.dart';
-import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
 import 'package:wegig_app/features/post/data/models/interest_document.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
@@ -75,6 +74,10 @@ class _HomePageState extends ConsumerState<HomePage>
   Completer<GoogleMapController>? _mapControllerCompleter;
   List<PostEntity> _cachedPosts = <PostEntity>[];
   bool _isDisposed = false;
+  
+  // PageView Controller para carrossel horizontal
+  late final PageController _pageController;
+  bool _isProgrammaticScroll = false; // Evita loops de sync
   
     ProfileEntity? get _activeProfile =>
       ref.read(profileProvider).value?.activeProfile;
@@ -132,6 +135,7 @@ class _HomePageState extends ConsumerState<HomePage>
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(viewportFraction: 0.88);
     _markerBuilder = MarkerBuilder();
     _initializePage();
     widget.refreshNotifier?.addListener(_onExternalRefresh);
@@ -159,6 +163,7 @@ class _HomePageState extends ConsumerState<HomePage>
     _mapControllerWrapper.dispose();
     _searchDebouncer.dispose(); // ✅ Cancela Timer pendente
     _markerBuilder.dispose();
+    _pageController.dispose(); // ✅ Dispose do PageController
     widget.searchNotifier?.removeListener(_onSearchChanged);
     widget.refreshNotifier?.removeListener(_onExternalRefresh);
     _isDisposed = true;
@@ -300,14 +305,48 @@ class _HomePageState extends ConsumerState<HomePage>
     });
 
     if (_activePostId != null) {
+      // ✅ Anima para a posição do post mantendo o zoom atual (sem zoom in)
       await _mapControllerWrapper.animateToPosition(
         geoPointToLatLng(post.location),
-        15,
+        _mapControllerWrapper.currentZoom,
       );
+      
+      // ✅ Sync: Marcador → Card - anima o PageView para o card correspondente
+      final postIndex = _visiblePosts.indexWhere((p) => p.id == post.id);
+      if (postIndex != -1 && _pageController.hasClients) {
+        _isProgrammaticScroll = true;
+        await _pageController.animateToPage(
+          postIndex,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOut,
+        );
+        _isProgrammaticScroll = false;
+      }
     }
 
     // Reconstrói marcadores com novo estado ativo
     await _rebuildMarkers(force: true);
+  }
+  
+  /// ✅ Sync: Card → Marcador - chamado quando o PageView muda de página
+  void _onPageChanged(int index) {
+    if (_isProgrammaticScroll || !mounted) return;
+    if (index < 0 || index >= _visiblePosts.length) return;
+    
+    final post = _visiblePosts[index];
+    
+    setState(() {
+      _activePostId = post.id;
+    });
+    
+    // ✅ Anima o mapa para a posição do post mantendo o zoom atual
+    _mapControllerWrapper.animateToPosition(
+      geoPointToLatLng(post.location),
+      _mapControllerWrapper.currentZoom,
+    );
+    
+    // Reconstrói marcadores com novo estado ativo
+    _rebuildMarkers(force: true);
   }
 
   void _closeCard() {
@@ -483,6 +522,7 @@ class _HomePageState extends ConsumerState<HomePage>
       activeProfileUid: activeProfile.uid,
       activeProfileId: activeProfile.profileId,
       activeProfileName: activeProfile.name,
+      activeProfileUsername: activeProfile.username,
       activeProfilePhotoUrl: activeProfile.photoUrl,
     );
 
@@ -490,21 +530,8 @@ class _HomePageState extends ConsumerState<HomePage>
 
     debugPrint('✅ Documento de interesse criado com sucesso');
 
-    final distance = _calculateDistanceToPost(post, activeProfile);
-
-    await ref.read(notificationServiceProvider).createInterestReceivedNotification(
-          postId: post.id,
-          postOwnerProfileId: post.authorProfileId,
-          postOwnerUid: authorUid, // ✅ Usar authorUid validado
-          interestedProfileId: activeProfile.profileId,
-          interestedUserName: activeProfile.name,
-          interestedUserPhoto: activeProfile.photoUrl ?? '',
-          interestedUserUsername: activeProfile.username,
-          city: post.city,
-          distanceKm: distance,
-        );
-    
-    debugPrint('✅ Notificação in-app criada com sucesso');
+    // ⚠️ REMOVIDO: Notificação duplicada - a Cloud Function `sendInterestNotification`
+    // já cria a notificação automaticamente via trigger onCreate em interests/{interestId}
   }
 
   double? _calculateDistanceToPost(PostEntity post, ProfileEntity profile) {
@@ -549,29 +576,16 @@ class _HomePageState extends ConsumerState<HomePage>
     
     try {
       // ✅ Chamar provider global (Optimistic Update já incluído)
+      // A Cloud Function `sendInterestNotification` cria a notificação automaticamente
+      // quando o documento é adicionado na collection `interests`
       await interestNotifier.addInterest(
         postId: post.id,
         postAuthorUid: post.authorUid,
         postAuthorProfileId: post.authorProfileId,
       );
 
-      // ✅ Criar notificação in-app
-      final activeProfile = _activeProfile;
-      if (activeProfile != null) {
-        final distance = _calculateDistanceToPost(post, activeProfile);
-        
-        await ref.read(notificationServiceProvider).createInterestReceivedNotification(
-          postId: post.id,
-          postOwnerProfileId: post.authorProfileId,
-          postOwnerUid: post.authorUid,
-          interestedProfileId: activeProfile.profileId,
-          interestedUserName: activeProfile.name,
-          interestedUserPhoto: activeProfile.photoUrl ?? '',
-          interestedUserUsername: activeProfile.username,
-          city: post.city,
-          distanceKm: distance,
-        );
-      }
+      // ⚠️ REMOVIDO: Notificação duplicada - a Cloud Function já cria a notificação
+      // via trigger onCreate em interests/{interestId}
 
       if (mounted) {
         AppSnackBar.showSuccess(
@@ -1110,8 +1124,8 @@ class _HomePageState extends ConsumerState<HomePage>
                       ),
                     ),
                   ),
-            // Card flutuante (só aparece quando um pin é clicado)
-            if (_activePostId != null) _buildFloatingCard(),
+            // ✅ Carrossel horizontal de cards (sempre visível quando há posts)
+            if (_visiblePosts.isNotEmpty) _buildFloatingCard(),
           ],
         ),
       ),
@@ -1231,7 +1245,23 @@ class _HomePageState extends ConsumerState<HomePage>
         setState(() {
           _visiblePosts = visible;
           _updatePostDistances();
+          // ✅ Auto-seleciona o primeiro post quando a lista muda
+          if (visible.isNotEmpty) {
+            _activePostId = visible.first.id;
+          } else {
+            _activePostId = null;
+          }
         });
+        
+        // ✅ Reseta o PageController para a primeira página
+        if (_pageController.hasClients && visible.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _pageController.hasClients) {
+              _pageController.jumpToPage(0);
+            }
+          });
+        }
+        
         await _rebuildMarkers();
       }
     } catch (e) {
@@ -1241,7 +1271,23 @@ class _HomePageState extends ConsumerState<HomePage>
         setState(() {
           _visiblePosts = allPosts;
           _updatePostDistances();
+          // ✅ Auto-seleciona o primeiro post quando a lista muda
+          if (allPosts.isNotEmpty) {
+            _activePostId = allPosts.first.id;
+          } else {
+            _activePostId = null;
+          }
         });
+        
+        // ✅ Reseta o PageController para a primeira página
+        if (_pageController.hasClients && allPosts.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _pageController.hasClients) {
+              _pageController.jumpToPage(0);
+            }
+          });
+        }
+        
         await _rebuildMarkers();
       }
     }
@@ -1264,26 +1310,38 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Widget _buildFloatingCard() {
-    // Encontrar o post ativo
-    final activePost =
-        _visiblePosts.firstWhereOrNull((p) => p.id == _activePostId);
-
-    if (activePost == null) {
+    // ✅ Carrossel horizontal de cards com PageView
+    if (_visiblePosts.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    // Card flutuante sobre o mapa (sem Positioned)
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
-        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
-        child: PostCard(
-          post: activePost,
-          isActive: true,
-          currentActiveProfileId: _activeProfile?.profileId,
-          isInterestSent: ref.watch(interestNotifierProvider).contains(activePost.id),
-          onOpenOptions: () => _showInterestOptionsDialog(activePost),
-          onClose: _closeCard,
+        padding: const EdgeInsets.only(bottom: 24),
+        child: SizedBox(
+          height: 200, // Altura fixa do card original
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: _visiblePosts.length,
+            onPageChanged: _onPageChanged,
+            itemBuilder: (context, index) {
+              final post = _visiblePosts[index];
+              final isActive = post.id == _activePostId;
+              
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: PostCard(
+                  post: post,
+                  isActive: isActive,
+                  currentActiveProfileId: _activeProfile?.profileId,
+                  isInterestSent: ref.watch(interestNotifierProvider).contains(post.id),
+                  onOpenOptions: () => _showInterestOptionsDialog(post),
+                  onClose: _closeCard,
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

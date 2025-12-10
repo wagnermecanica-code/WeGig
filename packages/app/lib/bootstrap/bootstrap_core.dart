@@ -10,7 +10,7 @@ import 'package:flutter/widgets.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:wegig_app/core/firebase/firebase_cache_config.dart';
 import 'package:wegig_app/core/firebase/firestore_cache_manager.dart';
-import 'package:wegig_app/features/notifications/data/services/push_notification_service.dart';
+import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 import 'package:wegig_app/utils/firebase_context_logger.dart';
 
 typedef BackgroundMessageHandler = Future<void> Function(RemoteMessage message);

@@ -15,16 +15,19 @@ Esta sessão focou em uma auditoria completa da **Notifications Feature** e impl
 ## 🎯 Objetivos Alcançados
 
 ### 1. Auditoria da Notifications Feature
+
 - Análise de 12 parâmetros críticos
 - Identificação de 18 issues (4 críticos, 2 altos, 7 médios, 5 baixos)
 - Criação de plano de 4 sprints com 9 ações priorizadas
 
 ### 2. Sprint 1 - Correções Críticas de Segurança ✅
+
 - **Ação 1.1:** Índice Composto Firestore
 - **Ação 1.2:** Security Rules com validação de ownership
 - **Ação 1.3:** Validação de tokens FCM em Cloud Functions
 
 ### 3. Patches no Flutter SDK 3.27.1
+
 - Correção de `CupertinoDynamicColor.toARGB32()`
 - Correção de `SemanticsData.elevation`
 
@@ -68,7 +71,7 @@ function ownsProfile(profileId) {
 
 // Regras de notificações atualizadas
 match /notifications/{notificationId} {
-  allow read: if isSignedIn() 
+  allow read: if isSignedIn()
     && resource.data.recipientUid == request.auth.uid
     && ownsProfile(resource.data.recipientProfileId);
   allow create: if isSignedIn()
@@ -76,7 +79,7 @@ match /notifications/{notificationId} {
     && request.resource.data.recipientUid != null
     && request.resource.data.recipientUid == request.auth.uid
     && ownsProfile(request.resource.data.recipientProfileId);
-  allow update, delete: if isSignedIn() 
+  allow update, delete: if isSignedIn()
     && resource.data.recipientUid == request.auth.uid
     && ownsProfile(resource.data.recipientProfileId);
 }
@@ -93,14 +96,15 @@ match /notifications/{notificationId} {
 **Alterações:**
 
 1. **Nova função helper `getValidTokensForProfile()`:**
+
 ```javascript
 async function getValidTokensForProfile(profileId, expectedUid) {
   // Valida ownership do perfil
-  const profileDoc = await db.collection('profiles').doc(profileId).get();
+  const profileDoc = await db.collection("profiles").doc(profileId).get();
   if (!profileDoc.exists || profileDoc.data().uid !== expectedUid) {
     return [];
   }
-  
+
   // Filtra tokens não expirados (< 60 dias)
   const SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000;
   // ... implementação completa
@@ -108,9 +112,11 @@ async function getValidTokensForProfile(profileId, expectedUid) {
 ```
 
 2. **Refatoração de `sendPushNotificationsForNearbyPost()`:**
+
    - Usa `getValidTokensForProfile()` para validação
 
 3. **Refatoração de `sendPushToProfile()`:**
+
    - Adicionado parâmetro `recipientUid` para validação
    - Usa `getValidTokensForProfile()` para buscar tokens válidos
 
@@ -131,6 +137,7 @@ async function getValidTokensForProfile(profileId, expectedUid) {
 **Problema:** Classe `CupertinoDynamicColor` não implementava `toARGB32()`.
 
 **Solução:**
+
 ```dart
 @override
 int toARGB32() => _effectiveColor.value;
@@ -141,6 +148,7 @@ int toARGB32() => _effectiveColor.value;
 **Problema:** Parâmetro `elevation` não aceito na API nativa.
 
 **Solução:**
+
 ```dart
 elevation: data.elevation ?? 0.0,  // Adicionado fallback
 ```
@@ -151,28 +159,31 @@ elevation: data.elevation ?? 0.0,  // Adicionado fallback
 
 ## 📊 Métricas de Impacto
 
-| Métrica | Antes | Depois |
-|---------|-------|--------|
-| Aba "Interesses" funcional | ❌ | ✅ |
-| Security Rules com ownership | ❌ | ✅ |
-| Tokens FCM validados | ❌ | ✅ |
-| iOS Build Success | ❌ | ✅ |
+| Métrica                      | Antes | Depois |
+| ---------------------------- | ----- | ------ |
+| Aba "Interesses" funcional   | ❌    | ✅     |
+| Security Rules com ownership | ❌    | ✅     |
+| Tokens FCM validados         | ❌    | ✅     |
+| iOS Build Success            | ❌    | ✅     |
 
 ---
 
 ## 🔍 Auditoria Completa - Issues Identificados
 
 ### 🔴 Críticos (4)
+
 1. ~~Missing Firestore index for type filter~~ ✅ FIXED
 2. ~~Security Rules não validam recipientProfileId ownership~~ ✅ FIXED
 3. ~~Cloud Functions enviam push sem validar token ownership~~ ✅ FIXED
 4. Lógica de navegação duplicada (NotificationItem vs NotificationActionHandler)
 
 ### 🟠 Altos (2)
+
 1. Invalidação de providers inconsistente após troca de perfil
 2. Tokens FCM sem expiração automática ✅ FIXED
 
 ### 🟡 Médios (7)
+
 1. NotificationService não usa Clean Architecture
 2. StreamBuilder sem tratamento de erro adequado
 3. Paginação infinita pode causar memory pressure
@@ -182,6 +193,7 @@ elevation: data.elevation ?? 0.0,  // Adicionado fallback
 7. Analytics de notificações limitado
 
 ### 🟢 Baixos (5)
+
 1. Logs de debug em produção
 2. Documentação incompleta
 3. Testes unitários ausentes
@@ -193,22 +205,26 @@ elevation: data.elevation ?? 0.0,  // Adicionado fallback
 ## 📅 Sprints Planejados
 
 ### Sprint 1: Correções Críticas de Segurança ✅ CONCLUÍDO
+
 - **Duração:** 4-6h
 - **Ações:** 1.1, 1.2, 1.3
 
 ### Sprint 2: Refatoração de Arquitetura (Pendente)
+
 - **Duração:** 6-8h
 - **Ações:**
   - 2.1: Provider invalidation consistente
   - 2.2: Clean Architecture compliance
 
 ### Sprint 3: Testes (Pendente)
+
 - **Duração:** 8-12h
 - **Ações:**
   - 3.1: Unit tests (0% → 70%)
   - 3.2: Widget tests
 
 ### Sprint 4: Acessibilidade (Pendente)
+
 - **Duração:** 4-6h
 - **Ações:**
   - 4.1: Semantics completos
@@ -219,11 +235,13 @@ elevation: data.elevation ?? 0.0,  // Adicionado fallback
 ## ⚠️ Ações Pendentes
 
 1. **Re-deploy Cloud Functions:** Algumas funções falharam no deploy
+
    ```bash
    cd .config && firebase deploy --only functions --project wegig-dev
    ```
 
 2. **Testar no App:**
+
    - Verificar aba "Interesses" carrega sem erros
    - Testar troca de perfil e isolamento de notificações
    - Monitorar logs do Firebase
@@ -239,13 +257,13 @@ elevation: data.elevation ?? 0.0,  // Adicionado fallback
 
 ## 📁 Arquivos Modificados
 
-| Arquivo | Tipo | Status |
-|---------|------|--------|
-| `.config/firestore.indexes.json` | Config | ✅ Deployed |
-| `.config/firestore.rules` | Config | ✅ Deployed |
-| `.tools/functions/index.js` | Backend | ⚠️ Parcial |
-| `.fvm/flutter_sdk/.../colors.dart` | SDK Patch | ✅ Local |
-| `.fvm/flutter_sdk/.../semantics.dart` | SDK Patch | ✅ Local |
+| Arquivo                               | Tipo      | Status      |
+| ------------------------------------- | --------- | ----------- |
+| `.config/firestore.indexes.json`      | Config    | ✅ Deployed |
+| `.config/firestore.rules`             | Config    | ✅ Deployed |
+| `.tools/functions/index.js`           | Backend   | ⚠️ Parcial  |
+| `.fvm/flutter_sdk/.../colors.dart`    | SDK Patch | ✅ Local    |
+| `.fvm/flutter_sdk/.../semantics.dart` | SDK Patch | ✅ Local    |
 
 ---
 
@@ -261,14 +279,18 @@ elevation: data.elevation ?? 0.0,  // Adicionado fallback
 ## 📝 Notas Técnicas
 
 ### Patches do Flutter SDK
+
 Os patches são **locais** e vinculados ao FVM. Se atualizar o Flutter ou reinstalar:
+
 1. Re-aplicar patch em `colors.dart` (adicionar `toARGB32()`)
 2. Re-aplicar patch em `semantics.dart` (fallback `elevation ?? 0.0`)
 
 ### Security Rules com `exists()`
+
 O warning `[W] Invalid function name: exists` é cosmético - as rules funcionam corretamente.
 
 ### Multi-Profile Security
+
 A validação `ownsProfile()` usa `get()` que conta como 1 read adicional por operação.
 Para alto volume, considerar denormalização ou cache.
 

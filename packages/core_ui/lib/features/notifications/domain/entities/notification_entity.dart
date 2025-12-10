@@ -5,7 +5,7 @@ import 'package:core_ui/core/json_converters.dart';
 part 'notification_entity.freezed.dart';
 part 'notification_entity.g.dart';
 
-/// Tipos de notificação suportados (9 tipos)
+/// Tipos de notificação suportados (10 tipos)
 enum NotificationType {
   interest,
   newMessage,
@@ -15,6 +15,7 @@ enum NotificationType {
   interestResponse,
   postUpdated,
   profileView,
+  savedPost,
   system,
 }
 
@@ -245,6 +246,8 @@ class NotificationEntity with _$NotificationEntity {
         return 'update';
       case NotificationType.profileView:
         return 'visibility';
+      case NotificationType.savedPost:
+        return 'bookmark';
       case NotificationType.system:
         return 'info';
     }
@@ -302,6 +305,8 @@ class NotificationEntity with _$NotificationEntity {
         return NotificationType.postUpdated;
       case 'profileView':
         return NotificationType.profileView;
+      case 'savedPost':
+        return NotificationType.savedPost;
       case 'system':
         return NotificationType.system;
       default:

@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:wegig_app/core/cache/image_cache_manager.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
 import 'package:core_ui/models/search_params.dart';
 import 'package:core_ui/theme/app_colors.dart';
@@ -18,10 +18,9 @@ import 'package:wegig_app/features/home/presentation/pages/search_page_new.dart'
 import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
 import 'package:wegig_app/features/messages/presentation/pages/messages_page.dart';
 import 'package:wegig_app/features/messages/presentation/providers/messages_providers.dart';
-import 'package:wegig_app/features/notifications/domain/services/notification_service.dart';
-import 'package:wegig_app/features/notifications/presentation/pages/notifications_page.dart';
-import 'package:wegig_app/features/notifications/presentation/utils/notification_action_handler.dart';
-import 'package:wegig_app/features/notifications/presentation/widgets/notification_location_row.dart';
+import 'package:wegig_app/features/notifications_new/presentation/pages/notifications_new_page.dart';
+import 'package:wegig_app/features/notifications_new/presentation/providers/notifications_new_providers.dart';
+import 'package:wegig_app/features/notifications_new/presentation/utils/notification_new_action_handler.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
@@ -77,7 +76,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
       onOpenSearch: _openSearchPage,
       refreshNotifier: _homeRefreshNotifier,
     ),
-    const NotificationsPage(),
+    const NotificationsNewPage(),
     const SizedBox.shrink(), // Placeholder - abre bottom sheet ao tocar
     const MessagesPage(),
     // ViewProfilePage without userId shows the current authenticated user's profile
@@ -189,86 +188,95 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
 
   /// Ícone de notificações com badge reativo
   Widget _buildNotificationIcon({bool isSelected = false}) {
-    return StreamBuilder<int>(
-      stream: ref.read(notificationServiceProvider).streamUnreadCount(),
-      builder: (context, snapshot) {
-        // Error state
-        if (snapshot.hasError) {
-          return Container(
-            padding: const EdgeInsets.all(4),
-            child: Icon(
-              Iconsax.notification_bing,
+    final profileState = ref.watch(profileProvider);
+    final activeProfile = profileState.value?.activeProfile;
+
+    if (activeProfile == null) {
+      return Container(
+        padding: const EdgeInsets.all(4),
+        child: Icon(
+          Iconsax.notification,
+          size: 26,
+          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+        ),
+      );
+    }
+
+    // Usa o novo provider de notificações
+    final unreadCountAsync = ref.watch(
+      unreadNotificationCountNewStreamProvider(
+        activeProfile.profileId,
+        activeProfile.uid,
+      ),
+    );
+
+    return unreadCountAsync.when(
+      loading: () => Container(
+        padding: const EdgeInsets.all(4),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              Iconsax.notification,
               size: 28,
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
             ),
-          );
-        }
-
-        // Loading state
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            padding: const EdgeInsets.all(4),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(
-                  Iconsax.notification,
-                  size: 28,
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                ),
-                Positioned(
-                  right: -4,
-                  top: -4,
-                  child: SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(strokeWidth: 1.5),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final unreadCount = snapshot.data ?? 0;
-
-        return Container(
-          padding: const EdgeInsets.all(4),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Icon(
-                Iconsax.notification,
-                size: 26,
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            const Positioned(
+              right: -4,
+              top: -4,
+              child: SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 1.5),
               ),
-              if (unreadCount > 0)
-                Positioned(
-                  top: 2,
-                  right: 2,
-                  child: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        unreadCount > 99 ? '99+' : unreadCount.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
+            ),
+          ],
+        ),
+      ),
+      error: (_, __) => Container(
+        padding: const EdgeInsets.all(4),
+        child: Icon(
+          Iconsax.notification_bing,
+          size: 28,
+          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+        ),
+      ),
+      data: (unreadCount) => Container(
+        padding: const EdgeInsets.all(4),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              Iconsax.notification,
+              size: 26,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                top: 2,
+                right: 2,
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      unreadCount > 99 ? '99+' : unreadCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 ),
-            ],
-          ),
-        );
-      },
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -480,7 +488,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   }
 }
 
-/// Modal de notificações rápidas
+/// Modal de notificações rápidas - AGORA USANDO NOVA FEATURE
 class NotificationsModal extends ConsumerStatefulWidget {
   const NotificationsModal({super.key});
 
@@ -525,7 +533,7 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                     // Navigate to full notifications page
                     Navigator.of(context).push<void>(
                       MaterialPageRoute<void>(
-                        builder: (_) => const NotificationsPage(),
+                        builder: (_) => const NotificationsNewPage(),
                       ),
                     );
                   },
@@ -535,49 +543,52 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
             ),
           ),
 
-          // Content
+          // Content - usando novo provider
           Expanded(
             child: Consumer(
               builder: (context, ref, child) {
-                // ✅ FIX: Usar watch() para reatividade ao trocar perfil
                 final profileState = ref.watch(profileProvider);
                 final activeProfile = profileState.value?.activeProfile;
                 if (activeProfile == null) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                // ...existing code for notifications...
-                return StreamBuilder<List<NotificationEntity>>(
-                  // ✅ FIX: Key baseada em profileId para forçar rebuild ao trocar perfil
-                  key: ValueKey('notifications_modal_${activeProfile.profileId}'),
-                  stream: ref.read(notificationServiceProvider).streamActiveProfileNotifications(),
-                  builder: (context, snapshot) {
-                    // ✅ FIX: Mostrar loading apenas no primeiro carregamento
-                    if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    // ✅ FIX: Tratar erros com UI de retry
-                    if (snapshot.hasError) {
-                      debugPrint('NotificationsModal: Erro no stream: ${snapshot.error}');
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Iconsax.warning_2, size: 48, color: Colors.orange.shade300),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Erro ao carregar notificações',
-                              style: TextStyle(color: Colors.grey.shade600),
-                            ),
-                            const SizedBox(height: 8),
-                            TextButton(
-                              onPressed: () => ref.invalidate(notificationServiceProvider),
-                              child: const Text('Tentar novamente'),
-                            ),
-                          ],
+
+                // Usa o novo stream provider
+                final notificationsAsync = ref.watch(
+                  notificationsNewStreamProvider(
+                    activeProfile.profileId,
+                    activeProfile.uid,
+                  ),
+                );
+
+                return notificationsAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (error, _) => Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Iconsax.warning_2,
+                            size: 48, color: Colors.orange.shade300),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Erro ao carregar notificações',
+                          style: TextStyle(color: Colors.grey.shade600),
                         ),
-                      );
-                    }
-                    final notifications = snapshot.data ?? [];
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => ref.invalidate(
+                            notificationsNewStreamProvider(
+                              activeProfile.profileId,
+                              activeProfile.uid,
+                            ),
+                          ),
+                          child: const Text('Tentar novamente'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  data: (notifications) {
                     final recentNotifications = notifications.take(10).toList();
                     if (recentNotifications.isEmpty) {
                       return Center(
@@ -595,20 +606,15 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                         ),
                       );
                     }
-                    return RefreshIndicator(
-                      color: AppColors.primary,
-                      onRefresh: () => _refreshModalNotifications(
-                        activeProfile.profileId,
-                      ),
-                      child: ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        itemCount: recentNotifications.length,
-                        itemBuilder: (context, index) {
-                          return _buildNotificationItem(
-                            recentNotifications[index],
-                          );
-                        },
-                      ),
+                    return ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: recentNotifications.length,
+                      itemBuilder: (context, index) {
+                        return _buildNotificationItem(
+                          recentNotifications[index],
+                          activeProfile.profileId,
+                        );
+                      },
                     );
                   },
                 );
@@ -620,15 +626,10 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
     );
   }
 
-  Future<void> _refreshModalNotifications(String profileId) async {
-    await ref.read(notificationServiceProvider).refreshNotifications(
-          recipientProfileId: profileId,
-        );
-  }
-
-  Widget _buildNotificationItem(NotificationEntity notification) {
+  Widget _buildNotificationItem(
+      NotificationEntity notification, String profileId) {
     return InkWell(
-      onTap: () => _handleNotificationTap(notification),
+      onTap: () => _handleNotificationTap(notification, profileId),
       child: Container(
         color: notification.read ? Colors.white : Colors.blue.shade50,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -664,15 +665,6 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  NotificationLocationRow(
-                    notification: notification,
-                    iconColor: AppColors.primary,
-                    textStyle: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
                   const SizedBox(height: 2),
                   Text(
                     _formatTimeAgo(notification.createdAt),
@@ -707,54 +699,60 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
       case NotificationType.interest:
         icon = Iconsax.heart5;
         color = Colors.pink;
-        break;
       case NotificationType.newMessage:
         icon = Iconsax.message;
         color = Colors.blue;
-        break;
       case NotificationType.postExpiring:
         icon = Iconsax.clock;
         color = Colors.orange;
-        break;
       case NotificationType.nearbyPost:
         icon = Iconsax.location;
         color = Colors.green;
-        break;
       case NotificationType.profileMatch:
         icon = Iconsax.people;
         color = Colors.purple;
-        break;
       case NotificationType.interestResponse:
         icon = Iconsax.arrow_left;
         color = Colors.blue;
-        break;
       case NotificationType.postUpdated:
         icon = Iconsax.edit;
         color = Colors.grey;
-        break;
       case NotificationType.profileView:
         icon = Iconsax.eye;
         color = Colors.purple;
-        break;
+      case NotificationType.savedPost:
+        icon = Iconsax.archive_add;
+        color = Colors.amber;
       case NotificationType.system:
         icon = Iconsax.info_circle;
         color = Colors.teal;
-        break;
     }
 
     return CircleAvatar(
       radius: 20,
-      backgroundColor: color.withOpacity(0.2),
+      backgroundColor: color.withValues(alpha: 0.2),
       child: Icon(icon, size: 20, color: color),
     );
   }
 
-  Future<void> _handleNotificationTap(NotificationEntity notification) async {
+  Future<void> _handleNotificationTap(
+      NotificationEntity notification, String profileId) async {
     // Close modal first
     Navigator.pop(context);
 
-    // ✅ Delegar para handler centralizado
-    final handler = NotificationActionHandler(ref: ref, context: context);
+    // Marcar como lida usando novo provider
+    if (!notification.read) {
+      final useCase = ref.read(markNotificationAsReadNewUseCaseProvider);
+      unawaited(useCase(
+        notificationId: notification.notificationId,
+        profileId: profileId,
+      ));
+    }
+
+    // Navegar usando novo handler
+    if (!context.mounted) return;
+    final handler =
+        NotificationNewActionHandler(ref: ref, context: context);
     await handler.handle(notification);
   }
 

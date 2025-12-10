@@ -188,7 +188,7 @@ final getUnreadNotificationCountUseCaseProvider =
 typedef GetUnreadNotificationCountUseCaseRef
     = AutoDisposeProviderRef<GetUnreadNotificationCount>;
 String _$notificationsStreamHash() =>
-    r'59b27213365a2635f7646af9ac3b99dab0796853';
+    r'db0dabb7a760425dc4f558fcee2e8e7fd6f4eb93';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -213,7 +213,6 @@ class _SystemHash {
 
 /// Stream de notificações em tempo real
 /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
-/// 🔧 REFACTOR: Adiciona logs e cleanup (Sprint 2 - Ação 2.1)
 ///
 /// Copied from [notificationsStream].
 @ProviderFor(notificationsStream)
@@ -221,21 +220,18 @@ const notificationsStreamProvider = NotificationsStreamFamily();
 
 /// Stream de notificações em tempo real
 /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
-/// 🔧 REFACTOR: Adiciona logs e cleanup (Sprint 2 - Ação 2.1)
 ///
 /// Copied from [notificationsStream].
 class NotificationsStreamFamily
     extends Family<AsyncValue<List<NotificationEntity>>> {
   /// Stream de notificações em tempo real
   /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
-  /// 🔧 REFACTOR: Adiciona logs e cleanup (Sprint 2 - Ação 2.1)
   ///
   /// Copied from [notificationsStream].
   const NotificationsStreamFamily();
 
   /// Stream de notificações em tempo real
   /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
-  /// 🔧 REFACTOR: Adiciona logs e cleanup (Sprint 2 - Ação 2.1)
   ///
   /// Copied from [notificationsStream].
   NotificationsStreamProvider call(
@@ -275,14 +271,12 @@ class NotificationsStreamFamily
 
 /// Stream de notificações em tempo real
 /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
-/// 🔧 REFACTOR: Adiciona logs e cleanup (Sprint 2 - Ação 2.1)
 ///
 /// Copied from [notificationsStream].
 class NotificationsStreamProvider
     extends AutoDisposeStreamProvider<List<NotificationEntity>> {
   /// Stream de notificações em tempo real
   /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
-  /// 🔧 REFACTOR: Adiciona logs e cleanup (Sprint 2 - Ação 2.1)
   ///
   /// Copied from [notificationsStream].
   NotificationsStreamProvider(
@@ -387,11 +381,10 @@ class _NotificationsStreamProviderElement
 }
 
 String _$unreadNotificationCountForProfileHash() =>
-    r'6bc76335e7ece6ea2413cf671adb320d4725ac91';
+    r'0a864b5f06c6754e6c8047935b55d723957b587c';
 
 /// Stream de contador de não lidas para BottomNav badge
 /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
-/// 🔧 REFACTOR: Adiciona logs e cleanup (Sprint 2 - Ação 2.1)
 ///
 /// Copied from [unreadNotificationCountForProfile].
 @ProviderFor(unreadNotificationCountForProfile)
@@ -400,20 +393,17 @@ const unreadNotificationCountForProfileProvider =
 
 /// Stream de contador de não lidas para BottomNav badge
 /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
-/// 🔧 REFACTOR: Adiciona logs e cleanup (Sprint 2 - Ação 2.1)
 ///
 /// Copied from [unreadNotificationCountForProfile].
 class UnreadNotificationCountForProfileFamily extends Family<AsyncValue<int>> {
   /// Stream de contador de não lidas para BottomNav badge
   /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
-  /// 🔧 REFACTOR: Adiciona logs e cleanup (Sprint 2 - Ação 2.1)
   ///
   /// Copied from [unreadNotificationCountForProfile].
   const UnreadNotificationCountForProfileFamily();
 
   /// Stream de contador de não lidas para BottomNav badge
   /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
-  /// 🔧 REFACTOR: Adiciona logs e cleanup (Sprint 2 - Ação 2.1)
   ///
   /// Copied from [unreadNotificationCountForProfile].
   UnreadNotificationCountForProfileProvider call(
@@ -453,14 +443,12 @@ class UnreadNotificationCountForProfileFamily extends Family<AsyncValue<int>> {
 
 /// Stream de contador de não lidas para BottomNav badge
 /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
-/// 🔧 REFACTOR: Adiciona logs e cleanup (Sprint 2 - Ação 2.1)
 ///
 /// Copied from [unreadNotificationCountForProfile].
 class UnreadNotificationCountForProfileProvider
     extends AutoDisposeStreamProvider<int> {
   /// Stream de contador de não lidas para BottomNav badge
   /// ✅ FIX: Agora requer recipientUid (UID) para match com Security Rules
-  /// 🔧 REFACTOR: Adiciona logs e cleanup (Sprint 2 - Ação 2.1)
   ///
   /// Copied from [unreadNotificationCountForProfile].
   UnreadNotificationCountForProfileProvider(
