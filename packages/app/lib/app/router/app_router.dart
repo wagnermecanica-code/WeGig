@@ -3,13 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../navigation/bottom_nav_scaffold.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:wegig_app/features/auth/presentation/pages/auth_page.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
-import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_detail_page.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
@@ -45,9 +46,13 @@ class AppRoutes {
   /// Post detail route template
   static String postDetail(String postId) => '/post/$postId';
 
-  /// Conversation/chat route template
+  /// Conversation/chat route template (legacy - ChatDetailPage)
   static String conversation(String conversationId) =>
       '/conversation/$conversationId';
+
+  /// Chat new route template (MensagensNew feature)
+  static String chatNew(String conversationId) =>
+      '/chat-new/$conversationId';
 
   /// Edit profile route template
   static String editProfile(String profileId) => '/profile/$profileId/edit';
@@ -203,7 +208,10 @@ GoRouter goRouter(Ref ref) {
         name: 'profile',
         pageBuilder: (context, state) {
           final profileId = state.pathParameters['profileId']!;
-          return _fadePage(state, ViewProfilePage(profileId: profileId));
+          return CupertinoPage<void>(
+            key: state.pageKey,
+            child: ViewProfilePage(profileId: profileId),
+          );
         },
       ),
       GoRoute(
@@ -211,7 +219,10 @@ GoRouter goRouter(Ref ref) {
         name: 'postDetail',
         pageBuilder: (context, state) {
           final postId = state.pathParameters['postId']!;
-          return _fadePage(state, PostDetailPage(postId: postId));
+          return CupertinoPage<void>(
+            key: state.pageKey,
+            child: PostDetailPage(postId: postId),
+          );
         },
       ),
       GoRoute(
@@ -225,12 +236,12 @@ GoRouter goRouter(Ref ref) {
           final otherUserPhoto = state.uri.queryParameters['otherUserPhoto'];
           return _fadePage(
             state,
-            ChatDetailPage(
+            ChatNewPage(
               conversationId: conversationId,
-              otherUserId: otherUserId ?? '',
+              otherUid: otherUserId ?? '',
               otherProfileId: otherProfileId ?? '',
-              otherUserName: otherUserName ?? '',
-              otherUserPhoto: otherUserPhoto ?? '',
+              otherName: otherUserName ?? '',
+              otherPhotoUrl: otherUserPhoto ?? '',
             ),
           );
         },
@@ -241,6 +252,28 @@ GoRouter goRouter(Ref ref) {
         name: 'notificationsNew',
         pageBuilder: (context, state) =>
             _slideLeftPage(state, const NotificationsNewPage()),
+      ),
+      // ✅ NOVA ROTA: Chat New (MensagensNew feature)
+      GoRoute(
+        path: '/chat-new/:conversationId',
+        name: 'chatNew',
+        pageBuilder: (context, state) {
+          final conversationId = state.pathParameters['conversationId']!;
+          final otherUid = state.uri.queryParameters['otherUid'] ?? '';
+          final otherProfileId = state.uri.queryParameters['otherProfileId'] ?? '';
+          final otherName = state.uri.queryParameters['otherName'] ?? '';
+          final otherPhotoUrl = state.uri.queryParameters['otherPhotoUrl'];
+          return _slideLeftPage(
+            state,
+            ChatNewPage(
+              conversationId: conversationId,
+              otherUid: otherUid,
+              otherProfileId: otherProfileId,
+              otherName: otherName,
+              otherPhotoUrl: otherPhotoUrl,
+            ),
+          );
+        },
       ),
       // ✅ NOVA ROTA: Settings com transição Slide
       GoRoute(
@@ -376,6 +409,48 @@ extension TypedNavigationExtension on BuildContext {
         if (otherProfileId != null) 'otherProfileId': otherProfileId,
         if (otherUserName != null) 'otherUserName': otherUserName,
         if (otherUserPhoto != null) 'otherUserPhoto': otherUserPhoto,
+      },
+    );
+    push(uri.toString());
+  }
+
+  /// Navigate to chat new page (MensagensNew feature)
+  void goToChatNew(
+    String conversationId, {
+    required String otherUid,
+    required String otherProfileId,
+    required String otherName,
+    String? otherPhotoUrl,
+  }) {
+    _logNavigation('chat_new', {'conversationId': conversationId});
+    final uri = Uri(
+      path: AppRoutes.chatNew(conversationId),
+      queryParameters: {
+        'otherUid': otherUid,
+        'otherProfileId': otherProfileId,
+        'otherName': otherName,
+        if (otherPhotoUrl != null) 'otherPhotoUrl': otherPhotoUrl,
+      },
+    );
+    go(uri.toString());
+  }
+
+  /// Push to chat new page (MensagensNew feature - adds to stack)
+  void pushChatNew(
+    String conversationId, {
+    required String otherUid,
+    required String otherProfileId,
+    required String otherName,
+    String? otherPhotoUrl,
+  }) {
+    _logNavigation('chat_new', {'conversationId': conversationId});
+    final uri = Uri(
+      path: AppRoutes.chatNew(conversationId),
+      queryParameters: {
+        'otherUid': otherUid,
+        'otherProfileId': otherProfileId,
+        'otherName': otherName,
+        if (otherPhotoUrl != null) 'otherPhotoUrl': otherPhotoUrl,
       },
     );
     push(uri.toString());

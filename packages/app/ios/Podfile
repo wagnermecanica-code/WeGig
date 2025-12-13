@@ -49,4 +49,17 @@ post_install do |installer|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
     end
   end
+
+  # Patch the generated resources script so flutter_inappwebview_ios copies the storyboard from the plugin source
+  # instead of an already-compiled storyboardc that may not exist for some configurations.
+  resources_script = File.join(installer.sandbox.root, 'Target Support Files', 'Pods-WeGig', 'Pods-WeGig-resources.sh')
+  if File.exist?(resources_script)
+    script = File.read(resources_script)
+    storyboard_source = '${PODS_ROOT}/../.symlinks/plugins/flutter_inappwebview_ios/ios/Storyboards/WebView.storyboard'
+    updated_script = script.gsub(
+      '${BUILT_PRODUCTS_DIR}/flutter_inappwebview_ios/flutter_inappwebview_ios.framework/WebView.storyboardc',
+      storyboard_source
+    )
+    File.write(resources_script, updated_script)
+  end
 end

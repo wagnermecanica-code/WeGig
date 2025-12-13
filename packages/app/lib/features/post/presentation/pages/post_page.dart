@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:http/http.dart' as http;
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
 import 'package:wegig_app/features/post/domain/models/post_form_input.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/post/presentation/widgets/photo_carousel_picker.dart';
@@ -355,18 +356,13 @@ class _PostPageState extends ConsumerState<PostPage> {
       _salesType = (data['salesType'] as String?) ?? 'Venda';
       _whatsappController.text = (data['whatsappNumber'] as String?) ?? '';
       
-      // Preço
-      final price = data['price'];
-      if (price != null) {
-        if (price is num) {
-          // Converter para centavos (formato esperado pelo _CurrencyInputFormatter)
-          final priceInCents = (price * 100).toInt();
-          _priceController.text = priceInCents.toString();
-        } else if (price is String) {
-          // Se vier como string já formatada (ex: "150,00")
-          final cleanedPrice = price.replaceAll(RegExp(r'[^\d]'), '');
-          _priceController.text = cleanedPrice.isEmpty ? '' : cleanedPrice;
-        }
+      // Preço - agora data['price'] é o preço ORIGINAL (sem desconto)
+      final originalPrice = data['price'];
+      
+      if (originalPrice != null && originalPrice is num && originalPrice > 0) {
+        // Converter para centavos (formato esperado pelo _CurrencyInputFormatter)
+        final priceInCents = (originalPrice.toDouble() * 100).toInt();
+        _priceController.text = priceInCents.toString();
       }
       
       // Modo de desconto e valor
@@ -646,10 +642,12 @@ class _PostPageState extends ConsumerState<PostPage> {
         // Campos específicos de sales
         title: _postType == 'sales' ? _titleController.text.trim() : null,
         salesType: _postType == 'sales' ? _salesType : null,
-        price: _postType == 'sales' ? _calculatedFinalPrice : null,
+        price: _postType == 'sales' ? (double.tryParse(_priceController.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0.0) / 100 : null,
         discountMode: _postType == 'sales' ? _discountMode : null,
         discountValue: _postType == 'sales' && _discountController.text.isNotEmpty
-            ? double.tryParse(_discountController.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0.0
+            ? (_discountMode == 'fixed' 
+                ? (double.tryParse(_discountController.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0.0) / 100
+                : double.tryParse(_discountController.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0.0)
             : null,
         promoStartDate: _postType == 'sales' ? _promoStartDate : null,
         promoEndDate: _postType == 'sales' ? _promoEndDate : null,
@@ -1014,7 +1012,6 @@ class _PostPageState extends ConsumerState<PostPage> {
         controller: _priceController,
         keyboardType: TextInputType.number,
         decoration: InputDecoration(
-          prefixText: 'R\$ ',
           hintText: '0,00',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           filled: true,
@@ -1116,7 +1113,7 @@ class _PostPageState extends ConsumerState<PostPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'R\$ ${_calculatedFinalPrice.toStringAsFixed(2).replaceAll('.', ',')}',
+              NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ').format(_calculatedFinalPrice),
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -1813,7 +1810,7 @@ class _CurrencyInputFormatter extends TextInputFormatter {
     if (newValue.text.isEmpty) return newValue;
     
     final value = int.parse(newValue.text);
-    final formatted = (value / 100).toStringAsFixed(2).replaceAll('.', ',');
+    final formatted = NumberFormat.currency(locale: 'pt_BR', symbol: '').format(value / 100);
     
     return TextEditingValue(
       text: formatted,

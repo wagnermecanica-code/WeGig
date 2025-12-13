@@ -35,9 +35,9 @@ class SettingsRemoteDataSource implements ISettingsRemoteDataSource {
         notifyNearbyPosts: data['notificationRadiusEnabled'] as bool? ?? true,
         nearbyRadiusKm:
             ((data['notificationRadius'] as num?) ?? 20.0).toDouble(),
-        // These are client-side only for now (could be stored in Firestore later)
-        notifyInterests: true,
-        notifyMessages: true,
+        // ✅ FIX: Carregar notifyInterests e notifyMessages do Firestore
+        notifyInterests: data['notifyInterests'] as bool? ?? true,
+        notifyMessages: data['notifyMessages'] as bool? ?? true,
       );
 
       debugPrint('✅ SettingsDataSource: Settings loaded');
@@ -60,6 +60,9 @@ class SettingsRemoteDataSource implements ISettingsRemoteDataSource {
           .update({
         'notificationRadiusEnabled': settings.notifyNearbyPosts,
         'notificationRadius': settings.nearbyRadiusKm,
+        // ✅ FIX: Persistir notifyInterests e notifyMessages no Firestore
+        'notifyInterests': settings.notifyInterests,
+        'notifyMessages': settings.notifyMessages,
         'profileUid': settings.profileId, // CRITICAL: Isolamento de perfil
         'updatedAt': FieldValue.serverTimestamp(),
       });

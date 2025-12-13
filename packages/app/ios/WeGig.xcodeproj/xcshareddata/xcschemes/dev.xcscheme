@@ -36,6 +36,20 @@
                BlueprintIdentifier = "97C146ED1CF9000F007C117D"
                BuildableName = "WeGig.app"
                BlueprintName = "WeGig"
+               ReferencedContainer = "container:Runner.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "97C146ED1CF9000F007C117D"
+               BuildableName = "WeGig.app"
+               BlueprintName = "WeGig"
                ReferencedContainer = "container:WeGig.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -50,7 +64,7 @@
       shouldAutocreateTestPlan = "YES">
    </TestAction>
    <LaunchAction
-      buildConfiguration = "Debug-dev"
+      buildConfiguration = "Release-dev"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       customLLDBInitFile = "$(SRCROOT)/Flutter/ephemeral/flutter_lldbinit"
@@ -65,7 +79,7 @@
             ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
             <ActionContent
                title = "Run Script"
-               scriptText = "&#10;">
+               scriptText = "#!/bin/bash&#10;echo &quot;&#x1f527; Configurando Firebase para DEV...&quot;&#10;cp &quot;${SRCROOT}/Firebase/GoogleService-Info-dev.plist&quot; &quot;${SRCROOT}/Runner/GoogleService-Info.plist&quot;&#10;echo &quot;&#x2705; DEV Firebase configurado&quot;&#10;">
                <EnvironmentBuildable>
                   <BuildableReference
                      BuildableIdentifier = "primary"
@@ -112,9 +126,18 @@
             BlueprintIdentifier = "97C146ED1CF9000F007C117D"
             BuildableName = "WeGig.app"
             BlueprintName = "WeGig"
-            ReferencedContainer = "container:WeGig.xcodeproj">
+            ReferencedContainer = "container:Runner.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "97C146ED1CF9000F007C117D"
+            BuildableName = "WeGig.app"
+            BlueprintName = "WeGig"
+            ReferencedContainer = "container:Runner.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug-dev">

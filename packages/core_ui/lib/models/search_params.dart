@@ -14,7 +14,7 @@ class SearchParams with _$SearchParams {
     String? availableFor, // 'gig', 'rehearsal', etc.
     bool? hasYoutube,
     // ✅ Campos de sales (anúncios)
-    String? salesType, // 'Gravação', 'Ensaios', etc
+    @Default({}) Set<String> salesTypes, // 'Gravação', 'Ensaios', etc (multi)
     double? minPrice, // Faixa de preço mínima
     double? maxPrice, // Faixa de preço máxima
     bool? onlyWithDiscount, // Apenas anúncios com desconto

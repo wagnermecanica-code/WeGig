@@ -11,7 +11,7 @@ import 'package:wegig_app/features/profile/presentation/providers/profile_provid
 import 'package:wegig_app/features/profile/presentation/providers/profile_switcher_provider.dart';
 import 'package:wegig_app/features/profile/presentation/widgets/profile_transition_overlay.dart';
 import 'package:wegig_app/features/notifications_new/presentation/providers/notifications_new_providers.dart';
-import 'package:wegig_app/features/messages/presentation/providers/messages_providers.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/providers/mensagens_new_providers.dart';
 
 /// BottomSheet para alternar entre perfis do usuário
 /// Agora com animações melhoradas e componentes do Design System
@@ -210,7 +210,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                       opacity: 1,
                       child: Semantics(
                         label:
-                            '${profile.name}, ${profile.isBand ? 'Banda' : 'Músico'}${isActive ? ', perfil ativo' : ''}',
+                            '${profile.name}, ${_getProfileTypeLabel(profile.profileType)}${isActive ? ', perfil ativo' : ''}',
                         button: true,
                         enabled: !isActive,
                         child: ListTile(
@@ -245,13 +245,13 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                           subtitle: Row(
                             children: [
                               Icon(
-                                profile.isBand ? Iconsax.people : Iconsax.user,
+                                _getProfileTypeIcon(profile.profileType),
                                 size: 14,
                                 color: AppColors.textSecondary,
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                profile.isBand ? 'Banda' : 'Músico',
+                                _getProfileTypeLabel(profile.profileType),
                                 style: AppTypography.captionLight,
                               ),
                             ],
@@ -321,14 +321,13 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                   ),
                                   PopupMenuItem(
                                     value: 'delete',
-                                    enabled: profile.profileId !=
-                                        user.uid, // Não permite excluir perfil principal
+                                    enabled: !isActive, // ✅ Não permite excluir perfil ativo
                                     child: Row(
                                       children: [
                                         Icon(
                                           Iconsax.trash,
                                           size: 18,
-                                          color: profile.profileId != user.uid
+                                          color: !isActive
                                               ? AppColors.error
                                               : AppColors.textSecondary,
                                         ),
@@ -336,7 +335,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                         Text(
                                           'Excluir',
                                           style: TextStyle(
-                                            color: profile.profileId != user.uid
+                                            color: !isActive
                                                 ? AppColors.error
                                                 : AppColors.textSecondary,
                                           ),
@@ -369,7 +368,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                         ProfileTransitionOverlay.show(
                                       context,
                                       profileName: profile.name,
-                                      isBand: profile.isBand,
+                                      profileType: profile.profileType.name,
                                       photoUrl: profile.photoUrl,
                                       onComplete: () {
                                         // Chama o callback para recarregar os dados
@@ -480,6 +479,30 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
     );
   }
 
+  /// ✅ Obtém o ícone baseado no tipo de perfil
+  IconData _getProfileTypeIcon(ProfileType profileType) {
+    switch (profileType) {
+      case ProfileType.band:
+        return Iconsax.people;
+      case ProfileType.space:
+        return Iconsax.building;
+      case ProfileType.musician:
+        return Iconsax.user;
+    }
+  }
+
+  /// ✅ Obtém o label baseado no tipo de perfil
+  String _getProfileTypeLabel(ProfileType profileType) {
+    switch (profileType) {
+      case ProfileType.band:
+        return 'Banda';
+      case ProfileType.space:
+        return 'Espaço';
+      case ProfileType.musician:
+        return 'Músico';
+    }
+  }
+
   /// Edita um perfil existente
   Future<void> _editProfile(BuildContext context, ProfileEntity profile) async {
     Navigator.pop(context); // Fecha o bottom sheet
@@ -510,9 +533,23 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Não permite excluir perfil principal
-    if (profile.profileId == user.uid) {
-      AppSnackBar.showError(context, 'Não é possível excluir o perfil principal');
+    // ✅ Obter todos os perfis do provider
+    final profileState = ref.read(profileProvider);
+    final allProfiles = profileState.value?.profiles ?? <ProfileEntity>[];
+    final activeProfile = profileState.value?.activeProfile;
+
+    // ✅ Verifica se tem mais de um perfil
+    if (allProfiles.length <= 1) {
+      AppSnackBar.showWarning(context, 'Você deve ter pelo menos um perfil');
+      return;
+    }
+
+    // ✅ Não permite excluir o perfil ativo
+    if (profile.profileId == activeProfile?.profileId) {
+      AppSnackBar.showWarning(
+        context,
+        'Para excluir este perfil, primeiro troque para outro perfil',
+      );
       return;
     }
 
@@ -586,42 +623,42 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
 
     if (confirmed != true) return;
 
+    // ✅ CORREÇÃO: Capturar TODAS as referências ANTES de fechar o bottom sheet
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final profileNotifier = ref.read(profileProvider.notifier);
+    final profileIdToDelete = profile.profileId;
+
     try {
-      // Obter todos os perfis do provider
-      final profileState = ref.read(profileProvider);
-      final allProfiles = profileState.value?.profiles ?? <ProfileEntity>[];
+      debugPrint('🗑️ ProfileSwitcher: Iniciando deleção do perfil $profileIdToDelete');
+      
+      // ✅ CORREÇÃO: Executar deleção ANTES de fechar o bottom sheet
+      await profileNotifier.deleteProfile(profileIdToDelete);
 
-      // Verifica se tem mais de um perfil
-      if (allProfiles.length <= 1) {
-        if (context.mounted) {
-          // Não fecha o bottom sheet, apenas mostra o erro.
-          AppSnackBar.showError(context, 'Você precisa ter pelo menos um perfil');
-        }
-        return;
-      }
+      debugPrint('✅ ProfileSwitcher: Perfil deletado com sucesso');
 
-      // Fecha o bottom sheet antes de excluir
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
+      // ✅ CORREÇÃO: Fechar o bottom sheet DEPOIS da deleção bem-sucedida
+      navigator.pop();
 
-      // Deletar perfil usando ProfileProvider
-      await ref.read(profileProvider.notifier).deleteProfile(profile.profileId);
-
-      if (context.mounted) {
-        // Se excluiu o perfil ativo, recarrega com o novo perfil ativo
-        final newActiveProfile =
-            ref.read(profileProvider).value?.activeProfile;
-        if (newActiveProfile != null) {
-          onProfileSelected(newActiveProfile.profileId);
-        }
-
-        AppSnackBar.showSuccess(context, 'Perfil excluído com sucesso');
-      }
+      // ✅ CORREÇÃO: Usar scaffoldMessenger salvo anteriormente
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text('Perfil excluído com sucesso'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } catch (e) {
-      if (context.mounted) {
-        AppSnackBar.showError(context, 'Erro ao excluir perfil: $e');
-      }
+      debugPrint('❌ ProfileSwitcher: Erro ao deletar perfil - $e');
+      
+      // ✅ CORREÇÃO: Usar scaffoldMessenger salvo anteriormente
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Erro ao excluir perfil: $e'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -658,7 +695,7 @@ class _UnifiedBadgeCounter extends ConsumerWidget {
     // Soma de notificações + mensagens
     // ✅ FIX: Passar uid para match com Security Rules
     final notificationsAsync = ref.watch(unreadNotificationCountNewStreamProvider(profileId, uid));
-    final messagesAsync = ref.watch(unreadMessageCountForProfileProvider(profileId, uid));
+    final messagesAsync = ref.watch(unreadMessagesNewCountProvider(profileId: profileId, profileUid: uid));
     
     // Aguardar ambos os providers carregarem
     if (notificationsAsync.isLoading || messagesAsync.isLoading) {

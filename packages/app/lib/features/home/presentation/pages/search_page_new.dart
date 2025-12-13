@@ -1,8 +1,17 @@
+import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/models/search_params.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/utils/debouncer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
+
+import '../../../../app/router/app_router.dart';
 
 /// SearchPage com sistema de abas: Músicos/Bandas + Anúncios
 class SearchPageNew extends StatefulWidget {
@@ -31,6 +40,14 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
   final TextEditingController _usernameController = TextEditingController();
   
   // ====================================================================
+  // USERNAME PREVIEW (BUSCA EM TEMPO REAL)
+  // ====================================================================
+  final Debouncer _usernameDebouncer = Debouncer(milliseconds: 500);
+  ProfileEntity? _usernamePreviewProfile;
+  bool _isSearchingUsername = false;
+  String? _usernameSearchError;
+  
+  // ====================================================================
   // CAMPOS MÚSICOS/BANDAS (ABA 0)
   // ====================================================================
   String? _selectedPostType; // 'musician' ou 'band'
@@ -43,10 +60,10 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
   // ====================================================================
   // CAMPOS ANÚNCIOS (ABA 1)
   // ====================================================================
-  String? _selectedSalesType;
+  final Set<String> _selectedSalesTypes = {};
   RangeValues _priceRange = const RangeValues(0, 5000);
   bool _onlyWithDiscount = false;
-  bool _onlyActivePromos = true; // Default: mostrar apenas ativos
+  bool _onlyActivePromos = false; // Default: mostrar todos os anúncios
 
   // ====================================================================
   // OPÇÕES
@@ -98,6 +115,9 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
     
     _tabController = TabController(length: 2, vsync: this);
     
+    // Listener para busca de username em tempo real
+    _usernameController.addListener(_onUsernameChanged);
+    
     // Carregar valores existentes (se houver)
     final current = widget.searchNotifier.value;
     if (current != null) {
@@ -112,16 +132,18 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
       _hasYouTube = current.hasYoutube ?? false;
       
       // Anúncios
-      _selectedSalesType = current.salesType;
+      _selectedSalesTypes
+        ..clear()
+        ..addAll(current.salesTypes);
       _priceRange = RangeValues(
         current.minPrice ?? 0,
         current.maxPrice ?? 5000,
       );
       _onlyWithDiscount = current.onlyWithDiscount ?? false;
-      _onlyActivePromos = current.onlyActivePromos ?? true;
+      _onlyActivePromos = current.onlyActivePromos ?? false;
       
       // Se está filtrando sales, vai para aba Anúncios
-      if (current.postType == 'sales' || current.salesType != null) {
+      if (current.postType == 'sales' || current.salesTypes.isNotEmpty) {
         _tabController.index = 1;
       }
     }
@@ -129,16 +151,82 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
 
   @override
   void dispose() {
+    _usernameController.removeListener(_onUsernameChanged);
+    _usernameDebouncer.cancel();
     _tabController.dispose();
     _usernameController.dispose();
     super.dispose();
+  }
+  
+  // ====================================================================
+  // USERNAME SEARCH LOGIC
+  // ====================================================================
+  
+  void _onUsernameChanged() {
+    final username = _usernameController.text.trim().toLowerCase();
+    
+    if (username.isEmpty) {
+      setState(() {
+        _usernamePreviewProfile = null;
+        _isSearchingUsername = false;
+        _usernameSearchError = null;
+      });
+      return;
+    }
+    
+    // Debounce para não fazer muitas requisições
+    _usernameDebouncer.run(() => _searchUsernamePreview(username));
+  }
+  
+  Future<void> _searchUsernamePreview(String username) async {
+    if (!mounted) return;
+    
+    setState(() {
+      _isSearchingUsername = true;
+      _usernameSearchError = null;
+    });
+    
+    try {
+      final profilesRef = FirebaseFirestore.instance.collection('profiles');
+      
+      // Buscar por usernameLowercase (índice otimizado)
+      var snapshot = await profilesRef
+          .where('usernameLowercase', isEqualTo: username)
+          .limit(1)
+          .get();
+      
+      // Fallback para perfis antigos sem usernameLowercase
+      if (snapshot.docs.isEmpty) {
+        snapshot = await profilesRef
+            .where('username', isEqualTo: username)
+            .limit(1)
+            .get();
+      }
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _usernamePreviewProfile = snapshot.docs.isNotEmpty
+            ? ProfileEntity.fromFirestore(snapshot.docs.first)
+            : null;
+        _isSearchingUsername = false;
+      });
+    } catch (error) {
+      debugPrint('❌ Erro ao buscar username: $error');
+      if (!mounted) return;
+      setState(() {
+        _usernameSearchError = 'Erro ao buscar perfil';
+        _isSearchingUsername = false;
+        _usernamePreviewProfile = null;
+      });
+    }
   }
 
   void _applyFilters() {
     final isAnunciosTab = _tabController.index == 1;
     
     debugPrint('🔍 SearchPageNew._applyFilters: isAnunciosTab = $isAnunciosTab');
-    debugPrint('🔍 SearchPageNew._applyFilters: _selectedSalesType = $_selectedSalesType');
+    debugPrint('🔍 SearchPageNew._applyFilters: _selectedSalesTypes = $_selectedSalesTypes');
     debugPrint('🔍 SearchPageNew._applyFilters: _priceRange = $_priceRange');
     debugPrint('🔍 SearchPageNew._applyFilters: _onlyWithDiscount = $_onlyWithDiscount');
     debugPrint('🔍 SearchPageNew._applyFilters: _onlyActivePromos = $_onlyActivePromos');
@@ -164,7 +252,7 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
       hasYoutube: !isAnunciosTab ? (_hasYouTube ? true : null) : null,
       
       // Anúncios (apenas se aba 1 ativa)
-      salesType: isAnunciosTab ? _selectedSalesType : null,
+      salesTypes: isAnunciosTab ? Set.of(_selectedSalesTypes) : {},
       minPrice: isAnunciosTab && _priceRange.start > 0 ? _priceRange.start : null,
       maxPrice: isAnunciosTab && _priceRange.end < 5000 ? _priceRange.end : null,
       onlyWithDiscount: isAnunciosTab ? (_onlyWithDiscount ? true : null) : null,
@@ -172,7 +260,7 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
     );
     
     debugPrint('🔍 SearchPageNew: SearchParams.postType = ${searchParams.postType}');
-    debugPrint('🔍 SearchPageNew: SearchParams.salesType = ${searchParams.salesType}');
+    debugPrint('🔍 SearchPageNew: SearchParams.salesTypes = ${searchParams.salesTypes}');
     debugPrint('🔍 SearchPageNew: SearchParams.minPrice = ${searchParams.minPrice}');
     debugPrint('🔍 SearchPageNew: SearchParams.maxPrice = ${searchParams.maxPrice}');
     
@@ -193,10 +281,10 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
       _hasYouTube = false;
       
       // Anúncios
-      _selectedSalesType = null;
+      _selectedSalesTypes.clear();
       _priceRange = const RangeValues(0, 5000);
       _onlyWithDiscount = false;
-      _onlyActivePromos = true;
+      _onlyActivePromos = false;
     });
     
     final currentParams = widget.searchNotifier.value;
@@ -375,16 +463,222 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
         TextField(
           controller: _usernameController,
           decoration: InputDecoration(
-            hintText: 'Ex: @joaomusico',
+            hintText: 'nome.de.usuario',
             prefixIcon: const Icon(Iconsax.search_normal_1),
+            prefixText: '@',
+            prefixStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: AppColors.primary,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
             filled: true,
             fillColor: Colors.grey[50],
+            suffixIcon: _isSearchingUsername
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : _usernameController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          _usernameController.clear();
+                          setState(() {
+                            _usernamePreviewProfile = null;
+                            _usernameSearchError = null;
+                          });
+                        },
+                      )
+                    : null,
+          ),
+          inputFormatters: [
+            // Permite letras, números, pontos e underscores (padrão Instagram)
+            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9._]')),
+            // Converte para lowercase
+            TextInputFormatter.withFunction((oldValue, newValue) {
+              return newValue.copyWith(text: newValue.text.toLowerCase());
+            }),
+          ],
+          textInputAction: TextInputAction.done,
+        ),
+        // Preview do perfil encontrado
+        _buildUsernamePreview(),
+      ],
+    );
+  }
+  
+  Widget _buildUsernamePreview() {
+    // Erro na busca
+    if (_usernameSearchError != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          _usernameSearchError!,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.red[600],
           ),
         ),
-      ],
+      );
+    }
+    
+    // Nenhum username digitado ou buscando
+    if (_usernameController.text.trim().isEmpty || _isSearchingUsername) {
+      return const SizedBox.shrink();
+    }
+    
+    // Perfil não encontrado
+    if (_usernamePreviewProfile == null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Row(
+          children: [
+            Icon(Iconsax.info_circle, size: 16, color: Colors.grey[500]),
+            const SizedBox(width: 6),
+            Text(
+              'Nenhum perfil encontrado com esse username',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Card do perfil encontrado
+    final profile = _usernamePreviewProfile!;
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.2),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            // Fecha a página de busca e navega para o perfil
+            Navigator.of(context).pop();
+            context.pushProfile(profile.profileId);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Avatar
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                  backgroundImage: profile.photoUrl != null
+                      ? CachedNetworkImageProvider(profile.photoUrl!)
+                      : null,
+                  child: profile.photoUrl == null
+                      ? Text(
+                          profile.name.isNotEmpty
+                              ? profile.name[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                // Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        profile.name,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '@${profile.username ?? ''}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      if (profile.city.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Icon(
+                              Iconsax.location,
+                              size: 12,
+                              color: Colors.grey[500],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              profile.city,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                // Chip de tipo
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: profile.isBand
+                        ? AppColors.accent.withOpacity(0.1)
+                        : AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    profile.isBand ? 'Banda' : 'Músico',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: profile.isBand
+                          ? AppColors.accent
+                          : AppColors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Iconsax.arrow_right_3,
+                  size: 16,
+                  color: Colors.grey[400],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -648,10 +942,14 @@ class _SearchPageNewState extends State<SearchPageNew> with SingleTickerProvider
           children: _salesTypeOptions.map((type) {
             return FilterChip(
               label: Text(type),
-              selected: _selectedSalesType == type,
+              selected: _selectedSalesTypes.contains(type),
               onSelected: (selected) {
                 setState(() {
-                  _selectedSalesType = selected ? type : null;
+                  if (selected) {
+                    _selectedSalesTypes.add(type);
+                  } else {
+                    _selectedSalesTypes.remove(type);
+                  }
                 });
               },
               selectedColor: AppColors.primary.withOpacity(0.1),

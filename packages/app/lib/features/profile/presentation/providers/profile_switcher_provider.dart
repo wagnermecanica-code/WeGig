@@ -1,9 +1,7 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:wegig_app/features/messages/presentation/providers/messages_providers.dart';
 import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
-import 'package:wegig_app/features/notifications_new/presentation/providers/notifications_new_providers.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_cache_provider.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';

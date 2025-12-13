@@ -17,6 +17,25 @@ class AppColors {
   static const Color utilityLink = Color(0xFF007EB9); // Azul para links
   static const Color salesBlue = Color(0xFF007EB9); // Azul para anúncios (sales)
 
+  // ✅ Cores por tipo de perfil
+  static const Color bandColor = Color(0xFFE47911); // Banda - Laranja
+  static const Color spaceColor = Color(0xFF007EB9); // Espaço - Azul
+  static const Color musicianColor = Color(0xFF37475A); // Músico - Cinza escuro
+
+  // ✅ Método helper para obter cor por tipo de perfil
+  static Color getProfileTypeColor(String profileType) {
+    switch (profileType.toLowerCase()) {
+      case 'band':
+        return bandColor;
+      case 'space':
+        return spaceColor;
+      case 'musician':
+        return musicianColor;
+      default:
+        return primary; // Fallback
+    }
+  }
+
   // Neutros
   static const Color background = Color(0xFFFAFAFA);
   static const Color surface = Color(0xFFFFFFFF);

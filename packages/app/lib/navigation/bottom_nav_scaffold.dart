@@ -6,18 +6,14 @@ import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
 import 'package:core_ui/models/search_params.dart';
 import 'package:core_ui/theme/app_colors.dart';
-import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/widgets/mention_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/home/presentation/pages/home_page.dart';
 import 'package:wegig_app/features/home/presentation/pages/search_page_new.dart';
-import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
-import 'package:wegig_app/features/messages/presentation/pages/messages_page.dart';
-import 'package:wegig_app/features/messages/presentation/providers/messages_providers.dart';
+import 'package:wegig_app/features/mensagens_new/mensagens_new.dart';
 import 'package:wegig_app/features/notifications_new/presentation/pages/notifications_new_page.dart';
 import 'package:wegig_app/features/notifications_new/presentation/providers/notifications_new_providers.dart';
 import 'package:wegig_app/features/notifications_new/presentation/utils/notification_new_action_handler.dart';
@@ -78,7 +74,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     ),
     const NotificationsNewPage(),
     const SizedBox.shrink(), // Placeholder - abre bottom sheet ao tocar
-    const MessagesPage(),
+    const MensagensNewPage(),
     // ViewProfilePage without userId shows the current authenticated user's profile
     const ViewProfilePage(),
   ];
@@ -253,24 +249,29 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
             ),
             if (unreadCount > 0)
               Positioned(
-                top: 2,
-                right: 2,
+                right: -4,
+                top: -4,
                 child: Container(
-                  width: 18,
-                  height: 18,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
                   ),
-                  child: Center(
-                    child: Text(
-                      unreadCount > 99 ? '99+' : unreadCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  decoration: BoxDecoration(
+                    color: AppColors.badgeRed,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 20,
+                    minHeight: 20,
+                  ),
+                  child: Text(
+                    unreadCount > 99 ? '99+' : unreadCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ),
@@ -281,9 +282,9 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   }
 
 
-  /// Ícone de mensagens com badge reativo
+  /// Ícone de mensagens com badge reativo (usando novo provider MensagensNew)
   Widget _buildMessagesIcon({bool isSelected = false}) {
-    final profileState = ref.read(profileProvider);
+    final profileState = ref.watch(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
 
     if (activeProfile == null) {
@@ -294,49 +295,52 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
       );
     }
 
-    return StreamBuilder<int>(
-      // ✅ FIX: Passar uid para match com Security Rules
-      stream: ref.read(unreadMessageCountForProfileProvider(activeProfile.profileId, activeProfile.uid).future).asStream(),
-      builder: (context, snapshot) {
-        // Error state
-        if (snapshot.hasError) {
-          return Icon(
-            Iconsax.message,
-            size: 28,
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
-          );
-        }
+    // Usa o novo provider de mensagens
+    final unreadCountAsync = ref.watch(
+      unreadMessagesNewCountProvider(
+        profileId: activeProfile.profileId,
+        profileUid: activeProfile.uid,
+      ),
+    );
 
-        // Loading state
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Icon(
-                Iconsax.message,
-                size: 28,
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              ),
-              Positioned(
-                right: -4,
-                top: -4,
-                child: SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 1.5),
-                ),
-              ),
-            ],
-          );
-        }
-
-        final unreadCount = snapshot.data ?? 0;
-
-        return Stack(
+    return unreadCountAsync.when(
+      loading: () => Container(
+        padding: const EdgeInsets.all(4),
+        child: Stack(
           clipBehavior: Clip.none,
           children: [
             Icon(
-              Icons.chat_bubble_outline,
+              Iconsax.message,
+              size: 26,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            ),
+            const Positioned(
+              right: -4,
+              top: -4,
+              child: SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 1.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+      error: (_, __) => Container(
+        padding: const EdgeInsets.all(4),
+        child: Icon(
+          Iconsax.message,
+          size: 26,
+          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+        ),
+      ),
+      data: (unreadCount) => Container(
+        padding: const EdgeInsets.all(4),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              Iconsax.message,
               size: 26,
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
             ),
@@ -369,8 +373,8 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
                 ),
               ),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 

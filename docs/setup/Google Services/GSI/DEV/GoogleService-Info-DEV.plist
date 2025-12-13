@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>963929089370-9vpki42g0itfkegtst8b149jtafm37cs.apps.googleusercontent.com</string>
+	<string>963929089370-ptr6oho7i5e222st1g9a3boec7g20tol.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.963929089370-9vpki42g0itfkegtst8b149jtafm37cs</string>
+	<string>com.googleusercontent.apps.963929089370-ptr6oho7i5e222st1g9a3boec7g20tol</string>
 	<key>API_KEY</key>
 	<string>AIzaSyAf6EMmKIke4UX_PH9L78dIhQjCZyPiO1s</string>
 	<key>GCM_SENDER_ID</key>
@@ -13,7 +13,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.tosembanda.wegig.dev</string>
+	<string>com.wegig.wegig</string>
 	<key>PROJECT_ID</key>
 	<string>wegig-dev</string>
 	<key>STORAGE_BUCKET</key>
@@ -29,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:963929089370:ios:09b43a150f6d7ec1ec7f63</string>
+	<string>1:963929089370:ios:c9a1e302fc589b5fec7f63</string>
 </dict>
 </plist>

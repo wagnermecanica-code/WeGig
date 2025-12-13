@@ -666,6 +666,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final notificationService = ref.read(notificationServiceProvider);
       await notificationService.create(
         recipientProfileId: activeProfile.profileId,
+        recipientUid: activeProfile.uid, // ✅ FIX: Obrigatório para Security Rules
         type: 'system',
         title: '🧪 Notificação de Teste',
         body: 'Push notifications estão funcionando perfeitamente!',

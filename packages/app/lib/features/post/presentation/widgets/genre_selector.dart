@@ -29,15 +29,17 @@ class GenreSelector extends StatelessWidget {
   }
 
   static String formatGenres(Set<String> genres) {
-    if (genres.isEmpty) return '';
+    if (genres.isEmpty) return 'Nenhum gênero selecionado';
     return genres.join(', ');
   }
 
   static String formatGenresShort(Set<String> genres, {int maxShow = 3}) {
-    if (genres.isEmpty) return '';
+    if (genres.isEmpty) return 'Nenhum gênero selecionado';
     final list = genres.toList();
     if (list.length <= maxShow) return list.join(', ');
-    return '${list.take(maxShow).join(', ')} +${list.length - maxShow}';
+    final remaining = list.length - maxShow;
+    if (maxShow == 0) return 'e +$remaining';
+    return '${list.take(maxShow).join(', ')} e +$remaining';
   }
 
   @override

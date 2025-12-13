@@ -27,8 +27,8 @@ mixin _$SearchParams {
       throw _privateConstructorUsedError; // 'gig', 'rehearsal', etc.
   bool? get hasYoutube =>
       throw _privateConstructorUsedError; // ✅ Campos de sales (anúncios)
-  String? get salesType =>
-      throw _privateConstructorUsedError; // 'Gravação', 'Ensaios', etc
+  Set<String> get salesTypes =>
+      throw _privateConstructorUsedError; // 'Gravação', 'Ensaios', etc (multi)
   double? get minPrice =>
       throw _privateConstructorUsedError; // Faixa de preço mínima
   double? get maxPrice =>
@@ -61,7 +61,7 @@ abstract class $SearchParamsCopyWith<$Res> {
       String? postType,
       String? availableFor,
       bool? hasYoutube,
-      String? salesType,
+      Set<String> salesTypes,
       double? minPrice,
       double? maxPrice,
       bool? onlyWithDiscount,
@@ -92,7 +92,7 @@ class _$SearchParamsCopyWithImpl<$Res, $Val extends SearchParams>
     Object? postType = freezed,
     Object? availableFor = freezed,
     Object? hasYoutube = freezed,
-    Object? salesType = freezed,
+    Object? salesTypes = null,
     Object? minPrice = freezed,
     Object? maxPrice = freezed,
     Object? onlyWithDiscount = freezed,
@@ -132,10 +132,10 @@ class _$SearchParamsCopyWithImpl<$Res, $Val extends SearchParams>
           ? _value.hasYoutube
           : hasYoutube // ignore: cast_nullable_to_non_nullable
               as bool?,
-      salesType: freezed == salesType
-          ? _value.salesType
-          : salesType // ignore: cast_nullable_to_non_nullable
-              as String?,
+      salesTypes: null == salesTypes
+          ? _value.salesTypes
+          : salesTypes // ignore: cast_nullable_to_non_nullable
+              as Set<String>,
       minPrice: freezed == minPrice
           ? _value.minPrice
           : minPrice // ignore: cast_nullable_to_non_nullable
@@ -177,7 +177,7 @@ abstract class _$$SearchParamsImplCopyWith<$Res>
       String? postType,
       String? availableFor,
       bool? hasYoutube,
-      String? salesType,
+      Set<String> salesTypes,
       double? minPrice,
       double? maxPrice,
       bool? onlyWithDiscount,
@@ -206,7 +206,7 @@ class __$$SearchParamsImplCopyWithImpl<$Res>
     Object? postType = freezed,
     Object? availableFor = freezed,
     Object? hasYoutube = freezed,
-    Object? salesType = freezed,
+    Object? salesTypes = null,
     Object? minPrice = freezed,
     Object? maxPrice = freezed,
     Object? onlyWithDiscount = freezed,
@@ -246,10 +246,10 @@ class __$$SearchParamsImplCopyWithImpl<$Res>
           ? _value.hasYoutube
           : hasYoutube // ignore: cast_nullable_to_non_nullable
               as bool?,
-      salesType: freezed == salesType
-          ? _value.salesType
-          : salesType // ignore: cast_nullable_to_non_nullable
-              as String?,
+      salesTypes: null == salesTypes
+          ? _value._salesTypes
+          : salesTypes // ignore: cast_nullable_to_non_nullable
+              as Set<String>,
       minPrice: freezed == minPrice
           ? _value.minPrice
           : minPrice // ignore: cast_nullable_to_non_nullable
@@ -286,14 +286,15 @@ class _$SearchParamsImpl implements _SearchParams {
       this.postType,
       this.availableFor,
       this.hasYoutube,
-      this.salesType,
+      final Set<String> salesTypes = const {},
       this.minPrice,
       this.maxPrice,
       this.onlyWithDiscount,
       this.onlyActivePromos,
       this.searchUsername})
       : _instruments = instruments,
-        _genres = genres;
+        _genres = genres,
+        _salesTypes = salesTypes;
 
   @override
   final String city;
@@ -328,9 +329,17 @@ class _$SearchParamsImpl implements _SearchParams {
   @override
   final bool? hasYoutube;
 // ✅ Campos de sales (anúncios)
+  final Set<String> _salesTypes;
+// ✅ Campos de sales (anúncios)
   @override
-  final String? salesType;
-// 'Gravação', 'Ensaios', etc
+  @JsonKey()
+  Set<String> get salesTypes {
+    if (_salesTypes is EqualUnmodifiableSetView) return _salesTypes;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableSetView(_salesTypes);
+  }
+
+// 'Gravação', 'Ensaios', etc (multi)
   @override
   final double? minPrice;
 // Faixa de preço mínima
@@ -348,7 +357,7 @@ class _$SearchParamsImpl implements _SearchParams {
 
   @override
   String toString() {
-    return 'SearchParams(city: $city, maxDistanceKm: $maxDistanceKm, level: $level, instruments: $instruments, genres: $genres, postType: $postType, availableFor: $availableFor, hasYoutube: $hasYoutube, salesType: $salesType, minPrice: $minPrice, maxPrice: $maxPrice, onlyWithDiscount: $onlyWithDiscount, onlyActivePromos: $onlyActivePromos, searchUsername: $searchUsername)';
+    return 'SearchParams(city: $city, maxDistanceKm: $maxDistanceKm, level: $level, instruments: $instruments, genres: $genres, postType: $postType, availableFor: $availableFor, hasYoutube: $hasYoutube, salesTypes: $salesTypes, minPrice: $minPrice, maxPrice: $maxPrice, onlyWithDiscount: $onlyWithDiscount, onlyActivePromos: $onlyActivePromos, searchUsername: $searchUsername)';
   }
 
   @override
@@ -369,8 +378,8 @@ class _$SearchParamsImpl implements _SearchParams {
                 other.availableFor == availableFor) &&
             (identical(other.hasYoutube, hasYoutube) ||
                 other.hasYoutube == hasYoutube) &&
-            (identical(other.salesType, salesType) ||
-                other.salesType == salesType) &&
+            const DeepCollectionEquality()
+                .equals(other._salesTypes, _salesTypes) &&
             (identical(other.minPrice, minPrice) ||
                 other.minPrice == minPrice) &&
             (identical(other.maxPrice, maxPrice) ||
@@ -394,7 +403,7 @@ class _$SearchParamsImpl implements _SearchParams {
       postType,
       availableFor,
       hasYoutube,
-      salesType,
+      const DeepCollectionEquality().hash(_salesTypes),
       minPrice,
       maxPrice,
       onlyWithDiscount,
@@ -420,7 +429,7 @@ abstract class _SearchParams implements SearchParams {
       final String? postType,
       final String? availableFor,
       final bool? hasYoutube,
-      final String? salesType,
+      final Set<String> salesTypes,
       final double? minPrice,
       final double? maxPrice,
       final bool? onlyWithDiscount,
@@ -444,7 +453,7 @@ abstract class _SearchParams implements SearchParams {
   @override
   bool? get hasYoutube; // ✅ Campos de sales (anúncios)
   @override
-  String? get salesType; // 'Gravação', 'Ensaios', etc
+  Set<String> get salesTypes; // 'Gravação', 'Ensaios', etc (multi)
   @override
   double? get minPrice; // Faixa de preço mínima
   @override

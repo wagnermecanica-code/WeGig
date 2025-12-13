@@ -12,6 +12,19 @@ class InterestService {
     required ProfileEntity activeProfile,
     String? message,
   }) async {
+    // ✅ VERIFICAÇÃO: Evitar duplicatas antes de criar
+    final existingInterest = await _firestore
+        .collection('interests')
+        .where('postId', isEqualTo: post.id)
+        .where('interestedProfileId', isEqualTo: activeProfile.profileId)
+        .limit(1)
+        .get();
+
+    if (existingInterest.docs.isNotEmpty) {
+      debugPrint('⚠️ InterestService: Interesse já existe, pulando criação...');
+      return;
+    }
+
     final interestData = {
       'postId': post.id,
       'postAuthorProfileId': post.authorProfileId,

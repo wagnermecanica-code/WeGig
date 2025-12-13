@@ -128,6 +128,7 @@ class NotificationsNewRemoteDataSource
       // Filtros client-side:
       // 1. Por profileId (isolamento multi-perfil)
       // 2. Por expiração (remove notificações expiradas)
+      // 3. Exclui newMessage (já notificado na MessagesNewPage)
       final notifications = snapshot.docs
           .map(NotificationEntity.fromFirestore)
           .where((n) {
@@ -142,6 +143,13 @@ class NotificationsNewRemoteDataSource
             if (n.expiresAt != null && n.expiresAt!.isBefore(now)) {
               debugPrint(
                   '🚫 Filtrado por expiração: expiresAt=${n.expiresAt} < now=$now');
+              return false;
+            }
+            
+            // Filtro: Excluir notificações de mensagem (já aparecem no chat)
+            if (n.type == NotificationType.newMessage) {
+              debugPrint(
+                  '🚫 Filtrado tipo newMessage: já notificado na MessagesNewPage');
               return false;
             }
             
@@ -322,7 +330,7 @@ class NotificationsNewRemoteDataSource
       
       final now = DateTime.now();
       
-      // Filtros client-side: profileId + expiração
+      // Filtros client-side: profileId + expiração + tipo
       final notifications = snapshot.docs
           .map(NotificationEntity.fromFirestore)
           .where((n) {
@@ -335,6 +343,11 @@ class NotificationsNewRemoteDataSource
             
             // Filtro por expiração
             if (n.expiresAt != null && n.expiresAt!.isBefore(now)) {
+              return false;
+            }
+            
+            // Filtro: Excluir notificações de mensagem (já aparecem no chat)
+            if (n.type == NotificationType.newMessage) {
               return false;
             }
             
@@ -366,11 +379,16 @@ class NotificationsNewRemoteDataSource
         .where('read', isEqualTo: false)
         .snapshots()
         .map((snapshot) {
+      // Filtro: exclui newMessage do contador (já contamos em MessagesNewPage)
       final count = snapshot.docs
-          .where((doc) => doc.data()['recipientProfileId'] == profileId)
+          .where((doc) {
+            final data = doc.data();
+            return data['recipientProfileId'] == profileId &&
+                   data['type'] != 'newMessage';
+          })
           .length;
 
-      debugPrint('📝 NotificationsNewDataSource: Stream unread count = $count');
+      debugPrint('📝 NotificationsNewDataSource: Stream unread count = $count (excluindo newMessage)');
       return count;
     }).distinct(); // Evita emissões duplicadas
   }

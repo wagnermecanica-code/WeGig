@@ -2,12 +2,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
-import 'package:core_ui/utils/geo_utils.dart';
 import 'package:core_ui/utils/location_utils.dart';
+import 'package:core_ui/utils/price_calculator.dart';
 import 'package:core_ui/widgets/mention_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -158,6 +157,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           '📊 Encontrados ${interestsSnapshot.docs.length} documentos na collection interests');
 
       final users = <Map<String, dynamic>>[];
+      final seenProfileIds = <String>{}; // ✅ Conjunto para rastrear profileIds já vistos
 
       // Para cada interesse, buscar dados do perfil
       for (final interestDoc in interestsSnapshot.docs) {
@@ -169,6 +169,13 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           debugPrint('⚠️ Interesse sem interestedProfileId válido, pulando...');
           continue;
         }
+
+        // ✅ DEDUPLICAÇÃO: Pular se já processamos este perfil
+        if (seenProfileIds.contains(interestedProfileId)) {
+          debugPrint('⚠️ Perfil $interestedProfileId já adicionado, pulando duplicata...');
+          continue;
+        }
+        seenProfileIds.add(interestedProfileId);
 
         debugPrint('👤 Carregando perfil: $interestedProfileId');
 
@@ -183,7 +190,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
             final profileData = profileDoc.data()!;
             users.add({
               'profileId': interestedProfileId,
-              'userId': data['interestedUid'] as String,
+              'userId': data['interestedUid'] as String? ?? '',
               'name': profileData['name'] as String? ?? 'Usuário',
               'photoUrl': profileData['photoUrl'] as String? ?? '',
               'isBand': profileData['isBand'] as bool? ?? false,
@@ -292,12 +299,37 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     final activeProfile = profileState.value?.activeProfile;
     if (activeProfile == null) return;
 
+    // ✅ VERIFICAR SE JÁ EXISTE INTERESSE ANTES DE CRIAR
+    // Evita criação de duplicatas
+    if (_hasInterest || _interestId != null) {
+      debugPrint('⚠️ Interesse já existe, pulando criação...');
+      return;
+    }
+
     // 1. Estado Otimista: Atualiza UI imediatamente
     setState(() {
       _hasInterest = true;
     });
 
     try {
+      // ✅ Verificar novamente no Firestore para evitar race conditions
+      final existingInterest = await FirebaseFirestore.instance
+          .collection('interests')
+          .where('postId', isEqualTo: _post!.id)
+          .where('interestedProfileId', isEqualTo: activeProfile.profileId)
+          .limit(1)
+          .get();
+
+      if (existingInterest.docs.isNotEmpty) {
+        debugPrint('⚠️ Interesse já existe no Firestore, atualizando estado...');
+        if (mounted) {
+          setState(() {
+            _interestId = existingInterest.docs.first.id;
+          });
+        }
+        return;
+      }
+
       // ✅ Usar factory padronizada
       final interestData = InterestDocumentFactory.create(
         postId: _post!.id,
@@ -349,17 +381,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         });
         AppSnackBar.showError(context, 'Erro ao salvar interesse. Verifique sua conexão.');
       }
-    }
-  }
-
-  double? _calculateDistance(ProfileEntity activeProfile) {
-    try {
-      return calculateDistanceBetweenGeoPoints(
-        _post!.location,
-        activeProfile.location,
-      );
-    } catch (_) {
-      return null;
     }
   }
 
@@ -1607,33 +1628,17 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   /// Bloco de preços Amazon-style com desconto
   Widget _buildPriceBlock() {
     final price = _post!.price;
-    final discountMode = _post!.discountMode;
-    final discountValue = _post!.discountValue;
 
     // Se não tem preço, não mostra o bloco
     if (price == null || price <= 0) {
       return const SizedBox.shrink();
     }
 
-    double originalPrice = price;
-    double finalPrice = price;
-    String? discountLabel;
+    // ✅ USAR PriceCalculator PARA CALCULOS CONSISTENTES
+    final priceData = PriceCalculator.getPriceDisplayData(_post!);
 
-    // Calcular preço original baseado no desconto
-    if (discountMode == 'percentage' && discountValue != null && discountValue > 0) {
-      // Se preço informado é o final e desconto é %, calcular original
-      originalPrice = price / (1 - discountValue / 100);
-      discountLabel = '-${discountValue.toStringAsFixed(0)}%';
-    } else if (discountMode == 'fixed' && discountValue != null && discountValue > 0) {
-      // Se desconto é valor fixo
-      originalPrice = price + discountValue;
-      discountLabel = 'R\$ ${discountValue.toStringAsFixed(2).replaceAll('.', ',')} OFF';
-    }
-
-    final hasDiscount = discountMode != null && 
-        discountMode != 'none' && 
-        discountValue != null && 
-        discountValue > 0;
+    // ✅ FORMATADOR BRASILEIRO PARA PREÇOS
+    final currencyFormatter = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1648,11 +1653,11 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (hasDiscount) ...[
+            if (priceData.hasDiscount) ...[
               Row(
                 children: [
                   Text(
-                    'De R\$ ${originalPrice.toStringAsFixed(2).replaceAll('.', ',')}',
+                    currencyFormatter.format(priceData.originalPrice),
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey[600],
@@ -1660,7 +1665,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  if (discountLabel != null)
+                  if (priceData.discountLabel != null)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
@@ -1668,7 +1673,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        discountLabel,
+                        priceData.discountLabel!,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -1685,7 +1690,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
               textBaseline: TextBaseline.alphabetic,
               children: [
                 Text(
-                  hasDiscount ? 'Por' : 'Preço',
+                  priceData.hasDiscount ? 'Por' : 'Preço',
                   style: const TextStyle(
                     fontSize: 16,
                     color: Colors.green,
@@ -1693,7 +1698,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'R\$ ${finalPrice.toStringAsFixed(2).replaceAll('.', ',')}',
+                  currencyFormatter.format(priceData.finalPrice),
                   style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
@@ -1905,9 +1910,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   /// Abre WhatsApp com mensagem pré-definida
   Future<void> _launchWhatsApp(String phone) async {
     final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-    final title = _post!.title ?? 'no WeGig';
+    final title = _post!.title ?? 'sem título';
     final message = Uri.encodeComponent(
-      'Olá! Vi seu anúncio "$title" e tenho interesse.',
+      'Olá! Vi seu anúncio "$title" no WeGig e tenho interesse.',
     );
     final url = 'https://wa.me/55$cleanPhone?text=$message';
 

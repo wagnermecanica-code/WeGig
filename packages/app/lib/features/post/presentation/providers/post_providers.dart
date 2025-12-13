@@ -252,6 +252,17 @@ class PostNotifier extends _$PostNotifier {
       }
 
       final now = DateTime.now();
+      
+      // Calcular preço final para posts de vendas
+      double? finalPrice = input.price;
+      if (input.type == 'sales' && input.price != null && input.discountMode != null && input.discountMode != 'none' && input.discountValue != null) {
+        if (input.discountMode == 'percentage') {
+          finalPrice = input.price! * (1 - input.discountValue! / 100);
+        } else if (input.discountMode == 'fixed') {
+          finalPrice = input.price! - input.discountValue!;
+        }
+      }
+      
       final post = PostEntity(
         id: postId,
         authorProfileId: profile.profileId,
@@ -279,10 +290,10 @@ class PostNotifier extends _$PostNotifier {
         authorPhotoUrl: profile.photoUrl,
         activeProfileName: profile.name,
         activeProfilePhotoUrl: profile.photoUrl,
-        // Sales-specific fields
+        // Sales-specific fields - CORREÇÃO: salvar preço ORIGINAL, não final
         title: input.title,
         salesType: input.salesType,
-        price: input.price,
+        price: input.price, // ✅ ORIGINAL price (sem desconto)
         discountMode: input.discountMode,
         discountValue: input.discountValue,
         promoStartDate: input.promoStartDate,

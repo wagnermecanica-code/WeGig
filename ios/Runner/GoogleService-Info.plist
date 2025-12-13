@@ -2,18 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>963929089370-ptr6oho7i5e222st1g9a3boec7g20tol.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.963929089370-ptr6oho7i5e222st1g9a3boec7g20tol</string>
 	<key>API_KEY</key>
-	<string>AIzaSyAe_WwvD3nN-VJlMZf2L_BRpIx-ne3P_-0</string>
+	<string>AIzaSyAf6EMmKIke4UX_PH9L78dIhQjCZyPiO1s</string>
 	<key>GCM_SENDER_ID</key>
-	<string>278498777601</string>
+	<string>963929089370</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.toSemBanda</string>
+	<string>com.wegig.wegig</string>
 	<key>PROJECT_ID</key>
-	<string>to-sem-banda-83e19</string>
+	<string>wegig-dev</string>
 	<key>STORAGE_BUCKET</key>
-	<string>to-sem-banda-83e19.firebasestorage.app</string>
+	<string>wegig-dev.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:278498777601:ios:cdeec8b4da7c657a9ebe00</string>
+	<string>1:963929089370:ios:c9a1e302fc589b5fec7f63</string>
 </dict>
 </plist>

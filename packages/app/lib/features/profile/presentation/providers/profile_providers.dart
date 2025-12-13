@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 import 'package:wegig_app/features/profile/data/datasources/profile_remote_datasource.dart';
 import 'package:wegig_app/features/profile/data/repositories/profile_repository_impl.dart';
 import 'package:wegig_app/features/profile/domain/repositories/profile_repository.dart';
@@ -149,6 +150,9 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
       // CRITICAL: Analytics - Track active profile para segmentação
       if (activeProfile != null) {
         _setAnalyticsProfile(activeProfile.profileId);
+        
+        // CRITICAL: Salvar token FCM para receber push notifications
+        _saveFcmToken(activeProfile.profileId);
       }
 
       return ProfileState(
@@ -214,6 +218,23 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
     } catch (e) {
       debugPrint('⚠️ Analytics error: $e');
     }
+  }
+
+  /// CRITICAL: Salva token FCM para receber push notifications
+  /// 
+  /// Chamado quando perfil é carregado (login) para garantir que
+  /// o token FCM está associado ao perfil ativo.
+  void _saveFcmToken(String profileId) {
+    // Usar Future para não bloquear o carregamento de perfis
+    Future.microtask(() async {
+      try {
+        await PushNotificationService().saveTokenForProfile(profileId);
+        debugPrint('🔔 FCM: Token salvo para perfil $profileId');
+      } catch (e) {
+        debugPrint('⚠️ FCM: Erro ao salvar token - $e');
+        // Não faz rethrow - falha em FCM não deve bloquear login
+      }
+    });
   }
 
   Future<ProfileResult> createProfile(ProfileEntity profile) async {

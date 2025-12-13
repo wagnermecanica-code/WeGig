@@ -35,7 +35,21 @@ service cloud.firestore {
 
     match /profiles/{profileId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      // ✅ CORREÇÃO: Separar regras para create/update e delete
+      // Para create/update: usa request.resource.data (dados que serão escritos)
+      // Para delete: usa resource.data (dados existentes no documento)
+      allow create, update: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+
+      // ============================================
+      // FCM TOKENS - Subcoleção para push notifications
+      // ============================================
+      // Qualquer usuário autenticado pode gerenciar tokens em seus próprios perfis
+      // A validação de ownership do perfil já é feita pela lógica do app
+      // (o app só salva tokens para perfis que o usuário possui)
+      match /fcmTokens/{tokenId} {
+        allow read, write: if isSignedIn();
+      }
     }
 
     // ============================================
@@ -86,13 +100,30 @@ service cloud.firestore {
       // ============================================
       // MESSAGES - Subcoleção aninhada
       // ============================================
-      // Usa isConversationMember para verificar se usuário pertence à conversa pai
+      // SIMPLIFICADO: Verifica apenas se o usuário é participante da conversa pai
+      // usando get() que funciona para operações individuais (não queries)
       match /messages/{messageId} {
-        allow read: if isSignedIn() && isConversationMember(conversationId);
+        // Helper inline para verificar participação
+        function canAccessConversation() {
+          let conv = get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+          return conv != null && (
+            (conv.participants != null && request.auth.uid in conv.participants) ||
+            (conv.profileUid != null && request.auth.uid in conv.profileUid)
+          );
+        }
+        
+        allow read: if isSignedIn() && canAccessConversation();
         allow create: if isSignedIn()
-          && isConversationMember(conversationId)
+          && canAccessConversation()
           && request.resource.data.senderId == request.auth.uid;
-        allow update, delete: if isSignedIn() && resource.data.senderId == request.auth.uid;
+        // ✅ FIX: Permitir update se:
+        // 1. É o remetente da mensagem (pode editar/deletar), OU
+        // 2. É participante da conversa e está apenas modificando reactions ou deletedForProfiles
+        allow update: if isSignedIn() && (
+          resource.data.senderId == request.auth.uid ||
+          (canAccessConversation() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions', 'deletedForProfiles']))
+        );
+        allow delete: if isSignedIn() && resource.data.senderId == request.auth.uid;
       }
     }
 

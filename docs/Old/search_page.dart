@@ -308,11 +308,20 @@ class SearchPageState extends State<SearchPage> {
     });
 
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('profiles')
+      final profilesRef = FirebaseFirestore.instance.collection('profiles');
+
+      var snapshot = await profilesRef
           .where('usernameLowercase', isEqualTo: username)
           .limit(10)
           .get();
+
+      // Fallback para perfis antigos sem usernameLowercase persistido
+      if (snapshot.docs.isEmpty) {
+        snapshot = await profilesRef
+            .where('username', isEqualTo: username)
+            .limit(10)
+            .get();
+      }
 
       if (!mounted) return;
 

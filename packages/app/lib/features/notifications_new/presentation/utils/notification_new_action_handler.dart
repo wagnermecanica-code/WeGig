@@ -10,7 +10,7 @@ import 'package:core_ui/core_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
 import 'package:wegig_app/features/notifications_new/domain/entities/notification_new_entity.dart';
 import 'package:wegig_app/features/notifications_new/presentation/providers/notifications_new_providers.dart';
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
@@ -148,12 +148,12 @@ class NotificationNewActionHandler {
 
     Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => ChatDetailPage(
+        builder: (_) => ChatNewPage(
           conversationId: conversationId,
-          otherUserId: otherUserId,
+          otherUid: otherUserId,
           otherProfileId: otherProfileId,
-          otherUserName: otherUserName,
-          otherUserPhoto: otherUserPhoto,
+          otherName: otherUserName,
+          otherPhotoUrl: otherUserPhoto,
         ),
       ),
     );

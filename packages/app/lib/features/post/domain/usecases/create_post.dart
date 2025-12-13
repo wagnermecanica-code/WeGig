@@ -15,8 +15,8 @@ class CreatePost {
       throw Exception('Conteúdo é obrigatório');
     }
 
-    if (post.content.length > 600) {
-      throw Exception('Conteúdo deve ter no máximo 600 caracteres');
+    if (post.content.length > 500) {
+      throw Exception('Conteúdo deve ter no máximo 500 caracteres');
     }
 
     if (post.city.trim().isEmpty) {

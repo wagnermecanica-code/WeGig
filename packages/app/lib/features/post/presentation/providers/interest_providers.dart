@@ -77,12 +77,31 @@ class InterestNotifier extends _$InterestNotifier {
       throw Exception('Usuário não autenticado ou perfil não ativo');
     }
 
+    // ✅ VERIFICAÇÃO: Se já está no estado local, não criar novamente
+    if (state.contains(postId)) {
+      debugPrint('⚠️ InterestNotifier: Interesse já existe no estado local, pulando...');
+      return;
+    }
+
     // 1. Optimistic Update: Adicionar imediatamente ao estado
     final previousState = state;
     state = {...state, postId};
     debugPrint('✅ InterestNotifier: Interesse adicionado otimisticamente (postId: $postId)');
 
     try {
+      // ✅ VERIFICAÇÃO NO FIRESTORE: Evitar duplicatas
+      final existingInterest = await _firestore
+          .collection('interests')
+          .where('postId', isEqualTo: postId)
+          .where('interestedProfileId', isEqualTo: activeProfile.profileId)
+          .limit(1)
+          .get();
+
+      if (existingInterest.docs.isNotEmpty) {
+        debugPrint('⚠️ InterestNotifier: Interesse já existe no Firestore, pulando criação...');
+        return;
+      }
+
       // 2. Criar documento no Firestore
       final interestData = InterestDocumentFactory.create(
         postId: postId,

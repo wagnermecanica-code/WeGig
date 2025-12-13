@@ -6,7 +6,7 @@ part of 'interest_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$interestNotifierHash() => r'1833a919ef2561e9e0ba8c66fd397bd9709fd2f3';
+String _$interestNotifierHash() => r'2ac70789eb8f70cdeeb1feace6037821aa6373e2';
 
 /// Provider global que gerencia o estado de interesses (posts salvos/curtidos)
 /// Sincroniza entre HomePage, PostDetailPage e ViewProfilePage

@@ -10,6 +10,7 @@ import 'package:core_ui/utils/deep_link_generator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,11 +22,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
-import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/providers/mensagens_new_providers.dart';
+import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/profile/presentation/widgets/profile_switcher_bottom_sheet.dart';
-import 'package:wegig_app/features/settings/presentation/pages/settings_page.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 /// Página principal de visualização/edição de perfis, tanto para o próprio
@@ -46,11 +48,10 @@ class ViewProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   ProfileEntity? _profile;
   List<String> _gallery = [];
   bool _loadingProfile = false;
-  final Set<String> _sentInterests = {};
   int _postsKey = 0; // Key para forçar rebuild do FutureBuilder de posts
 
   // IDs reais do perfil carregado (para compartilhamento)
@@ -60,12 +61,80 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   YoutubePlayerController? _youtubeController;
   TabController? _tabController;
 
+  // Estado de loading para o botão de mensagem (evita cliques múltiplos)
+  bool _isOpeningConversation = false;
+  
+  // Cache de conversationId para acelerar abertura do chat
+  String? _prefetchedConversationId;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(
         length: 4, vsync: this); // 4 tabs: Gallery, YouTube, Posts, Interests
     _loadProfileFromFirestore();
+    
+    // Prefetch conversation ID em background (não bloqueia UI)
+    _prefetchConversationIfNeeded();
+  }
+  
+  // Função para formatar telefone brasileiro
+  String _formatBrazilianPhone(String phone) {
+    final digitsOnly = phone.replaceAll(RegExp(r'\D'), '');
+    
+    if (digitsOnly.length == 10) {
+      // Formato: (XX) XXXX-XXXX
+      return '(${digitsOnly.substring(0, 2)}) ${digitsOnly.substring(2, 6)}-${digitsOnly.substring(6)}';
+    } else if (digitsOnly.length == 11) {
+      // Formato: (XX) XXXXX-XXXX
+      return '(${digitsOnly.substring(0, 2)}) ${digitsOnly.substring(2, 7)}-${digitsOnly.substring(7)}';
+    }
+    
+    // Retorna o telefone original se não conseguir formatar
+    return phone;
+  }
+
+  /// Carrega conversationId em background para acelerar botão de mensagem
+  Future<void> _prefetchConversationIfNeeded() async {
+    // Só faz prefetch para perfis de outros usuários
+    if (widget.profileId == null && widget.userId == null) return;
+    
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+      
+      final activeProfile = ref.read(activeProfileProvider);
+      if (activeProfile == null) return;
+      
+      // Aguarda perfil carregar
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (_profile == null) return;
+      
+      // Evita prefetch para si mesmo
+      if (activeProfile.profileId == _profile!.profileId) return;
+      
+      // Query otimizada: busca APENAS conversationId (não cria)
+      final query = await FirebaseFirestore.instance
+          .collection('conversations')
+          .where('participants', arrayContains: currentUser.uid)
+          .limit(10) // Limita para economizar bandwidth
+          .get();
+      
+      // Filtra client-side (mais rápido que query complexa)
+      for (final doc in query.docs) {
+        final data = doc.data();
+        final participantProfiles = (data['participantProfiles'] as List?)?.cast<String>() ?? [];
+        
+        if (participantProfiles.contains(activeProfile.profileId) &&
+            participantProfiles.contains(_profile!.profileId)) {
+          _prefetchedConversationId = doc.id;
+          debugPrint('⚡ ViewProfile: Conversation prefetched: $_prefetchedConversationId');
+          break;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ ViewProfile: Prefetch error (non-critical): $e');
+    }
   }
 
   Future<void> _loadProfileFromFirestore() async {
@@ -232,28 +301,48 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   Widget _buildActionButton({
     required String label,
     required IconData icon,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     required bool isPrimary,
+    bool isLoading = false,
   }) {
+    final isDisabled = onPressed == null || isLoading;
+    
     return SizedBox(
       height: 32,
       child: ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(
-          icon,
-          size: 16,
-          color: isPrimary ? Colors.white : Colors.black,
-        ),
+        onPressed: isDisabled ? null : onPressed,
+        icon: isLoading
+            ? SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isPrimary ? Colors.white : Colors.black54,
+                  ),
+                ),
+              )
+            : Icon(
+                icon,
+                size: 16,
+                color: isDisabled
+                    ? (isPrimary ? Colors.white70 : Colors.black38)
+                    : (isPrimary ? Colors.white : Colors.black),
+              ),
         label: Text(
-          label,
+          isLoading ? 'Abrindo...' : label,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: isPrimary ? Colors.white : Colors.black,
+            color: isDisabled
+                ? (isPrimary ? Colors.white70 : Colors.black38)
+                : (isPrimary ? Colors.white : Colors.black),
           ),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary ? AppColors.primary : Colors.grey[200],
+          backgroundColor: isPrimary
+              ? (isDisabled ? AppColors.primary.withOpacity(0.7) : AppColors.primary)
+              : (isDisabled ? Colors.grey[300] : Colors.grey[200]),
           foregroundColor: isPrimary ? Colors.white : Colors.black,
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -267,6 +356,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
   /// Abre ou cria uma conversa com o perfil visualizado
   Future<void> _openOrCreateConversation() async {
+    // Debouncing: evita cliques múltiplos
+    if (_isOpeningConversation) {
+      debugPrint('⚠️ ViewProfile: Operação já em andamento, ignorando clique');
+      return;
+    }
+    
     if (_profile == null) return;
 
     final currentUser = FirebaseAuth.instance.currentUser;
@@ -283,72 +378,54 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       return;
     }
 
+    // Ativar estado de loading
+    if (mounted) {
+      setState(() => _isOpeningConversation = true);
+    }
+
     try {
-      // Buscar conversa existente entre os dois perfis
-      final existingConversations = await FirebaseFirestore.instance
-          .collection('conversations')
-          .where('participantProfiles', arrayContains: activeProfile.profileId)
-          .where('profileUid', arrayContains: activeProfile.uid)
-          .get();
-
-      String? conversationId;
-
-      // Verificar se já existe conversa entre os dois perfis
-      for (final doc in existingConversations.docs) {
-        final participantProfiles =
-            (doc.data()['participantProfiles'] as List?)?.cast<String>() ?? [];
-        if (participantProfiles.contains(_profile!.profileId)) {
-          conversationId = doc.id;
-          break;
-        }
+      // Verificar se está tentando conversar com seu próprio perfil (mesmo profileId)
+      if (activeProfile.profileId == _profile!.profileId) {
+        throw Exception('Não é possível iniciar conversa consigo mesmo');
       }
 
-      // Se não existe, criar nova conversa
-      if (conversationId == null) {
-        // Garantir que temos o UID do outro usuário
-        final otherUserId = _profile!.uid;
-        debugPrint(
-            'Criando conversa: currentUser.uid=${currentUser.uid}, otherUserId=$otherUserId');
-        debugPrint(
-            'Participantes perfis: ${activeProfile.profileId}, ${_profile!.profileId}');
-
-        if (otherUserId.isEmpty) {
-          throw Exception('UID do perfil não encontrado');
-        }
-
-        // Verificar se está tentando conversar com seu próprio perfil (mesmo profileId)
-        if (activeProfile.profileId == _profile!.profileId) {
-          throw Exception('Não é possível iniciar conversa consigo mesmo');
-        }
-
-        final newConversation =
-            await FirebaseFirestore.instance.collection('conversations').add({
-          'participants': [currentUser.uid, otherUserId],
-          'profileUid': [currentUser.uid, otherUserId],
-          'participantProfiles': [activeProfile.profileId, _profile!.profileId],
-          'lastMessage': '',
-          'lastMessageTimestamp': FieldValue.serverTimestamp(),
-          'createdAt': FieldValue.serverTimestamp(),
-          'archived': false,
-          'unreadCount': {
-            activeProfile.profileId: 0,
-            _profile!.profileId: 0,
+      // Usar conversationId prefetched se disponível (economiza 1 query!)
+      String conversationId;
+      if (_prefetchedConversationId != null) {
+        conversationId = _prefetchedConversationId!;
+        debugPrint('⚡ ViewProfile: Usando conversation prefetched');
+      } else {
+        // Fallback: busca/cria conversa normalmente
+        final conversation = await ref.read(mensagensNewRepositoryProvider).getOrCreateConversation(
+          currentProfileId: activeProfile.profileId,
+          currentUid: currentUser.uid,
+          otherProfileId: _profile!.profileId,
+          otherUid: _profile!.uid,
+          currentProfileData: {
+            'name': activeProfile.name,
+            'photoUrl': activeProfile.photoUrl,
           },
-        });
-        conversationId = newConversation.id;
-        debugPrint('Conversa criada com sucesso: $conversationId');
+          otherProfileData: {
+            'name': _profile!.name,
+            'photoUrl': _profile!.photoUrl,
+          },
+        );
+        conversationId = conversation.id;
       }
 
       // Navegar para a tela de chat
       if (mounted) {
+        // Desativar loading antes de navegar
+        setState(() => _isOpeningConversation = false);
+        
         Navigator.of(context).push<void>(
           MaterialPageRoute<void>(
-            builder: (_) => ChatDetailPage(
-              conversationId: conversationId!,
-              otherUserId: widget.userId ?? _profile!.uid,
+            builder: (_) => ChatNewPage(
+              conversationId: conversationId,
+              otherUid: widget.userId ?? _profile!.uid,
               otherProfileId: _profile!.profileId,
-              otherUserName: _profile!.name,
-              otherUserPhoto: _profile!.photoUrl ?? '',
+              otherName: _profile!.name,
+              otherPhotoUrl: _profile!.photoUrl ?? '',
             ),
           ),
         );
@@ -356,7 +433,16 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     } catch (e) {
       debugPrint('Erro ao abrir conversa: $e');
       if (mounted) {
-        AppSnackBar.showError(context, 'Erro ao abrir conversa: $e');
+        // Mensagem de erro mais amigável
+        final errorMessage = e.toString().contains('consigo mesmo')
+            ? 'Não é possível enviar mensagem para si mesmo'
+            : 'Não foi possível abrir a conversa. Tente novamente.';
+        AppSnackBar.showError(context, errorMessage);
+      }
+    } finally {
+      // Garantir que loading é desativado em caso de erro
+      if (mounted) {
+        setState(() => _isOpeningConversation = false);
       }
     }
   }
@@ -1102,54 +1188,25 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                     children: [
                                       // Botão de ligar
                                       Expanded(
-                                        child: InkWell(
-                                          onTap: () => _launchUrl('tel:${_profile!.phone}'),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                                            decoration: BoxDecoration(
-                                              border: Border.all(color: AppColors.primary),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(Iconsax.call, size: 18, color: AppColors.primary),
-                                                const SizedBox(width: 8),
-                                                Flexible(
-                                                  child: Text(
-                                                    _profile!.phone!,
-                                                    style: const TextStyle(
-                                                      fontSize: 14,
-                                                      color: AppColors.primary,
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
+                                        child: _buildActionButton(
+                                          label: 'Ligar',
+                                          icon: Iconsax.call,
+                                          onPressed: () => _launchUrl('tel:${_profile!.phone}'),
+                                          isPrimary: true,
                                         ),
                                       ),
                                       const SizedBox(width: 8),
                                       // Botão WhatsApp
-                                      InkWell(
-                                        onTap: () {
-                                          final phone = _profile!.phone!.replaceAll(RegExp(r'[^\d]'), '');
-                                          final phoneWithCountry = phone.startsWith('55') ? phone : '55$phone';
-                                          _launchUrl('https://wa.me/$phoneWithCountry');
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.all(10),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF25D366),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Icon(
-                                            Icons.chat,
-                                            size: 20,
-                                            color: Colors.white,
-                                          ),
+                                      Expanded(
+                                        child: _buildActionButton(
+                                          label: 'WhatsApp',
+                                          icon: Icons.chat,
+                                          onPressed: () {
+                                            final phone = _profile!.phone!.replaceAll(RegExp(r'[^\d]'), '');
+                                            final phoneWithCountry = phone.startsWith('55') ? phone : '55$phone';
+                                            _launchUrl('https://wa.me/$phoneWithCountry');
+                                          },
+                                          isPrimary: false,
                                         ),
                                       ),
                                     ],
@@ -1167,6 +1224,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                         icon: Iconsax.message,
                                         onPressed: _openOrCreateConversation,
                                         isPrimary: true,
+                                        isLoading: _isOpeningConversation,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -1547,7 +1605,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               ),
 
             // Telefone (clicável)
-            if (_profile!.phone != null && _profile!.phone!.isNotEmpty)
+            if (_profile!.phone != null && _profile!.phone!.trim().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: InkWell(
@@ -1558,7 +1616,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          _profile!.phone!,
+                          _formatBrazilianPhone(_profile!.phone!.trim()),
                           style: valueStyle.copyWith(
                             color: AppColors.primary,
                             decoration: TextDecoration.underline,
@@ -1572,7 +1630,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
             // Horário de Funcionamento
             if (_profile!.operatingHours != null &&
-                _profile!.operatingHours!.isNotEmpty)
+                _profile!.operatingHours!.trim().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
@@ -1587,7 +1645,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                           Text('Horário:', style: labelStyle),
                           const SizedBox(height: 4),
                           Text(
-                            _profile!.operatingHours!,
+                            _profile!.operatingHours!.trim(),
                             style: valueStyle,
                           ),
                         ],
@@ -1598,7 +1656,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               ),
 
             // Website (clicável)
-            if (_profile!.website != null && _profile!.website!.isNotEmpty)
+            if (_profile!.website != null && _profile!.website!.trim().isNotEmpty)
               Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: InkWell(
@@ -1609,7 +1667,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   const SizedBox(width: 8),
                   Expanded(
                   child: Text(
-                    _profile!.website!
+                    _profile!.website!.trim()
                       .replaceFirst(RegExp(r'^https?://'), '')
                       .replaceFirst(RegExp(r'^www\.'), '')
                       .split('/')[0], // Shows only domain
@@ -2050,6 +2108,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final isOwner =
         activeProfile != null && activeProfile.profileId == _profile!.profileId;
 
+    // ✅ Buscar status de interesses do usuário ativo
+    final interestsAsync = ref.watch(interestNotifierProvider);
+
     return FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
       key: ValueKey(_postsKey), // Força rebuild quando _postsKey muda
       future: _fetchPosts(isOwner),
@@ -2102,7 +2163,10 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           itemCount: docs.length,
           itemBuilder: (context, i) {
             final d = docs[i].data();
-            return _buildPostCard(docs[i].id, d, isOwner);
+            final postId = docs[i].id;
+            // ✅ Verificar se o usuário ativo demonstrou interesse neste post
+            final isInterestSent = interestsAsync.contains(postId);
+            return _buildPostCard(postId, d, isOwner, isInterestSent: isInterestSent);
           },
         );
       },
@@ -2119,12 +2183,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           .where('authorProfileId', isEqualTo: _profile!.profileId)
           .orderBy('createdAt', descending: true);
     } else {
-      // Visitantes vêem apenas posts não expirados
+      // Visitantes vêem apenas posts não expirados, ordenados por createdAt
+      // ✅ Usa índice composto: authorProfileId + expiresAt + __name__
       final now = DateTime.now();
       postsQuery = postsQuery
           .where('authorProfileId', isEqualTo: _profile!.profileId)
           .where('expiresAt', isGreaterThan: Timestamp.fromDate(now))
-          .orderBy('expiresAt', descending: true);
+          .orderBy('expiresAt') // Requerido para o índice
+          .orderBy('createdAt', descending: true); // Ordem desejada
     }
 
     return postsQuery.get();
@@ -2139,6 +2205,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final activeProfile = profileState.value?.activeProfile;
     final isOwner =
         activeProfile != null && activeProfile.profileId == _profile!.profileId;
+
+    // ✅ NOVO: Buscar status de interesses do usuário ativo
+    final interestsAsync = ref.watch(interestNotifierProvider);
 
     // Apenas mostra se for o próprio perfil
     if (!isOwner) {
@@ -2225,8 +2294,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 final postData = postSnap.data!.data()!;
                 debugPrint(
                     'ViewProfile: Mostrando post $postId - type: ${postData['type']}');
+
+                // ✅ NOVO: Verificar se o usuário ativo demonstrou interesse neste post
+                final isInterestSent = interestsAsync.contains(postId);
+
                 return _buildPostCard(postId, postData, false,
-                    isInterestCard: true);
+                    isInterestCard: true, isInterestSent: isInterestSent);
               },
             );
           },
@@ -2277,32 +2350,45 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   Future<void> _sendInterestOptimistically(
       String postId, String authorProfileId, String postType) async {
     if (!mounted) return;
-    setState(() => _sentInterests.add(postId));
-
-    AppSnackBar.showSuccess(
-      context,
-      'Interesse enviado!',
-    );
 
     try {
       final activeProfile = ref.read(profileProvider).value?.activeProfile;
       if (activeProfile == null) return;
 
-      await FirebaseFirestore.instance.collection('interests').add({
-        'postId': postId,
-        'postAuthorProfileId': authorProfileId,
-        'profileUid': activeProfile.uid,
-        'interestedProfileId': activeProfile.profileId,
-        'interestedProfileName': activeProfile.name, // ✅ Cloud Function expects this
-        'interestedProfilePhotoUrl': activeProfile.photoUrl, // ✅ Used in notification
-        'interestedName': activeProfile.name, // ⚠️ Deprecated but kept for backwards compat
-        'createdAt': FieldValue.serverTimestamp(),
-        'read': false,
-      });
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
+      // ✅ Buscar dados do autor do post para preencher postAuthorUid
+      final postDoc = await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(postId)
+          .get();
+
+      if (!postDoc.exists) {
+        throw Exception('Post não encontrado');
+      }
+
+      final postAuthorUid = postDoc.data()?['authorUid'] as String?;
+      if (postAuthorUid == null) {
+        throw Exception('Post sem authorUid');
+      }
+
+      // ✅ Usar provider global para optimistic update e persistência
+      await ref.read(interestNotifierProvider.notifier).addInterest(
+        postId: postId,
+        postAuthorUid: postAuthorUid,
+        postAuthorProfileId: authorProfileId,
+      );
+
+      if (mounted) {
+        AppSnackBar.showSuccess(
+          context,
+          'Interesse enviado!',
+        );
+      }
     } catch (e) {
       debugPrint('Erro no envio otimista de interesse: $e');
       if (mounted) {
-        setState(() => _sentInterests.remove(postId));
         AppSnackBar.showError(
           context,
           'Erro ao enviar interesse: $e',
@@ -2314,32 +2400,25 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   Future<void> _removeInterestOptimistically(
       String postId, String authorProfileId) async {
     if (!mounted) return;
-    setState(() => _sentInterests.remove(postId));
-
-    AppSnackBar.showInfo(
-      context,
-      'Interesse removido',
-    );
 
     try {
       final activeProfile = ref.read(profileProvider).value?.activeProfile;
       if (activeProfile == null) return;
 
-      final query = await FirebaseFirestore.instance
-          .collection('interests')
-          .where('postId', isEqualTo: postId)
-          .where('interestedProfileId', isEqualTo: activeProfile.profileId)
-          .where('profileUid', isEqualTo: activeProfile.uid)
-          .limit(1)
-          .get();
+      // ✅ Usar provider global para optimistic update e remoção
+      await ref.read(interestNotifierProvider.notifier).removeInterest(
+        postId: postId,
+      );
 
-      for (final doc in query.docs) {
-        await doc.reference.delete();
+      if (mounted) {
+        AppSnackBar.showInfo(
+          context,
+          'Interesse removido',
+        );
       }
     } catch (e) {
       debugPrint('Erro ao remover interesse: $e');
       if (mounted) {
-        setState(() => _sentInterests.add(postId));
         AppSnackBar.showError(
           context,
           'Erro ao remover interesse: $e',
@@ -2539,7 +2618,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   }
 
   Widget _buildPostCard(String postId, Map<String, dynamic> data, bool isOwner,
-      {bool isInterestCard = false}) {
+      {bool isInterestCard = false, bool isInterestSent = false}) {
     // ✅ Priorizar photoUrls (carrossel) com fallback para photoUrl legado
     final photoUrls = (data['photoUrls'] as List<dynamic>?)?.cast<String>() ?? [];
     final photo = photoUrls.isNotEmpty 
@@ -2549,8 +2628,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final type = (data['type'] as String?) ?? '';
     final city = (data['city'] as String?) ?? '';
     final state = (data['state'] as String?) ?? '';
-    // Se é um card de interesse, já foi enviado. Senão, verifica no Set
-    final isInterestSent = isInterestCard || _sentInterests.contains(postId);
+    // Se é um card de interesse, já foi enviado. Senão, verifica no Set ou parâmetro
     final primaryColor = type == 'band' ? AppColors.accent : AppColors.primary;
 
     // Time counter (apenas para posts do owner)

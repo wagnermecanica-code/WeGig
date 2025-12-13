@@ -34,6 +34,7 @@ class NotificationService {
   /// Cria uma notificação para um profileId específico
   ///
   /// [recipientProfileId] - ID do perfil que receberá a notificação (CRÍTICO)
+  /// [recipientUid] - UID do usuário dono do perfil (obrigatório para Security Rules)
   /// [type] - Tipo da notificação (interest, newMessage, etc.)
   /// [title] - Título da notificação
   /// [body] - Corpo/mensagem da notificação
@@ -42,6 +43,7 @@ class NotificationService {
   /// [senderUsername] - Username público do remetente para menções (sem @)
   Future<void> create({
     required String recipientProfileId,
+    String? recipientUid,
     required String type,
     required String title,
     required String body,
@@ -56,10 +58,36 @@ class NotificationService {
       // Calcular expiração baseada no tipo
       final expiresAt = _getExpirationDate(type, now);
 
+      // ✅ FIX: Obter recipientUid se não fornecido
+      // Para notificações self-directed (teste), usar o activeProfile.uid
+      // Para notificações a outros, buscar o UID do perfil destinatário
+      String? finalRecipientUid = recipientUid;
+      if (finalRecipientUid == null) {
+        // Primeiro, verificar se é o perfil ativo (caso comum: auto-notificação/teste)
+        final activeProfile = _profileState.activeProfile;
+        if (activeProfile != null && activeProfile.profileId == recipientProfileId) {
+          finalRecipientUid = activeProfile.uid;
+        } else {
+          // Buscar o UID do perfil destinatário no Firestore
+          final profileDoc = await _firestore
+              .collection('profiles')
+              .doc(recipientProfileId)
+              .get();
+          if (profileDoc.exists) {
+            finalRecipientUid = profileDoc.data()?['uid'] as String?;
+          }
+        }
+      }
+
+      if (finalRecipientUid == null) {
+        throw Exception('recipientUid é obrigatório para criar notificações');
+      }
+
       final notificationData = {
         'type': type,
         'recipientProfileId': recipientProfileId,
-        'profileUid': recipientProfileId, // CRITICAL: Isolamento de perfil
+        'recipientUid': finalRecipientUid, // ✅ CRÍTICO: Obrigatório para Security Rules
+        'profileUid': finalRecipientUid, // CRITICAL: Isolamento de perfil (backwards compat)
         'senderProfileId': senderProfileId,
         'senderUsername': normalizedUsername,
         'title': title,

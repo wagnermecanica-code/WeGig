@@ -109,10 +109,12 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
           .where('authorProfileId', isEqualTo: profileId)
           .where('expiresAt', isGreaterThan: Timestamp.now())
           .orderBy('expiresAt')
-          .orderBy('createdAt', descending: true)
           .get();
 
       final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
+      
+      // Sort by createdAt descending in memory to avoid composite index requirement
+      posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       debugPrint('✅ PostDataSource: ${posts.length} posts loaded for profile');
       return posts;
@@ -321,11 +323,12 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
           .collection('posts')
           .where('expiresAt', isGreaterThan: Timestamp.now())
           .orderBy('expiresAt')
-          .orderBy('createdAt', descending: true)
           .limit(limit)
           .get();
 
       final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
+      // Sort by createdAt descending in memory
+      posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       debugPrint('✅ PostDataSource: ${posts.length} nearby posts loaded');
       return posts;
@@ -345,11 +348,12 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
           .where('profileUid', isEqualTo: uid)
           .where('expiresAt', isGreaterThan: Timestamp.now())
           .orderBy('expiresAt')
-          .orderBy('createdAt', descending: true)
           .snapshots()
           .debounceTime(const Duration(milliseconds: 300))  // ⚡ Debounce para reduzir rebuilds
           .map((snapshot) {
         final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
+        // Sort by createdAt descending in memory
+        posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         debugPrint('👁️ PostDataSource: Stream emitiu ${posts.length} posts (debounced)');
         return posts;
       });
@@ -370,11 +374,12 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
           .where('authorProfileId', isEqualTo: profileId)
           .where('expiresAt', isGreaterThan: Timestamp.now())
           .orderBy('expiresAt')
-          .orderBy('createdAt', descending: true)
           .snapshots()
           .debounceTime(const Duration(milliseconds: 300))  // ⚡ Debounce para reduzir rebuilds
           .map((snapshot) {
         final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
+        // Sort by createdAt descending in memory
+        posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         debugPrint('👁️ PostDataSource: Stream emitiu ${posts.length} posts (debounced)');
         return posts;
       });

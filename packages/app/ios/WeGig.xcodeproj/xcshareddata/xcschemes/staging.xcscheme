@@ -91,7 +91,7 @@
             ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
             <ActionContent
                title = "Run Script"
-               scriptText = "&#10;">
+               scriptText = "#!/bin/bash&#10;echo &quot;&#x1f527; Configurando Firebase para STAGING...&quot;&#10;cp &quot;${SRCROOT}/Firebase/GoogleService-Info-staging.plist&quot; &quot;${SRCROOT}/Runner/GoogleService-Info.plist&quot;&#10;echo &quot;&#x2705; STAGING Firebase configurado&quot;&#10;">
                <EnvironmentBuildable>
                   <BuildableReference
                      BuildableIdentifier = "primary"

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -575,14 +576,13 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   Future<void> _handleSuccessfulProfileSave(
     ProfileEntity profile, {
     required bool isCreation,
+    required ProfileNotifier profileNotifier,
   }) async {
-    final profileNotifier = ref.read(profileProvider.notifier);
     try {
       await profileNotifier.refresh();
     } catch (_) {
-      if (mounted) {
-        ref.invalidate(profileProvider);
-      }
+      // Se falhar o refresh, silenciosamente ignora
+      // pois o perfil já foi salvo com sucesso
     }
 
     if (!mounted) return;
@@ -628,6 +628,29 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     }
   }
 
+  Future<void> _ensureUsernameLowercaseField(
+    String profileId,
+    String? username,
+  ) async {
+    final value = username?.trim();
+    if (value == null || value.isEmpty) return;
+
+    final lowercase = value.toLowerCase();
+    try {
+      await FirebaseFirestore.instance
+          .collection('profiles')
+          .doc(profileId)
+          .set(
+        {'usernameLowercase': lowercase},
+        SetOptions(merge: true),
+      );
+    } catch (error) {
+      debugPrint(
+        'EditProfile: Falha ao garantir usernameLowercase para $profileId: $error',
+      );
+    }
+  }
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -642,13 +665,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
     // Validar campos específicos de Espaço
     if (_profileType == ProfileType.space) {
-      if (_phoneController.text.trim().isEmpty) {
-        AppSnackBar.showWarning(
-          context,
-          'Por favor, informe um telefone/WhatsApp para contato',
-        );
-        return;
-      }
       if (_selectedSpaceType == null) {
         AppSnackBar.showWarning(
           context,
@@ -781,16 +797,22 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           updatedAt: DateTime.now(),
         );
 
+        // ✅ Capturar notifier ANTES das operações assíncronas para evitar "ref after disposed"
+        final profileNotifier = ref.read(profileProvider.notifier);
+        
         // ✅ Usar profileProvider.notifier (Clean Architecture)
-        final result =
-            await ref.read(profileProvider.notifier).createProfile(newProfile);
+        final result = await profileNotifier.createProfile(newProfile);
 
         switch (result) {
           case ProfileSuccess(:final profile):
             debugPrint(
                 '✅ EditProfile: Perfil criado - ID=${profile.profileId}');
 
-            final profileNotifier = ref.read(profileProvider.notifier);
+            await _ensureUsernameLowercaseField(
+              profile.profileId,
+              profile.username,
+            );
+
             await profileNotifier.switchProfile(profile.profileId);
 
             final userDocRef =
@@ -805,13 +827,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
             await _waitForUserDocumentUsername(user.uid);
 
-            if (mounted) {
-              ref.invalidate(userDocumentProvider);
-            }
-
             await _handleSuccessfulProfileSave(
               profile,
               isCreation: true,
+              profileNotifier: profileNotifier,
             );
             return;
 
@@ -885,19 +904,26 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           updatedAt: DateTime.now(),
         );
 
+        // ✅ Capturar notifier ANTES das operações assíncronas para evitar "ref after disposed"
+        final profileNotifierUpdate = ref.read(profileProvider.notifier);
+        
         // ✅ Usar profileProvider.notifier (Clean Architecture)
-        final result = await ref
-            .read(profileProvider.notifier)
-            .updateProfile(updatedProfile);
+        final result = await profileNotifierUpdate.updateProfile(updatedProfile);
 
         switch (result) {
           case ProfileSuccess(:final profile):
             debugPrint(
                 '✅ EditProfile: Perfil atualizado - ID=${profile.profileId}');
 
+            await _ensureUsernameLowercaseField(
+              profile.profileId,
+              profile.username,
+            );
+
             await _handleSuccessfulProfileSave(
               profile,
               isCreation: false,
+              profileNotifier: profileNotifierUpdate,
             );
             return;
 
@@ -1666,12 +1692,16 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         ),
         const SizedBox(height: 16),
 
-        // Telefone/WhatsApp (obrigatório)
+        // Telefone/WhatsApp (opcional)
         TextFormField(
           controller: _phoneController,
           keyboardType: TextInputType.phone,
+          inputFormatters: [
+            // Formatação brasileira para telefone
+            _BrazilianPhoneFormatter(),
+          ],
           decoration: InputDecoration(
-            labelText: 'Telefone/WhatsApp *',
+            labelText: 'Telefone/WhatsApp',
             hintText: '(11) 99999-9999',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1680,7 +1710,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           ),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return 'Telefone/WhatsApp é obrigatório';
+              return null; // Campo opcional
             }
             // Remove caracteres não numéricos
             final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
@@ -1990,5 +2020,70 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     if (excludeProfileId == null || existingId != excludeProfileId) {
       throw Exception('Este nome de usuário já está em uso');
     }
+  }
+}
+
+class _BrazilianPhoneFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Permite digitação livre se estiver apagando
+    if (newValue.text.length < oldValue.text.length) {
+      return newValue;
+    }
+
+    String text = newValue.text;
+
+    // Remove todos os caracteres não numéricos
+    text = text.replaceAll(RegExp(r'\D'), '');
+
+    // Limita a 11 dígitos (DDD + 9 dígitos)
+    if (text.length > 11) {
+      text = text.substring(0, 11);
+    }
+
+    final buffer = StringBuffer();
+
+    if (text.isEmpty) {
+      return TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+
+    // Aplica formatação progressiva
+    if (text.length <= 2) {
+      buffer.write('(');
+      buffer.write(text);
+    } else if (text.length <= 6) {
+      buffer.write('(');
+      buffer.write(text.substring(0, 2));
+      buffer.write(') ');
+      buffer.write(text.substring(2));
+    } else if (text.length <= 10) {
+      buffer.write('(');
+      buffer.write(text.substring(0, 2));
+      buffer.write(') ');
+      buffer.write(text.substring(2, 6));
+      buffer.write('-');
+      buffer.write(text.substring(6));
+    } else {
+      // 11 dígitos: (XX) XXXXX-XXXX
+      buffer.write('(');
+      buffer.write(text.substring(0, 2));
+      buffer.write(') ');
+      buffer.write(text.substring(2, 7));
+      buffer.write('-');
+      buffer.write(text.substring(7));
+    }
+
+    final formattedText = buffer.toString();
+
+    return TextEditingValue(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: formattedText.length),
+    );
   }
 }

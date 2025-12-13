@@ -197,6 +197,7 @@ class PushNotificationService {
       _currentProfileId = profileId;
 
       // Salvar token no Firestore
+      // NOTA: Campo 'updatedAt' é usado pela Cloud Function para validar idade do token
       await _firestore
           .collection('profiles')
           .doc(profileId)
@@ -206,7 +207,7 @@ class PushNotificationService {
         'token': token,
         'platform': defaultTargetPlatform.name.toLowerCase(),
         'createdAt': FieldValue.serverTimestamp(),
-        'lastUsedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(), // Cloud Function valida tokens > 60 dias
       }, SetOptions(merge: true));
 
       debugPrint('💾 PushNotificationService: Token saved for profile: '

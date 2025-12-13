@@ -8,7 +8,7 @@ void main() {
   group('GenreSelector - Validation Methods', () {
     test('validateRequired returns error for empty selection', () {
       final result = GenreSelector.validateRequired(<String>{});
-      expect(result, 'Selecione pelo menos um gênero musical');
+      expect(result, 'Selecione pelo menos um gênero');
     });
 
     test('validateRequired returns null for non-empty selection', () {
@@ -76,7 +76,7 @@ void main() {
 
   group('GenreSelector - Genre Options', () {
     test('genreOptions has expected total count', () {
-      expect(GenreSelector.genreOptions.length, 73);
+      expect(GenreSelector.genreOptions.length, 22);
     });
 
     test('genreOptions contains popular international genres', () {
@@ -90,27 +90,22 @@ void main() {
       expect(GenreSelector.genreOptions.contains('Sertanejo'), true);
       expect(GenreSelector.genreOptions.contains('MPB'), true);
       expect(GenreSelector.genreOptions.contains('Forró'), true);
-      expect(GenreSelector.genreOptions.contains('Axé'), true);
       expect(GenreSelector.genreOptions.contains('Samba'), true);
-      expect(GenreSelector.genreOptions.contains('Bossa Nova'), true);
+      expect(GenreSelector.genreOptions.contains('Pagode'), true);
     });
 
-    test('genreOptions contains Latin American genres', () {
-      expect(GenreSelector.genreOptions.contains('Reggaeton'), true);
-      expect(GenreSelector.genreOptions.contains('Cumbia'), true);
-      expect(GenreSelector.genreOptions.contains('Salsa'), true);
-      expect(GenreSelector.genreOptions.contains('Tango'), true);
+    test('genreOptions contains Outro option', () {
+      expect(GenreSelector.genreOptions.contains('Outro'), true);
     });
 
-    test('genreOptions contains Asian genres', () {
-      expect(GenreSelector.genreOptions.contains('K-pop'), true);
-      expect(GenreSelector.genreOptions.contains('J-pop'), true);
-    });
-
-    test('genreOptions contains modern genres', () {
-      expect(GenreSelector.genreOptions.contains('Lo-fi'), true);
-      expect(GenreSelector.genreOptions.contains('Chillout'), true);
+    test('genreOptions contains electronic genres', () {
       expect(GenreSelector.genreOptions.contains('Eletrônica'), true);
+    });
+
+    test('genreOptions contains urban genres', () {
+      expect(GenreSelector.genreOptions.contains('Hip Hop'), true);
+      expect(GenreSelector.genreOptions.contains('Rap'), true);
+      expect(GenreSelector.genreOptions.contains('Funk'), true);
     });
 
     test('genreOptions does not contain duplicates', () {

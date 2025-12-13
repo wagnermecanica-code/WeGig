@@ -12,7 +12,9 @@ import 'package:collection/collection.dart';
 import 'package:core_ui/core_ui.dart';
 import 'package:core_ui/utils/debouncer.dart';
 import 'package:core_ui/utils/geo_utils.dart';
+import 'package:core_ui/utils/price_calculator.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +23,7 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/features/home/data/datasources/gps_cache_service.dart';
 import 'package:wegig_app/features/home/presentation/providers/map_center_provider.dart';
 import 'package:wegig_app/features/home/presentation/widgets/feed/interest_service.dart';
 import 'package:wegig_app/features/home/presentation/widgets/map/map_controller.dart';
@@ -31,7 +34,7 @@ import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
-import 'package:wegig_app/features/home/data/datasources/gps_cache_service.dart';
+import 'package:wegig_app/utils/migrate_post_prices.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({
@@ -78,6 +81,9 @@ class _HomePageState extends ConsumerState<HomePage>
   // PageView Controller para carrossel horizontal
   late final PageController _pageController;
   bool _isProgrammaticScroll = false; // Evita loops de sync
+  
+  // Flag para executar migração apenas uma vez
+  static bool _migrationExecuted = false;
   
     ProfileEntity? get _activeProfile =>
       ref.read(profileProvider).value?.activeProfile;
@@ -229,6 +235,16 @@ class _HomePageState extends ConsumerState<HomePage>
     await _mapControllerWrapper.loadMapStyle();
     await _initializeMap();
     widget.searchNotifier?.addListener(_onSearchChanged);
+    
+    // Executar migração de preços apenas uma vez por sessão do app
+    if (!_migrationExecuted) {
+      _migrationExecuted = true;
+      try {
+        await migratePostPrices();
+      } catch (e) {
+        debugPrint('❌ Erro na migração de preços: $e');
+      }
+    }
   }
 
   // ========================= MÉTODOS DE LÓGICA =========================
@@ -1443,7 +1459,7 @@ class _HomePageState extends ConsumerState<HomePage>
     if (params == null) return true;
 
     debugPrint('🔍 HomePage._matchesFilters: Checking post ${post.id} (type: ${post.type})');
-    debugPrint('🔍 Params: postType=${params.postType}, salesType=${params.salesType}, minPrice=${params.minPrice}, maxPrice=${params.maxPrice}');
+    debugPrint('🔍 Params: postType=${params.postType}, salesTypes=${params.salesTypes}, minPrice=${params.minPrice}, maxPrice=${params.maxPrice}');
 
     // ✅ FILTROS DE SALES (Anúncios)
     if (params.postType == 'sales') {
@@ -1456,9 +1472,9 @@ class _HomePageState extends ConsumerState<HomePage>
       }
       
       // Tipo de anúncio (Gravação, Ensaios, etc)
-      if (params.salesType != null && params.salesType!.isNotEmpty) {
-        if (post.salesType != params.salesType) {
-          debugPrint('🔍 Post rejected: salesType is ${post.salesType}, expected ${params.salesType}');
+      if (params.salesTypes.isNotEmpty) {
+        if (!params.salesTypes.contains(post.salesType)) {
+          debugPrint('🔍 Post rejected: salesType is ${post.salesType}, expected one of ${params.salesTypes}');
           return false;
         }
       }
@@ -1481,16 +1497,26 @@ class _HomePageState extends ConsumerState<HomePage>
       
       // Apenas com desconto
       if (params.onlyWithDiscount == true) {
-        if (post.discountMode == null || post.discountMode!.isEmpty) {
-          debugPrint('🔍 Post rejected: no discount mode');
+        final hasDiscount = post.discountMode != null && 
+                           post.discountMode!.isNotEmpty && 
+                           post.discountMode != 'none' &&
+                           post.discountValue != null && 
+                           post.discountValue! > 0;
+        if (!hasDiscount) {
+          debugPrint('🔍 Post rejected: no valid discount (mode: ${post.discountMode}, value: ${post.discountValue})');
           return false;
         }
       }
       
       // Apenas promoções ativas (não expiradas)
       if (params.onlyActivePromos == true) {
-        if (post.promoEndDate == null || post.promoEndDate!.isBefore(DateTime.now())) {
-          debugPrint('🔍 Post rejected: promo expired or null');
+        final now = DateTime.now();
+        final hasActivePromo = post.promoStartDate != null && 
+                              post.promoEndDate != null && 
+                              post.promoStartDate!.isBefore(now) && 
+                              post.promoEndDate!.isAfter(now);
+        if (!hasActivePromo) {
+          debugPrint('🔍 Post rejected: promo not active (start: ${post.promoStartDate}, end: ${post.promoEndDate}, now: $now)');
           return false;
         }
       }
@@ -1684,27 +1710,6 @@ class PostCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Botão fechar no canto superior esquerdo
-                if (onClose != null)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: GestureDetector(
-                      onTap: onClose,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Iconsax.close_circle,
-                          size: 18,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),
@@ -1975,48 +1980,37 @@ class PostCard extends StatelessWidget {
 
   // ✅ Conteúdo específico para Sales
   Widget _buildSalesContent() {
+    // ✅ USAR PriceCalculator PARA CALCULOS CONSISTENTES
+    final priceData = PriceCalculator.getPriceDisplayData(post);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. Ícone + Preço atual
-        Row(
-          children: [
-            const Icon(Iconsax.dollar_circle, size: 16, color: AppColors.primary),
-            const SizedBox(width: 8),
-            Text(
-              'R\$ ${(post.price ?? 0.0).toStringAsFixed(2).replaceAll('.', ',')}',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
-            ),
-          ],
-        ),
-        
-        const SizedBox(height: 4),
-        
-        // 2. Ícone + Preço riscado + Desconto (se houver)
-        if (_hasDiscount()) ...[
+        // ✅ Se há desconto, mostra preço original riscado + badge de desconto
+        if (priceData.hasDiscount) ...[
           Row(
             children: [
               Icon(Iconsax.percentage_circle, size: 14, color: Colors.grey[600]),
               const SizedBox(width: 8),
-              
-              // Preço original riscado
-              Text(
-                'R\$ ${_calculateOriginalPrice().toStringAsFixed(2).replaceAll('.', ',')}',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  decoration: TextDecoration.lineThrough,
+
+              // ✅ CORREÇÃO: Preço ORIGINAL riscado (post.price = preço sem desconto)
+              Expanded(
+                child: Text(
+                  _truncatePrice(NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ').format(priceData.originalPrice)),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              
+
               const SizedBox(width: 8),
               const Text('•', style: TextStyle(color: Colors.grey)),
               const SizedBox(width: 8),
-              
+
               // Badge de desconto
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -2025,7 +2019,7 @@ class PostCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  _getDiscountLabel(),
+                  priceData.discountLabel!,
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -2035,10 +2029,31 @@ class PostCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-        ] else
-          const SizedBox(height: 8),
-        
+          const SizedBox(height: 4),
+        ],
+
+        // ✅ CORREÇÃO: Preço FINAL destacado (calculado aplicando desconto)
+        Row(
+          children: [
+            const Icon(Iconsax.dollar_circle, size: 16, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _truncatePrice(NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ').format(priceData.finalPrice)),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 4),
+
         // 3. Conteúdo/mensagem do post
         if (post.content.isNotEmpty)
           Text(
@@ -2055,37 +2070,26 @@ class PostCard extends StatelessWidget {
     );
   }
 
-  bool _hasDiscount() {
-    final discountMode = post.discountMode;
-    final discountValue = post.discountValue ?? 0.0;
-    return discountMode != null && 
-           discountMode != 'none' && 
-           discountValue > 0;
-  }
+  // ✅ Função para truncar preço se for muito longo
+  String _truncatePrice(String price) {
+    // Se o preço for menor que 15 caracteres, retorna como está
+    if (price.length <= 15) return price;
 
-  double _calculateOriginalPrice() {
-    final price = post.price ?? 0.0;
-    final discountMode = post.discountMode ?? 'none';
-    final discountValue = post.discountValue ?? 0.0;
-    
-    if (discountMode == 'percentage' && discountValue > 0) {
-      return price / (1 - discountValue / 100);
-    } else if (discountMode == 'fixed' && discountValue > 0) {
-      return price + discountValue;
-    }
-    return price;
-  }
+    // Para preços muito longos, formata de forma mais compacta
+    final numericValue = post.price ?? 0.0;
 
-  String _getDiscountLabel() {
-    final discountMode = post.discountMode ?? 'none';
-    final discountValue = post.discountValue ?? 0.0;
-    
-    if (discountMode == 'percentage') {
-      return '-${discountValue.toStringAsFixed(0)}%';
-    } else if (discountMode == 'fixed') {
-      return '-R\$ ${discountValue.toStringAsFixed(2).replaceAll('.', ',')}';
+    if (numericValue >= 1000000) {
+      // Para milhões: R$ 1,2M
+      final millions = numericValue / 1000000;
+      return 'R\$ ${millions.toStringAsFixed(1)}M';
+    } else if (numericValue >= 1000) {
+      // Para milhares: R$ 1,2K
+      final thousands = numericValue / 1000;
+      return 'R\$ ${thousands.toStringAsFixed(1)}K';
     }
-    return '';
+
+    // Para valores menores, usa formatação padrão mas trunca se necessário
+    return price.length > 15 ? '${price.substring(0, 12)}...' : price;
   }
 }
 
