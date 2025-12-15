@@ -1,25 +1,27 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:core_ui/post_result.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/widgets/multi_select_field.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
-import 'package:uuid/uuid.dart';
-import 'package:wegig_app/features/post/domain/services/post_service.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
+import 'package:wegig_app/features/post/domain/models/post_form_input.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
+import 'package:wegig_app/features/post/presentation/widgets/photo_carousel_picker.dart';
+import 'package:wegig_app/features/post/presentation/widgets/post_form_fields.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 /// Navega para a página de criação de post
 void showPostModal(BuildContext context, String postType) {
   Navigator.of(context).push(
-    MaterialPageRoute(
+    MaterialPageRoute<void>(
       builder: (context) => PostPage(postType: postType),
     ),
   );
@@ -28,7 +30,7 @@ void showPostModal(BuildContext context, String postType) {
 /// Navega para a página de edição de post
 void showEditPostModal(BuildContext context, Map<String, dynamic> postData) {
   Navigator.of(context).push(
-    MaterialPageRoute(
+    MaterialPageRoute<void>(
       builder: (context) => PostPage(
         postType: (postData['type'] as String?) ?? 'musician',
         existingPostData: postData,
@@ -75,13 +77,40 @@ class _PostPageState extends ConsumerState<PostPage> {
   String? _selectedState;
 
   // === Foto & Estado ===
-  String? _photoLocalPath;
+  List<String> _photoPaths = [];
   bool _isSaving = false;
+
+  // === Sales-specific fields ===
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
+  final TextEditingController _discountController = TextEditingController();
+  final TextEditingController _whatsappController = TextEditingController();
+  
+  String _salesType = 'Venda';
+  String _discountMode = 'none'; // 'none', 'percentage', 'fixed'
+  double _calculatedFinalPrice = 0.0;
+  DateTime _promoStartDate = DateTime.now();
+  DateTime _promoEndDate = DateTime.now().add(const Duration(days: 30));
 
   // === Limites e opções ===
   static const int maxInstruments = 5;
   static const int maxGenres = 5;
 
+  // === Sales type options ===
+  static const List<String> _salesTypeOptions = [
+    'Venda',
+    'Gravação',
+    'Ensaios',
+    'Aluguel',
+    'Show/Evento',
+    'Aula/Workshop',
+    'Freela',
+    'Promoção',
+    'Manutenção/Reparo',
+    'Outro',
+  ];
+
+ // Lista para disponibilidade
   static const List<String> _availableForOptions = <String>[
     'Ensaios regulares',
     'Free lance',
@@ -93,6 +122,7 @@ class _PostPageState extends ConsumerState<PostPage> {
     'Outros',
   ];
 
+ // ✨ EXPANDIDO: Lista completa de instrumentos com opção "Outros"
   static const List<String> _instrumentOptions = <String>[
     'Violão',
     'Guitarra',
@@ -150,6 +180,7 @@ class _PostPageState extends ConsumerState<PostPage> {
     'Outro',
   ];
 
+  // ✨ EXPANDIDO: Lista completa de gêneros musicais com opção "Outros"
   static const List<String> _genreOptions = <String>[
     'Rock',
     'Pop',
@@ -237,6 +268,13 @@ class _PostPageState extends ConsumerState<PostPage> {
   void initState() {
     super.initState();
     _postType = widget.postType;
+    
+    // Inicializar listeners para sales
+    if (_postType == 'sales') {
+      _priceController.addListener(_calculateFinalPrice);
+      _discountController.addListener(_calculateFinalPrice);
+    }
+    
     _loadExistingData();
   }
 
@@ -300,11 +338,83 @@ class _PostPageState extends ConsumerState<PostPage> {
       await _fetchFullAddress(geoPoint.latitude, geoPoint.longitude);
     }
 
-    // Foto (URL existente)
-    if (data['photoUrl'] != null && data['photoUrl'].toString().isNotEmpty) {
-      setState(() {
-        _photoLocalPath = data['photoUrl'] as String?;
-      });
+    // Fotos (URLs existentes - suporte para lista ou single)
+    setState(() {
+      final photoUrls = data['photoUrls'] as List<dynamic>?;
+      final photoUrl = data['photoUrl'] as String?;
+      
+      if (photoUrls != null && photoUrls.isNotEmpty) {
+        _photoPaths = photoUrls.cast<String>().toList();
+      } else if (photoUrl != null && photoUrl.isNotEmpty) {
+        _photoPaths = [photoUrl];
+      }
+    });
+
+    // ✅ SALES FIELDS - Carregar campos específicos de anúncios
+    if (_postType == 'sales') {
+      _titleController.text = (data['title'] as String?) ?? '';
+      _salesType = (data['salesType'] as String?) ?? 'Venda';
+      _whatsappController.text = (data['whatsappNumber'] as String?) ?? '';
+      
+      // Preço - agora data['price'] é o preço ORIGINAL (sem desconto)
+      final originalPrice = data['price'];
+      
+      if (originalPrice != null && originalPrice is num && originalPrice > 0) {
+        // Converter para centavos (formato esperado pelo _CurrencyInputFormatter)
+        final priceInCents = (originalPrice.toDouble() * 100).toInt();
+        _priceController.text = priceInCents.toString();
+      }
+      
+      // Modo de desconto e valor
+      _discountMode = (data['discountMode'] as String?) ?? 'none';
+      final discountValue = data['discountValue'];
+      if (discountValue != null && _discountMode != 'none') {
+        if (discountValue is num) {
+          if (_discountMode == 'fixed') {
+            // Desconto fixo: converter para centavos
+            final discountInCents = (discountValue * 100).toInt();
+            _discountController.text = discountInCents.toString();
+          } else if (_discountMode == 'percentage') {
+            // Percentual: já é número inteiro (ex: 20 para 20%)
+            _discountController.text = discountValue.toInt().toString();
+          }
+        } else if (discountValue is String) {
+          final cleaned = discountValue.replaceAll(RegExp(r'[^\d]'), '');
+          _discountController.text = cleaned.isEmpty ? '' : cleaned;
+        }
+      }
+      
+      // Datas da promoção
+      if (data['promoStartDate'] != null) {
+        if (data['promoStartDate'] is Timestamp) {
+          _promoStartDate = (data['promoStartDate'] as Timestamp).toDate();
+        } else if (data['promoStartDate'] is DateTime) {
+          _promoStartDate = data['promoStartDate'] as DateTime;
+        }
+      }
+      
+      if (data['promoEndDate'] != null) {
+        if (data['promoEndDate'] is Timestamp) {
+          _promoEndDate = (data['promoEndDate'] as Timestamp).toDate();
+        } else if (data['promoEndDate'] is DateTime) {
+          _promoEndDate = data['promoEndDate'] as DateTime;
+        }
+      }
+      
+      // Recalcular preço final após carregar dados
+      _calculateFinalPrice();
+      
+      debugPrint('''
+✅ Sales fields loaded:
+   Title: ${_titleController.text}
+   Sales Type: $_salesType
+   Price: ${_priceController.text}
+   Discount Mode: $_discountMode
+   Discount Value: ${_discountController.text}
+   WhatsApp: ${_whatsappController.text}
+   Promo Start: $_promoStartDate
+   Promo End: $_promoEndDate
+''');
     }
   }
 
@@ -364,6 +474,15 @@ class _PostPageState extends ConsumerState<PostPage> {
     _youtubeController.dispose();
     _locationController.dispose();
     _locationFocusNode.dispose();
+    
+    // Dispose sales-specific controllers
+    if (_postType == 'sales') {
+      _titleController.dispose();
+      _priceController.dispose();
+      _discountController.dispose();
+      _whatsappController.dispose();
+    }
+    
     super.dispose();
   }
 
@@ -426,219 +545,190 @@ class _PostPageState extends ConsumerState<PostPage> {
     }
   }
 
-  Future<void> _pickPhoto() async {
+  void _calculateFinalPrice() {
+    final priceStr = _priceController.text.replaceAll(RegExp(r'[^\d]'), '');
+    final price = double.tryParse(priceStr) ?? 0.0;
+    
+    if (_discountMode == 'none' || _discountController.text.isEmpty) {
+      setState(() => _calculatedFinalPrice = price / 100);
+      return;
+    }
+    
+    final discountStr = _discountController.text.replaceAll(RegExp(r'[^\d]'), '');
+    final discountValue = double.tryParse(discountStr) ?? 0.0;
+    
+    if (_discountMode == 'percentage') {
+      final discountAmount = (price * discountValue) / 10000;
+      setState(() => _calculatedFinalPrice = (price / 100) - discountAmount);
+    } else if (_discountMode == 'fixed') {
+      setState(() => _calculatedFinalPrice = (price / 100) - (discountValue / 100));
+    }
+  }
+
+  Future<void> _submitPost() async {
+    if (!_formKey.currentState!.validate()) {
+      _showSnackBar('Preencha todos os campos obrigatórios.', isError: true);
+      return;
+    }
+
+    // Validações específicas por tipo
+    if (_postType == 'sales') {
+      // Sales: fotos, título, descrição, tipo, preço, localização (SEM gêneros/instrumentos)
+      if (_photoPaths.isEmpty) {
+        _showSnackBar('Adicione pelo menos uma foto do produto/serviço.', isError: true);
+        return;
+      }
+      if (_titleController.text.trim().isEmpty) {
+        _showSnackBar('Título é obrigatório para anúncios.', isError: true);
+        return;
+      }
+      if (_messageController.text.trim().isEmpty) {
+        _showSnackBar('Descrição é obrigatória para anúncios.', isError: true);
+        return;
+      }
+      if (_priceController.text.isEmpty || _calculatedFinalPrice <= 0) {
+        _showSnackBar('Preço deve ser maior que zero.', isError: true);
+        return;
+      }
+      if (_promoEndDate.isBefore(_promoStartDate)) {
+        _showSnackBar('Data de fim deve ser após a data de início.', isError: true);
+        return;
+      }
+      // Sales NÃO precisa de gêneros ou instrumentos
+    } else if (_postType == 'musician') {
+      // Musician: instrumentos, gêneros, descrição, localização
+      if (_selectedInstruments.isEmpty) {
+        _showSnackBar('Selecione pelo menos um instrumento.', isError: true);
+        return;
+      }
+      if (_selectedGenres.isEmpty) {
+        _showSnackBar('Selecione pelo menos um gênero musical.', isError: true);
+        return;
+      }
+      if (_messageController.text.trim().isEmpty) {
+        _showSnackBar('Mensagem é obrigatória.', isError: true);
+        return;
+      }
+    } else if (_postType == 'band') {
+      // Band: músicos procurados, gêneros, descrição, localização
+      if (_selectedInstruments.isEmpty) {
+        _showSnackBar('Selecione pelo menos um instrumento/músico procurado.', isError: true);
+        return;
+      }
+      if (_selectedGenres.isEmpty) {
+        _showSnackBar('Selecione pelo menos um gênero musical.', isError: true);
+        return;
+      }
+      if (_messageController.text.trim().isEmpty) {
+        _showSnackBar('Mensagem é obrigatória.', isError: true);
+        return;
+      }
+    }
+
+    final location = _selectedLocation;
+    final city = _selectedCity;
+    if (location == null || city == null) {
+      _showSnackBar('Selecione uma localização válida.', isError: true);
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
     try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(source: ImageSource.gallery);
-      if (picked == null) return;
-
-      debugPrint('📷 PostPage: Imagem selecionada: ${picked.path}');
-
-      // Comprimir imagem antes de salvar
-      final tempDir = Directory.systemTemp;
-      final targetPath =
-          '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}_post.jpg';
-
-      debugPrint('📷 PostPage: Comprimindo imagem...');
-      final compressed = await FlutterImageCompress.compressAndGetFile(
-        picked.path,
-        targetPath,
-        quality: 85,
-        minWidth: 800,
-        minHeight: 800,
+      final input = PostFormInput(
+        postId: widget.existingPostData?['postId'] as String?,
+        type: _postType,
+        
+        // Campos específicos de sales
+        title: _postType == 'sales' ? _titleController.text.trim() : null,
+        salesType: _postType == 'sales' ? _salesType : null,
+        price: _postType == 'sales' ? (double.tryParse(_priceController.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0.0) / 100 : null,
+        discountMode: _postType == 'sales' ? _discountMode : null,
+        discountValue: _postType == 'sales' && _discountController.text.isNotEmpty
+            ? (_discountMode == 'fixed' 
+                ? (double.tryParse(_discountController.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0.0) / 100
+                : double.tryParse(_discountController.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0.0)
+            : null,
+        promoStartDate: _postType == 'sales' ? _promoStartDate : null,
+        promoEndDate: _postType == 'sales' ? _promoEndDate : null,
+        whatsappNumber: _postType == 'sales' && _whatsappController.text.isNotEmpty
+            ? _whatsappController.text.replaceAll(RegExp(r'\D'), '')
+            : null,
+        
+        // Campos comuns
+        content: _messageController.text.trim(),
+        location: location,
+        city: city,
+        neighborhood: _selectedNeighborhood,
+        state: _selectedState,
+        photoPaths: _photoPaths,
+        youtubeLink: _youtubeController.text.trim().isEmpty ? null : _youtubeController.text.trim(),
+        
+        // Campos de musician/band (null para sales)
+        level: _postType != 'sales' ? _level : null,
+        genres: _postType != 'sales' ? _selectedGenres.toList() : <String>[],
+        selectedInstruments: _postType != 'sales' ? _selectedInstruments.toList() : <String>[],
+        availableFor: _postType != 'sales' ? _selectedAvailableFor.toList() : <String>[],
+        
+        createdAt: _maybeExtractDate(widget.existingPostData?['createdAt']),
+        expiresAt: _maybeExtractDate(widget.existingPostData?['expiresAt']),
       );
 
-      if (compressed == null) {
-        debugPrint('⚠️ PostPage: Falha na compressão, usando imagem original');
-        setState(() => _photoLocalPath = picked.path);
-      } else {
-        final compressedSize = await compressed.length();
-        debugPrint(
-            '✅ PostPage: Imagem comprimida: ${(compressedSize / 1024).toStringAsFixed(2)} KB');
-        setState(() => _photoLocalPath = compressed.path);
-      }
-    } catch (e) {
-      debugPrint('❌ PostPage: Erro ao selecionar/comprimir imagem: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erro ao processar imagem. Tente novamente.'),
-            backgroundColor: Colors.red,
-          ),
+      final notifier = ref.read(postNotifierProvider.notifier);
+      final result = await notifier.savePost(input);
+
+      if (!mounted) return;
+
+      if (result is PostSuccess) {
+        _showSnackBar(
+          result.message ??
+              (input.isEditing
+                  ? 'Post atualizado com sucesso!'
+                  : 'Post criado com sucesso!'),
         );
+        Navigator.of(context).pop(true);
+      } else if (result is PostValidationError) {
+        _showSnackBar(
+          result.errors.values.join('\n'),
+          isError: true,
+        );
+      } else if (result is PostFailure) {
+        _showSnackBar(result.message, isError: true);
+      } else {
+        _showSnackBar(
+          'Não foi possível salvar o post. Tente novamente.',
+          isError: true,
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ PostPage: erro ao salvar post - $e');
+      debugPrint('$stackTrace');
+      if (mounted) {
+        _showSnackBar('Erro ao salvar post: $e', isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }
 
-  Future<void> _publish() async {
-    final profileAsync = ref.read(profileProvider);
-    final profile =
-        profileAsync is AsyncData ? profileAsync.value?.activeProfile : null;
-    if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Preencha todos os campos obrigatórios.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-    if (profile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Perfil não carregado. Tente novamente.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-    setState(() => _isSaving = true);
-    try {
-      final postService = PostService();
-      String? photoUrl;
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
+  }
 
-      // Upload de foto apenas se for arquivo local novo
-      if (_photoLocalPath != null) {
-        if (_photoLocalPath!.startsWith('http')) {
-          // É uma URL existente, manter
-          photoUrl = _photoLocalPath;
-        } else {
-          // É um arquivo local, fazer upload
-          final file = File(_photoLocalPath!);
-          if (file.existsSync()) {
-            final postId = (widget.existingPostData?['postId'] as String?) ??
-                const Uuid().v4();
-            photoUrl = await postService.uploadPostImage(file, postId);
-          }
-        }
-      }
-
-      final ytLink = _youtubeController.text.trim();
-
-      // Preparar postData com campos obrigatórios
-      final postData = <String, dynamic>{
-        'authorUid': profile.uid,
-        'authorProfileId': profile.profileId,
-        'authorName': profile.name,
-        'authorPhotoUrl': profile.photoUrl ?? '',
-        'type': _postType,
-        'availableFor': _selectedAvailableFor.toList(),
-        'genres': _selectedGenres.toList(),
-        'level': _level,
-        'location': _selectedLocation,
-        'city': _selectedCity,
-        'neighborhood': _selectedNeighborhood ?? '',
-        'state': _selectedState ?? '',
-        'content': _messageController.text.trim(),
-        'youtubeLink': ytLink.isEmpty ? null : ytLink,
-        'photoUrl': photoUrl,
-        'createdAt': FieldValue.serverTimestamp(),
-        'expiresAt': Timestamp.fromDate(
-          DateTime.now().add(const Duration(days: 30)), // 30 dias de expiração
-        ),
-      };
-
-      // Adicionar campos específicos por tipo
-      if (_postType == 'musician') {
-        postData['instruments'] = _selectedInstruments.toList();
-        postData['seekingMusicians'] = <String>[]; // Vazio para músicos
-      } else if (_postType == 'band') {
-        postData['instruments'] = <String>[]; // Vazio para bandas
-        postData['seekingMusicians'] =
-            _selectedInstruments.toList(); // Banda busca músicos
-      }
-
-      debugPrint('PostPage: ========== DADOS DO POST ==========');
-      debugPrint('PostPage: Campos presentes: ${postData.keys.toList()}');
-      debugPrint('PostPage: type = ${postData['type']}');
-      debugPrint('PostPage: instruments = ${postData['instruments']}');
-      debugPrint(
-          'PostPage: seekingMusicians = ${postData['seekingMusicians']}');
-      debugPrint(
-          'PostPage: location = ${postData['location']} (${postData['location'].runtimeType})');
-      debugPrint('PostPage: city = ${postData['city']}');
-      debugPrint('PostPage: authorProfileId = ${postData['authorProfileId']}');
-      debugPrint('PostPage: authorUid = ${postData['authorUid']}');
-      debugPrint('PostPage: expiresAt = ${postData['expiresAt']}');
-      debugPrint('PostPage: createdAt = ${postData['createdAt']}');
-
-      // Validar dados antes de salvar
-      try {
-        postService.validatePostData(postData);
-        debugPrint('PostPage: ✅ Validação dos dados passou!');
-      } catch (e) {
-        debugPrint('PostPage: ❌ ERRO na validação: $e');
-        throw Exception('Dados inválidos: $e');
-      }
-
-      // Se é edição, atualizar; caso contrário, criar
-      if (widget.existingPostData != null) {
-        final postId = widget.existingPostData!['postId'] as String;
-        debugPrint('PostPage: Atualizando post existente: $postId');
-        await FirebaseFirestore.instance
-            .collection('posts')
-            .doc(postId)
-            .update(postData);
-        debugPrint('PostPage: ✅ Post atualizado com sucesso!');
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post atualizado com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        debugPrint('PostPage: Criando novo post...');
-        final postId = await postService.createPost(postData);
-        debugPrint('PostPage: ✅ Post criado com ID: $postId');
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post criado com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-
-      // Invalidar posts provider para forçar atualização em todas as telas
-      ref.invalidate(postProvider);
-
-      Navigator.of(context).pop(true); // Retorna true para indicar sucesso
-    } catch (e) {
-      debugPrint('❌ PostPage: ERRO ao publicar post');
-      debugPrint('❌ PostPage: Erro: $e');
-      debugPrint('❌ PostPage: Tipo: ${e.runtimeType}');
-
-      if (mounted) {
-        var errorMessage = 'Erro ao publicar: $e';
-
-        // Mensagens específicas para erros conhecidos
-        if (e.toString().contains('firebase_storage')) {
-          if (e.toString().contains('400')) {
-            errorMessage =
-                'Erro ao fazer upload da imagem. Verifique se a imagem é válida e tente novamente.';
-          } else if (e.toString().contains('permission')) {
-            errorMessage =
-                'Sem permissão para fazer upload. Verifique suas credenciais.';
-          } else {
-            errorMessage =
-                'Erro no Firebase Storage: ${e.toString().replaceAll('firebase_storage/', '')}';
-          }
-        } else if (e.toString().contains('Arquivo muito grande')) {
-          errorMessage = e.toString();
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
+  DateTime? _maybeExtractDate(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
   }
 
   @override
@@ -647,7 +737,8 @@ class _PostPageState extends ConsumerState<PostPage> {
     final sectionTitleStyle = theme.textTheme.titleMedium?.copyWith(
       fontWeight: FontWeight.bold,
     );
-    final profileAsync = ref.watch(profileProvider);
+    // Ler provider apenas uma vez, sem observar mudanças para evitar rebuild loops
+    final profileAsync = ref.read(profileProvider);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -657,7 +748,6 @@ class _PostPageState extends ConsumerState<PostPage> {
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.close, size: 28),
-          tooltip: 'Fechar',
         ),
         actions: [
           if (_isSaving)
@@ -677,13 +767,12 @@ class _PostPageState extends ConsumerState<PostPage> {
             )
           else
             IconButton(
-              onPressed: _publish,
+              onPressed: _submitPost,
               icon: const Icon(
                 Icons.send_rounded,
                 size: 26,
                 color: AppColors.primary,
               ),
-              tooltip: 'Publicar',
             ),
         ],
       ),
@@ -782,10 +871,12 @@ class _PostPageState extends ConsumerState<PostPage> {
                         Expanded(
                           child: Text(
                             widget.existingPostData != null
-                                ? 'Editar post'
-                                : (_postType == 'musician'
-                                    ? 'Quero me juntar\na uma banda'
-                                    : 'Quero encontrar\num músico'),
+                                ? (_postType == 'sales' ? 'Editar anúncio' : 'Editar post')
+                                : (_postType == 'sales'
+                                    ? 'Quero oferecer um\nproduto ou serviço'
+                                    : (_postType == 'musician'
+                                        ? 'Quero me juntar\na uma banda'
+                                        : 'Quero encontrar\num músico')),
                             style: const TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 20,
@@ -800,99 +891,636 @@ class _PostPageState extends ConsumerState<PostPage> {
                     ),
                   ),
 
-                  // Disponível para (lista suspensa)
-                  Text('Disponível para', style: sectionTitleStyle),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedAvailableFor.isNotEmpty
-                        ? _selectedAvailableFor.first
-                        : null,
-                    items: _availableForOptions
-                        .map(
-                          (option) => DropdownMenuItem(
-                            value: option,
-                            child: Text(option),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedAvailableFor.clear();
-                        if (value != null) {
-                          _selectedAvailableFor.add(value);
-                        }
-                      });
-                    },
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: AppColors.primary,
-                          width: 2,
+                  // Renderização condicional baseada no tipo
+                  if (_postType == 'sales') 
+                    ..._buildSalesFields()
+                  else
+                    ..._buildMusicianBandFields(),
+
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ====================================================================
+  // SALES FIELDS
+  // ====================================================================
+  
+  List<Widget> _buildSalesFields() {
+    return [
+      // 1. Fotos (obrigatória)
+      const Text(
+        'Fotos do produto/serviço *',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+      ),
+      const SizedBox(height: 12),
+      PhotoCarouselPicker(
+        photoPaths: _photoPaths,
+        onPhotosChanged: (paths) => setState(() => _photoPaths = paths),
+        maxPhotos: 4,
+      ),
+      const Divider(height: 48, thickness: 0.5),
+
+      // 2. Título do anúncio
+      const Text(
+        'Título do anúncio *',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _titleController,
+        maxLength: 25,
+        decoration: InputDecoration(
+          hintText: 'Ex: Estúdio de gravação profissional',
+          counterText: '${_titleController.text.length}/25',
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          filled: true,
+          fillColor: Colors.grey[50],
+        ),
+        validator: (v) => v == null || v.trim().isEmpty ? 'Título é obrigatório' : null,
+        onChanged: (_) => setState(() {}),
+      ),
+      const Divider(height: 48, thickness: 0.5),
+
+      // 3. Descrição
+      const Text(
+        'Descrição *',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _messageController,
+        maxLength: 600,
+        maxLines: 6,
+        decoration: InputDecoration(
+          hintText: 'Descreva o que você está oferecendo...',
+          counterText: '${_messageController.text.length}/600',
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          filled: true,
+          fillColor: Colors.grey[50],
+        ),
+        validator: (v) => v == null || v.trim().isEmpty ? 'Descrição é obrigatória' : null,
+        onChanged: (_) => setState(() {}),
+      ),
+      const Divider(height: 48, thickness: 0.5),
+
+      // 4. Tipo do anúncio
+      const Text(
+        'Tipo do anúncio *',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+      ),
+      const SizedBox(height: 12),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: _salesTypeOptions.map((type) {
+          final isSelected = _salesType == type;
+          return FilterChip(
+            label: Text(type),
+            selected: isSelected,
+            onSelected: (selected) => setState(() => _salesType = type),
+            backgroundColor: Theme.of(context).cardColor,
+            selectedColor: AppColors.primary.withValues(alpha: 0.1),
+            checkmarkColor: AppColors.primary,
+            labelStyle: TextStyle(
+              color: isSelected ? AppColors.primary : Colors.grey[700],
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: isSelected ? AppColors.primary : Colors.grey.shade300,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+      const Divider(height: 48, thickness: 0.5),
+
+      // 5. Preço
+      const Text(
+        'Preço *',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _priceController,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(
+          hintText: '0,00',
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          filled: true,
+          fillColor: Colors.grey[50],
+        ),
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          _CurrencyInputFormatter(),
+        ],
+        validator: (v) => v == null || v.isEmpty ? 'Preço é obrigatório' : null,
+      ),
+      const Divider(height: 48, thickness: 0.5),
+
+      // 6. Desconto
+      const Text(
+        'Desconto (opcional)',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: FilterChip(
+              label: const Text('Sem desconto'),
+              selected: _discountMode == 'none',
+              onSelected: (selected) => setState(() {
+                _discountMode = 'none';
+                _discountController.clear();
+              }),
+              backgroundColor: Theme.of(context).cardColor,
+              selectedColor: AppColors.primary.withOpacity(0.1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: FilterChip(
+              label: const Text('% desconto'),
+              selected: _discountMode == 'percentage',
+              onSelected: (selected) => setState(() {
+                _discountMode = 'percentage';
+                _discountController.clear();
+              }),
+              backgroundColor: Theme.of(context).cardColor,
+              selectedColor: AppColors.primary.withOpacity(0.1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: FilterChip(
+              label: const Text('R\$ off'),
+              selected: _discountMode == 'fixed',
+              onSelected: (selected) => setState(() {
+                _discountMode = 'fixed';
+                _discountController.clear();
+              }),
+              backgroundColor: Theme.of(context).cardColor,
+              selectedColor: AppColors.primary.withOpacity(0.1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+          ),
+        ],
+      ),
+      if (_discountMode != 'none') ...[
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _discountController,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            prefixText: _discountMode == 'percentage' ? '' : 'R\$ ',
+            suffixText: _discountMode == 'percentage' ? '%' : '',
+            hintText: _discountMode == 'percentage' ? '0' : '0,00',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Colors.grey[50],
+          ),
+          inputFormatters: _discountMode == 'percentage'
+              ? [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(2)]
+              : [FilteringTextInputFormatter.digitsOnly, _CurrencyInputFormatter()],
+        ),
+      ],
+      const Divider(height: 48, thickness: 0.5),
+
+      // 7. Valor final
+      const Text(
+        'Valor final',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+      ),
+      const SizedBox(height: 12),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.shade300),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ').format(_calculatedFinalPrice),
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
+              ),
+            ),
+            if (_discountMode != 'none' && _discountController.text.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _discountMode == 'percentage'
+                      ? '-${_discountController.text}%'
+                      : 'R\$ ${_discountController.text} off',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+          ],
+        ),
+      ),
+      const Divider(height: 48, thickness: 0.5),
+
+      // 8. Validade da promoção
+      const Text(
+        'Validade da promoção *',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        'Datas desabilitadas ficam acinzentadas no calendário',
+        style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: _promoStartDate,
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 30)),
+                  helpText: 'Data de início (até 30 dias)',
+                  cancelText: 'Cancelar',
+                  confirmText: 'OK',
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: AppColors.primary,
                         ),
                       ),
-                    ),
-                    validator: (v) => v == null || v.trim().isEmpty
-                        ? 'Campo obrigatório'
-                        : null,
+                      child: child!,
+                    );
+                  },
+                );
+                if (date != null) {
+                  setState(() {
+                    _promoStartDate = date;
+                    // Ajusta data de término automaticamente se necessário
+                    if (_promoEndDate.isBefore(date) || _promoEndDate.isAfter(date.add(const Duration(days: 30)))) {
+                      _promoEndDate = date.add(const Duration(days: 30));
+                    }
+                  });
+                }
+              },
+              icon: const Icon(Icons.calendar_today),
+              label: Text('De: ${_promoStartDate.day}/${_promoStartDate.month}/${_promoStartDate.year.toString().substring(2)}'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: _promoEndDate.isAfter(_promoStartDate.add(const Duration(days: 30)))
+                      ? _promoStartDate.add(const Duration(days: 30))
+                      : _promoEndDate,
+                  firstDate: _promoStartDate,
+                  lastDate: _promoStartDate.add(const Duration(days: 30)),
+                  helpText: 'Data de término (máx: 30 dias após início)',
+                  cancelText: 'Cancelar',
+                  confirmText: 'OK',
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: AppColors.primary,
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (date != null) setState(() => _promoEndDate = date);
+              },
+              icon: const Icon(Icons.calendar_today),
+              label: Text('Até: ${_promoEndDate.day}/${_promoEndDate.month}/${_promoEndDate.year.toString().substring(2)}'),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, size: 18, color: Colors.blue.shade700),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Início: até 30 dias de hoje • Término: até 30 dias após início',
+                style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const Divider(height: 48, thickness: 0.5),
+
+      // 9. Localização
+      const Text(
+        'Localização *',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+      ),
+      const SizedBox(height: 12),
+      TypeAheadField<Map<String, dynamic>>(
+        controller: _locationController,
+        focusNode: _locationFocusNode,
+        suggestionsCallback: _fetchAddressSuggestions,
+        itemBuilder: (BuildContext context, Map<String, dynamic> suggestion) {
+          final address = suggestion['address'] as Map<String, dynamic>? ?? {};
+          final road = (address['road'] ?? address['pedestrian'] ?? '') as String;
+          final houseNumber = (address['house_number'] ?? '') as String;
+          final neighbourhood = (address['neighbourhood'] ??
+              address['suburb'] ??
+              address['quarter'] ??
+              '') as String;
+          final city = (address['city'] ??
+              address['town'] ??
+              address['village'] ??
+              address['municipality'] ??
+              '') as String;
+          final state = (address['state'] ?? '') as String;
+          final streetLine = [road, houseNumber].where((e) => e.isNotEmpty).join(', ');
+          final List<String> secondaryParts = [];
+          if (neighbourhood.isNotEmpty) secondaryParts.add(neighbourhood);
+          if (city.isNotEmpty) secondaryParts.add(city);
+          if (state.isNotEmpty) secondaryParts.add(state);
+          final secondaryLine = secondaryParts.join(' • ');
+          return ListTile(
+            leading: const Icon(Icons.location_on, color: AppColors.primary, size: 20),
+            title: Text(
+              streetLine.isNotEmpty ? streetLine : (suggestion['display_name'] as String?)?.split(',').first ?? 'Localização',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: secondaryLine.isNotEmpty
+                ? Text(
+                    secondaryLine,
+                    style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : null,
+          );
+        },
+        onSelected: _onAddressSelected,
+        builder: (context, controller, focusNode) {
+          return TextFormField(
+            controller: controller,
+            focusNode: focusNode,
+            decoration: InputDecoration(
+              labelText: 'Digite o endereço',
+              hintText: 'Ex: Rua das Flores, São Paulo',
+              prefixIcon: const Icon(Iconsax.location),
+              suffixIcon: controller.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Iconsax.close_circle, color: AppColors.textSecondary),
+                      onPressed: () {
+                        setState(() {
+                          controller.clear();
+                          _selectedLocation = null;
+                          _selectedCity = null;
+                          _selectedNeighborhood = null;
+                          _selectedState = null;
+                        });
+                        focusNode.unfocus();
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: Colors.grey[50],
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Localização é obrigatória';
+              }
+              if (_selectedLocation == null) {
+                return 'Selecione uma localização da lista';
+              }
+              return null;
+            },
+          );
+        },
+        hideOnEmpty: true,
+        hideOnLoading: false,
+        hideOnError: false,
+        debounceDuration: Duration.zero,
+        loadingBuilder: (context) => const Padding(
+          padding: EdgeInsets.all(16.0),
+          child: CircularProgressIndicator(),
+        ),
+        errorBuilder: (context, error) => Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text('Erro ao buscar endereços: $error'),
+        ),
+        emptyBuilder: (context) => const Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('Nenhum endereço encontrado'),
+        ),
+      ),
+      const Divider(height: 48, thickness: 0.5),
+
+      // 10. WhatsApp
+      const Text(
+        'WhatsApp para contato (opcional)',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _whatsappController,
+        keyboardType: TextInputType.phone,
+        decoration: InputDecoration(
+          prefixIcon: const Icon(Icons.phone),
+          hintText: 'Ex: (11) 98765-4321',
+          helperText: 'Clientes poderão falar diretamente no WhatsApp',
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          filled: true,
+          fillColor: Colors.grey[50],
+        ),
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          _PhoneInputFormatter(),
+        ],
+      ),
+    ];
+  }
+
+  // ====================================================================
+  // MUSICIAN/BAND FIELDS
+  // ====================================================================
+  
+  List<Widget> _buildMusicianBandFields() {
+    final theme = Theme.of(context);
+    final sectionTitleStyle = theme.textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.bold,
+    );
+    
+    return [
+      // Disponível para
+      MultiSelectField(
+                    title: 'Disponível para',
+                    placeholder: 'Selecione suas disponibilidades',
+                    options: _availableForOptions,
+                    selectedItems: _selectedAvailableFor,
+                    maxSelections: 8,
+                    onSelectionChanged: (values) {
+                      setState(() {
+                        _selectedAvailableFor
+                          ..clear()
+                          ..addAll(values);
+                      });
+                    },
                   ),
                   const Divider(thickness: 0.5, height: 48),
 
-                  // Onde (Localização)
-                  Text('Onde', style: sectionTitleStyle),
+                  // Localização
+                  const Text(
+                    'Localização',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   TypeAheadField<Map<String, dynamic>>(
                     controller: _locationController,
                     focusNode: _locationFocusNode,
                     suggestionsCallback: _fetchAddressSuggestions,
+                    itemBuilder: (BuildContext context, Map<String, dynamic> suggestion) {
+                      final address = suggestion['address'] as Map<String, dynamic>? ?? {};
+
+                      // Extrai os componentes com fallback
+                      final road = (address['road'] ?? address['pedestrian'] ?? '') as String;
+                      final houseNumber = (address['house_number'] ?? '') as String;
+                      final neighbourhood = (address['neighbourhood'] ??
+                          address['suburb'] ??
+                          address['quarter'] ??
+                          '') as String;
+                      final city = (address['city'] ??
+                          address['town'] ??
+                          address['village'] ??
+                          address['municipality'] ??
+                          '') as String;
+                      final state = (address['state'] ?? '') as String;
+
+                      // Monta a linha principal (rua + número)
+                      final streetLine = [road, houseNumber].where((e) => e.isNotEmpty).join(', ');
+
+                      // Monta a linha secundária (bairro • cidade - estado)
+                      final List<String> secondaryParts = [];
+                      if (neighbourhood.isNotEmpty) secondaryParts.add(neighbourhood);
+                      if (city.isNotEmpty) secondaryParts.add(city);
+                      if (state.isNotEmpty) secondaryParts.add(state);
+
+                      final secondaryLine = secondaryParts.join(' • ');
+
+                      return ListTile(
+                        leading: const Icon(Icons.location_on, color: AppColors.primary, size: 20),
+                        title: Text(
+                          streetLine.isNotEmpty ? streetLine : (suggestion['display_name'] as String?)?.split(',').first ?? 'Localização',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: secondaryLine.isNotEmpty
+                            ? Text(
+                                secondaryLine,
+                                style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                            : null,
+                      );
+                    },
+                    onSelected: _onAddressSelected,
                     builder: (context, controller, focusNode) {
                       return TextFormField(
                         controller: controller,
                         focusNode: focusNode,
                         decoration: InputDecoration(
-                          hintText:
-                              'Buscar localização (cidade, bairro, endereço...)',
-                          prefixIcon:
-                              const Icon(Icons.place, color: AppColors.primary),
+                          labelText: 'Digite o endereço',
+                          hintText: 'Ex: Rua das Flores, São Paulo',
+                          prefixIcon: Icon(Iconsax.location),
+                          suffixIcon: controller.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Iconsax.close_circle,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      controller.clear();
+                                      _selectedLocation = null;
+                                      _selectedCity = null;
+                                      _selectedNeighborhood = null;
+                                      _selectedState = null;
+                                    });
+                                    focusNode.unfocus();
+                                  },
+                                )
+                              : null,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: AppColors.primary,
-                              width: 2,
-                            ),
                           ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: AppColors.primary,
-                              width: 2,
-                            ),
-                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
                         ),
-                        validator: (v) => _selectedLocation == null
-                            ? 'Selecione uma localização'
-                            : null,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Localização é obrigatória';
+                          }
+                          if (_selectedLocation == null) {
+                            return 'Selecione uma localização da lista';
+                          }
+                          return null;
+                        },
                       );
                     },
-                    itemBuilder: (context, suggestion) {
-                      return ListTile(
-                        leading: const Icon(Icons.location_on,
-                            color: AppColors.primary),
-                        title: Text(
-                          (suggestion['display_name'] as String?) ?? '',
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      );
-                    },
-                    onSelected: _onAddressSelected,
+                    hideOnEmpty: true,
+                    hideOnLoading: false,
+                    hideOnError: false,
+                    debounceDuration: Duration.zero,
+                    loadingBuilder: (context) => const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                    errorBuilder: (context, error) => Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text('Erro ao buscar endereços: $error'),
+                    ),
                     emptyBuilder: (context) => const Padding(
-                      padding: EdgeInsets.all(8),
+                      padding: EdgeInsets.all(16.0),
                       child: Text('Nenhum endereço encontrado'),
                     ),
                   ),
@@ -905,7 +1533,6 @@ class _PostPageState extends ConsumerState<PostPage> {
                     options: _genreOptions,
                     selectedItems: _selectedGenres,
                     maxSelections: maxGenres,
-                    enabled: !_isSaving,
                     onSelectionChanged: (values) {
                       setState(() {
                         _selectedGenres
@@ -914,7 +1541,7 @@ class _PostPageState extends ConsumerState<PostPage> {
                       });
                     },
                   ),
-                  const Divider(thickness: 0.5, height: 48),
+                  const SizedBox(height: 16),
 
                   // Instrumentos
                   MultiSelectField(
@@ -935,168 +1562,67 @@ class _PostPageState extends ConsumerState<PostPage> {
                   const Divider(thickness: 0.5, height: 48),
 
                   // Nível
-                  Text('Nível', style: sectionTitleStyle),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: _level,
-                    items: _levelOptions
-                        .map(
-                          (level) => DropdownMenuItem(
-                            value: level,
-                            child: Text(level),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) =>
-                        setState(() => _level = value ?? _level),
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Nível',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                           color: AppColors.primary,
-                          width: 2,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _levelOptions.map((level) {
+                          final isSelected = _level == level;
+                          return FilterChip(
+                            label: Text(level),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                _level = level;
+                              });
+                            },
+                            backgroundColor: Theme.of(context).cardColor,
+                            selectedColor: AppColors.primary.withOpacity(0.1),
+                            checkmarkColor: AppColors.primary,
+                            labelStyle: TextStyle(
+                              color: isSelected ? AppColors.primary : Colors.grey[700],
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(
+                                color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
                   ),
                   const Divider(height: 48, thickness: 0.5),
 
-                  // Foto
-                  Text('Foto (opcional)', style: sectionTitleStyle),
+                  // Fotos
+                  Text('Fotos (opcional, até 4)', style: sectionTitleStyle),
                   const SizedBox(height: 12),
-                  Stack(
-                    children: [
-                      GestureDetector(
-                        onTap: _pickPhoto,
-                        child: Container(
-                          height: 180,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: AppColors.primary.withValues(
-                                alpha: 0.18,
-                              ),
-                              width: 1.5,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            color: AppColors.surface,
-                          ),
-                          child: _photoLocalPath != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: _photoLocalPath!.startsWith('http')
-                                      ? CachedNetworkImage(
-                                          imageUrl: _photoLocalPath!,
-                                          fit: BoxFit.cover,
-                                          placeholder: (context, url) =>
-                                              const Center(
-                                            child: CircularProgressIndicator(
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                      Color(0xFFE47911)),
-                                            ),
-                                          ),
-                                          errorWidget: (context, url, error) =>
-                                              const Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.error_outline,
-                                                size: 48,
-                                                color: Colors.red,
-                                              ),
-                                              SizedBox(height: 8),
-                                              Text(
-                                                'Erro ao carregar foto',
-                                                style: TextStyle(
-                                                    color: Colors.red),
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                      : Image.file(
-                                          File(_photoLocalPath!),
-                                          fit: BoxFit.cover,
-                                        ),
-                                )
-                              : const Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.add_a_photo,
-                                      size: 48,
-                                      color: Colors.grey,
-                                    ),
-                                    SizedBox(height: 12),
-                                    Text(
-                                      'Toque para adicionar foto',
-                                      style: TextStyle(
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
-                      if (_photoLocalPath != null)
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: GestureDetector(
-                            onTap: () => setState(() => _photoLocalPath = null),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                color: Colors.black54,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+                  PhotoCarouselPicker(
+                    photoPaths: _photoPaths,
+                    onPhotosChanged: (paths) => setState(() => _photoPaths = paths),
+                    maxPhotos: 4,
                   ),
-                  if (_photoLocalPath != null)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Center(
-                        child: Text(
-                          'Alterar foto',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-                    ),
                   const Divider(height: 48, thickness: 0.5),
 
                   // Mensagem
                   Text('Mensagem', style: sectionTitleStyle),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _messageController,
-                    maxLines: 4,
-                    minLines: 2,
-                    maxLength: 150,
-                    decoration: InputDecoration(
-                      hintText: 'Conte um pouco sobre a oportunidade...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
-                      counterText: '${_messageController.text.length}/150',
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    validator: (v) => v == null || v.trim().isEmpty
+                  PostFormFields(
+                    descriptionController: _messageController,
+                    descriptionValidator: (v) => v == null || v.trim().isEmpty
                         ? 'Campo obrigatório'
                         : null,
                   ),
@@ -1162,15 +1688,7 @@ class _PostPageState extends ConsumerState<PostPage> {
                     const SizedBox(height: 12),
                     _buildYouTubePreview(_youtubeController.text),
                   ],
-
-                  const SizedBox(height: 32),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
+    ];
   }
 
   String? _extractYouTubeVideoId(String url) {
@@ -1274,6 +1792,58 @@ class _PostPageState extends ConsumerState<PostPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ====================================================================
+// INPUT FORMATTERS
+// ====================================================================
+
+/// Formatter para moeda brasileira (centavos)
+class _CurrencyInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) return newValue;
+    
+    final value = int.parse(newValue.text);
+    final formatted = NumberFormat.currency(locale: 'pt_BR', symbol: '').format(value / 100);
+    
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+/// Formatter para telefone brasileiro
+class _PhoneInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) return newValue;
+    
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    String formatted = '';
+    
+    if (digits.length <= 2) {
+      formatted = '($digits';
+    } else if (digits.length <= 7) {
+      formatted = '(${digits.substring(0, 2)}) ${digits.substring(2)}';
+    } else if (digits.length <= 11) {
+      formatted = '(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7)}';
+    } else {
+      formatted = '(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7, 11)}';
+    }
+    
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the build method from the ProfileSwitcherBottomSheet class, for the Dart programming language.">
+  <title>build method - ProfileSwitcherBottomSheet class - profile_switcher_bottom_sheet library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">wegig_app</a></li>
+    <li><a href="../../features_profile_presentation_widgets_profile_switcher_bottom_sheet/">features&#47;profile&#47;presentation&#47;widgets&#47;profile_switcher_bottom_sheet.dart</a></li>
+    <li><a href="../../features_profile_presentation_widgets_profile_switcher_bottom_sheet/ProfileSwitcherBottomSheet-class.html">ProfileSwitcherBottomSheet</a></li>
+    <li class="self-crumb">build method</li>
+  </ol>
+  <div class="self-name">build</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="features_profile_presentation_widgets_profile_switcher_bottom_sheet&#47;ProfileSwitcherBottomSheet-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">build</span> method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+  <div>
+    <ol class="annotation-list">
+        <li>@<a href="https://api.flutter.dev/flutter/dart-core/override-constant.html">override</a></li>
+    </ol>
+  </div>
+<span class="returntype"><a href="https://api.flutter.dev/flutter/widgets/Widget-class.html">Widget</a></span>
+<span class="name ">build</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="build-param-context"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a></span> <span class="parameter-name">context</span>, </span></li>
+<li><span class="parameter" id="build-param-ref"><span class="type-annotation"><a href="https://pub.dev/documentation/flutter_riverpod/2.6.1/flutter_riverpod/WidgetRef-class.html">WidgetRef</a></span> <span class="parameter-name">ref</span></span></li>
+</ol>)
+
+      <div class="features"><span class="feature">override</span></div>
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Describes the part of the user interface represented by this widget.</p>
+<p>The framework calls this method when this widget is inserted into the tree
+in a given <a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a> and when the dependencies of this widget change
+(e.g., an <a href="https://api.flutter.dev/flutter/widgets/InheritedWidget-class.html">InheritedWidget</a> referenced by this widget changes). This
+method can potentially be called in every frame and should not have any side
+effects beyond building a widget.</p>
+<p>The framework replaces the subtree below this widget with the widget
+returned by this method, either by updating the existing subtree or by
+removing the subtree and inflating a new subtree, depending on whether the
+widget returned by this method can update the root of the existing
+subtree, as determined by calling <a href="https://api.flutter.dev/flutter/widgets/Widget/canUpdate.html">Widget.canUpdate</a>.</p>
+<p>Typically implementations return a newly created constellation of widgets
+that are configured with information from this widget's constructor and
+from the given <a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a>.</p>
+<p>The given <a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a> contains information about the location in the
+tree at which this widget is being built. For example, the context
+provides the set of inherited widgets for this location in the tree. A
+given widget might be built with multiple different <a href="https://api.flutter.dev/flutter/widgets/BuildContext-class.html">BuildContext</a>
+arguments over time if the widget is moved around the tree or if the
+widget is inserted into the tree in multiple places at once.</p>
+<p>The implementation of this method must only depend on:</p>
+<ul>
+<li>the fields of the widget, which themselves must not change over time,
+and</li>
+<li>any ambient state obtained from the <code>context</code> using
+<a href="https://api.flutter.dev/flutter/widgets/BuildContext/dependOnInheritedWidgetOfExactType.html">BuildContext.dependOnInheritedWidgetOfExactType</a>.</li>
+</ul>
+<p>If a widget's <a href="../../features_profile_presentation_widgets_profile_switcher_bottom_sheet/ProfileSwitcherBottomSheet/build.html">build</a> method is to depend on anything else, use a
+<a href="https://api.flutter.dev/flutter/widgets/StatefulWidget-class.html">StatefulWidget</a> instead.</p>
+<p>See also:</p>
+<ul>
+<li><a href="https://api.flutter.dev/flutter/widgets/StatelessWidget-class.html">StatelessWidget</a>, which contains the discussion on performance considerations.</li>
+</ul>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">@override
+Widget build(BuildContext context, WidgetRef ref) {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    return const SizedBox.shrink();
+  }
+
+  return AnimatedContainer(
+    duration: const Duration(milliseconds: 300),
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.of(context).size.height * 0.8,
+    ),
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black26,
+          blurRadius: 10,
+          offset: Offset(0, -2),
+        ),
+      ],
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        &#47;&#47; Handle bar com semântica para acessibilidade
+        Semantics(
+          label: &#39;Arraste para fechar&#39;,
+          child: Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+
+        &#47;&#47; Título com melhor tipografia
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            children: [
+              Icon(Iconsax.repeat, color: AppColors.primary, size: 24),
+              SizedBox(width: 12),
+              Text(
+                &#39;Alternar Perfil&#39;,
+                style: AppTypography.titleLarge,
+              ),
+            ],
+          ),
+        ),
+
+        const Divider(height: 1),
+
+        &#47;&#47; Lista de perfis - Busca da collection &#39;profiles&#39;
+        Flexible(
+          child: StreamBuilder&lt;QuerySnapshot&gt;(
+            stream: FirebaseFirestore.instance
+                .collection(&#39;profiles&#39;)
+                .where(&#39;uid&#39;, isEqualTo: user.uid)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Iconsax.info_circle,
+                          color: AppColors.error, size: 40),
+                      SizedBox(height: 8),
+                      Text(
+                        &#39;Erro ao carregar perfis&#39;,
+                        style: TextStyle(color: AppColors.error),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              &#47;&#47; Converter documentos para lista de Profiles
+              final profiles = snapshot.data?.docs
+                      .map((QueryDocumentSnapshot&lt;Object?&gt; doc) {
+                        try {
+                          return ProfileEntity.fromFirestore(
+                              doc as DocumentSnapshot&lt;Map&lt;String, dynamic&gt;&gt;);
+                        } catch (e) {
+                          debugPrint(
+                              &#39;Erro ao converter perfil ${doc.id}: $e&#39;);
+                          return null;
+                        }
+                      })
+                      .where((ProfileEntity? p) =&gt; p != null)
+                      .cast&lt;ProfileEntity&gt;()
+                      .toList() ??
+                  &lt;ProfileEntity&gt;[];
+
+              &#47;&#47; Se não há perfis, mostrar opção para criar primeiro perfil
+              if (profiles.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Iconsax.user_add,
+                        size: 64,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        &#39;Nenhum perfil encontrado&#39;,
+                        style: AppTypography.titleLarge.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        &#39;Crie seu primeiro perfil para começar&#39;,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          final result = await Navigator.push&lt;bool?&gt;(
+                            context,
+                            MaterialPageRoute&lt;bool?&gt;(
+                              builder: (context) =&gt;
+                                  const EditProfilePage(isNewProfile: true),
+                            ),
+                          );
+                          if (result == true &amp;&amp; context.mounted) {
+                            AppSnackBar.showSuccess(context, &#39;Perfil criado com sucesso!&#39;);
+                          }
+                        },
+                        icon: const Icon(Iconsax.add),
+                        label: const Text(&#39;Criar Primeiro Perfil&#39;),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: profiles.length,
+                separatorBuilder: (context, index) =&gt;
+                    const Divider(height: 1, indent: 72),
+                itemBuilder: (context, index) {
+                  final profile = profiles[index];
+                  final isActive = profile.profileId == activeProfileId;
+
+                  &#47;&#47; Card com animação FadeIn
+                  return AnimatedOpacity(
+                    duration: Duration(milliseconds: 200 + (index * 50)),
+                    opacity: 1,
+                    child: Semantics(
+                      label:
+                          &#39;${profile.name}, ${profile.isBand ? &#39;Banda&#39; : &#39;Músico&#39;}${isActive ? &#39;, perfil ativo&#39; : &#39;&#39;}&#39;,
+                      button: true,
+                      enabled: !isActive,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 8),
+                        &#47;&#47; Avatar com indicador de perfil ativo
+                        leading: Hero(
+                          tag: &#39;profile-avatar-${profile.profileId}&#39;,
+                          child: CircleAvatar(
+                            radius: 28,
+                            backgroundImage: profile.photoUrl != null &amp;&amp;
+                                    profile.photoUrl!.isNotEmpty
+                                ? CachedNetworkImageProvider(
+                                    profile.photoUrl!) as ImageProvider
+                                : null,
+                            child: profile.photoUrl == null ||
+                                    profile.photoUrl!.isEmpty
+                                ? const Icon(Iconsax.user, size: 30)
+                                : null,
+                          ),
+                        ),
+                        title: Text(
+                          profile.name,
+                          style: AppTypography.subtitleLight.copyWith(
+                            fontWeight:
+                                isActive ? FontWeight.bold : FontWeight.w600,
+                            color: isActive
+                                ? AppColors.primary
+                                : AppColors.textPrimary,
+                          ),
+                        ),
+                        subtitle: Row(
+                          children: [
+                            Icon(
+                              profile.isBand ? Iconsax.people : Iconsax.user,
+                              size: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              profile.isBand ? &#39;Banda&#39; : &#39;Músico&#39;,
+                              style: AppTypography.captionLight,
+                            ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            &#47;&#47; Badge counter unificado para perfis não ativos
+                            if (!isActive) ...[
+                              _UnifiedBadgeCounter(
+                                profileId: profile.profileId,
+                              ),
+                              const SizedBox(width: 12),
+                            ],
+                            if (isActive)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Iconsax.tick_circle,
+                                        size: 14, color: Colors.white),
+                                    SizedBox(width: 4),
+                                    Text(&#39;Ativo&#39;,
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12)),
+                                  ],
+                                ),
+                              )
+                            else
+                              const Icon(
+                                Iconsax.arrow_right_3,
+                                color: AppColors.textSecondary,
+                              ),
+                            &#47;&#47; Menu de opções (editar&#47;excluir)
+                            PopupMenuButton&lt;String&gt;(
+                              icon: const Icon(
+                                Iconsax.more,
+                                color: AppColors.textSecondary,
+                                size: 20,
+                              ),
+                              onSelected: (value) async {
+                                if (value == &#39;edit&#39;) {
+                                  _editProfile(context, profile);
+                                } else if (value == &#39;delete&#39;) {
+                                  _deleteProfile(context, ref, profile);
+                                }
+                              },
+                              itemBuilder: (context) =&gt; [
+                                const PopupMenuItem(
+                                  value: &#39;edit&#39;,
+                                  child: Row(
+                                    children: [
+                                      Icon(Iconsax.edit,
+                                          size: 18, color: AppColors.primary),
+                                      SizedBox(width: 8),
+                                      Text(&#39;Editar&#39;),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: &#39;delete&#39;,
+                                  enabled: profile.profileId !=
+                                      user.uid, &#47;&#47; Não permite excluir perfil principal
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Iconsax.trash,
+                                        size: 18,
+                                        color: profile.profileId != user.uid
+                                            ? AppColors.error
+                                            : AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        &#39;Excluir&#39;,
+                                        style: TextStyle(
+                                          color: profile.profileId != user.uid
+                                              ? AppColors.error
+                                              : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        onTap: isActive
+                            ? null
+                            : () async {
+                                &#47;&#47; Fecha o modal primeiro
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                }
+
+                                &#47;&#47; Aguarda um frame para garantir que o modal foi fechado
+                                await Future&lt;void&gt;.delayed(
+                                  const Duration(milliseconds: 100),
+                                );
+
+                                if (!context.mounted) return;
+
+                                try {
+                                  &#47;&#47; Mostra overlay e aguarda
+                                  final overlayFuture =
+                                      ProfileTransitionOverlay.show(
+                                    context,
+                                    profileName: profile.name,
+                                    isBand: profile.isBand,
+                                    photoUrl: profile.photoUrl,
+                                    onComplete: () {
+                                      &#47;&#47; Chama o callback para recarregar os dados
+                                      onProfileSelected(profile.profileId);
+                                    },
+                                  );
+
+                                  &#47;&#47; Atualiza o perfil ativo usando ProfileRepository
+                                  &#47;&#47; Faz isso em paralelo com a animação do overlay
+                                  await Future.wait(&lt;Future&lt;dynamic&gt;&gt;[
+                                    ref.read(profileProvider.notifier)
+                                        .switchProfile(profile.profileId),
+                                    Future&lt;void&gt;.delayed(const Duration(
+                                      milliseconds: 1300,
+                                    )), &#47;&#47; Duração mínima do overlay
+                                  ]);
+
+                                  &#47;&#47; Aguarda o overlay fechar completamente
+                                  await overlayFuture;
+                                } catch (e) {
+                                  &#47;&#47; Fecha overlay se houver erro
+                                  if (context.mounted) {
+                                    Navigator.of(context)
+                                        .popUntil((route) =&gt; route.isFirst);
+                                  }
+
+                                  &#47;&#47; Mostra mensagem de erro
+                                  &#47;&#47; Error already shown by AppSnackBar above
+                                }
+                              },
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+
+        const Divider(height: 1),
+
+        &#47;&#47; Botão adicionar novo perfil com gradiente (esconde quando há 5 perfis)
+        StreamBuilder&lt;QuerySnapshot&gt;(
+          stream: FirebaseFirestore.instance
+              .collection(&#39;profiles&#39;)
+              .where(&#39;uid&#39;, isEqualTo: user.uid)
+              .snapshots(),
+          builder: (context, snapshot) {
+            final profileCount = snapshot.data?.docs.length ?? 0;
+
+            &#47;&#47; Esconder botão se já tem 5 perfis
+            if (profileCount &gt;= 5) {
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  &#39;Você atingiu o limite de 5 perfis&#39;,
+                  style: AppTypography.captionLight.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Semantics(
+                label: &#39;Adicionar novo perfil&#39;,
+                button: true,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    final result = await Navigator.push&lt;String?&gt;(
+                      context,
+                      MaterialPageRoute&lt;String?&gt;(
+                        builder: (context) =&gt;
+                            const EditProfilePage(isNewProfile: true),
+                      ),
+                    );
+
+                    if (result is String &amp;&amp; result.isNotEmpty) {
+                      onProfileSelected(result);
+
+                      if (context.mounted) {
+                        AppSnackBar.showSuccess(
+                          context,
+                          &#39;Novo perfil ativado!&#39;,
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Iconsax.user_add),
+                  label: const Text(&#39;Adicionar Novo Perfil&#39;),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+
+        SizedBox(height: MediaQuery.of(context).padding.bottom),
+      ],
+    ),
+  );
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">wegig_app</a></li>
+    <li><a href="../../features_profile_presentation_widgets_profile_switcher_bottom_sheet/">profile_switcher_bottom_sheet</a></li>
+    <li><a href="../../features_profile_presentation_widgets_profile_switcher_bottom_sheet/ProfileSwitcherBottomSheet-class.html">ProfileSwitcherBottomSheet</a></li>
+    <li class="self-crumb">build method</li>
+</ol>
+
+    <h5>ProfileSwitcherBottomSheet class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    wegig_app
+      1.0.1+2
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

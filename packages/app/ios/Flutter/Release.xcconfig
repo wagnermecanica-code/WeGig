@@ -1,2 +1,8 @@
-#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
+// Include Pods config for all release/profile configurations
+#include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.release.xcconfig"
+#include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.release-dev.xcconfig"
+#include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.release-staging.xcconfig"
+#include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.profile.xcconfig"
+#include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.profile-dev.xcconfig"
+#include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.profile-staging.xcconfig"
 #include "Generated.xcconfig"

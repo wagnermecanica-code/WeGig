@@ -821,6 +821,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ### 📊 Cobertura Final - Data Classes com Freezed
 
 **Total no projeto:**
+
 - 12 classes com `@freezed`
 - 4 sealed classes com Freezed (AuthResult, ProfileResult, PostResult, MessagesResult)
 - 17 arquivos de dados identificados
@@ -828,6 +829,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 **Breakdown por categoria:**
 
 **Entities (5) - Core UI:**
+
 1. ✅ ProfileEntity
 2. ✅ PostEntity
 3. ✅ MessageEntity + MessageReplyEntity
@@ -835,6 +837,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 5. ✅ NotificationEntity
 
 **State Classes (5) - App:**
+
 1. ✅ ProfileState (profile_providers.dart)
 2. ✅ PostState (post_providers.dart)
 3. ✅ FeedState (home_providers.dart)
@@ -842,9 +845,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 5. ✅ AuthResult (sealed class - auth)
 
 **Data Models (1) - Core UI:**
+
 1. ✅ SearchParams (models/search_params.dart)
 
 **Result Types (4) - Core UI:**
+
 1. ✅ AuthResult (sealed + freezed)
 2. ✅ ProfileResult (sealed)
 3. ✅ PostResult (sealed)

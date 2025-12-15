@@ -84,3 +84,6 @@ lib/firebase_options_prod.dart
 # Node modules (commitlint, husky)
 node_modules/
 package-lock.json
+# Package build directories
+packages/*/build/
+packages/**/build/

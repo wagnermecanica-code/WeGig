@@ -1,0 +1,180 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    // Verifica se o auth.uid é participante de uma conversa (participants ou profileUid)
+    function isConversationMember(conversationId) {
+      let conv = get(/databases/$(database)/documents/conversations/$(conversationId));
+      return conv.exists() && (
+        (conv.data.participants != null && request.auth.uid in conv.data.participants) ||
+        (conv.data.profileUid != null && request.auth.uid in conv.data.profileUid)
+      );
+    }
+
+    // Verifica se o profileId pertence ao usuário autenticado
+    function ownsProfile(profileId) {
+      let profile = get(/databases/$(database)/documents/profiles/$(profileId));
+      return profile.exists() && profile.data.uid == request.auth.uid;
+    }
+
+    // ============================================
+    // PROFILES - Perfis de usuários (multi-perfil)
+    // ============================================
+
+    match /profiles/{profileId} {
+      allow read: if isSignedIn();
+      // ✅ CORREÇÃO: Separar regras para create/update e delete
+      // Para create/update: usa request.resource.data (dados que serão escritos)
+      // Para delete: usa resource.data (dados existentes no documento)
+      allow create, update: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+
+      // ============================================
+      // FCM TOKENS - Subcoleção para push notifications
+      // ============================================
+      // Qualquer usuário autenticado pode gerenciar tokens em seus próprios perfis
+      // A validação de ownership do perfil já é feita pela lógica do app
+      // (o app só salva tokens para perfis que o usuário possui)
+      match /fcmTokens/{tokenId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    // ============================================
+    // USERS - Dados privados do usuário
+    // ============================================
+
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && isOwner(userId);
+    }
+
+    // ============================================
+    // POSTS - Publicações (expiram após 30 dias)
+    // ============================================
+    // Fields: authorUid (auth UID), authorProfileId (profile ID)
+
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.authorUid == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && resource.data.authorUid == request.auth.uid;
+    }
+
+    // ============================================
+    // CONVERSATIONS - Multi-perfil
+    // ============================================
+    // Estrutura esperada:
+    // - participants: [uid1, uid2] (auth UIDs)
+    // - profileUid: [uid1, uid2] (fallback de owners dos perfis)
+    // - participantProfiles: [profileId1, profileId2]
+
+    match /conversations/{conversationId} {
+      // Para queries: verifica se o usuário está em participants ou profileUid do documento retornado
+      // Para leitura de documento específico: usa isConversationMember
+      allow read: if isSignedIn() && (
+        // Query support: verifica campos do documento retornado (resource.data)
+        (resource.data.participants != null && request.auth.uid in resource.data.participants) ||
+        (resource.data.profileUid != null && request.auth.uid in resource.data.profileUid)
+      );
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participantProfiles != null;
+      allow update, delete: if isSignedIn() && (
+        (resource.data.participants != null && request.auth.uid in resource.data.participants) ||
+        (resource.data.profileUid != null && request.auth.uid in resource.data.profileUid)
+      );
+
+      // ============================================
+      // MESSAGES - Subcoleção aninhada
+      // ============================================
+      // SIMPLIFICADO: Verifica apenas se o usuário é participante da conversa pai
+      // usando get() que funciona para operações individuais (não queries)
+      match /messages/{messageId} {
+        // Helper inline para verificar participação
+        function canAccessConversation() {
+          let conv = get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+          return conv != null && (
+            (conv.participants != null && request.auth.uid in conv.participants) ||
+            (conv.profileUid != null && request.auth.uid in conv.profileUid)
+          );
+        }
+        
+        allow read: if isSignedIn() && canAccessConversation();
+        allow create: if isSignedIn()
+          && canAccessConversation()
+          && request.resource.data.senderId == request.auth.uid;
+        // ✅ FIX: Permitir update se:
+        // 1. É o remetente da mensagem (pode editar/deletar), OU
+        // 2. É participante da conversa e está apenas modificando reactions ou deletedForProfiles
+        allow update: if isSignedIn() && (
+          resource.data.senderId == request.auth.uid ||
+          (canAccessConversation() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions', 'deletedForProfiles']))
+        );
+        allow delete: if isSignedIn() && resource.data.senderId == request.auth.uid;
+      }
+    }
+
+    // ============================================
+    // INTERESTS - Interesses enviados entre perfis
+    // ============================================
+
+    match /interests/{interestId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && request.resource.data.profileUid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.profileUid == request.auth.uid;
+    }
+
+    // ============================================
+    // NOTIFICATIONS - Notificações push/in-app
+    // ============================================
+    // SIMPLIFICADO: Apenas verifica recipientUid para leitura
+    // O filtro por recipientProfileId é feito client-side para isolamento multi-perfil
+    // Isso evita problemas com get() em queries e melhora performance
+
+    match /notifications/{notificationId} {
+      // Leitura: apenas verificar recipientUid (Security Rules não suporta bem get() em queries)
+      allow read: if isSignedIn() 
+        && resource.data.recipientUid == request.auth.uid;
+      
+      // Create: qualquer usuário autenticado pode criar notificações
+      // (Cloud Functions e outros usuários podem enviar notificações)
+      allow create: if isSignedIn()
+        && request.resource.data.recipientProfileId != null
+        && request.resource.data.recipientUid != null;
+      
+      // Update/Delete: apenas o destinatário pode modificar suas notificações
+      allow update, delete: if isSignedIn() 
+        && resource.data.recipientUid == request.auth.uid;
+    }
+
+    // ============================================
+    // BLOCKS - Bloqueios de perfis/usuários
+    // ============================================
+    match /blocks/{blockId} {
+      allow read: if isSignedIn() && resource.data.blockedByUid == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.blockedByUid == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.blockedByUid == request.auth.uid;
+    }
+
+    // ============================================
+    // REPORTS - Denúncias
+    // ============================================
+    match /reports/{reportId} {
+      allow create: if isSignedIn() && request.resource.data.reporterUid == request.auth.uid;
+      allow read, update, delete: if isSignedIn() && resource.data.reporterUid == request.auth.uid;
+    }
+  }
+}

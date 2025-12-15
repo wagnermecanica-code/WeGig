@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the keepAlive method from the UnreadMessageCountForProfileRef mixin, for the Dart programming language.">
+  <title>keepAlive method - UnreadMessageCountForProfileRef mixin - messages_providers library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">wegig_app</a></li>
+    <li><a href="../../features_messages_presentation_providers_messages_providers/">features&#47;messages&#47;presentation&#47;providers&#47;messages_providers.dart</a></li>
+    <li><a href="../../features_messages_presentation_providers_messages_providers/UnreadMessageCountForProfileRef-mixin.html">UnreadMessageCountForProfileRef</a></li>
+    <li class="self-crumb">keepAlive abstract method</li>
+  </ol>
+  <div class="self-name">keepAlive</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="features_messages_presentation_providers_messages_providers&#47;UnreadMessageCountForProfileRef-mixin-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">keepAlive</span> abstract method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+<span class="returntype"><a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/KeepAliveLink-class.html">KeepAliveLink</a></span>
+<span class="name ">keepAlive</span>(<wbr>)
+
+      <div class="features"><span class="feature">inherited</span></div>
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Requests for the state of a provider to not be disposed when all the
+listeners of the provider are removed.</p>
+<p>Returns an object which allows cancelling this operation, therefore
+allowing the provider to dispose itself when all listeners are removed.</p>
+<p>If <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Ref/keepAlive.html">keepAlive</a> is invoked multiple times, all <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/KeepAliveLink-class.html">KeepAliveLink</a> will have
+to be closed for the provider to dispose itself when all listeners are removed.</p>
+<p><strong>Note</strong>:
+This is only useful if your provider is using "auto dispose".
+If your provider is not using "auto dispose", then this method has no effect.</p>
+<p><strong>Note</strong>:
+A provider that is kept alive may still be paused.
+If a provider is not listened, regardless of whether it is kept alive or not,
+the provider won't rebuild when using <a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Ref/watch.html">watch</a> until it is listened to again.</p>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">KeepAliveLink keepAlive();</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">wegig_app</a></li>
+    <li><a href="../../features_messages_presentation_providers_messages_providers/">messages_providers</a></li>
+    <li><a href="../../features_messages_presentation_providers_messages_providers/UnreadMessageCountForProfileRef-mixin.html">UnreadMessageCountForProfileRef</a></li>
+    <li class="self-crumb">keepAlive abstract method</li>
+</ol>
+
+    <h5>UnreadMessageCountForProfileRef mixin</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    wegig_app
+      1.0.1+2
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

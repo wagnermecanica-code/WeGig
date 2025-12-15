@@ -1,24 +1,44 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
+import 'package:core_ui/utils/location_utils.dart';
+import 'package:core_ui/utils/price_calculator.dart';
+import 'package:core_ui/widgets/mention_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/features/post/data/models/interest_document.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 /// Tela de detalhes completos de um post
-/// Acessível via navegação de cards de posts, notificações e galerias
+///
+/// Acessível via navegação de cards de posts, notificações e galerias.
+/// Exibe informações completas do post incluindo:
+/// - Foto e informações do autor
+/// - Gêneros, instrumentos e localização
+/// - Link de YouTube (se disponível)
+/// - Sistema de interesse (curtir)
+/// - Lista de perfis interessados
+/// - Ações (editar/deletar para autor, demonstrar interesse para outros)
 class PostDetailPage extends ConsumerStatefulWidget {
+  /// Construtor da página de detalhes
   const PostDetailPage({
     required this.postId,
     super.key,
   });
+
+  /// ID do post a ser exibido
   final String postId;
 
   @override
@@ -35,6 +55,17 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   YoutubePlayerController? _youtubeController;
   List<Map<String, dynamic>> _interestedUsers = [];
   bool _isLoadingInterests = false;
+  int _currentPhotoIndex = 0;
+
+  void _handleBackNavigation() {
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+    context.goToHome();
+  }
 
   @override
   void initState() {
@@ -59,9 +90,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       if (!doc.exists) {
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Post não encontrado')),
-          );
+          AppSnackBar.showError(context, 'Post não encontrado');
         }
         return;
       }
@@ -100,9 +129,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       debugPrint('Erro ao carregar post: $e');
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao carregar post')),
-        );
+        AppSnackBar.showError(context, 'Erro ao carregar post');
       }
     }
   }
@@ -130,39 +157,51 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           '📊 Encontrados ${interestsSnapshot.docs.length} documentos na collection interests');
 
       final users = <Map<String, dynamic>>[];
+      final seenProfileIds = <String>{}; // ✅ Conjunto para rastrear profileIds já vistos
 
       // Para cada interesse, buscar dados do perfil
       for (final interestDoc in interestsSnapshot.docs) {
         final data = interestDoc.data();
         final interestedProfileId = data['interestedProfileId'] as String?;
 
+        // ✅ VALIDAÇÃO: Filtrar profileIds vazios
+        if (interestedProfileId == null || interestedProfileId.isEmpty) {
+          debugPrint('⚠️ Interesse sem interestedProfileId válido, pulando...');
+          continue;
+        }
+
+        // ✅ DEDUPLICAÇÃO: Pular se já processamos este perfil
+        if (seenProfileIds.contains(interestedProfileId)) {
+          debugPrint('⚠️ Perfil $interestedProfileId já adicionado, pulando duplicata...');
+          continue;
+        }
+        seenProfileIds.add(interestedProfileId);
+
         debugPrint('👤 Carregando perfil: $interestedProfileId');
 
-        if (interestedProfileId != null) {
-          try {
-            // Buscar perfil do interessado
-            final profileDoc = await FirebaseFirestore.instance
-                .collection('profiles')
-                .doc(interestedProfileId)
-                .get();
+        try {
+          // Buscar perfil do interessado
+          final profileDoc = await FirebaseFirestore.instance
+              .collection('profiles')
+              .doc(interestedProfileId)
+              .get();
 
-            if (profileDoc.exists) {
-              final profileData = profileDoc.data()!;
-              users.add({
-                'profileId': interestedProfileId,
-                'userId': data['interestedUid'] as String,
-                'name': profileData['name'] as String? ?? 'Usuário',
-                'photoUrl': profileData['photoUrl'] as String? ?? '',
-                'isBand': profileData['isBand'] as bool? ?? false,
-                'createdAt': data['createdAt'] as Timestamp?,
-              });
-              debugPrint('✅ Perfil carregado: ${profileData['name']}');
-            } else {
-              debugPrint('⚠️ Perfil não encontrado: $interestedProfileId');
-            }
-          } catch (e) {
-            debugPrint('❌ Erro ao buscar perfil do interessado: $e');
+          if (profileDoc.exists) {
+            final profileData = profileDoc.data()!;
+            users.add({
+              'profileId': interestedProfileId,
+              'userId': data['interestedUid'] as String? ?? '',
+              'name': profileData['name'] as String? ?? 'Usuário',
+              'photoUrl': profileData['photoUrl'] as String? ?? '',
+              'isBand': profileData['isBand'] as bool? ?? false,
+              'createdAt': data['createdAt'] as Timestamp?,
+            });
+            debugPrint('✅ Perfil carregado: ${profileData['name']}');
+          } else {
+            debugPrint('⚠️ Perfil não encontrado: $interestedProfileId');
           }
+        } catch (e) {
+          debugPrint('❌ Erro ao buscar perfil do interessado: $e');
         }
       }
 
@@ -205,6 +244,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           .where('postId', isEqualTo: post.id)
           .where('interestedUid', isEqualTo: currentUser.uid)
           .where('interestedProfileId', isEqualTo: activeProfile.profileId)
+          .where('profileUid', isEqualTo: activeProfile.uid)
           .limit(1)
           .get();
 
@@ -248,96 +288,138 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
-  /// Demonstra interesse no post
+  /// Demonstra interesse no post (Abordagem Otimista)
   Future<void> _showInterest() async {
     if (_post == null) return;
 
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final profileState = ref.read(profileProvider);
+    final activeProfile = profileState.value?.activeProfile;
+    if (activeProfile == null) return;
+
+    // ✅ VERIFICAR SE JÁ EXISTE INTERESSE ANTES DE CRIAR
+    // Evita criação de duplicatas
+    if (_hasInterest || _interestId != null) {
+      debugPrint('⚠️ Interesse já existe, pulando criação...');
+      return;
+    }
+
+    // 1. Estado Otimista: Atualiza UI imediatamente
+    setState(() {
+      _hasInterest = true;
+    });
+
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return;
+      // ✅ Verificar novamente no Firestore para evitar race conditions
+      final existingInterest = await FirebaseFirestore.instance
+          .collection('interests')
+          .where('postId', isEqualTo: _post!.id)
+          .where('interestedProfileId', isEqualTo: activeProfile.profileId)
+          .limit(1)
+          .get();
 
-      final profileState = ref.read(profileProvider);
-      final activeProfile = profileState.value?.activeProfile;
-      if (activeProfile == null) return;
+      if (existingInterest.docs.isNotEmpty) {
+        debugPrint('⚠️ Interesse já existe no Firestore, atualizando estado...');
+        if (mounted) {
+          setState(() {
+            _interestId = existingInterest.docs.first.id;
+          });
+        }
+        return;
+      }
 
-      // Criar documento de interesse
-      final docRef =
-          await FirebaseFirestore.instance.collection('interests').add({
-        'postId': _post!.id,
-        'postAuthorUid': _post!.authorUid,
-        'postAuthorProfileId': _post!.authorProfileId,
-        'interestedUid': currentUser.uid,
-        'interestedProfileId': activeProfile.profileId,
-        'createdAt': FieldValue.serverTimestamp(),
-        'read': false,
-      });
+      // ✅ Usar factory padronizada
+      final interestData = InterestDocumentFactory.create(
+        postId: _post!.id,
+        postAuthorUid: _post!.authorUid,
+        postAuthorProfileId: _post!.authorProfileId,
+        currentUserUid: currentUser.uid,
+        activeProfileUid: activeProfile.uid,
+        activeProfileId: activeProfile.profileId,
+        activeProfileName: activeProfile.name,
+        activeProfileUsername: activeProfile.username,
+        activeProfilePhotoUrl: activeProfile.photoUrl,
+      );
 
-      setState(() {
-        _hasInterest = true;
-        _interestId = docRef.id;
-      });
+      // 2. Chamada ao Firebase
+      final docRef = await FirebaseFirestore.instance
+          .collection('interests')
+          .add(interestData);
 
-      // Aguardar 500ms para garantir que o Firestore processou o serverTimestamp
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Recarregar lista de interessados
-      debugPrint('🔄 Recarregando interessados após demonstrar interesse...');
-      await _loadInterestedUsers();
-      debugPrint(
-          '✅ Interessados recarregados - _interestedUsers.length: ${_interestedUsers.length}');
-
+      // Atualiza o ID do interesse confirmado
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Interesse demonstrado! 💙'),
-            duration: Duration(seconds: 2),
-          ),
+        setState(() {
+          _interestId = docRef.id;
+        });
+      }
+
+      // ⚠️ REMOVIDO: Notificação duplicada - a Cloud Function `sendInterestNotification`
+      // já cria a notificação automaticamente via trigger onCreate em interests/{interestId}
+      // Aguardar confirmação do Firestore para garantir consistência antes de recarregar lista
+      await docRef.get();
+      
+      if (mounted) {
+        // Recarregar lista silenciosamente
+        _loadInterestedUsers();
+        
+        AppSnackBar.showSuccess(
+          context, 
+          _post!.type == 'sales' ? 'Anúncio salvo!' : 'Interesse demonstrado!',
         );
       }
+
     } catch (e) {
-      debugPrint('Erro ao demonstrar interesse: $e');
+      debugPrint('❌ Erro ao demonstrar interesse: $e');
+      
+      // 4. Rollback em caso de erro
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao demonstrar interesse')),
-        );
+        setState(() {
+          _hasInterest = false;
+          _interestId = null;
+        });
+        AppSnackBar.showError(context, 'Erro ao salvar interesse. Verifique sua conexão.');
       }
     }
   }
 
-  /// Remove interesse
+  /// Remove interesse (Abordagem Otimista)
   Future<void> _removeInterest() async {
     if (_interestId == null) return;
 
+    // Guardar ID para caso de rollback
+    final idToRemove = _interestId!;
+
+    // 1. Estado Otimista: Remove da UI imediatamente
+    setState(() {
+      _hasInterest = false;
+      _interestId = null;
+    });
+
     try {
+      // 2. Chamada ao Firebase
       await FirebaseFirestore.instance
           .collection('interests')
-          .doc(_interestId)
+          .doc(idToRemove)
           .delete();
 
-      setState(() {
-        _hasInterest = false;
-        _interestId = null;
-      });
-
-      // Aguardar 500ms para garantir que o Firestore processou a exclusão
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Recarregar lista de interessados
-      debugPrint('🔄 Recarregando interessados após remover interesse...');
-      await _loadInterestedUsers();
-      debugPrint(
-          '✅ Interessados recarregados - _interestedUsers.length: ${_interestedUsers.length}');
-
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Interesse removido'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        AppSnackBar.showInfo(context, 'Interesse removido');
+        // Recarregar lista
+        _loadInterestedUsers();
       }
     } catch (e) {
-      debugPrint('Erro ao remover interesse: $e');
+      debugPrint('❌ Erro ao remover interesse: $e');
+      
+      // 3. Rollback em caso de erro
+      if (mounted) {
+        setState(() {
+          _hasInterest = true;
+          _interestId = idToRemove;
+        });
+        AppSnackBar.showError(context, 'Erro ao remover interesse.');
+      }
     }
   }
 
@@ -350,6 +432,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       authorName: _authorName,
       postType: _post!.type,
       city: _post!.city,
+      neighborhood: _post!.neighborhood,
+      state: _post!.state,
       content: _post!.content,
       instruments: _post!.type == 'musician'
           ? _post!.instruments
@@ -357,7 +441,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       genres: _post!.genres,
     );
 
-    Share.share(text);
+    SharePlus.instance.share(ShareParams(text: text));
   }
 
   /// Deleta o post
@@ -403,16 +487,12 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post deletado com sucesso')),
-        );
+        AppSnackBar.showSuccess(context, 'Post deletado com sucesso');
       }
     } catch (e) {
       debugPrint(r'Erro ao deletar post: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao deletar post')),
-        );
+        AppSnackBar.showError(context, 'Erro ao deletar post');
       }
     }
   }
@@ -503,9 +583,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                     color: Colors.black87,
                   ),
                   children: [
-                    const TextSpan(
-                      text: 'Interessados: ',
-                      style: TextStyle(fontWeight: FontWeight.normal),
+                    TextSpan(
+                      text: _post!.type == 'sales' ? 'Salvaram: ' : 'Interessados: ',
+                      style: const TextStyle(fontWeight: FontWeight.normal),
                     ),
                     TextSpan(
                       text: _interestedUsers[0]['name'] as String,
@@ -529,7 +609,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
             // Ícone de seta (indica que é clicável)
             Icon(
-              Icons.chevron_right,
+              Iconsax.arrow_right_3,
               size: 20,
               color: Colors.grey[400],
             ),
@@ -552,7 +632,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       ),
       child: CircleAvatar(
         radius: 14,
-        backgroundColor: AppColors.primary.withOpacity(0.1),
+        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
         backgroundImage:
             photoUrl.isNotEmpty ? CachedNetworkImageProvider(photoUrl) : null,
         child: photoUrl.isEmpty
@@ -568,7 +648,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
   /// Modal bottom sheet com lista completa de interessados
   void _showAllInterestedUsers() {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -601,7 +681,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   child: Row(
                     children: [
                       const Icon(
-                        Icons.favorite,
+                        Iconsax.heart5,
                         color: Colors.red,
                         size: 24,
                       ),
@@ -640,7 +720,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                       final photoUrl = user['photoUrl'] as String;
                       final name = user['name'] as String;
                       final isBand = user['isBand'] as bool;
-                      final userId = user['userId'] as String;
                       final profileId = user['profileId'] as String;
 
                       return ListTile(
@@ -648,7 +727,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                             horizontal: 20, vertical: 4),
                         leading: CircleAvatar(
                           radius: 24,
-                          backgroundColor: AppColors.primary.withOpacity(0.1),
+                            backgroundColor:
+                              AppColors.primary.withValues(alpha: 0.1),
                           backgroundImage: photoUrl.isNotEmpty
                               ? CachedNetworkImageProvider(photoUrl)
                               : null,
@@ -676,7 +756,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                           ),
                         ),
                         trailing: Icon(
-                          Icons.arrow_forward_ios,
+                          Iconsax.arrow_right_3,
                           size: 16,
                           color: Colors.grey[400],
                         ),
@@ -698,7 +778,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
   /// Mostra opções do próprio post
   void _showOwnPostOptions() {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -708,30 +788,45 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.edit, color: AppColors.primary),
+              leading: const Icon(Iconsax.edit, color: AppColors.primary),
               title: const Text('Editar post'),
               onTap: () async {
                 Navigator.pop(context);
 
-                final result = await Navigator.push(
+                final result = await Navigator.push<bool?>(
                   context,
-                  MaterialPageRoute(
+                  MaterialPageRoute<bool?>(
                     builder: (_) => PostPage(
                       postType: _post!.type,
                       existingPostData: {
                         'postId': _post!.id,
                         'content': _post!.content,
+                        // Common fields
+                        'city': _post!.city,
+                        'neighborhood': _post!.neighborhood,
+                        'state': _post!.state,
+                        'photoUrls': _post!.photoUrls,
+                        'photoUrl': _post!.photoUrl, // fallback
+                        'youtubeLink': _post!.youtubeLink,
+                        'location': GeoPoint(_post!.location.latitude,
+                            _post!.location.longitude),
+                        'createdAt': _post!.createdAt,
+                        'expiresAt': _post!.expiresAt,
+                        // Musician/Band fields
                         'instruments': _post!.instruments,
                         'genres': _post!.genres,
                         'seekingMusicians': _post!.seekingMusicians,
                         'level': _post!.level,
-                        'city': _post!.city,
-                        'neighborhood': _post!.neighborhood,
-                        'state': _post!.state,
-                        'photoUrl': _post!.photoUrl,
-                        'youtubeLink': _post!.youtubeLink,
-                        'location': GeoPoint(_post!.location.latitude,
-                            _post!.location.longitude),
+                        'availableFor': _post!.availableFor,
+                        // Sales fields
+                        'title': _post!.title,
+                        'salesType': _post!.salesType,
+                        'price': _post!.price,
+                        'discountMode': _post!.discountMode,
+                        'discountValue': _post!.discountValue,
+                        'promoStartDate': _post!.promoStartDate,
+                        'promoEndDate': _post!.promoEndDate,
+                        'whatsappNumber': _post!.whatsappNumber,
                       },
                     ),
                   ),
@@ -743,7 +838,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
+              leading: const Icon(Iconsax.trash, color: Colors.red),
               title: const Text('Deletar post'),
               onTap: () {
                 Navigator.pop(context);
@@ -758,7 +853,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
   /// Mostra opções de interesse
   void _showInterestOptions() {
-    showModalBottomSheet(
+    final isSalesPost = _post?.type == 'sales';
+    
+    showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -767,16 +864,179 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             ListTile(
-              leading: const Icon(Icons.favorite_border, color: Colors.red),
-              title: const Text('Remover interesse'),
+              leading: Icon(
+                isSalesPost ? Iconsax.tag : Iconsax.heart,
+                color: isSalesPost ? AppColors.primary : Colors.red,
+                size: 24,
+              ),
+              title: Text(isSalesPost ? 'Remover dos Salvos' : 'Remover interesse'),
               onTap: () {
                 Navigator.pop(context);
                 _removeInterest();
               },
             ),
+            const SizedBox(height: 8),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Constrói o carrossel de fotos do post
+  Widget _buildPhotoCarousel(double screenWidth, double photoHeight) {
+    // Pega as fotos disponíveis (photoUrls ou fallback para photoUrl)
+    final List<String> photos = _post!.photoUrls.isNotEmpty
+        ? _post!.photoUrls
+        : (_post!.photoUrl != null && _post!.photoUrl!.isNotEmpty)
+            ? [_post!.photoUrl!]
+            : [];
+
+    // Se não há fotos, mostra placeholder
+    if (photos.isEmpty) {
+      return Container(
+        width: screenWidth,
+        height: photoHeight,
+        color: Colors.grey[200],
+        child: Center(
+          child: Icon(
+            _post!.type == 'band' ? Iconsax.people : Iconsax.user,
+            size: 80,
+            color: Colors.grey[600],
+          ),
+        ),
+      );
+    }
+
+    // Se só tem uma foto, não precisa de carrossel
+    if (photos.length == 1) {
+      return Hero(
+        tag: 'post-photo-${_post!.id}',
+        child: Container(
+          width: screenWidth,
+          height: photoHeight,
+          color: Colors.grey[200],
+          child: CachedNetworkImage(
+            cacheManager: WeGigImageCacheManager.instance,
+            imageUrl: photos.first,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Container(
+              color: Colors.grey[200],
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+                ),
+              ),
+            ),
+            errorWidget: (context, url, error) => Container(
+              color: Colors.grey[300],
+              child: Icon(
+                _post!.type == 'band' ? Iconsax.people : Iconsax.user,
+                size: 80,
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Múltiplas fotos - carrossel com indicadores
+    return SizedBox(
+      width: screenWidth,
+      height: photoHeight,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          PageView.builder(
+            itemCount: photos.length,
+            onPageChanged: (index) => setState(() => _currentPhotoIndex = index),
+            itemBuilder: (context, index) {
+              return Hero(
+                tag: 'post-photo-${_post!.id}-$index',
+                child: CachedNetworkImage(
+                  cacheManager: WeGigImageCacheManager.instance,
+                  imageUrl: photos[index],
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    color: Colors.grey[300],
+                    child: Icon(
+                      _post!.type == 'band' ? Iconsax.people : Iconsax.user,
+                      size: 80,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          // Indicadores de página (dots)
+          Positioned(
+            bottom: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(
+                  photos.length,
+                  (index) => Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _currentPhotoIndex == index
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Contador de fotos
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${_currentPhotoIndex + 1}/${photos.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -804,58 +1064,22 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final photoHeight = screenWidth * 0.7; // Proporção ~10:7
 
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        if (didPop) return;
+        _handleBackNavigation();
+      },
+      child: Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
           // Conteúdo scrollável
           SingleChildScrollView(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Hero com foto do post
-                Hero(
-                  tag: r'post-photo-${_post!.id}',
-                  child: Container(
-                    width: screenWidth,
-                    height: photoHeight,
-                    color: Colors.grey[200],
-                    child:
-                        (_post!.photoUrl != null && _post!.photoUrl!.isNotEmpty)
-                            ? CachedNetworkImage(
-                                imageUrl: _post!.photoUrl!,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          Color(0xFFE47911)),
-                                    ),
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Colors.grey[300],
-                                  child: Icon(
-                                    _post!.type == 'band'
-                                        ? Icons.group
-                                        : Icons.person,
-                                    size: 80,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              )
-                            : Center(
-                                child: Icon(
-                                  _post!.type == 'band'
-                                      ? Icons.group
-                                      : Icons.person,
-                                  size: 80,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                  ),
-                ),
+                // Carrossel de fotos do post
+                _buildPhotoCarousel(screenWidth, photoHeight),
 
                 // Overlap negativo com informações do autor
                 Transform.translate(
@@ -868,7 +1092,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                       ),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Header com autor e localização
                         Padding(
@@ -883,7 +1106,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                 child: CircleAvatar(
                                   radius: 28,
                                   backgroundColor:
-                                      AppColors.primary.withOpacity(0.1),
+                                      AppColors.primary.withValues(alpha: 0.1),
                                   backgroundImage: _authorPhotoUrl.isNotEmpty
                                       ? CachedNetworkImageProvider(
                                           _authorPhotoUrl)
@@ -914,8 +1137,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                           fontSize: 20,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.black87,
-                                          decoration: TextDecoration.underline,
-                                          decorationColor: Colors.black87,
                                         ),
                                       ),
                                     ),
@@ -935,159 +1156,11 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                         // Seção de interessados (visível para todos)
                         _buildInterestedUsers(),
 
-                        // Título dinâmico do tipo de post
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                          child: Text(
-                            _post!.type == 'musician'
-                                ? 'Músico em busca de banda'
-                                : 'Banda em busca de músico',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-
-                        // Card de informações
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Área de Interesse (Localização)
-                                _buildInfoRow(
-                                  Icons.location_on,
-                                  'Área de Interesse',
-                                  _buildLocationString(),
-                                ),
-                                const SizedBox(height: 12),
-                                // Instrumentos (músico) ou Procurando (banda)
-                                if (_post!.type == 'musician' &&
-                                    _post!.instruments.isNotEmpty)
-                                  _buildInfoRow(
-                                    Icons.music_note,
-                                    'Instrumentos',
-                                    _post!.instruments.join(', '),
-                                  )
-                                else if (_post!.type == 'band' &&
-                                    _post!.seekingMusicians.isNotEmpty)
-                                  _buildInfoRow(
-                                    Icons.search,
-                                    'Procurando',
-                                    _post!.seekingMusicians.join(', '),
-                                  ),
-                                if ((_post!.type == 'musician' &&
-                                        _post!.instruments.isNotEmpty) ||
-                                    (_post!.type == 'band' &&
-                                        _post!.seekingMusicians.isNotEmpty))
-                                  const SizedBox(height: 12),
-                                // Gêneros musicais
-                                if (_post!.genres.isNotEmpty)
-                                  _buildInfoRow(
-                                    Icons.album,
-                                    'Gêneros',
-                                    _post!.genres.join(', '),
-                                  ),
-                                if (_post!.genres.isNotEmpty)
-                                  const SizedBox(height: 12),
-                                // Nível de habilidade
-                                _buildInfoRow(
-                                  Icons.star,
-                                  'Nível',
-                                  _getSkillLevelLabel(_post!.level),
-                                ),
-                                // Disponível para
-                                if (_post!.availableFor.isNotEmpty) ...[
-                                  const SizedBox(height: 12),
-                                  _buildInfoRow(
-                                    Icons.calendar_today,
-                                    'Disponível para',
-                                    _post!.availableFor.join(', '),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // Card de mensagem
-                        if (_post!.content.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Row(
-                                    children: [
-                                      Icon(
-                                        Icons.message,
-                                        size: 18,
-                                        color: AppColors.primary,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Mensagem',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  SelectableText(
-                                    _post!.content,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      color: Colors.grey[800],
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                        const SizedBox(height: 16),
-
-                        // Card de vídeo do YouTube
-                        if (_youtubeController != null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey[50],
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: YoutubePlayer(
-                                  controller: _youtubeController!,
-                                  showVideoProgressIndicator: true,
-                                  progressIndicatorColor: AppColors.primary,
-                                ),
-                              ),
-                            ),
-                          ),
+                        // ✅ Renderização condicional por tipo de post
+                        if (_post!.type == 'sales')
+                          _buildSalesContent()
+                        else
+                          _buildMusicianBandContent(),
 
                         const SizedBox(height: 32),
                       ],
@@ -1112,18 +1185,18 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                     // Botão voltar
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
+                        color: Colors.black.withValues(alpha: 0.5),
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
                         icon: const Icon(
-                          Icons.arrow_back_ios_new,
+                          Iconsax.arrow_left_2,
                           color: Colors.white,
                           size: 18,
                         ),
                         padding: const EdgeInsets.all(8),
                         constraints: const BoxConstraints(),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: _handleBackNavigation,
                       ),
                     ),
                     // Botões de ação
@@ -1132,12 +1205,12 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                         // Compartilhar
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
+                            color: Colors.black.withValues(alpha: 0.5),
                             shape: BoxShape.circle,
                           ),
                           child: IconButton(
                             icon: const Icon(
-                              Icons.share,
+                              Iconsax.share,
                               color: Colors.white,
                               size: 18,
                             ),
@@ -1150,13 +1223,13 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                         // Interesse ou Menu de opções
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
+                            color: Colors.black.withValues(alpha: 0.5),
                             shape: BoxShape.circle,
                           ),
                           child: _isOwnPost()
                               ? IconButton(
                                   icon: const Icon(
-                                    Icons.more_vert,
+                                    Iconsax.more,
                                     color: Colors.white,
                                     size: 18,
                                   ),
@@ -1167,12 +1240,12 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                               : IconButton(
                                   icon: Icon(
                                     _hasInterest
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
+                                        ? (_post!.type == 'sales' ? Iconsax.tag5 : Iconsax.heart5)
+                                        : (_post!.type == 'sales' ? Iconsax.tag : Iconsax.heart),
                                     color: _hasInterest
-                                        ? Colors.red
+                                        ? Colors.pink
                                         : Colors.white,
-                                    size: 18,
+                                    size: 20,
                                   ),
                                   padding: const EdgeInsets.all(8),
                                   constraints: const BoxConstraints(),
@@ -1190,8 +1263,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// Widget para linha de informação
   Widget _buildInfoRow(IconData icon, String label, String value) {
@@ -1215,6 +1289,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   color: Colors.grey[600],
                   fontWeight: FontWeight.w500,
                 ),
+                textAlign: TextAlign.left,
               ),
               const SizedBox(height: 2),
               Text(
@@ -1223,6 +1298,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   fontSize: 15,
                   color: Colors.black87,
                 ),
+                textAlign: TextAlign.left,
               ),
             ],
           ),
@@ -1247,21 +1323,614 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
-  /// Constrói string de localização com bairro, cidade e estado
-  String _buildLocationString() {
-    if (_post == null) return '';
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ✅ CONTEÚDO PARA MÚSICO/BANDA (código original extraído)
+  // ═══════════════════════════════════════════════════════════════════════════
 
-    final parts = <String>[];
-    if (_post!.neighborhood != null && _post!.neighborhood!.isNotEmpty) {
-      parts.add(_post!.neighborhood!);
-    }
-    if (_post!.city.isNotEmpty) {
-      parts.add(_post!.city);
-    }
-    if (_post!.state != null && _post!.state!.isNotEmpty) {
-      parts.add(_post!.state!);
-    }
+  /// Conteúdo para posts de músico ou banda
+  Widget _buildMusicianBandContent() {
+    return Column(
+      children: [
+        // Título dinâmico do tipo de post
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _post!.type == 'musician'
+                  ? 'Músico em busca de banda'
+                  : 'Banda em busca de músico',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ),
 
-    return parts.isNotEmpty ? parts.join(', ') : 'Localização não disponível';
+        // Card de informações
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Área de Interesse (Localização)
+                _buildInfoRow(
+                  Iconsax.location,
+                  'Área de Interesse',
+                  formatCleanLocation(
+                    neighborhood: _post!.neighborhood,
+                    city: _post!.city,
+                    state: _post!.state,
+                    fallback: 'Localização não disponível',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Instrumentos (músico) ou Procurando (banda)
+                if (_post!.type == 'musician' && _post!.instruments.isNotEmpty)
+                  _buildInfoRow(
+                    Iconsax.musicnote,
+                    'Instrumentos',
+                    _post!.instruments.join(', '),
+                  )
+                else if (_post!.type == 'band' && _post!.seekingMusicians.isNotEmpty)
+                  _buildInfoRow(
+                    Iconsax.search_favorite,
+                    'Procurando',
+                    _post!.seekingMusicians.join(', '),
+                  ),
+                if ((_post!.type == 'musician' && _post!.instruments.isNotEmpty) ||
+                    (_post!.type == 'band' && _post!.seekingMusicians.isNotEmpty))
+                  const SizedBox(height: 12),
+                // Gêneros musicais
+                if (_post!.genres.isNotEmpty)
+                  _buildInfoRow(
+                    Iconsax.music_library_2,
+                    'Gêneros',
+                    _post!.genres.join(', '),
+                  ),
+                if (_post!.genres.isNotEmpty) const SizedBox(height: 12),
+                // Nível de habilidade
+                _buildInfoRow(
+                  Iconsax.star,
+                  'Nível',
+                  _getSkillLevelLabel(_post!.level),
+                ),
+                // Disponível para
+                if (_post!.availableFor.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildInfoRow(
+                    Iconsax.calendar,
+                    'Disponível para',
+                    _post!.availableFor.join(', '),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Card de mensagem
+        if (_post!.content.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(
+                        Iconsax.message,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Mensagem',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  MentionText(
+                    text: _post!.content,
+                    selectable: true,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.grey[800],
+                      height: 1.5,
+                    ),
+                    onMentionTap: (username) {
+                      context.pushProfileByUsername(username);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        const SizedBox(height: 16),
+
+        // Card de vídeo do YouTube
+        if (_youtubeController != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: YoutubePlayer(
+                  controller: _youtubeController!,
+                  showVideoProgressIndicator: true,
+                  progressIndicatorColor: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ✅ CONTEÚDO PARA SALES (ANÚNCIOS DE ESPAÇOS)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Conteúdo principal para posts de sales (anúncios)
+  Widget _buildSalesContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Espaçamento adicional no topo
+        const SizedBox(height: 16),
+        
+        // 1. Badge de status da promoção
+        _buildPromotionStatusBadge(),
+        const SizedBox(height: 16),
+
+        // 2. Título do anúncio
+        _buildSalesTitle(),
+        const SizedBox(height: 16),
+
+        // 3. Bloco de preços Amazon-style
+        _buildPriceBlock(),
+        const SizedBox(height: 24),
+
+        // 4. Descrição (reaproveita message card)
+        _buildSalesDescriptionCard(),
+        const SizedBox(height: 16),
+
+        // 5. Localização + distância
+        _buildSalesLocation(),
+        const SizedBox(height: 16),
+
+        // 6. Validade da promoção
+        _buildPromoValidity(),
+        const SizedBox(height: 24),
+
+        // 7. Botões de ação rápida
+        _buildSalesActionButtons(),
+        const SizedBox(height: 24),
+
+        // 8. Tipo do anúncio
+        _buildSalesTypeSection(),
+      ],
+    );
+  }
+
+  /// Badge de status da promoção (ATIVA / EXPIRA EM X DIAS / EXPIRADA)
+  Widget _buildPromotionStatusBadge() {
+    final now = DateTime.now();
+    final expiresAt = _post!.expiresAt;
+    final daysRemaining = expiresAt.difference(now).inDays;
+
+    final isUrgent = daysRemaining <= 3 && daysRemaining >= 0;
+    final isExpired = daysRemaining < 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isExpired
+              ? Colors.red.shade50
+              : isUrgent
+                  ? Colors.orange.shade50
+                  : Colors.green.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isExpired
+                ? Colors.red.shade300
+                : isUrgent
+                    ? Colors.orange.shade300
+                    : Colors.green.shade300,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Iconsax.clock,
+              size: 16,
+              color: isExpired
+                  ? Colors.red
+                  : isUrgent
+                      ? Colors.orange
+                      : Colors.green,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              isExpired
+                  ? 'PROMOÇÃO EXPIRADA'
+                  : isUrgent
+                      ? 'EXPIRA EM ${daysRemaining + 1} ${daysRemaining == 0 ? 'DIA' : 'DIAS'}'
+                      : 'PROMOÇÃO ATIVA',
+              style: TextStyle(
+                color: isExpired
+                    ? Colors.red
+                    : isUrgent
+                        ? Colors.orange
+                        : Colors.green,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Título do anúncio
+  Widget _buildSalesTitle() {
+    // Usar campo 'title' da entidade ou primeira linha do content
+    final title = _post!.title ?? 
+        (_post!.content.isNotEmpty 
+            ? _post!.content.split('\n').first 
+            : 'Anúncio');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          height: 1.3,
+        ),
+      ),
+    );
+  }
+
+  /// Bloco de preços Amazon-style com desconto
+  Widget _buildPriceBlock() {
+    final price = _post!.price;
+
+    // Se não tem preço, não mostra o bloco
+    if (price == null || price <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    // ✅ USAR PriceCalculator PARA CALCULOS CONSISTENTES
+    final priceData = PriceCalculator.getPriceDisplayData(_post!);
+
+    // ✅ FORMATADOR BRASILEIRO PARA PREÇOS
+    final currencyFormatter = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.shade300),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (priceData.hasDiscount) ...[
+              Row(
+                children: [
+                  Text(
+                    currencyFormatter.format(priceData.originalPrice),
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (priceData.discountLabel != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        priceData.discountLabel!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  priceData.hasDiscount ? 'Por' : 'Preço',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.green,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  currencyFormatter.format(priceData.finalPrice),
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Card de descrição para sales
+  Widget _buildSalesDescriptionCard() {
+    if (_post!.content.isEmpty) return const SizedBox.shrink();
+
+    // Se tem título, pegar conteúdo sem a primeira linha (que é o título)
+    String description = _post!.content;
+    if (_post!.title == null && _post!.content.contains('\n')) {
+      final lines = _post!.content.split('\n');
+      if (lines.length > 1) {
+        description = lines.sublist(1).join('\n').trim();
+      }
+    }
+
+    if (description.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(
+                  Iconsax.document_text,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'Descrição',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            MentionText(
+              text: description,
+              selectable: true,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey[800],
+                height: 1.5,
+              ),
+              onMentionTap: (username) {
+                context.pushProfileByUsername(username);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Localização para sales
+  Widget _buildSalesLocation() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            _buildInfoRow(
+              Iconsax.location,
+              'Localização',
+              formatCleanLocation(
+                neighborhood: _post!.neighborhood,
+                city: _post!.city,
+                state: _post!.state,
+                fallback: 'Localização não disponível',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Validade da promoção
+  Widget _buildPromoValidity() {
+    final startDate = _post!.promoStartDate ?? _post!.createdAt;
+    final endDate = _post!.promoEndDate ?? _post!.expiresAt;
+
+    final dateFormat = DateFormat('dd/MM/yyyy');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: _buildInfoRow(
+          Iconsax.calendar,
+          'Válida de',
+          '${dateFormat.format(startDate)} até ${dateFormat.format(endDate)}',
+        ),
+      ),
+    );
+  }
+
+  /// Botões de ação rápida para sales
+  Widget _buildSalesActionButtons() {
+    final whatsapp = _post!.whatsappNumber;
+    final hasWhatsApp = whatsapp != null && whatsapp.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          // WhatsApp
+          if (hasWhatsApp)
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _launchWhatsApp(whatsapp),
+                icon: const Icon(Iconsax.message, size: 20),
+                label: const Text('WhatsApp'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF25D366),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+
+          if (hasWhatsApp) const SizedBox(width: 12),
+
+          // Compartilhar
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _sharePost,
+              icon: const Icon(Iconsax.share, size: 20),
+              label: const Text('Compartilhar'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tipo do anúncio
+  Widget _buildSalesTypeSection() {
+    final salesType = _post!.salesType;
+
+    if (salesType == null || salesType.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: _buildInfoRow(
+          Iconsax.tag,
+          'Categoria',
+          salesType,
+        ),
+      ),
+    );
+  }
+
+  /// Abre WhatsApp com mensagem pré-definida
+  Future<void> _launchWhatsApp(String phone) async {
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    final title = _post!.title ?? 'sem título';
+    final message = Uri.encodeComponent(
+      'Olá! Vi seu anúncio "$title" no WeGig e tenho interesse.',
+    );
+    final url = 'https://wa.me/55$cleanPhone?text=$message';
+
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          AppSnackBar.showError(context, 'Não foi possível abrir o WhatsApp');
+        }
+      }
+    } catch (e) {
+      debugPrint('Erro ao abrir WhatsApp: $e');
+      if (mounted) {
+        AppSnackBar.showError(context, 'Erro ao abrir WhatsApp');
+      }
+    }
+  }
+
 }

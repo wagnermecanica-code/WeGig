@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Widget reutilizável para bolhas de mensagem no chat
 /// Otimizado para performance com CachedNetworkImage
@@ -56,7 +57,6 @@ class MessageBubble extends StatelessWidget {
             ],
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Reply preview (se houver)
               if (replyTo != null)
@@ -85,7 +85,6 @@ class MessageBubble extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'Respondendo a:',
@@ -99,7 +98,7 @@ class MessageBubble extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                replyTo!['text'] ?? '',
+                                (replyTo!['text'] as String?) ?? '',
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -136,7 +135,7 @@ class MessageBubble extends StatelessWidget {
                       height: 200,
                       alignment: Alignment.center,
                       child: const Icon(
-                        Icons.broken_image,
+                        Iconsax.gallery_slash,
                         size: 48,
                         color: Colors.grey,
                       ),

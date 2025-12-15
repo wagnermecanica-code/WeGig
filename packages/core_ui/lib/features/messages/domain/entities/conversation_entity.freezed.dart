@@ -31,6 +31,7 @@ mixin _$ConversationEntity {
   List<Map<String, dynamic>> get participantProfilesData =>
       throw _privateConstructorUsedError;
   bool get archived => throw _privateConstructorUsedError;
+  List<String> get archivedProfileIds => throw _privateConstructorUsedError;
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
   /// Serializes this ConversationEntity to a JSON map.
@@ -60,6 +61,7 @@ abstract class $ConversationEntityCopyWith<$Res> {
       @JsonKey(includeFromJson: false, includeToJson: false)
       List<Map<String, dynamic>> participantProfilesData,
       bool archived,
+      List<String> archivedProfileIds,
       DateTime? updatedAt});
 }
 
@@ -87,6 +89,7 @@ class _$ConversationEntityCopyWithImpl<$Res, $Val extends ConversationEntity>
     Object? createdAt = null,
     Object? participantProfilesData = null,
     Object? archived = null,
+    Object? archivedProfileIds = null,
     Object? updatedAt = freezed,
   }) {
     return _then(_value.copyWith(
@@ -126,6 +129,10 @@ class _$ConversationEntityCopyWithImpl<$Res, $Val extends ConversationEntity>
           ? _value.archived
           : archived // ignore: cast_nullable_to_non_nullable
               as bool,
+      archivedProfileIds: null == archivedProfileIds
+          ? _value.archivedProfileIds
+          : archivedProfileIds // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       updatedAt: freezed == updatedAt
           ? _value.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
@@ -153,6 +160,7 @@ abstract class _$$ConversationEntityImplCopyWith<$Res>
       @JsonKey(includeFromJson: false, includeToJson: false)
       List<Map<String, dynamic>> participantProfilesData,
       bool archived,
+      List<String> archivedProfileIds,
       DateTime? updatedAt});
 }
 
@@ -178,6 +186,7 @@ class __$$ConversationEntityImplCopyWithImpl<$Res>
     Object? createdAt = null,
     Object? participantProfilesData = null,
     Object? archived = null,
+    Object? archivedProfileIds = null,
     Object? updatedAt = freezed,
   }) {
     return _then(_$ConversationEntityImpl(
@@ -217,6 +226,10 @@ class __$$ConversationEntityImplCopyWithImpl<$Res>
           ? _value.archived
           : archived // ignore: cast_nullable_to_non_nullable
               as bool,
+      archivedProfileIds: null == archivedProfileIds
+          ? _value._archivedProfileIds
+          : archivedProfileIds // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       updatedAt: freezed == updatedAt
           ? _value.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
@@ -239,11 +252,13 @@ class _$ConversationEntityImpl extends _ConversationEntity {
       @JsonKey(includeFromJson: false, includeToJson: false)
       final List<Map<String, dynamic>> participantProfilesData = const [],
       this.archived = false,
+      final List<String> archivedProfileIds = const <String>[],
       this.updatedAt})
       : _participants = participants,
         _participantProfiles = participantProfiles,
         _unreadCount = unreadCount,
         _participantProfilesData = participantProfilesData,
+        _archivedProfileIds = archivedProfileIds,
         super._();
 
   factory _$ConversationEntityImpl.fromJson(Map<String, dynamic> json) =>
@@ -295,12 +310,22 @@ class _$ConversationEntityImpl extends _ConversationEntity {
   @override
   @JsonKey()
   final bool archived;
+  final List<String> _archivedProfileIds;
+  @override
+  @JsonKey()
+  List<String> get archivedProfileIds {
+    if (_archivedProfileIds is EqualUnmodifiableListView)
+      return _archivedProfileIds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_archivedProfileIds);
+  }
+
   @override
   final DateTime? updatedAt;
 
   @override
   String toString() {
-    return 'ConversationEntity(id: $id, participants: $participants, participantProfiles: $participantProfiles, lastMessage: $lastMessage, lastMessageTimestamp: $lastMessageTimestamp, unreadCount: $unreadCount, createdAt: $createdAt, participantProfilesData: $participantProfilesData, archived: $archived, updatedAt: $updatedAt)';
+    return 'ConversationEntity(id: $id, participants: $participants, participantProfiles: $participantProfiles, lastMessage: $lastMessage, lastMessageTimestamp: $lastMessageTimestamp, unreadCount: $unreadCount, createdAt: $createdAt, participantProfilesData: $participantProfilesData, archived: $archived, archivedProfileIds: $archivedProfileIds, updatedAt: $updatedAt)';
   }
 
   @override
@@ -325,6 +350,8 @@ class _$ConversationEntityImpl extends _ConversationEntity {
                 other._participantProfilesData, _participantProfilesData) &&
             (identical(other.archived, archived) ||
                 other.archived == archived) &&
+            const DeepCollectionEquality()
+                .equals(other._archivedProfileIds, _archivedProfileIds) &&
             (identical(other.updatedAt, updatedAt) ||
                 other.updatedAt == updatedAt));
   }
@@ -342,6 +369,7 @@ class _$ConversationEntityImpl extends _ConversationEntity {
       createdAt,
       const DeepCollectionEquality().hash(_participantProfilesData),
       archived,
+      const DeepCollectionEquality().hash(_archivedProfileIds),
       updatedAt);
 
   /// Create a copy of ConversationEntity
@@ -373,6 +401,7 @@ abstract class _ConversationEntity extends ConversationEntity {
       @JsonKey(includeFromJson: false, includeToJson: false)
       final List<Map<String, dynamic>> participantProfilesData,
       final bool archived,
+      final List<String> archivedProfileIds,
       final DateTime? updatedAt}) = _$ConversationEntityImpl;
   const _ConversationEntity._() : super._();
 
@@ -398,6 +427,8 @@ abstract class _ConversationEntity extends ConversationEntity {
   List<Map<String, dynamic>> get participantProfilesData;
   @override
   bool get archived;
+  @override
+  List<String> get archivedProfileIds;
   @override
   DateTime? get updatedAt;
 

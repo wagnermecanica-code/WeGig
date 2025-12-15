@@ -6,11 +6,9 @@ part of 'app_router.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$goRouterHash() => r'f70940ebb6c0ec8eff154e803c65eb5787164059';
+String _$goRouterHash() => r'd8adb63c86ae574e9d165050693ee3c21b09393a';
 
-/// Provider do GoRouter com auth guard e redirect logic usando rotas tipadas
-///
-/// Copied from [goRouter].
+/// See also [goRouter].
 @ProviderFor(goRouter)
 final goRouterProvider = AutoDisposeProvider<GoRouter>.internal(
   goRouter,

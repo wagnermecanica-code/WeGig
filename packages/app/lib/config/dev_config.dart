@@ -32,8 +32,8 @@ class DevConfig {
   static const bool skipOnboarding = true; // Pula onboarding em dev
 
   // Bundle IDs
-  static const String androidApplicationId = 'com.tosembanda.wegig.dev';
-  static const String iosBundleId = 'com.tosembanda.wegig.dev';
+  static const String androidApplicationId = 'com.wegig.wegig.dev';
+  static const String iosBundleId = 'com.wegig.wegig.dev';
 
   /// Verifica se está em ambiente de desenvolvimento
   static bool get isDevelopment => true;

@@ -35,7 +35,7 @@ ID do cliente: 278498777601-XXXXXXXXXXXXXXXX.apps.googleusercontent.com
 
 ### 4️⃣ Atualizar Info.plist
 
-Edite o arquivo: `ios/Runner/Info.plist`
+Edite o arquivo: `ios/WeGig/Info.plist`
 
 Procure por:
 

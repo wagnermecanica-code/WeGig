@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the NotificationService class from the notification_service library, for the Dart programming language.">
+  <title>NotificationService class - notification_service library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../static-assets/styles.css?v1">
+  <link rel="icon" href="../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../index.html">wegig_app</a></li>
+    <li><a href="../features_notifications_domain_services_notification_service/">features&#47;notifications&#47;domain&#47;services&#47;notification_service.dart</a></li>
+    <li class="self-crumb">NotificationService class</li>
+  </ol>
+  <div class="self-name">NotificationService</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="features_notifications_domain_services_notification_service&#47;features_notifications_domain_services_notification_service-library-sidebar.html"
+    data-below-sidebar="features_notifications_domain_services_notification_service&#47;NotificationService-class-sidebar.html">
+    <div>
+<h1><span class="kind-class">NotificationService</span> class 
+ 
+</h1></div>
+
+    
+<section class="desc markdown">
+  <p>Serviço de notificações refatorado para Instagram-Style Architecture</p>
+<p>CRÍTICO: Todas as notificações são isoladas por profileId</p>
+<ul>
+<li>Usa o profileProvider para determinar o perfil ativo</li>
+<li>Stream automático reage a mudanças de perfil</li>
+<li>Zero vazamento entre perfis</li>
+</ul>
+</section>
+
+
+
+    
+  <section class="summary offset-anchor" id="constructors">
+    <h2>Constructors</h2>
+    <dl class="constructor-summary-list">
+        <dt id="NotificationService.new" class="callable">
+          <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/NotificationService.html">NotificationService.new</a></span><span class="signature">(<span class="parameter" id="-param-_ref"><span class="type-annotation"><a href="https://pub.dev/documentation/riverpod/2.6.1/riverpod/Ref-class.html">Ref</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Object-class.html">Object</a>?</span>&gt;</span></span> <span class="parameter-name">_ref</span></span>)</span>
+        </dt>
+        <dd>
+          
+        </dd>
+    </dl>
+  </section>
+    
+  <section
+      class="summary offset-anchor inherited"
+      id="instance-properties">
+    <h2>Properties</h2>
+    <dl class="properties">
+        <dt id="hashCode" class="property inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/hashCode.html">hashCode</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd class="inherited">
+  The hash code for this object.
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="runtimeType" class="property inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/runtimeType.html">runtimeType</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Type-class.html">Type</a></span>
+  
+
+</dt>
+<dd class="inherited">
+  A representation of the runtime type of the object.
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
+
+</dd>
+
+    </dl>
+  </section>
+
+    
+  <section
+      class="summary offset-anchor"
+      id="instance-methods">
+    <h2>Methods</h2>
+    <dl class="callables">
+        <dt id="cleanExpiredNotifications" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/cleanExpiredNotifications.html">cleanExpiredNotifications</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Limpa notificações expiradas (executar periodicamente ou via Cloud Function)
+  
+
+</dd>
+
+        <dt id="create" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/create.html">create</a></span><span class="signature">(<wbr>{<span class="parameter" id="create-param-recipientProfileId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">recipientProfileId</span>, </span><span class="parameter" id="create-param-type"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">type</span>, </span><span class="parameter" id="create-param-title"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">title</span>, </span><span class="parameter" id="create-param-body"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">body</span>, </span><span class="parameter" id="create-param-data"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span> <span class="parameter-name">data</span> = <span class="default-value">const {}</span>, </span><span class="parameter" id="create-param-senderProfileId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">senderProfileId</span>, </span><span class="parameter" id="create-param-senderUsername"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">senderUsername</span></span>})
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Cria uma notificação para um profileId específico
+  
+
+</dd>
+
+        <dt id="createInterestNewPostNotifications" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/createInterestNewPostNotifications.html">createInterestNewPostNotifications</a></span><span class="signature">(<wbr>{<span class="parameter" id="createInterestNewPostNotifications-param-postId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postId</span>, </span><span class="parameter" id="createInterestNewPostNotifications-param-authorName"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">authorName</span>, </span><span class="parameter" id="createInterestNewPostNotifications-param-genres"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span></span> <span class="parameter-name">genres</span>, </span><span class="parameter" id="createInterestNewPostNotifications-param-instruments"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span></span> <span class="parameter-name">instruments</span>, </span><span class="parameter" id="createInterestNewPostNotifications-param-seeking"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>&gt;</span></span> <span class="parameter-name">seeking</span>, </span><span class="parameter" id="createInterestNewPostNotifications-param-city"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">city</span></span>})
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Cria notificações para seguidores de interesses quando um novo post é publicado
+Gera notificações tipo 'interest' para perfis que combinam com gêneros/instrumentos
+  
+
+</dd>
+
+        <dt id="createInterestNotification" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/createInterestNotification.html">createInterestNotification</a></span><span class="signature">(<wbr>{<span class="parameter" id="createInterestNotification-param-postId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postId</span>, </span><span class="parameter" id="createInterestNotification-param-postAuthorProfileId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postAuthorProfileId</span>, </span><span class="parameter" id="createInterestNotification-param-postMessage"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postMessage</span></span>})
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Cria notificação de interesse
+  
+
+</dd>
+
+        <dt id="createInterestReceivedNotification" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/createInterestReceivedNotification.html">createInterestReceivedNotification</a></span><span class="signature">(<wbr>{<span class="parameter" id="createInterestReceivedNotification-param-postId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postId</span>, </span><span class="parameter" id="createInterestReceivedNotification-param-postOwnerProfileId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postOwnerProfileId</span>, </span><span class="parameter" id="createInterestReceivedNotification-param-postOwnerUid"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postOwnerUid</span>, </span><span class="parameter" id="createInterestReceivedNotification-param-interestedProfileId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">interestedProfileId</span>, </span><span class="parameter" id="createInterestReceivedNotification-param-interestedUserName"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">interestedUserName</span>, </span><span class="parameter" id="createInterestReceivedNotification-param-interestedUserPhoto"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">interestedUserPhoto</span>, </span><span class="parameter" id="createInterestReceivedNotification-param-city"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">city</span>, </span><span class="parameter" id="createInterestReceivedNotification-param-distanceKm"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/double-class.html">double</a>?</span> <span class="parameter-name">distanceKm</span>, </span><span class="parameter" id="createInterestReceivedNotification-param-interestedUserUsername"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">interestedUserUsername</span></span>})
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Notifica o dono do post quando alguém demonstra interesse
+  
+
+</dd>
+
+        <dt id="createNearbyPostNotification" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/createNearbyPostNotification.html">createNearbyPostNotification</a></span><span class="signature">(<wbr>{<span class="parameter" id="createNearbyPostNotification-param-postId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postId</span>, </span><span class="parameter" id="createNearbyPostNotification-param-recipientProfileId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">recipientProfileId</span>, </span><span class="parameter" id="createNearbyPostNotification-param-postAuthorProfileId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">postAuthorProfileId</span>, </span><span class="parameter" id="createNearbyPostNotification-param-distanceKm"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/double-class.html">double</a></span> <span class="parameter-name">distanceKm</span>, </span><span class="parameter" id="createNearbyPostNotification-param-city"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">city</span></span>})
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Cria notificação de post próximo
+  
+
+</dd>
+
+        <dt id="createNewMessageNotification" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/createNewMessageNotification.html">createNewMessageNotification</a></span><span class="signature">(<wbr>{<span class="parameter" id="createNewMessageNotification-param-conversationId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">conversationId</span>, </span><span class="parameter" id="createNewMessageNotification-param-recipientProfileId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">recipientProfileId</span>, </span><span class="parameter" id="createNewMessageNotification-param-messagePreview"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">messagePreview</span></span>})
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Cria notificação de nova mensagem
+  
+
+</dd>
+
+        <dt id="delete" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/delete.html">delete</a></span><span class="signature">(<wbr><span class="parameter" id="delete-param-notificationId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">notificationId</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Deleta uma notificação
+  
+
+</dd>
+
+        <dt id="deleteNotification" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/deleteNotification.html">deleteNotification</a></span><span class="signature">(<wbr><span class="parameter" id="deleteNotification-param-notificationId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">notificationId</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  
+  
+
+</dd>
+
+        <dt id="getCachedUnreadCount" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/getCachedUnreadCount.html">getCachedUnreadCount</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a>?</span>
+  </span>
+  
+
+</dt>
+<dd>
+  Obtém contador não lido do cache (se disponível e válido)
+  
+
+</dd>
+
+        <dt id="getNotifications" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/getNotifications.html">getNotifications</a></span><span class="signature">(<wbr><span class="parameter" id="getNotifications-param-currentProfileId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">currentProfileId</span>, {</span><span class="parameter" id="getNotifications-param-type"><span class="type-annotation">NotificationType?</span> <span class="parameter-name">type</span>, </span><span class="parameter" id="getNotifications-param-limit"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">limit</span> = <span class="default-value">50</span>, </span><span class="parameter" id="getNotifications-param-startAfter"><span class="type-annotation"><a href="https://pub.dev/documentation/cloud_firestore/6.1.0/cloud_firestore/DocumentSnapshot-class.html">DocumentSnapshot</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Object-class.html">Object</a>?</span>&gt;</span>?</span> <span class="parameter-name">startAfter</span></span>})
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter">NotificationEntity</span>&gt;</span></span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Obtém notificações com paginação cursor-based
+  
+
+</dd>
+
+        <dt id="invalidateUnreadCountCache" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/invalidateUnreadCountCache.html">invalidateUnreadCountCache</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; void</span>
+  </span>
+  
+
+</dt>
+<dd>
+  Invalida cache do contador
+  
+
+</dd>
+
+        <dt id="markAllAsRead" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/markAllAsRead.html">markAllAsRead</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Marca todas as notificações do perfil ativo como lidas
+  
+
+</dd>
+
+        <dt id="markAsRead" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/markAsRead.html">markAsRead</a></span><span class="signature">(<wbr><span class="parameter" id="markAsRead-param-notificationId"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">notificationId</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Marca uma notificação como lida
+  
+
+</dd>
+
+        <dt id="noSuchMethod" class="callable inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/noSuchMethod.html">noSuchMethod</a></span><span class="signature">(<wbr><span class="parameter" id="noSuchMethod-param-invocation"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Invocation-class.html">Invocation</a></span> <span class="parameter-name">invocation</span></span>)
+    <span class="returntype parameter">&#8594; dynamic</span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  Invoked when a nonexistent method or property is accessed.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="refreshNotifications" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/refreshNotifications.html">refreshNotifications</a></span><span class="signature">(<wbr>{<span class="parameter" id="refreshNotifications-param-recipientProfileId"><span>required</span> <span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">recipientProfileId</span>, </span><span class="parameter" id="refreshNotifications-param-type"><span class="type-annotation">NotificationType?</span> <span class="parameter-name">type</span></span>})
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Força refresh manual (útil para pull-to-refresh)
+  
+
+</dd>
+
+        <dt id="streamActiveProfileNotifications" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/streamActiveProfileNotifications.html">streamActiveProfileNotifications</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter">NotificationEntity</span>&gt;</span></span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Stream de notificações do perfil ativo
+  
+
+</dd>
+
+        <dt id="streamUnreadCount" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/streamUnreadCount.html">streamUnreadCount</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Stream de contador de notificações não lidas do perfil ativo
+  
+
+</dd>
+
+        <dt id="testNotification" class="callable">
+  <span class="name"><a href="../features_notifications_domain_services_notification_service/NotificationService/testNotification.html">testNotification</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Método de teste rápido
+  
+
+</dd>
+
+        <dt id="toString" class="callable inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/toString.html">toString</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  A string representation of this object.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+    </dl>
+  </section>
+    
+  <section
+      class="summary offset-anchor inherited"
+      id="operators">
+    <h2>Operators</h2>
+    <dl class="callables">
+        <dt id="operator ==" class="callable inherited">
+  <span class="name"><a href="https://api.flutter.dev/flutter/dart-core/Object/operator_equals.html">operator ==</a></span><span class="signature">(<wbr><span class="parameter" id="==-param-other"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Object-class.html">Object</a></span> <span class="parameter-name">other</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  The equality operator.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+    </dl>
+  </section>
+    
+    
+    
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../index.html">wegig_app</a></li>
+    <li><a href="../features_notifications_domain_services_notification_service/">notification_service</a></li>
+    <li class="self-crumb">NotificationService class</li>
+</ol>
+
+    <h5>notification_service library</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div>
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+  </div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    wegig_app
+      1.0.1+2
+  </span>
+  
+</footer>
+
+
+<script src="../static-assets/highlight.pack.js?v1"></script>
+<script src="../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

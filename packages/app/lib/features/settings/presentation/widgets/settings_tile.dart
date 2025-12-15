@@ -1,6 +1,7 @@
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Widget para item de menu em Settings
 /// Design: Card com ícone, título, subtítulo e seta
@@ -57,7 +58,7 @@ class SettingsTile extends StatelessWidget {
           ),
         ),
         trailing: const Icon(
-          Icons.arrow_forward_ios,
+          Iconsax.arrow_right_3,
           color: AppColors.textSecondary,
           size: 18,
         ),
@@ -120,7 +121,26 @@ class SettingsSwitchTile extends StatelessWidget {
         ),
         value: value,
         onChanged: onChanged,
-        activeThumbColor: AppColors.primary,
+        // ✅ FIX: Melhorar cores dos toggles para maior visibilidade
+        activeColor: AppColors.primary,
+        thumbColor: WidgetStateProperty.resolveWith<Color?>(
+          (states) => states.contains(WidgetState.selected)
+              ? Colors.white  // Thumb branco quando ativo
+              : AppColors.textSecondary.withValues(alpha: 0.6),
+        ),
+        trackColor: WidgetStateProperty.resolveWith<Color?>(
+          (states) => states.contains(WidgetState.selected)
+              ? AppColors.primary  // Track colorido quando ativo
+              : AppColors.border,  // Track cinza quando inativo
+        ),
+        trackOutlineColor: WidgetStateProperty.resolveWith<Color?>(
+          (states) => states.contains(WidgetState.selected)
+              ? AppColors.primary
+              : AppColors.border,
+        ),
+        thumbIcon: WidgetStateProperty.resolveWith<Icon?>(
+          (states) => null, // Thumb com sombra padrão
+        ),
       ),
     );
   }

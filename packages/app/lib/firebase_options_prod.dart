@@ -50,6 +50,8 @@ class DefaultFirebaseOptions {
   }
 
   // Production Firebase project (to-sem-banda-83e19)
+  // ⚠️ CRITICAL: These credentials point to the PROD Firebase project
+  // DO NOT use wegig-dev credentials here!
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyC_QxHROqFRoIzCHBK_NFxu-GG6uMNS0uk',
@@ -69,6 +71,6 @@ class DefaultFirebaseOptions {
     storageBucket: 'to-sem-banda-83e19.firebasestorage.app',
     iosClientId:
         '278498777601-qlukbsv2s4aukhlh34v3icqsjj0ho2k7.apps.googleusercontent.com',
-    iosBundleId: 'com.tosembanda.wegig',
+    iosBundleId: 'com.wegig.wegig',
   );
 }

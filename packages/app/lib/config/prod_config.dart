@@ -33,8 +33,8 @@ class ProdConfig {
   static const bool skipOnboarding = false;
 
   // Bundle IDs
-  static const String androidApplicationId = 'com.tosembanda.wegig';
-  static const String iosBundleId = 'com.tosembanda.wegig';
+  static const String androidApplicationId = 'com.wegig.wegig';
+  static const String iosBundleId = 'com.wegig.wegig';
 
   /// Verifica se está em ambiente de produção
   static bool get isDevelopment => false;

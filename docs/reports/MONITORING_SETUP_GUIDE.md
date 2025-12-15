@@ -307,7 +307,7 @@ Antes de lançar para beta testers, confirme:
 ### Configuração
 
 - [ ] ✅ `google-services.json` presente em `android/app/`
-- [ ] ✅ `GoogleService-Info.plist` presente em `ios/Runner/`
+- [ ] ✅ `GoogleService-Info.plist` presente em `ios/WeGig/`
 - [ ] ✅ Plugin `com.google.gms.google-services` em `android/app/build.gradle.kts`
 - [ ] ✅ Firebase inicializado em `main.dart` (antes de runApp)
 - [ ] ✅ Error handlers configurados em `main.dart`

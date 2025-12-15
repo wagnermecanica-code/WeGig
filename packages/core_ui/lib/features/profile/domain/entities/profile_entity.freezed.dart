@@ -23,7 +23,10 @@ mixin _$ProfileEntity {
   String get profileId => throw _privateConstructorUsedError;
   String get uid => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
+  String? get username => throw _privateConstructorUsedError;
+  @Deprecated('Use profileType instead')
   bool get isBand => throw _privateConstructorUsedError;
+  ProfileType get profileType => throw _privateConstructorUsedError;
   String get city => throw _privateConstructorUsedError;
   @GeoPointConverter()
   GeoPoint get location => throw _privateConstructorUsedError;
@@ -42,7 +45,13 @@ mixin _$ProfileEntity {
   String? get youtubeLink => throw _privateConstructorUsedError;
   String? get neighborhood => throw _privateConstructorUsedError;
   String? get state => throw _privateConstructorUsedError;
-  List<String>? get bandMembers => throw _privateConstructorUsedError;
+  List<String>? get bandMembers =>
+      throw _privateConstructorUsedError; // Space-specific fields
+  String? get spaceType => throw _privateConstructorUsedError;
+  String? get phone => throw _privateConstructorUsedError;
+  String? get operatingHours => throw _privateConstructorUsedError;
+  String? get website => throw _privateConstructorUsedError;
+  List<String>? get amenities => throw _privateConstructorUsedError;
   @NullableTimestampConverter()
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
@@ -66,7 +75,9 @@ abstract class $ProfileEntityCopyWith<$Res> {
       {String profileId,
       String uid,
       String name,
-      bool isBand,
+      String? username,
+      @Deprecated('Use profileType instead') bool isBand,
+      ProfileType profileType,
       String city,
       @GeoPointConverter() GeoPoint location,
       @TimestampConverter() DateTime createdAt,
@@ -84,6 +95,11 @@ abstract class $ProfileEntityCopyWith<$Res> {
       String? neighborhood,
       String? state,
       List<String>? bandMembers,
+      String? spaceType,
+      String? phone,
+      String? operatingHours,
+      String? website,
+      List<String>? amenities,
       @NullableTimestampConverter() DateTime? updatedAt});
 }
 
@@ -105,7 +121,9 @@ class _$ProfileEntityCopyWithImpl<$Res, $Val extends ProfileEntity>
     Object? profileId = null,
     Object? uid = null,
     Object? name = null,
+    Object? username = freezed,
     Object? isBand = null,
+    Object? profileType = null,
     Object? city = null,
     Object? location = null,
     Object? createdAt = null,
@@ -123,6 +141,11 @@ class _$ProfileEntityCopyWithImpl<$Res, $Val extends ProfileEntity>
     Object? neighborhood = freezed,
     Object? state = freezed,
     Object? bandMembers = freezed,
+    Object? spaceType = freezed,
+    Object? phone = freezed,
+    Object? operatingHours = freezed,
+    Object? website = freezed,
+    Object? amenities = freezed,
     Object? updatedAt = freezed,
   }) {
     return _then(_value.copyWith(
@@ -138,10 +161,18 @@ class _$ProfileEntityCopyWithImpl<$Res, $Val extends ProfileEntity>
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
               as String,
+      username: freezed == username
+          ? _value.username
+          : username // ignore: cast_nullable_to_non_nullable
+              as String?,
       isBand: null == isBand
           ? _value.isBand
           : isBand // ignore: cast_nullable_to_non_nullable
               as bool,
+      profileType: null == profileType
+          ? _value.profileType
+          : profileType // ignore: cast_nullable_to_non_nullable
+              as ProfileType,
       city: null == city
           ? _value.city
           : city // ignore: cast_nullable_to_non_nullable
@@ -210,6 +241,26 @@ class _$ProfileEntityCopyWithImpl<$Res, $Val extends ProfileEntity>
           ? _value.bandMembers
           : bandMembers // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      spaceType: freezed == spaceType
+          ? _value.spaceType
+          : spaceType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      phone: freezed == phone
+          ? _value.phone
+          : phone // ignore: cast_nullable_to_non_nullable
+              as String?,
+      operatingHours: freezed == operatingHours
+          ? _value.operatingHours
+          : operatingHours // ignore: cast_nullable_to_non_nullable
+              as String?,
+      website: freezed == website
+          ? _value.website
+          : website // ignore: cast_nullable_to_non_nullable
+              as String?,
+      amenities: freezed == amenities
+          ? _value.amenities
+          : amenities // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
       updatedAt: freezed == updatedAt
           ? _value.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
@@ -230,7 +281,9 @@ abstract class _$$ProfileEntityImplCopyWith<$Res>
       {String profileId,
       String uid,
       String name,
-      bool isBand,
+      String? username,
+      @Deprecated('Use profileType instead') bool isBand,
+      ProfileType profileType,
       String city,
       @GeoPointConverter() GeoPoint location,
       @TimestampConverter() DateTime createdAt,
@@ -248,6 +301,11 @@ abstract class _$$ProfileEntityImplCopyWith<$Res>
       String? neighborhood,
       String? state,
       List<String>? bandMembers,
+      String? spaceType,
+      String? phone,
+      String? operatingHours,
+      String? website,
+      List<String>? amenities,
       @NullableTimestampConverter() DateTime? updatedAt});
 }
 
@@ -267,7 +325,9 @@ class __$$ProfileEntityImplCopyWithImpl<$Res>
     Object? profileId = null,
     Object? uid = null,
     Object? name = null,
+    Object? username = freezed,
     Object? isBand = null,
+    Object? profileType = null,
     Object? city = null,
     Object? location = null,
     Object? createdAt = null,
@@ -285,6 +345,11 @@ class __$$ProfileEntityImplCopyWithImpl<$Res>
     Object? neighborhood = freezed,
     Object? state = freezed,
     Object? bandMembers = freezed,
+    Object? spaceType = freezed,
+    Object? phone = freezed,
+    Object? operatingHours = freezed,
+    Object? website = freezed,
+    Object? amenities = freezed,
     Object? updatedAt = freezed,
   }) {
     return _then(_$ProfileEntityImpl(
@@ -300,10 +365,18 @@ class __$$ProfileEntityImplCopyWithImpl<$Res>
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
               as String,
+      username: freezed == username
+          ? _value.username
+          : username // ignore: cast_nullable_to_non_nullable
+              as String?,
       isBand: null == isBand
           ? _value.isBand
           : isBand // ignore: cast_nullable_to_non_nullable
               as bool,
+      profileType: null == profileType
+          ? _value.profileType
+          : profileType // ignore: cast_nullable_to_non_nullable
+              as ProfileType,
       city: null == city
           ? _value.city
           : city // ignore: cast_nullable_to_non_nullable
@@ -372,6 +445,26 @@ class __$$ProfileEntityImplCopyWithImpl<$Res>
           ? _value._bandMembers
           : bandMembers // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      spaceType: freezed == spaceType
+          ? _value.spaceType
+          : spaceType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      phone: freezed == phone
+          ? _value.phone
+          : phone // ignore: cast_nullable_to_non_nullable
+              as String?,
+      operatingHours: freezed == operatingHours
+          ? _value.operatingHours
+          : operatingHours // ignore: cast_nullable_to_non_nullable
+              as String?,
+      website: freezed == website
+          ? _value.website
+          : website // ignore: cast_nullable_to_non_nullable
+              as String?,
+      amenities: freezed == amenities
+          ? _value._amenities
+          : amenities // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
       updatedAt: freezed == updatedAt
           ? _value.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
@@ -387,7 +480,9 @@ class _$ProfileEntityImpl extends _ProfileEntity {
       {required this.profileId,
       required this.uid,
       required this.name,
-      required this.isBand,
+      this.username,
+      @Deprecated('Use profileType instead') required this.isBand,
+      this.profileType = ProfileType.musician,
       required this.city,
       @GeoPointConverter() required this.location,
       @TimestampConverter() required this.createdAt,
@@ -405,10 +500,16 @@ class _$ProfileEntityImpl extends _ProfileEntity {
       this.neighborhood,
       this.state,
       final List<String>? bandMembers,
+      this.spaceType,
+      this.phone,
+      this.operatingHours,
+      this.website,
+      final List<String>? amenities,
       @NullableTimestampConverter() this.updatedAt})
       : _instruments = instruments,
         _genres = genres,
         _bandMembers = bandMembers,
+        _amenities = amenities,
         super._();
 
   factory _$ProfileEntityImpl.fromJson(Map<String, dynamic> json) =>
@@ -421,7 +522,13 @@ class _$ProfileEntityImpl extends _ProfileEntity {
   @override
   final String name;
   @override
+  final String? username;
+  @override
+  @Deprecated('Use profileType instead')
   final bool isBand;
+  @override
+  @JsonKey()
+  final ProfileType profileType;
   @override
   final String city;
   @override
@@ -484,13 +591,32 @@ class _$ProfileEntityImpl extends _ProfileEntity {
     return EqualUnmodifiableListView(value);
   }
 
+// Space-specific fields
+  @override
+  final String? spaceType;
+  @override
+  final String? phone;
+  @override
+  final String? operatingHours;
+  @override
+  final String? website;
+  final List<String>? _amenities;
+  @override
+  List<String>? get amenities {
+    final value = _amenities;
+    if (value == null) return null;
+    if (_amenities is EqualUnmodifiableListView) return _amenities;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
   @override
   @NullableTimestampConverter()
   final DateTime? updatedAt;
 
   @override
   String toString() {
-    return 'ProfileEntity(profileId: $profileId, uid: $uid, name: $name, isBand: $isBand, city: $city, location: $location, createdAt: $createdAt, notificationRadius: $notificationRadius, notificationRadiusEnabled: $notificationRadiusEnabled, photoUrl: $photoUrl, birthYear: $birthYear, bio: $bio, instruments: $instruments, genres: $genres, level: $level, instagramLink: $instagramLink, tiktokLink: $tiktokLink, youtubeLink: $youtubeLink, neighborhood: $neighborhood, state: $state, bandMembers: $bandMembers, updatedAt: $updatedAt)';
+    return 'ProfileEntity(profileId: $profileId, uid: $uid, name: $name, username: $username, isBand: $isBand, profileType: $profileType, city: $city, location: $location, createdAt: $createdAt, notificationRadius: $notificationRadius, notificationRadiusEnabled: $notificationRadiusEnabled, photoUrl: $photoUrl, birthYear: $birthYear, bio: $bio, instruments: $instruments, genres: $genres, level: $level, instagramLink: $instagramLink, tiktokLink: $tiktokLink, youtubeLink: $youtubeLink, neighborhood: $neighborhood, state: $state, bandMembers: $bandMembers, spaceType: $spaceType, phone: $phone, operatingHours: $operatingHours, website: $website, amenities: $amenities, updatedAt: $updatedAt)';
   }
 
   @override
@@ -502,7 +628,11 @@ class _$ProfileEntityImpl extends _ProfileEntity {
                 other.profileId == profileId) &&
             (identical(other.uid, uid) || other.uid == uid) &&
             (identical(other.name, name) || other.name == name) &&
+            (identical(other.username, username) ||
+                other.username == username) &&
             (identical(other.isBand, isBand) || other.isBand == isBand) &&
+            (identical(other.profileType, profileType) ||
+                other.profileType == profileType) &&
             (identical(other.city, city) || other.city == city) &&
             (identical(other.location, location) ||
                 other.location == location) &&
@@ -533,6 +663,14 @@ class _$ProfileEntityImpl extends _ProfileEntity {
             (identical(other.state, state) || other.state == state) &&
             const DeepCollectionEquality()
                 .equals(other._bandMembers, _bandMembers) &&
+            (identical(other.spaceType, spaceType) ||
+                other.spaceType == spaceType) &&
+            (identical(other.phone, phone) || other.phone == phone) &&
+            (identical(other.operatingHours, operatingHours) ||
+                other.operatingHours == operatingHours) &&
+            (identical(other.website, website) || other.website == website) &&
+            const DeepCollectionEquality()
+                .equals(other._amenities, _amenities) &&
             (identical(other.updatedAt, updatedAt) ||
                 other.updatedAt == updatedAt));
   }
@@ -544,7 +682,9 @@ class _$ProfileEntityImpl extends _ProfileEntity {
         profileId,
         uid,
         name,
+        username,
         isBand,
+        profileType,
         city,
         location,
         createdAt,
@@ -562,6 +702,11 @@ class _$ProfileEntityImpl extends _ProfileEntity {
         neighborhood,
         state,
         const DeepCollectionEquality().hash(_bandMembers),
+        spaceType,
+        phone,
+        operatingHours,
+        website,
+        const DeepCollectionEquality().hash(_amenities),
         updatedAt
       ]);
 
@@ -586,7 +731,9 @@ abstract class _ProfileEntity extends ProfileEntity {
           {required final String profileId,
           required final String uid,
           required final String name,
-          required final bool isBand,
+          final String? username,
+          @Deprecated('Use profileType instead') required final bool isBand,
+          final ProfileType profileType,
           required final String city,
           @GeoPointConverter() required final GeoPoint location,
           @TimestampConverter() required final DateTime createdAt,
@@ -604,6 +751,11 @@ abstract class _ProfileEntity extends ProfileEntity {
           final String? neighborhood,
           final String? state,
           final List<String>? bandMembers,
+          final String? spaceType,
+          final String? phone,
+          final String? operatingHours,
+          final String? website,
+          final List<String>? amenities,
           @NullableTimestampConverter() final DateTime? updatedAt}) =
       _$ProfileEntityImpl;
   const _ProfileEntity._() : super._();
@@ -618,7 +770,12 @@ abstract class _ProfileEntity extends ProfileEntity {
   @override
   String get name;
   @override
+  String? get username;
+  @override
+  @Deprecated('Use profileType instead')
   bool get isBand;
+  @override
+  ProfileType get profileType;
   @override
   String get city;
   @override
@@ -654,7 +811,17 @@ abstract class _ProfileEntity extends ProfileEntity {
   @override
   String? get state;
   @override
-  List<String>? get bandMembers;
+  List<String>? get bandMembers; // Space-specific fields
+  @override
+  String? get spaceType;
+  @override
+  String? get phone;
+  @override
+  String? get operatingHours;
+  @override
+  String? get website;
+  @override
+  List<String>? get amenities;
   @override
   @NullableTimestampConverter()
   DateTime? get updatedAt;

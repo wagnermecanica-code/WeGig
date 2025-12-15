@@ -359,7 +359,7 @@ final class GoRouterProvider
 
 ### Configuração iOS
 
-**Arquivo:** `packages/app/ios/Runner/Info.plist`
+**Arquivo:** `packages/app/ios/WeGig/Info.plist`
 
 ```xml
 <key>CFBundleURLTypes</key>
@@ -1123,7 +1123,7 @@ dev_dependencies:
 - `packages/app/lib/app/router/app_router.dart` - Implementação completa
 - `packages/core_ui/lib/utils/deep_link_generator.dart` - Gerador de deep links
 - `packages/app/android/app/src/main/AndroidManifest.xml` - Config Android
-- `packages/app/ios/Runner/Info.plist` - Config iOS
+- `packages/app/ios/WeGig/Info.plist` - Config iOS
 
 ### Padrões Relacionados
 

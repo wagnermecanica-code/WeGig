@@ -1,4 +1,4 @@
-# Tô Sem Banda - ProGuard Rules
+# WeGig - ProGuard Rules
 # Configurações de ofuscação para builds de produção
 
 # Flutter wrapper

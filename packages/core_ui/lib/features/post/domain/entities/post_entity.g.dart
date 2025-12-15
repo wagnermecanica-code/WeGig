@@ -34,12 +34,30 @@ _$PostEntityImpl _$$PostEntityImplFromJson(Map<String, dynamic> json) =>
       neighborhood: json['neighborhood'] as String?,
       state: json['state'] as String?,
       photoUrl: json['photoUrl'] as String?,
+      photoUrls: (json['photoUrls'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
       youtubeLink: json['youtubeLink'] as String?,
       availableFor: (json['availableFor'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],
       distanceKm: (json['distanceKm'] as num?)?.toDouble(),
+      authorName: json['authorName'] as String?,
+      authorPhotoUrl: json['authorPhotoUrl'] as String?,
+      activeProfileName: json['activeProfileName'] as String?,
+      activeProfilePhotoUrl: json['activeProfilePhotoUrl'] as String?,
+      title: json['title'] as String?,
+      salesType: json['salesType'] as String?,
+      price: (json['price'] as num?)?.toDouble(),
+      discountMode: json['discountMode'] as String?,
+      discountValue: (json['discountValue'] as num?)?.toDouble(),
+      promoStartDate: _$JsonConverterFromJson<Object, DateTime>(
+          json['promoStartDate'], const TimestampConverter().fromJson),
+      promoEndDate: _$JsonConverterFromJson<Object, DateTime>(
+          json['promoEndDate'], const TimestampConverter().fromJson),
+      whatsappNumber: json['whatsappNumber'] as String?,
     );
 
 Map<String, dynamic> _$$PostEntityImplToJson(_$PostEntityImpl instance) =>
@@ -60,7 +78,34 @@ Map<String, dynamic> _$$PostEntityImplToJson(_$PostEntityImpl instance) =>
       'neighborhood': instance.neighborhood,
       'state': instance.state,
       'photoUrl': instance.photoUrl,
+      'photoUrls': instance.photoUrls,
       'youtubeLink': instance.youtubeLink,
       'availableFor': instance.availableFor,
       'distanceKm': instance.distanceKm,
+      'authorName': instance.authorName,
+      'authorPhotoUrl': instance.authorPhotoUrl,
+      'activeProfileName': instance.activeProfileName,
+      'activeProfilePhotoUrl': instance.activeProfilePhotoUrl,
+      'title': instance.title,
+      'salesType': instance.salesType,
+      'price': instance.price,
+      'discountMode': instance.discountMode,
+      'discountValue': instance.discountValue,
+      'promoStartDate': _$JsonConverterToJson<Object, DateTime>(
+          instance.promoStartDate, const TimestampConverter().toJson),
+      'promoEndDate': _$JsonConverterToJson<Object, DateTime>(
+          instance.promoEndDate, const TimestampConverter().toJson),
+      'whatsappNumber': instance.whatsappNumber,
     };
+
+Value? _$JsonConverterFromJson<Json, Value>(
+  Object? json,
+  Value? Function(Json json) fromJson,
+) =>
+    json == null ? null : fromJson(json as Json);
+
+Json? _$JsonConverterToJson<Json, Value>(
+  Value? value,
+  Json? Function(Value value) toJson,
+) =>
+    value == null ? null : toJson(value);

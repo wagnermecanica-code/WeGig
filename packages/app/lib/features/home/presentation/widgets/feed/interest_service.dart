@@ -12,10 +12,24 @@ class InterestService {
     required ProfileEntity activeProfile,
     String? message,
   }) async {
+    // ✅ VERIFICAÇÃO: Evitar duplicatas antes de criar
+    final existingInterest = await _firestore
+        .collection('interests')
+        .where('postId', isEqualTo: post.id)
+        .where('interestedProfileId', isEqualTo: activeProfile.profileId)
+        .limit(1)
+        .get();
+
+    if (existingInterest.docs.isNotEmpty) {
+      debugPrint('⚠️ InterestService: Interesse já existe, pulando criação...');
+      return;
+    }
+
     final interestData = {
-      'postId': post.postId,
+      'postId': post.id,
       'postAuthorProfileId': post.authorProfileId,
       'interestedProfileId': activeProfile.profileId,
+      'profileUid': activeProfile.uid,
       'interestedProfileName': activeProfile.name,
       'interestedProfileCity': activeProfile.city,
       'interestedProfileIsBand': activeProfile.isBand,
@@ -27,7 +41,7 @@ class InterestService {
 
     await _firestore.collection('interests').add(interestData);
     
-    debugPrint('✅ Interest sent to post ${post.postId}');
+    debugPrint('✅ Interest sent to post ${post.id}');
   }
 
   Future<void> removeInterest({
@@ -50,14 +64,20 @@ class InterestService {
   Future<bool> hasInterest({
     required String postId,
     required String profileId,
+    String? profileUid,
   }) async {
-    final querySnapshot = await _firestore
+    var querySnapshot = _firestore
         .collection('interests')
         .where('postId', isEqualTo: postId)
-        .where('interestedProfileId', isEqualTo: profileId)
-        .limit(1)
-        .get();
+        .where('interestedProfileId', isEqualTo: profileId);
 
-    return querySnapshot.docs.isNotEmpty;
+    if (profileUid != null && profileUid.isNotEmpty) {
+      querySnapshot =
+          querySnapshot.where('profileUid', isEqualTo: profileUid);
+    }
+
+    final result = await querySnapshot.limit(1).get();
+
+    return result.docs.isNotEmpty;
   }
 }

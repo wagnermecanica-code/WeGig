@@ -10,6 +10,25 @@ Implementação completa de proteções de segurança no backend Firebase sem im
 
 ### 1. Firestore Security Rules (firestore.rules)
 
+> **⚠️ Atualização 08/12/2025:** Regras de posts corrigidas para usar `authorUid` (campo correto do PostEntity).
+
+#### **Regras de Acesso a Posts**
+
+```javascript
+match /posts/{postId} {
+  allow read: if isSignedIn();
+  allow create: if isSignedIn()
+    && request.resource.data.authorUid == request.auth.uid;
+  allow update, delete: if isSignedIn()
+    && resource.data.authorUid == request.auth.uid;
+}
+```
+
+**Campos importantes (PostEntity):**
+
+- `authorUid` - UID do usuário autenticado (dono do perfil)
+- `authorProfileId` - ID do perfil que criou o post
+
 #### **Validação de Dados em Posts**
 
 ```dart

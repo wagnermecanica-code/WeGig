@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/profile_result.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 import 'package:wegig_app/features/profile/data/datasources/profile_remote_datasource.dart';
 import 'package:wegig_app/features/profile/data/repositories/profile_repository_impl.dart';
 import 'package:wegig_app/features/profile/domain/repositories/profile_repository.dart';
@@ -16,6 +18,7 @@ import 'package:wegig_app/features/profile/domain/usecases/get_active_profile.da
 import 'package:wegig_app/features/profile/domain/usecases/load_all_profiles.dart';
 import 'package:wegig_app/features/profile/domain/usecases/switch_active_profile.dart';
 import 'package:wegig_app/features/profile/domain/usecases/update_profile.dart';
+import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 
 part 'profile_providers.freezed.dart';
 part 'profile_providers.g.dart';
@@ -29,6 +32,11 @@ part 'profile_providers.g.dart';
 ProfileRemoteDataSource profileRemoteDataSource(Ref ref) {
   return ProfileRemoteDataSourceImpl();
 }
+
+/// Provider para FirebaseAuth (facilita override em testes)
+final profileFirebaseAuthProvider = Provider<FirebaseAuth>(
+  (ref) => FirebaseAuth.instance,
+);
 
 /// Provider para ProfileRepository (singleton)
 @riverpod
@@ -103,15 +111,19 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
   @override
   set state(AsyncValue<ProfileState> value) {
     super.state = value;
-    if (value is AsyncData<ProfileState>) {
-      _streamController.add(value.value);
+    if (value is AsyncData<ProfileState> && !_streamController.isClosed) {
+      _streamController.add(value.value);  // ✅ Check if closed before adding
     }
   }
 
   @override
   FutureOr<ProfileState> build() async {
-    // Registra dispose para cleanup
-    ref.onDispose(_streamController.close);
+    // Registra dispose para cleanup (com verificação)
+    ref.onDispose(() {
+      if (!_streamController.isClosed) {
+        _streamController.close();  // ✅ Only close if not already closed
+      }
+    });
 
     return _loadProfiles();
   }
@@ -120,7 +132,7 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
     try {
       debugPrint('🔄 ProfileNotifier: Carregando perfis...');
 
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
       if (uid == null) {
         debugPrint('⚠️ ProfileNotifier: Usuário não autenticado');
         return ProfileState();
@@ -134,6 +146,14 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
 
       debugPrint(
           '✅ ProfileNotifier: ${profiles.length} perfis carregados, ativo: ${activeProfile?.name ?? "nenhum"}');
+
+      // CRITICAL: Analytics - Track active profile para segmentação
+      if (activeProfile != null) {
+        _setAnalyticsProfile(activeProfile.profileId);
+        
+        // CRITICAL: Salvar token FCM para receber push notifications
+        _saveFcmToken(activeProfile.profileId);
+      }
 
       return ProfileState(
         activeProfile: activeProfile,
@@ -150,11 +170,21 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
 
   Future<void> switchProfile(String profileId) async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
       if (uid == null) throw Exception('Usuário não autenticado');
 
       final switchUseCase = ref.read(switchActiveProfileUseCaseProvider);
       await switchUseCase(uid, profileId);
+
+      // CRITICAL: Analytics - Track profile switch
+      _setAnalyticsProfile(profileId);
+      _logProfileSwitch(profileId);
+
+      // ✅ Invalidar providers dependentes para recarregar dados do novo perfil
+      debugPrint('🔄 ProfileNotifier: Invalidando providers após troca de perfil');
+      ref.invalidate(postNotifierProvider);
+      // Nota: notificationsStream e conversationsStream são @riverpod com parâmetro,
+      // serão automaticamente recarregados quando o profileProvider mudar
 
       state = AsyncValue.data(await _loadProfiles());
     } catch (e) {
@@ -163,9 +193,53 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
     }
   }
 
+  /// CRITICAL: Set active_profile_id in Firebase Analytics
+  void _setAnalyticsProfile(String profileId) {
+    try {
+      FirebaseAnalytics.instance.setUserProperty(
+        name: 'active_profile_id',
+        value: profileId,
+      );
+      debugPrint('📊 Analytics: active_profile_id = $profileId');
+    } catch (e) {
+      debugPrint('⚠️ Analytics error: $e');
+    }
+  }
+
+  /// Log profile switch event
+  void _logProfileSwitch(String toProfileId) {
+    try {
+      FirebaseAnalytics.instance.logEvent(
+        name: 'profile_switched',
+        parameters: {
+          'to_profile_id': toProfileId,
+        },
+      );
+    } catch (e) {
+      debugPrint('⚠️ Analytics error: $e');
+    }
+  }
+
+  /// CRITICAL: Salva token FCM para receber push notifications
+  /// 
+  /// Chamado quando perfil é carregado (login) para garantir que
+  /// o token FCM está associado ao perfil ativo.
+  void _saveFcmToken(String profileId) {
+    // Usar Future para não bloquear o carregamento de perfis
+    Future.microtask(() async {
+      try {
+        await PushNotificationService().saveTokenForProfile(profileId);
+        debugPrint('🔔 FCM: Token salvo para perfil $profileId');
+      } catch (e) {
+        debugPrint('⚠️ FCM: Erro ao salvar token - $e');
+        // Não faz rethrow - falha em FCM não deve bloquear login
+      }
+    });
+  }
+
   Future<ProfileResult> createProfile(ProfileEntity profile) async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
       if (uid == null) {
         return const ProfileFailure(message: 'Usuário não autenticado');
       }
@@ -187,7 +261,7 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
 
   Future<ProfileResult> updateProfile(ProfileEntity profile) async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
       if (uid == null) {
         return const ProfileFailure(message: 'Usuário não autenticado');
       }
@@ -209,7 +283,7 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
 
   Future<void> deleteProfile(String profileId) async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
       if (uid == null) throw Exception('Usuário não autenticado');
 
       final deleteUseCase = ref.read(deleteProfileUseCaseProvider);

@@ -1,16 +1,20 @@
 import 'dart:async';
 import 'dart:io';
-
+import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
-import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/core_ui.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
@@ -18,16 +22,25 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
-import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/providers/mensagens_new_providers.dart';
+import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/profile/presentation/widgets/profile_switcher_bottom_sheet.dart';
-import 'package:wegig_app/features/settings/presentation/pages/settings_page.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
+/// Página principal de visualização/edição de perfis, tanto para o próprio
+/// usuário quanto para outros músicos/bandas.
 class ViewProfilePage extends ConsumerStatefulWidget {
+  /// Cria uma nova tela de perfil opcionalmente fixando usuário/perfil.
   const ViewProfilePage({super.key, this.userId, this.profileId});
+
+  /// UID do dono do perfil que deve ser exibido (opcional para perfis próprios).
   final String? userId;
+
+  /// Identificador do perfil específico a ser carregado; quando ausente usa-se o
+  /// perfil ativo do usuário.
   final String? profileId;
 
   @override
@@ -35,11 +48,10 @@ class ViewProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   ProfileEntity? _profile;
   List<String> _gallery = [];
   bool _loadingProfile = false;
-  final Set<String> _sentInterests = {};
   int _postsKey = 0; // Key para forçar rebuild do FutureBuilder de posts
 
   // IDs reais do perfil carregado (para compartilhamento)
@@ -49,16 +61,85 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   YoutubePlayerController? _youtubeController;
   TabController? _tabController;
 
+  // Estado de loading para o botão de mensagem (evita cliques múltiplos)
+  bool _isOpeningConversation = false;
+  
+  // Cache de conversationId para acelerar abertura do chat
+  String? _prefetchedConversationId;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(
         length: 4, vsync: this); // 4 tabs: Gallery, YouTube, Posts, Interests
     _loadProfileFromFirestore();
+    
+    // Prefetch conversation ID em background (não bloqueia UI)
+    _prefetchConversationIfNeeded();
+  }
+  
+  // Função para formatar telefone brasileiro
+  String _formatBrazilianPhone(String phone) {
+    final digitsOnly = phone.replaceAll(RegExp(r'\D'), '');
+    
+    if (digitsOnly.length == 10) {
+      // Formato: (XX) XXXX-XXXX
+      return '(${digitsOnly.substring(0, 2)}) ${digitsOnly.substring(2, 6)}-${digitsOnly.substring(6)}';
+    } else if (digitsOnly.length == 11) {
+      // Formato: (XX) XXXXX-XXXX
+      return '(${digitsOnly.substring(0, 2)}) ${digitsOnly.substring(2, 7)}-${digitsOnly.substring(7)}';
+    }
+    
+    // Retorna o telefone original se não conseguir formatar
+    return phone;
+  }
+
+  /// Carrega conversationId em background para acelerar botão de mensagem
+  Future<void> _prefetchConversationIfNeeded() async {
+    // Só faz prefetch para perfis de outros usuários
+    if (widget.profileId == null && widget.userId == null) return;
+    
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+      
+      final activeProfile = ref.read(activeProfileProvider);
+      if (activeProfile == null) return;
+      
+      // Aguarda perfil carregar
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (_profile == null) return;
+      
+      // Evita prefetch para si mesmo
+      if (activeProfile.profileId == _profile!.profileId) return;
+      
+      // Query otimizada: busca APENAS conversationId (não cria)
+      final query = await FirebaseFirestore.instance
+          .collection('conversations')
+          .where('participants', arrayContains: currentUser.uid)
+          .limit(10) // Limita para economizar bandwidth
+          .get();
+      
+      // Filtra client-side (mais rápido que query complexa)
+      for (final doc in query.docs) {
+        final data = doc.data();
+        final participantProfiles = (data['participantProfiles'] as List?)?.cast<String>() ?? [];
+        
+        if (participantProfiles.contains(activeProfile.profileId) &&
+            participantProfiles.contains(_profile!.profileId)) {
+          _prefetchedConversationId = doc.id;
+          debugPrint('⚡ ViewProfile: Conversation prefetched: $_prefetchedConversationId');
+          break;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ ViewProfile: Prefetch error (non-critical): $e');
+    }
   }
 
   Future<void> _loadProfileFromFirestore() async {
     debugPrint('🔄 ViewProfilePage: _loadProfileFromFirestore() iniciado');
+    if (!mounted) return;
     setState(() => _loadingProfile = true);
 
     final user = FirebaseAuth.instance.currentUser;
@@ -133,7 +214,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       final gallery =
           (doc.data()?['gallery'] as List<dynamic>?)?.cast<String>() ??
               <String>[];
-      _gallery = gallery.take(9).toList(); // Limitar a 9 fotos para performance
+      _gallery = gallery.take(12).toList(); // Limitar a 12 fotos para performance
 
       // Preparar YouTube controller se link válido
       final videoId = _extractYoutubeVideoId(profile.youtubeLink);
@@ -153,6 +234,13 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         return;
       }
 
+      // Atualizar TabController baseado no tipo de perfil
+      final newTabLength = profile.isSpace ? 3 : 4;
+      if (_tabController?.length != newTabLength) {
+        _tabController?.dispose();
+        _tabController = TabController(length: newTabLength, vsync: this);
+      }
+
       setState(() {
         _profile = profile;
         _loadingProfile = false;
@@ -165,6 +253,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
       debugPrint(
           '✅ ViewProfilePage: Perfil carregado com sucesso - ${profile.name} (${profile.profileId})');
+      debugPrint('   📊 Profile Type: ${profile.profileType.label} (isSpace=${profile.isSpace})');
+      if (profile.isSpace) {
+        debugPrint('   🏢 Space Type: ${profile.spaceType}');
+        debugPrint('   📞 Phone: ${profile.phone}');
+        debugPrint('   🕐 Operating Hours: ${profile.operatingHours}');
+        debugPrint('   🌐 Website: ${profile.website}');
+        debugPrint('   ✨ Amenities: ${profile.amenities}');
+      }
     } catch (e) {
       debugPrint('❌ ViewProfilePage: Erro ao carregar perfil: $e');
       if (mounted) setState(() => _loadingProfile = false);
@@ -179,12 +275,15 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         oldWidget.profileId != widget.profileId) {
       debugPrint(
           '🔄 ViewProfilePage: didUpdateWidget detectou mudança nos parâmetros');
-      _loadProfileFromFirestore();
+      if (mounted) {
+        _loadProfileFromFirestore();
+      }
     }
   }
 
   @override
   void dispose() {
+    if (!mounted) return;
     _youtubeController?.dispose();
     _tabController?.dispose();
     super.dispose();
@@ -202,28 +301,48 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   Widget _buildActionButton({
     required String label,
     required IconData icon,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     required bool isPrimary,
+    bool isLoading = false,
   }) {
+    final isDisabled = onPressed == null || isLoading;
+    
     return SizedBox(
       height: 32,
       child: ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(
-          icon,
-          size: 16,
-          color: isPrimary ? Colors.white : Colors.black,
-        ),
+        onPressed: isDisabled ? null : onPressed,
+        icon: isLoading
+            ? SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isPrimary ? Colors.white : Colors.black54,
+                  ),
+                ),
+              )
+            : Icon(
+                icon,
+                size: 16,
+                color: isDisabled
+                    ? (isPrimary ? Colors.white70 : Colors.black38)
+                    : (isPrimary ? Colors.white : Colors.black),
+              ),
         label: Text(
-          label,
+          isLoading ? 'Abrindo...' : label,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: isPrimary ? Colors.white : Colors.black,
+            color: isDisabled
+                ? (isPrimary ? Colors.white70 : Colors.black38)
+                : (isPrimary ? Colors.white : Colors.black),
           ),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary ? AppColors.primary : Colors.grey[200],
+          backgroundColor: isPrimary
+              ? (isDisabled ? AppColors.primary.withOpacity(0.7) : AppColors.primary)
+              : (isDisabled ? Colors.grey[300] : Colors.grey[200]),
           foregroundColor: isPrimary ? Colors.white : Colors.black,
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -237,13 +356,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
   /// Abre ou cria uma conversa com o perfil visualizado
   Future<void> _openOrCreateConversation() async {
+    // Debouncing: evita cliques múltiplos
+    if (_isOpeningConversation) {
+      debugPrint('⚠️ ViewProfile: Operação já em andamento, ignorando clique');
+      return;
+    }
+    
     if (_profile == null) return;
 
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Você precisa estar autenticado')),
-      );
+      AppSnackBar.showError(context, 'Você precisa estar autenticado');
       return;
     }
 
@@ -251,76 +374,58 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final profileState = ref.read(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
     if (activeProfile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Perfil ativo não encontrado')),
-      );
+      AppSnackBar.showError(context, 'Perfil ativo não encontrado');
       return;
     }
 
+    // Ativar estado de loading
+    if (mounted) {
+      setState(() => _isOpeningConversation = true);
+    }
+
     try {
-      // Buscar conversa existente entre os dois perfis
-      final existingConversations = await FirebaseFirestore.instance
-          .collection('conversations')
-          .where('participantProfiles', arrayContains: activeProfile.profileId)
-          .get();
-
-      String? conversationId;
-
-      // Verificar se já existe conversa entre os dois perfis
-      for (final doc in existingConversations.docs) {
-        final participantProfiles =
-            (doc.data()['participantProfiles'] as List?)?.cast<String>() ?? [];
-        if (participantProfiles.contains(_profile!.profileId)) {
-          conversationId = doc.id;
-          break;
-        }
+      // Verificar se está tentando conversar com seu próprio perfil (mesmo profileId)
+      if (activeProfile.profileId == _profile!.profileId) {
+        throw Exception('Não é possível iniciar conversa consigo mesmo');
       }
 
-      // Se não existe, criar nova conversa
-      if (conversationId == null) {
-        // Garantir que temos o UID do outro usuário
-        final otherUserId = _profile!.uid;
-        debugPrint(
-            'Criando conversa: currentUser.uid=${currentUser.uid}, otherUserId=$otherUserId');
-        debugPrint(
-            'Participantes perfis: ${activeProfile.profileId}, ${_profile!.profileId}');
-
-        if (otherUserId.isEmpty) {
-          throw Exception('UID do perfil não encontrado');
-        }
-
-        // Verificar se está tentando conversar com seu próprio perfil (mesmo profileId)
-        if (activeProfile.profileId == _profile!.profileId) {
-          throw Exception('Não é possível iniciar conversa consigo mesmo');
-        }
-
-        final newConversation =
-            await FirebaseFirestore.instance.collection('conversations').add({
-          'participants': [currentUser.uid, otherUserId],
-          'participantProfiles': [activeProfile.profileId, _profile!.profileId],
-          'lastMessage': '',
-          'lastMessageTimestamp': FieldValue.serverTimestamp(),
-          'createdAt': FieldValue.serverTimestamp(),
-          'archived': false,
-          'unreadCount': {
-            activeProfile.profileId: 0,
-            _profile!.profileId: 0,
+      // Usar conversationId prefetched se disponível (economiza 1 query!)
+      String conversationId;
+      if (_prefetchedConversationId != null) {
+        conversationId = _prefetchedConversationId!;
+        debugPrint('⚡ ViewProfile: Usando conversation prefetched');
+      } else {
+        // Fallback: busca/cria conversa normalmente
+        final conversation = await ref.read(mensagensNewRepositoryProvider).getOrCreateConversation(
+          currentProfileId: activeProfile.profileId,
+          currentUid: currentUser.uid,
+          otherProfileId: _profile!.profileId,
+          otherUid: _profile!.uid,
+          currentProfileData: {
+            'name': activeProfile.name,
+            'photoUrl': activeProfile.photoUrl,
           },
-        });
-        conversationId = newConversation.id;
-        debugPrint('Conversa criada com sucesso: $conversationId');
+          otherProfileData: {
+            'name': _profile!.name,
+            'photoUrl': _profile!.photoUrl,
+          },
+        );
+        conversationId = conversation.id;
       }
 
       // Navegar para a tela de chat
       if (mounted) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ChatDetailPage(
-              conversationId: conversationId!,
-              otherUserId: widget.userId ?? _profile!.uid,
+        // Desativar loading antes de navegar
+        setState(() => _isOpeningConversation = false);
+        
+        Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ChatNewPage(
+              conversationId: conversationId,
+              otherUid: widget.userId ?? _profile!.uid,
               otherProfileId: _profile!.profileId,
-              otherUserName: _profile!.name,
-              otherUserPhoto: _profile!.photoUrl ?? '',
+              otherName: _profile!.name,
+              otherPhotoUrl: _profile!.photoUrl ?? '',
             ),
           ),
         );
@@ -328,12 +433,16 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     } catch (e) {
       debugPrint('Erro ao abrir conversa: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao abrir conversa: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Mensagem de erro mais amigável
+        final errorMessage = e.toString().contains('consigo mesmo')
+            ? 'Não é possível enviar mensagem para si mesmo'
+            : 'Não foi possível abrir a conversa. Tente novamente.';
+        AppSnackBar.showError(context, errorMessage);
+      }
+    } finally {
+      // Garantir que loading é desativado em caso de erro
+      if (mounted) {
+        setState(() => _isOpeningConversation = false);
       }
     }
   }
@@ -345,35 +454,50 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     try {
       final city = _profile!.city;
 
+      // Gerar deep link para o perfil
+      final profileUrl = 'https://wegig.app/profile/${_loadedProfileId ?? _profile!.profileId}';
+      
       final message = DeepLinkGenerator.generateProfileShareMessage(
         name: _profile!.name,
         isBand: _profile!.isBand,
         city: city,
+        neighborhood: _profile!.neighborhood,
+        state: _profile!.state,
         userId: _loadedUserId ?? _profile!.uid,
         profileId: _loadedProfileId ?? _profile!.profileId,
         instruments: _profile!.instruments ?? <String>[],
         genres: _profile!.genres ?? <String>[],
       );
 
-      Share.share(message, subject: 'Perfil no WeGig');
+      // Compartilhar com deep link incluído
+      await SharePlus.instance.share(
+        ShareParams(
+          text: '$message\n\nVeja o perfil completo: $profileUrl',
+          subject: 'Perfil no WeGig',
+        ),
+      );
     } catch (e) {
       debugPrint('Erro ao compartilhar perfil: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao compartilhar: $e'),
-            backgroundColor: Colors.red,
-          ),
+        AppSnackBar.showError(
+          context,
+          'Erro ao compartilhar: $e',
         );
       }
     }
   }
 
-  String? _extractYoutubeVideoId(String? url) {
-    if (url == null || url.isEmpty) return null;
+  void _openSettings() {
+    // ✅ ALTERAÇÃO: Usa GoRouter para navegar para settings
+    // Isso ativará a transição _slideLeftPage definida no router
+    context.push('/settings');
+  }
+
+  String? _extractYoutubeVideoId(String? originalUrl) {
+    if (originalUrl == null || originalUrl.isEmpty) return null;
 
     // Limpar espaços e garantir que é uma URL válida
-    url = url.trim();
+    var url = originalUrl.trim();
 
     // Padrões mais abrangentes para YouTube
     final patterns = [
@@ -400,60 +524,63 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
   Future<void> _launchUrl(String url) async {
     try {
-      final uri = Uri.tryParse(url);
-      if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+      // Adicionar protocolo se não tiver
+      var finalUrl = url;
+      if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('tel:') && !url.startsWith('whatsapp://')) {
+        finalUrl = 'https://$url';
+      }
+      
+      final uri = Uri.tryParse(finalUrl);
+      if (uri != null) {
         if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Não foi possível abrir o link')),
-            );
+            AppSnackBar.showError(context, 'Não foi possível abrir o link');
           }
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('URL inválida')),
-          );
+          AppSnackBar.showError(context, 'URL inválida');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao abrir o link')),
-        );
+        AppSnackBar.showError(context, 'Erro ao abrir o link');
       }
     }
   }
 
   Widget _buildGalleryImage(String pathOrUrl) {
-    // Container com ClipRRect ao invés de AspectRatio para evitar achatamento
+    // AspectRatio 1:1 para garantir células quadradas e evitar achatamento
     if (pathOrUrl.startsWith('http')) {
-      return Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-        ),
-        child: CachedNetworkImage(
-          imageUrl: pathOrUrl,
-          fit: BoxFit.cover, // Preenche o espaço mantendo proporção
-          placeholder: (context, url) => Container(
+      return AspectRatio(
+        aspectRatio: 1.0,
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
             color: Colors.grey[200],
-            child: const Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          ),
+          child: CachedNetworkImage(
+            imageUrl: pathOrUrl,
+            fit: BoxFit.cover, // Preenche o espaço mantendo proporção
+            placeholder: (context, url) => Container(
+              color: Colors.grey[200],
+              child: const Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                ),
               ),
             ),
+            errorWidget: (context, url, error) => Container(
+              color: Colors.grey[300],
+              child: const Icon(Iconsax.gallery_slash, size: 42, color: Colors.grey),
+            ),
+            memCacheWidth: 400,
+            memCacheHeight: 400,
+            maxWidthDiskCache: 800,
+            maxHeightDiskCache: 800,
           ),
-          errorWidget: (context, url, error) => Container(
-            color: Colors.grey[300],
-            child: const Icon(Icons.broken_image, size: 40, color: Colors.grey),
-          ),
-          memCacheWidth: 400,
-          memCacheHeight: 400,
-          maxWidthDiskCache: 800,
-          maxHeightDiskCache: 800,
         ),
       );
     }
@@ -464,20 +591,23 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
     final f = File(candidate);
     if (f.existsSync()) {
-      return Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-        ),
-        child: Image.file(
-          f,
-          fit: BoxFit.cover, // Preenche o espaço mantendo proporção
-          cacheWidth: 400,
-          cacheHeight: 400,
-          errorBuilder: (context, error, stackTrace) => Container(
-            color: Colors.grey[300],
-            child: const Icon(Icons.broken_image, size: 40),
+      return AspectRatio(
+        aspectRatio: 1.0,
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+          ),
+          child: Image.file(
+            f,
+            fit: BoxFit.cover, // Preenche o espaço mantendo proporção
+            cacheWidth: 400,
+            cacheHeight: 400,
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: Colors.grey[300],
+              child: const Icon(Iconsax.gallery_slash, size: 42),
+            ),
           ),
         ),
       );
@@ -491,7 +621,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
   void _openPhotoViewer(int startIndex) {
     Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (context) {
+      MaterialPageRoute<void>(builder: (context) {
         return _PhotoViewerPage(
           gallery: _gallery,
           startIndex: startIndex,
@@ -513,22 +643,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
               if (mounted) {
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Foto de perfil atualizada!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                AppSnackBar.showSuccess(context, 'Foto de perfil atualizada!');
               }
             } catch (e) {
               debugPrint('Erro ao definir foto de perfil: $e');
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erro: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                AppSnackBar.showError(context, 'Erro: $e');
               }
             }
           },
@@ -546,28 +666,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
               if (mounted) {
                 Navigator.of(context).pop(); // Fecha o visualizador
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Row(
-                      children: [
-                        Icon(Icons.check_circle, color: Colors.white),
-                        SizedBox(width: 12),
-                        Expanded(child: Text('Foto baixada com sucesso!')),
-                      ],
-                    ),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 3),
-                  ),
-                );
+                AppSnackBar.showSuccess(context, 'Foto baixada com sucesso!');
               }
             } catch (e) {
               debugPrint('Erro ao fazer download: $e');
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erro ao fazer download: $e'),
-                    backgroundColor: Colors.red,
-                  ),
+                AppSnackBar.showError(
+                  context,
+                  'Erro ao fazer download: $e',
                 );
               }
             }
@@ -652,6 +758,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               final compressedPath = compressed.path;
               debugPrint('ViewProfile: Imagem comprimida: $compressedPath');
 
+              final squareFile = await _createLetterboxedSquare(compressedPath);
+              debugPrint('ViewProfile: Imagem com letterbox pronta: ${squareFile.path}');
+
               // Fazer upload da foto editada
               final profileState = ref.read(profileProvider);
               final activeProfile = profileState.value?.activeProfile;
@@ -666,7 +775,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   .child('gallery')
                   .child('photo_${DateTime.now().millisecondsSinceEpoch}.jpg');
 
-              await storageRef.putFile(File(compressedPath));
+              await storageRef.putFile(squareFile);
               final newUrl = await storageRef.getDownloadURL();
               debugPrint('ViewProfile: Upload concluído: $newUrl');
 
@@ -699,21 +808,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
               if (mounted) {
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Foto atualizada com sucesso!'),
-                    backgroundColor: Colors.green,
-                  ),
+                AppSnackBar.showSuccess(
+                  context,
+                  'Foto atualizada com sucesso!',
                 );
               }
             } catch (e) {
               debugPrint('ViewProfile: ERRO ao editar foto: $e');
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erro ao editar foto: $e'),
-                    backgroundColor: Colors.red,
-                  ),
+                AppSnackBar.showError(
+                  context,
+                  'Erro ao editar foto: $e',
                 );
               }
             }
@@ -748,21 +853,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
               if (mounted) {
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Foto deletada com sucesso!'),
-                    backgroundColor: Colors.green,
-                  ),
+                AppSnackBar.showSuccess(
+                  context,
+                  'Foto deletada com sucesso!',
                 );
               }
             } catch (e) {
               debugPrint('Erro ao deletar foto: $e');
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erro ao deletar: $e'),
-                    backgroundColor: Colors.red,
-                  ),
+                AppSnackBar.showError(
+                  context,
+                  'Erro ao deletar: $e',
                 );
               }
             }
@@ -775,8 +876,10 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   @override
   Widget build(BuildContext context) {
     final isOwnProfile = _isMyProfile();
+    final theme = Theme.of(context);
 
-    // Listener para detectar mudanças no perfil ativo
+    // ✅ FIX: Listener para detectar mudanças no perfil ativo
+    // Após trocar de perfil, recarrega ViewProfilePage ao invés de ir para Home
     // SEMPRE escuta, mas só age se for visualização do próprio perfil
     ref.listen<AsyncValue<ProfileState?>>(
       profileProvider,
@@ -797,7 +900,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             previousProfileId != currentProfileId) {
           debugPrint(
               '🔄 ViewProfilePage: Perfil ativo mudou de $previousProfileId para $currentProfileId');
-          // Recarrega o perfil imediatamente
+          // ✅ Recarrega o perfil imediatamente na mesma página (não navega para Home)
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               _loadProfileFromFirestore();
@@ -814,14 +917,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         elevation: 0,
         leading: Navigator.canPop(context)
             ? IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black),
+                icon: const Icon(Iconsax.arrow_left_2, color: Colors.black),
                 onPressed: () => Navigator.of(context).pop(),
               )
             : null,
         actions: isOwnProfile
             ? [
                 IconButton(
-                  icon: const Icon(Icons.swap_horiz, color: Colors.black),
+                  icon: const Icon(Iconsax.arrow_swap_horizontal, color: Colors.black),
                   tooltip: 'Trocar perfil',
                   onPressed: () {
                     ProfileSwitcherBottomSheet.show(
@@ -835,7 +938,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                         debugPrint(
                             '🔄 ViewProfile: Callback recebido - perfil trocado para $newProfileId');
                         // Aguarda um frame para garantir que o Riverpod atualizou
-                        await Future.delayed(const Duration(milliseconds: 100));
+                        await Future<void>.delayed(
+                          const Duration(milliseconds: 100),
+                        );
                         // Força reload imediato após troca
                         if (mounted) {
                           debugPrint(
@@ -848,15 +953,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.settings, color: Colors.black),
+                  icon: const Icon(Iconsax.setting_2, color: Colors.black),
                   tooltip: 'Configurações',
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsPage(),
-                      ),
-                    );
-                  },
+                  onPressed: _openSettings,
                 ),
               ]
             : null,
@@ -880,7 +979,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 20, vertical: 16),
                           child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Avatar
                               Hero(
@@ -894,33 +992,62 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                           _profile!.photoUrl!)
                                       : null,
                                   child: _profile!.photoUrl == null
-                                      ? const Icon(Icons.person,
+                                      ? const Icon(Iconsax.user,
                                           size: 42, color: Colors.grey)
                                       : null,
                                 ),
                               ),
                               const SizedBox(width: 16),
-                              // Nome e Bio ao lado da foto
+                              // Nome e Bio ao lado da foto - ALINHADO À ESQUERDA
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
                                   children: [
                                     Text(
                                       _profile!.name,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16.8),
+                                      style: theme.textTheme.headlineSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 22,
+                                                height: 1.2,
+                                                color: Colors.black87,
+                                              ) ??
+                                          const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 22,
+                                          ),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
+                                    if ((_profile!.username ?? '').isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          '@${_profile!.username}',
+                                          style: theme.textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                    fontSize: 16,
+                                                    color: Colors.grey[700],
+                                                  ) ??
+                                              TextStyle(
+                                                fontSize: 16,
+                                                color: Colors.grey[700],
+                                              ),
+                                        ),
+                                      ),
                                     if (_profile!.bio != null &&
                                         _profile!.bio!.isNotEmpty)
                                       Padding(
                                         padding: const EdgeInsets.only(top: 4),
                                         child: Text(
                                           _profile!.bio!,
-                                          style:
-                                              const TextStyle(fontSize: 12.6),
+                                          style: theme.textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                    fontSize: 15,
+                                                    height: 1.4,
+                                                    color: Colors.grey[800],
+                                                  ) ??
+                                              const TextStyle(fontSize: 15),
                                           maxLines: 4,
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -932,27 +1059,159 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                           ),
                         ),
 
-                        // Location and Social Links Section
+                        // Location and Social Links Section - ALINHADO À ESQUERDA
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
                             children: [
+                              // Space Type subtitle (only for Space profiles)
+                              if (_profile!.isSpace && _profile!.spaceType != null) ...[
+                                Text(
+                                  SpaceType.fromString(_profile!.spaceType!).label,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                        fontSize: 15,
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w600,
+                                      ) ??
+                                      TextStyle(
+                                        fontSize: 15,
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+
                               // Location info
                               Text(
-                                [
-                                  _profile!.city,
-                                  if (_profile!.state != null) _profile!.state,
-                                ]
-                                    .where((e) => e != null && e.isNotEmpty)
-                                    .join(', '),
-                                style: TextStyle(
-                                    fontSize: 13, color: Colors.grey[600]),
+                                formatCleanLocation(
+                                  neighborhood: _profile!.neighborhood,
+                                  city: _profile!.city,
+                                  state: _profile!.state,
+                                ),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontSize: 14.5,
+                                      color: Colors.grey[700],
+                                      fontWeight: FontWeight.w500,
+                                    ) ??
+                                    TextStyle(
+                                      fontSize: 14.5,
+                                      color: Colors.grey[700],
+                                    ),
                               ),
 
                               const SizedBox(height: 12),
-                              // Social Links Block
+
+                              // ===== CAMPOS ESPECÍFICOS DE ESPAÇO =====
+                              if (_profile!.isSpace) ...[
+                                // Horário de funcionamento
+                                if (_profile!.operatingHours != null && _profile!.operatingHours!.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(Iconsax.clock, size: 18, color: AppColors.primary),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            _profile!.operatingHours!,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey[800],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                // Site/Linktree
+                                if (_profile!.website != null && _profile!.website!.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: InkWell(
+                                      onTap: () => _launchUrl(_profile!.website!),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Iconsax.global_search, size: 18, color: AppColors.primary),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              _profile!.website!,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: AppColors.primary,
+                                                decoration: TextDecoration.underline,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+
+                                // Comodidades
+                                if (_profile!.amenities != null && _profile!.amenities!.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(Iconsax.tick_circle, size: 18, color: Colors.grey[600]),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            _profile!.amenities!.join(' • '),
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey[800],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+
+                              // Social Links Block (YouTube, TikTok, Instagram)
                               if (_hasSocialLinks()) _buildSocialLinksBlock(),
+
+                              // Telefone/WhatsApp (posicionado APÓS os links sociais)
+                              if (_profile!.isSpace && _profile!.phone != null && _profile!.phone!.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8, bottom: 8),
+                                  child: Row(
+                                    children: [
+                                      // Botão de ligar
+                                      Expanded(
+                                        child: _buildActionButton(
+                                          label: 'Ligar',
+                                          icon: Iconsax.call,
+                                          onPressed: () => _launchUrl('tel:${_profile!.phone}'),
+                                          isPrimary: true,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // Botão WhatsApp
+                                      Expanded(
+                                        child: _buildActionButton(
+                                          label: 'WhatsApp',
+                                          icon: Icons.chat,
+                                          onPressed: () {
+                                            final phone = _profile!.phone!.replaceAll(RegExp(r'[^\d]'), '');
+                                            final phoneWithCountry = phone.startsWith('55') ? phone : '55$phone';
+                                            _launchUrl('https://wa.me/$phoneWithCountry');
+                                          },
+                                          isPrimary: false,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
 
                               // Botões de ação (Mensagem e Compartilhar) - estilo Instagram
                               if (!isOwnProfile) ...[
@@ -962,16 +1221,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                     Expanded(
                                       child: _buildActionButton(
                                         label: 'Mensagem',
-                                        icon: Icons.chat_bubble_outline,
+                                        icon: Iconsax.message,
                                         onPressed: _openOrCreateConversation,
                                         isPrimary: true,
+                                        isLoading: _isOpeningConversation,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: _buildActionButton(
                                         label: 'Compartilhar',
-                                        icon: Icons.share_outlined,
+                                        icon: Iconsax.share,
                                         onPressed: _shareProfile,
                                         isPrimary: false,
                                       ),
@@ -1003,12 +1263,18 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                             unselectedLabelColor: Colors.grey,
                             indicatorColor: Colors.black,
                             indicatorWeight: 1,
-                            tabs: const [
-                              Tab(icon: Icon(Icons.grid_on, size: 24)),
-                              Tab(icon: Icon(Icons.smart_display, size: 24)),
-                              Tab(icon: Icon(Icons.list_alt, size: 24)),
-                              Tab(icon: Icon(Icons.favorite_border, size: 24)),
-                            ],
+                            tabs: _profile!.isSpace
+                                ? const [
+                                    Tab(icon: Icon(Iconsax.element_3, size: 26)), // Galeria
+                                    Tab(icon: Icon(Iconsax.video_play, size: 26)), // YouTube
+                                    Tab(icon: Icon(Iconsax.document_text, size: 26)), // Ofertas
+                                  ]
+                                : const [
+                                    Tab(icon: Icon(Iconsax.element_3, size: 26)), // Galeria
+                                    Tab(icon: Icon(Iconsax.video_play, size: 26)), // YouTube
+                                    Tab(icon: Icon(Iconsax.document_text, size: 26)), // Posts
+                                    Tab(icon: Icon(Iconsax.heart, size: 26)), // Interesses
+                                  ],
                           ),
                         ),
 
@@ -1017,12 +1283,18 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                           height: 600, // Altura fixa para o TabBarView
                           child: TabBarView(
                             controller: _tabController,
-                            children: [
-                              _buildGalleryTab(),
-                              _buildYoutubeTab(),
-                              _buildPostsTab(),
-                              _buildInterestsTab(),
-                            ],
+                            children: _profile!.isSpace
+                                ? [
+                                    _buildGalleryTab(),
+                                    _buildYoutubeTab(),
+                                    _buildPostsTab(), // Ofertas (reaproveita a mesma função)
+                                  ]
+                                : [
+                                    _buildGalleryTab(),
+                                    _buildYoutubeTab(),
+                                    _buildPostsTab(),
+                                    _buildInterestsTab(),
+                                  ],
                           ),
                         ),
                       ],
@@ -1049,20 +1321,20 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           if (_profile?.instagramLink != null &&
               _profile!.instagramLink!.isNotEmpty)
             _buildSocialIcon(
-              icon: Icons.photo_camera,
+              icon: Iconsax.camera,
               label: 'Instagram',
               onTap: () => _launchUrl(_profile!.instagramLink!),
             ),
           if (_profile?.tiktokLink != null && _profile!.tiktokLink!.isNotEmpty)
             _buildSocialIcon(
-              icon: Icons.music_note,
+              icon: Iconsax.musicnote,
               label: 'TikTok',
               onTap: () => _launchUrl(_profile!.tiktokLink!),
             ),
           if (_profile?.youtubeLink != null &&
               _profile!.youtubeLink!.isNotEmpty)
             _buildSocialIcon(
-              icon: Icons.play_circle_outline,
+              icon: Iconsax.play_circle,
               label: 'YouTube',
               onTap: () => _launchUrl(_profile!.youtubeLink!),
             ),
@@ -1111,6 +1383,56 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   }
 
   Widget _buildProfileInfoSection() {
+    final theme = Theme.of(context);
+    final sectionTitleStyle = theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+          color: Colors.black87,
+        ) ??
+        const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+          color: Colors.black87,
+        );
+    final labelStyle = theme.textTheme.bodyMedium?.copyWith(
+          fontSize: 14.5,
+          color: Colors.grey[700],
+          fontWeight: FontWeight.w600,
+        ) ??
+        TextStyle(
+          fontSize: 14.5,
+          color: Colors.grey[700],
+          fontWeight: FontWeight.w600,
+        );
+    final valueStyle = theme.textTheme.bodyMedium?.copyWith(
+          fontSize: 14.5,
+          color: Colors.black87,
+        ) ??
+        const TextStyle(
+          fontSize: 14.5,
+          color: Colors.black87,
+        );
+    final chipPrimaryStyle = theme.textTheme.bodySmall?.copyWith(
+          fontSize: 13,
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
+        ) ??
+        const TextStyle(
+          fontSize: 13,
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
+        );
+    final chipSecondaryStyle = theme.textTheme.bodySmall?.copyWith(
+          fontSize: 13,
+          color: Colors.black87,
+          fontWeight: FontWeight.w600,
+        ) ??
+        const TextStyle(
+          fontSize: 13,
+          color: Colors.black87,
+          fontWeight: FontWeight.w600,
+        );
+
     return Container(
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(16),
@@ -1120,91 +1442,79 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         border: Border.all(color: Colors.grey[200]!),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
         children: [
           Text(
-            _profile!.isBand ? 'Sobre a Banda' : 'Sobre o Músico',
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 15,
-              color: Colors.black87,
-            ),
+            _profile!.isSpace
+                ? 'Sobre o Espaço'
+                : (_profile!.isBand ? 'Sobre a Banda' : 'Sobre o Músico'),
+            style: sectionTitleStyle,
           ),
           const SizedBox(height: 12),
 
-          // Idade (músicos) ou Tempo de formação (bandas)
-          if (_profile!.ageOrFormationText != null)
+          // Idade (músicos) ou Tempo de formação (bandas) - não para espaços
+          if (!_profile!.isSpace && _profile!.ageOrFormationText != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 children: [
                   Icon(
-                    _profile!.isBand ? Icons.calendar_today : Icons.cake,
+                    _profile!.isBand ? Iconsax.calendar : Iconsax.cake,
                     size: 18,
                     color: Colors.grey[600],
                   ),
                   const SizedBox(width: 8),
                   Text(
                     _profile!.ageOrFormationText!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: valueStyle,
                   ),
                 ],
               ),
             ),
 
-          // Nível (apenas para músicos)
-          if (!_profile!.isBand &&
+          // Nível (apenas para músicos, não para espaços)
+          if (!_profile!.isSpace &&
+              !_profile!.isBand &&
               _profile!.level != null &&
               _profile!.level!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 children: [
-                  Icon(Icons.bar_chart, size: 18, color: Colors.grey[600]),
+                  Icon(Iconsax.chart, size: 20, color: Colors.grey[600]),
                   const SizedBox(width: 8),
                   Text(
                     'Nível: ',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: labelStyle,
                   ),
                   Text(
                     _profile!.level!,
-                    style: const TextStyle(fontSize: 13, color: Colors.black87),
+                    style: valueStyle,
                   ),
                 ],
               ),
             ),
 
-          // Instrumentos (rótulo adaptável)
-          if (_profile!.instruments?.isNotEmpty ?? false)
+          // Instrumentos (rótulo adaptável) - não para espaços
+          if (!_profile!.isSpace && (_profile!.instruments?.isNotEmpty ?? false))
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.music_note, size: 18, color: Colors.grey[600]),
+                      Icon(Iconsax.musicnote, size: 20, color: Colors.grey[600]),
                       const SizedBox(width: 8),
                       Text(
                         _profile!.isBand ? 'Instrumentação:' : 'Instrumentos:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: labelStyle,
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
                   Wrap(
+                    alignment: WrapAlignment.start, // Alinhamento à esquerda
                     spacing: 6,
                     runSpacing: 6,
                     children: _profile!.instruments?.map((String instrument) {
@@ -1212,13 +1522,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
+                              color: AppColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               instrument,
-                              style: const TextStyle(
-                                  fontSize: 12, color: AppColors.primary),
+                              style: chipPrimaryStyle,
                             ),
                           );
                         }).toList() ??
@@ -1228,30 +1537,27 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               ),
             ),
 
-          // Gêneros
-          if (_profile!.genres?.isNotEmpty ?? false)
+          // Gêneros - não para espaços
+          if (!_profile!.isSpace && (_profile!.genres?.isNotEmpty ?? false))
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.library_music,
+                      Icon(Iconsax.music_library_2,
                           size: 18, color: Colors.grey[600]),
                       const SizedBox(width: 8),
                       Text(
                         'Gêneros:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: labelStyle,
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
                   Wrap(
+                    alignment: WrapAlignment.start, // Alinhamento à esquerda
                     spacing: 6,
                     runSpacing: 6,
                     children: _profile!.genres?.map((String genre) {
@@ -1264,8 +1570,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                             ),
                             child: Text(
                               genre,
-                              style: const TextStyle(
-                                  fontSize: 12, color: Colors.black87),
+                              style: chipSecondaryStyle,
                             ),
                           );
                         }).toList() ??
@@ -1275,32 +1580,160 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               ),
             ),
 
-          // Membros da Banda (apenas para bandas)
-          if (_profile!.isBand && (_profile!.bandMembers?.isNotEmpty ?? false))
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          // ===== ESPAÇO: Campos Específicos =====
+          if (_profile!.isSpace) ...[
+            // Tipo de Espaço
+            if (_profile!.spaceType != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
                   children: [
-                    Icon(Icons.people, size: 18, color: Colors.grey[600]),
+                    Icon(Iconsax.building, size: 20, color: Colors.grey[600]),
                     const SizedBox(width: 8),
                     Text(
-                      'Membros:',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[700],
-                        fontWeight: FontWeight.w500,
+                      'Tipo: ',
+                      style: labelStyle,
+                    ),
+                    Expanded(
+                      child: Text(
+                        SpaceType.fromString(_profile!.spaceType!).label,
+                        style: valueStyle,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '${_profile!.bandMembers?.length ?? 0} membros cadastrados',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+
+            // Telefone (clicável)
+            if (_profile!.phone != null && _profile!.phone!.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InkWell(
+                  onTap: () => _launchUrl('tel:${_profile!.phone}'),
+                  child: Row(
+                    children: [
+                      Icon(Iconsax.call, size: 20, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _formatBrazilianPhone(_profile!.phone!.trim()),
+                          style: valueStyle.copyWith(
+                            color: AppColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+
+            // Horário de Funcionamento
+            if (_profile!.operatingHours != null &&
+                _profile!.operatingHours!.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Iconsax.clock, size: 20, color: Colors.grey[600]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Horário:', style: labelStyle),
+                          const SizedBox(height: 4),
+                          Text(
+                            _profile!.operatingHours!.trim(),
+                            style: valueStyle,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Website (clicável)
+            if (_profile!.website != null && _profile!.website!.trim().isNotEmpty)
+              Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: InkWell(
+                onTap: () => _launchUrl(_profile!.website!),
+                child: Row(
+                children: [
+                  Icon(Iconsax.global, size: 20, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                  child: Text(
+                    _profile!.website!.trim()
+                      .replaceFirst(RegExp(r'^https?://'), '')
+                      .replaceFirst(RegExp(r'^www\.'), '')
+                      .split('/')[0], // Shows only domain
+                    style: valueStyle.copyWith(
+                    color: AppColors.primary,
+                    decoration: TextDecoration.underline,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  ),
+                ],
+                ),
+              ),
+              ),
+
+            // Comodidades/Amenidades
+            if (_profile!.amenities?.isNotEmpty ?? false)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Iconsax.ticket_star,
+                            size: 20, color: Colors.grey[600]),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Comodidades:',
+                          style: labelStyle,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      alignment: WrapAlignment.start,
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: _profile!.amenities!.map((String amenity) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.purple.shade200,
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            amenity,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.purple.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -1343,7 +1776,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: _pickAndUploadGalleryPhoto,
-              icon: const Icon(Icons.add_a_photo),
+              icon: const Icon(Iconsax.camera),
               label: const Text('Adicionar Foto'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -1406,13 +1839,64 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         ),
         child: Center(
           child: Icon(
-            Icons.add_a_photo,
+            Iconsax.camera,
             size: 32,
             color: Colors.grey[400],
           ),
         ),
       ),
     );
+  }
+
+  Future<File> _createLetterboxedSquare(String sourcePath) async {
+    final originalBytes = await File(sourcePath).readAsBytes();
+    final codec = await ui.instantiateImageCodec(originalBytes);
+    final frame = await codec.getNextFrame();
+    codec.dispose();
+    final image = frame.image;
+
+    final squareSize = math.max(image.width, image.height);
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final backgroundPaint = Paint()..color = Colors.black;
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, squareSize.toDouble(), squareSize.toDouble()),
+      backgroundPaint,
+    );
+
+    final offset = Offset(
+      (squareSize - image.width) / 2,
+      (squareSize - image.height) / 2,
+    );
+    canvas.drawImage(image, offset, Paint());
+
+    final picture = recorder.endRecording();
+    final squareImage = await picture.toImage(squareSize, squareSize);
+    final byteData =
+        await squareImage.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) {
+      image.dispose();
+      squareImage.dispose();
+      throw Exception('Não foi possível gerar imagem quadrada');
+    }
+
+    final tempDir = Directory.systemTemp;
+    final squarePath = p.join(
+      tempDir.path,
+      'gallery_square_${DateTime.now().millisecondsSinceEpoch}.jpg',
+    );
+    final Uint8List pngBytes = byteData.buffer.asUint8List();
+    final jpgBytes = await FlutterImageCompress.compressWithList(
+      pngBytes,
+      quality: 90,
+      format: CompressFormat.jpeg,
+    );
+    final squareFile = await File(squarePath).writeAsBytes(jpgBytes);
+
+    image.dispose();
+    squareImage.dispose();
+
+    return squareFile;
   }
 
   Future<void> _pickAndUploadGalleryPhoto() async {
@@ -1433,28 +1917,40 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
       debugPrint('ViewProfile: Imagem selecionada: ${pickedFile.path}');
 
-      // Crop da imagem
+      // Crop da imagem com opção square
       final cropped = await ImageCropper().cropImage(
         sourcePath: pickedFile.path,
+        compressQuality: 85,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        compressFormat: ImageCompressFormat.jpg,
         uiSettings: [
           AndroidUiSettings(
-            toolbarTitle: 'Editar foto',
+            toolbarTitle: 'Editar Foto',
             toolbarColor: AppColors.primary,
             toolbarWidgetColor: Colors.white,
+            backgroundColor: Colors.black,
+            activeControlsWidgetColor: AppColors.primary,
+            initAspectRatio: CropAspectRatioPreset.square,
             aspectRatioPresets: [
               CropAspectRatioPreset.square,
               CropAspectRatioPreset.ratio3x2,
               CropAspectRatioPreset.ratio4x3,
               CropAspectRatioPreset.ratio16x9,
+              CropAspectRatioPreset.original,
             ],
+            lockAspectRatio: false,
           ),
           IOSUiSettings(
-            title: 'Editar foto',
+            title: 'Editar Foto',
+            minimumAspectRatio: 0.5,
+            aspectRatioLockDimensionSwapEnabled: true,
             aspectRatioPresets: [
               CropAspectRatioPreset.square,
               CropAspectRatioPreset.ratio3x2,
               CropAspectRatioPreset.ratio4x3,
               CropAspectRatioPreset.ratio16x9,
+              CropAspectRatioPreset.original,
             ],
           ),
         ],
@@ -1494,6 +1990,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       final compressedPath = compressed.path;
       debugPrint('ViewProfile: Imagem comprimida: $compressedPath');
 
+      final squareFile = await _createLetterboxedSquare(compressedPath);
+      debugPrint('ViewProfile: Imagem com letterbox pronta: ${squareFile.path}');
+
       // Upload para o Firebase Storage
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
@@ -1508,7 +2007,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           .ref()
           .child('profiles/${activeProfile.profileId}/gallery/$fileName');
 
-      await storageRef.putFile(File(compressedPath));
+      await storageRef.putFile(squareFile);
       final downloadUrl = await storageRef.getDownloadURL();
       debugPrint('ViewProfile: Upload concluído: $downloadUrl');
 
@@ -1524,21 +2023,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Foto adicionada com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
+        AppSnackBar.showSuccess(
+          context,
+          'Foto adicionada com sucesso!',
         );
       }
     } catch (e) {
       debugPrint('ViewProfile: ERRO ao adicionar foto: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao adicionar foto: $e'),
-            backgroundColor: Colors.red,
-          ),
+        AppSnackBar.showError(
+          context,
+          'Erro ao adicionar foto: $e',
         );
       }
     }
@@ -1550,7 +2045,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.smart_display_outlined,
+            Icon(Iconsax.video_play,
                 size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
@@ -1591,7 +2086,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
@@ -1613,6 +2107,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final activeProfile = profileState.value?.activeProfile;
     final isOwner =
         activeProfile != null && activeProfile.profileId == _profile!.profileId;
+
+    // ✅ Buscar status de interesses do usuário ativo
+    final interestsAsync = ref.watch(interestNotifierProvider);
 
     return FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
       key: ValueKey(_postsKey), // Força rebuild quando _postsKey muda
@@ -1646,7 +2143,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.article_outlined, size: 64, color: Colors.grey[400]),
+                Icon(Iconsax.document_text, size: 68, color: Colors.grey[400]),
                 const SizedBox(height: 16),
                 Text(
                   'Nenhum post encontrado',
@@ -1666,7 +2163,10 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           itemCount: docs.length,
           itemBuilder: (context, i) {
             final d = docs[i].data();
-            return _buildPostCard(docs[i].id, d, isOwner);
+            final postId = docs[i].id;
+            // ✅ Verificar se o usuário ativo demonstrou interesse neste post
+            final isInterestSent = interestsAsync.contains(postId);
+            return _buildPostCard(postId, d, isOwner, isInterestSent: isInterestSent);
           },
         );
       },
@@ -1683,12 +2183,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           .where('authorProfileId', isEqualTo: _profile!.profileId)
           .orderBy('createdAt', descending: true);
     } else {
-      // Visitantes vêem apenas posts não expirados
+      // Visitantes vêem apenas posts não expirados, ordenados por createdAt
+      // ✅ Usa índice composto: authorProfileId + expiresAt + __name__
       final now = DateTime.now();
       postsQuery = postsQuery
           .where('authorProfileId', isEqualTo: _profile!.profileId)
           .where('expiresAt', isGreaterThan: Timestamp.fromDate(now))
-          .orderBy('expiresAt', descending: true);
+          .orderBy('expiresAt') // Requerido para o índice
+          .orderBy('createdAt', descending: true); // Ordem desejada
     }
 
     return postsQuery.get();
@@ -1704,13 +2206,16 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final isOwner =
         activeProfile != null && activeProfile.profileId == _profile!.profileId;
 
+    // ✅ NOVO: Buscar status de interesses do usuário ativo
+    final interestsAsync = ref.watch(interestNotifierProvider);
+
     // Apenas mostra se for o próprio perfil
     if (!isOwner) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.lock_outline, size: 64, color: Colors.grey[400]),
+            Icon(Iconsax.lock, size: 68, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               'Conteúdo privado',
@@ -1789,8 +2294,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 final postData = postSnap.data!.data()!;
                 debugPrint(
                     'ViewProfile: Mostrando post $postId - type: ${postData['type']}');
+
+                // ✅ NOVO: Verificar se o usuário ativo demonstrou interesse neste post
+                final isInterestSent = interestsAsync.contains(postId);
+
                 return _buildPostCard(postId, postData, false,
-                    isInterestCard: true);
+                    isInterestCard: true, isInterestSent: isInterestSent);
               },
             );
           },
@@ -1815,6 +2324,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       final query = await FirebaseFirestore.instance
           .collection('interests')
           .where('interestedProfileId', isEqualTo: activeProfile.profileId)
+          .where('profileUid', isEqualTo: activeProfile.uid)
           .limit(50)
           .get();
 
@@ -1840,49 +2350,48 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   Future<void> _sendInterestOptimistically(
       String postId, String authorProfileId, String postType) async {
     if (!mounted) return;
-    setState(() => _sentInterests.add(postId));
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.favorite, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Interesse enviado! 🎵'),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
-    );
 
     try {
       final activeProfile = ref.read(profileProvider).value?.activeProfile;
       if (activeProfile == null) return;
 
-      await FirebaseFirestore.instance.collection('interests').add({
-        'postId': postId,
-        'postAuthorProfileId': authorProfileId,
-        'interestedProfileId': activeProfile.profileId,
-        'interestedName': activeProfile.name,
-        'createdAt': FieldValue.serverTimestamp(),
-        'read': false,
-      });
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
+      // ✅ Buscar dados do autor do post para preencher postAuthorUid
+      final postDoc = await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(postId)
+          .get();
+
+      if (!postDoc.exists) {
+        throw Exception('Post não encontrado');
+      }
+
+      final postAuthorUid = postDoc.data()?['authorUid'] as String?;
+      if (postAuthorUid == null) {
+        throw Exception('Post sem authorUid');
+      }
+
+      // ✅ Usar provider global para optimistic update e persistência
+      await ref.read(interestNotifierProvider.notifier).addInterest(
+        postId: postId,
+        postAuthorUid: postAuthorUid,
+        postAuthorProfileId: authorProfileId,
+      );
+
+      if (mounted) {
+        AppSnackBar.showSuccess(
+          context,
+          'Interesse enviado!',
+        );
+      }
     } catch (e) {
       debugPrint('Erro no envio otimista de interesse: $e');
       if (mounted) {
-        setState(() => _sentInterests.remove(postId));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Erro ao enviar interesse: $e')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-          ),
+        AppSnackBar.showError(
+          context,
+          'Erro ao enviar interesse: $e',
         );
       }
     }
@@ -1891,51 +2400,28 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   Future<void> _removeInterestOptimistically(
       String postId, String authorProfileId) async {
     if (!mounted) return;
-    setState(() => _sentInterests.remove(postId));
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.favorite_border, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Interesse removido 🎵'),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
-    );
 
     try {
       final activeProfile = ref.read(profileProvider).value?.activeProfile;
       if (activeProfile == null) return;
 
-      final query = await FirebaseFirestore.instance
-          .collection('interests')
-          .where('postId', isEqualTo: postId)
-          .where('interestedProfileId', isEqualTo: activeProfile.profileId)
-          .limit(1)
-          .get();
+      // ✅ Usar provider global para optimistic update e remoção
+      await ref.read(interestNotifierProvider.notifier).removeInterest(
+        postId: postId,
+      );
 
-      for (final doc in query.docs) {
-        await doc.reference.delete();
+      if (mounted) {
+        AppSnackBar.showInfo(
+          context,
+          'Interesse removido',
+        );
       }
     } catch (e) {
       debugPrint('Erro ao remover interesse: $e');
       if (mounted) {
-        setState(() => _sentInterests.add(postId));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Erro ao remover interesse: $e')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-          ),
+        AppSnackBar.showError(
+          context,
+          'Erro ao remover interesse: $e',
         );
       }
     }
@@ -1945,8 +2431,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       bool isInterestSent, bool isOwner) {
     final type = (data['type'] as String?) ?? '';
     final authorProfileId = (data['authorProfileId'] as String?) ?? '';
+    final isSalesPost = type == 'sales';
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -1968,16 +2455,44 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             // Opções para o dono do post
             if (isOwner) ...[
               ListTile(
-                leading: const Icon(Icons.edit, color: AppColors.primary),
+                leading: const Icon(Iconsax.edit, color: AppColors.primary),
                 title: const Text('Editar Post'),
                 onTap: () async {
                   Navigator.pop(ctx);
                   // Navegar para PostPage com dados do post para edição
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(
+                  await Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
                       builder: (_) => PostPage(
                         postType: type,
-                        existingPostData: {'postId': postId, ...data},
+                        existingPostData: {
+                          'postId': postId,
+                          'content': data['content'],
+                          // Common fields
+                          'city': data['city'],
+                          'neighborhood': data['neighborhood'],
+                          'state': data['state'],
+                          'photoUrls': data['photoUrls'],
+                          'photoUrl': data['photoUrl'], // fallback
+                          'youtubeLink': data['youtubeLink'],
+                          'location': data['location'],
+                          'createdAt': data['createdAt'],
+                          'expiresAt': data['expiresAt'],
+                          // Musician/Band fields
+                          'instruments': data['instruments'],
+                          'genres': data['genres'],
+                          'seekingMusicians': data['seekingMusicians'],
+                          'level': data['level'],
+                          'availableFor': data['availableFor'],
+                          // Sales fields
+                          'title': data['title'],
+                          'salesType': data['salesType'],
+                          'price': data['price'],
+                          'discountMode': data['discountMode'],
+                          'discountValue': data['discountValue'],
+                          'promoStartDate': data['promoStartDate'],
+                          'promoEndDate': data['promoEndDate'],
+                          'whatsappNumber': data['whatsappNumber'],
+                        },
                       ),
                     ),
                   );
@@ -1990,7 +2505,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
+                leading: const Icon(Iconsax.trash, color: Colors.red),
                 title: const Text('Deletar Post'),
                 onTap: () async {
                   Navigator.pop(ctx);
@@ -2038,18 +2553,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
                       // Mostrar confirmação
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Row(
-                              children: [
-                                Icon(Icons.check_circle, color: Colors.white),
-                                SizedBox(width: 12),
-                                Text('Post deletado com sucesso!'),
-                              ],
-                            ),
-                            backgroundColor: Colors.green,
-                            duration: Duration(seconds: 2),
-                          ),
+                        AppSnackBar.showSuccess(
+                          context,
+                          'Post deletado com sucesso!',
                         );
 
                         // Recarregar posts
@@ -2060,18 +2566,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                     } catch (e) {
                       debugPrint('Erro ao deletar post: $e');
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                const Icon(Icons.error, color: Colors.white),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                    child: Text('Erro ao deletar post: $e')),
-                              ],
-                            ),
-                            backgroundColor: Colors.red,
-                          ),
+                        AppSnackBar.showError(
+                          context,
+                          'Erro ao deletar post: $e',
                         );
                       }
                     }
@@ -2083,8 +2580,11 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             else ...[
               if (isInterestSent)
                 ListTile(
-                  leading: const Icon(Icons.favorite_border, color: Colors.red),
-                  title: const Text('Remover Interesse'),
+                  leading: Icon(
+                    isSalesPost ? Iconsax.tag5 : Iconsax.heart,
+                    color: isSalesPost ? AppColors.primary : Colors.red,
+                  ),
+                  title: Text(isSalesPost ? 'Remover dos Salvos' : 'Remover Interesse'),
                   onTap: () {
                     Navigator.pop(ctx);
                     _removeInterestOptimistically(postId, authorProfileId);
@@ -2092,15 +2592,18 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 )
               else
                 ListTile(
-                  leading: const Icon(Icons.favorite, color: Colors.pink),
-                  title: const Text('Demonstrar Interesse'),
+                  leading: Icon(
+                    isSalesPost ? Iconsax.tag : Iconsax.heart5,
+                    color: isSalesPost ? AppColors.primary : Colors.pink,
+                  ),
+                  title: Text(isSalesPost ? 'Salvar Anúncio' : 'Demonstrar Interesse'),
                   onTap: () {
                     Navigator.pop(ctx);
                     _sendInterestOptimistically(postId, authorProfileId, type);
                   },
                 ),
               ListTile(
-                leading: const Icon(Icons.person, color: AppColors.primary),
+                leading: const Icon(Iconsax.user, color: AppColors.primary),
                 title: const Text('Ver Perfil'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -2115,13 +2618,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   }
 
   Widget _buildPostCard(String postId, Map<String, dynamic> data, bool isOwner,
-      {bool isInterestCard = false}) {
-    final photo = (data['photoUrl'] as String?) ?? '';
+      {bool isInterestCard = false, bool isInterestSent = false}) {
+    // ✅ Priorizar photoUrls (carrossel) com fallback para photoUrl legado
+    final photoUrls = (data['photoUrls'] as List<dynamic>?)?.cast<String>() ?? [];
+    final photo = photoUrls.isNotEmpty 
+        ? photoUrls.first 
+        : (data['photoUrl'] as String? ?? '');
+    
     final type = (data['type'] as String?) ?? '';
     final city = (data['city'] as String?) ?? '';
     final state = (data['state'] as String?) ?? '';
-    // Se é um card de interesse, já foi enviado. Senão, verifica no Set
-    final isInterestSent = isInterestCard || _sentInterests.contains(postId);
+    // Se é um card de interesse, já foi enviado. Senão, verifica no Set ou parâmetro
     final primaryColor = type == 'band' ? AppColors.accent : AppColors.primary;
 
     // Time counter (apenas para posts do owner)
@@ -2194,8 +2701,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                     color: Colors.grey[200],
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(Icons.music_note,
-                                      color: Colors.grey),
+                                  child: const Icon(Iconsax.musicnote,
+                                      color: Colors.grey, size: 24),
                                 ),
                                 memCacheWidth: 112,
                                 memCacheHeight: 112,
@@ -2213,8 +2720,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                               color: Colors.grey[200],
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.music_note,
-                                color: Colors.grey),
+                            child: const Icon(Iconsax.musicnote,
+                                color: Colors.grey, size: 24),
                           );
                         })(),
                       ),
@@ -2228,7 +2735,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                           color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.music_note, color: Colors.grey),
+                        child: const Icon(Iconsax.musicnote, color: Colors.grey, size: 24),
                       ),
                     ),
               title: isOwner && timeAgo != null
@@ -2270,11 +2777,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     () {
-                      final locationParts = <String>[];
-                      if (city.isNotEmpty) locationParts.add(city);
-                      if (state.isNotEmpty) locationParts.add(state);
-
-                      final locationText = locationParts.join(', ');
+                      final locationText = formatCleanLocation(
+                        neighborhood: data['neighborhood'] as String?,
+                        city: city,
+                        state: state.isEmpty ? null : state,
+                        fallback: '',
+                      );
 
                       return locationText.isNotEmpty
                           ? Text(
@@ -2283,28 +2791,32 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                   fontSize: 12, color: Colors.grey[700]),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.left,
                             )
                           : const SizedBox.shrink();
                     }(),
-                    if (isOwner && daysLeft != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        'Expira em: $daysLeft',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: daysLeft == 'Expirado'
-                              ? Colors.red
-                              : Colors.grey[600],
-                          fontWeight: FontWeight.w500,
+                    if (isOwner && daysLeft != null)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Expira em: $daysLeft',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: daysLeft == 'Expirado'
+                                ? Colors.red
+                                : Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ],
                   ],
                 ),
               ),
             ),
 
-            // Botão de interesse (canto superior direito) ou menu (canto inferior direito)
+            // Botão de interesse (alinhado com topo da foto) ou menu (canto inferior direito)
             if (isOwner)
               Positioned(
                 bottom: 8,
@@ -2313,7 +2825,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   onTap: () => _showInterestOptionsDialog(
                       postId, data, isInterestSent, isOwner),
                   child: Icon(
-                    Icons.more_horiz_rounded,
+                    Iconsax.more,
                     color: Colors.grey[600],
                     size: 20,
                   ),
@@ -2321,7 +2833,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               )
             else
               Positioned(
-                top: 8,
+                top: 16, // Alinhado com contentPadding top do ListTile
                 right: 8,
                 child: GestureDetector(
                   onTap: () => _showInterestOptionsDialog(
@@ -2331,13 +2843,13 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                     decoration: BoxDecoration(
                       color: isInterestSent
                           ? Colors.pink.withValues(alpha: 0.15)
-                          : primaryColor.withValues(alpha: 0.1),
+                          : AppColors.primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       isInterestSent
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
+                          ? (type == 'sales' ? Iconsax.tag5 : Iconsax.heart5)
+                          : (type == 'sales' ? Iconsax.tag : Iconsax.heart),
                       size: 16,
                       color: isInterestSent ? Colors.pink : primaryColor,
                     ),
@@ -2376,11 +2888,19 @@ class _PhotoViewerPage extends StatefulWidget {
 
 class _PhotoViewerPageState extends State<_PhotoViewerPage> {
   late int _currentIndex;
+  late PageController _pageController;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.startIndex;
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Widget _buildImage(String pathOrUrl) {
@@ -2389,13 +2909,14 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
         return CachedNetworkImage(
           imageUrl: pathOrUrl,
           fit: BoxFit.contain,
+          alignment: Alignment.center,
           placeholder: (context, url) => const ColoredBox(
             color: Colors.black,
             child:
                 Center(child: CircularProgressIndicator(color: Colors.white)),
           ),
           errorWidget: (context, url, error) =>
-              const Icon(Icons.broken_image, size: 100, color: Colors.white),
+              const Icon(Iconsax.gallery_slash, size: 100, color: Colors.white),
           memCacheWidth: 1200,
           memCacheHeight: 1200,
         );
@@ -2410,13 +2931,14 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
         return Image.file(
           f,
           fit: BoxFit.contain,
+          alignment: Alignment.center,
           cacheWidth: 1200,
         );
       }
 
-      return const Icon(Icons.broken_image, size: 100, color: Colors.white);
+      return const Icon(Iconsax.gallery_slash, size: 100, color: Colors.white);
     } catch (e) {
-      return const Icon(Icons.broken_image, size: 100, color: Colors.white);
+      return const Icon(Iconsax.gallery_slash, size: 100, color: Colors.white);
     }
   }
 
@@ -2427,13 +2949,13 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
+          icon: const Icon(Iconsax.close_circle, color: Colors.white, size: 26),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: widget.isMyProfile
             ? [
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, color: Colors.white),
+                  icon: const Icon(Iconsax.more, color: Colors.white, size: 26),
                   color: Colors.white,
                   onSelected: (value) async {
                     final url = widget.gallery[_currentIndex];
@@ -2455,7 +2977,7 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
                       value: 'set_profile',
                       child: Row(
                         children: [
-                          Icon(Icons.account_circle, size: 20),
+                          Icon(Iconsax.profile_circle, size: 22),
                           SizedBox(width: 12),
                           Text('Tornar foto de perfil'),
                         ],
@@ -2465,7 +2987,7 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
                       value: 'download',
                       child: Row(
                         children: [
-                          Icon(Icons.download, size: 20),
+                          Icon(Iconsax.document_download, size: 22),
                           SizedBox(width: 12),
                           Text('Fazer download'),
                         ],
@@ -2475,7 +2997,7 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
                       value: 'edit',
                       child: Row(
                         children: [
-                          Icon(Icons.edit, size: 20),
+                          Icon(Iconsax.edit, size: 22),
                           SizedBox(width: 12),
                           Text('Editar'),
                         ],
@@ -2485,7 +3007,7 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          Icon(Iconsax.trash, size: 22, color: Colors.red),
                           SizedBox(width: 12),
                           Text('Deletar', style: TextStyle(color: Colors.red)),
                         ],
@@ -2499,7 +3021,7 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
       body: Center(
         child: PageView.builder(
           itemCount: widget.gallery.length,
-          controller: PageController(initialPage: _currentIndex),
+          controller: _pageController,
           onPageChanged: (index) {
             setState(() => _currentIndex = index);
           },

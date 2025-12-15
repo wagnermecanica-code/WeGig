@@ -175,7 +175,7 @@ flutter run --dart-define=ANALYTICS_DEBUG=true
 ### Configuração
 
 - [x] ✅ `google-services.json` presente em `android/app/` ✅
-- [x] ✅ `GoogleService-Info.plist` presente em `ios/Runner/` ✅
+- [x] ✅ `GoogleService-Info.plist` presente em `ios/WeGig/` ✅
 - [x] ✅ Firebase inicializado em `main.dart` ✅
 - [x] ✅ Error handlers configurados em `main.dart` ✅
 - [x] ✅ `AnalyticsService` integrado no código ✅
@@ -283,5 +283,5 @@ flutter run --dart-define=ANALYTICS_DEBUG=true
 
 **Última atualização:** 27 de novembro de 2025  
 **Autor:** GitHub Copilot (Claude Sonnet 4.5)  
-**Projeto:** WeGig (Tô Sem Banda)  
+**Projeto:** WeGig  
 **Firebase Project:** to-sem-banda-83e19

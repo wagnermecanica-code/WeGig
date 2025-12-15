@@ -1,4 +1,4 @@
-// TÔ SEM BANDA – HOME PAGE (2025, Flutter 3.24+, Dart 3.5+, Riverpod 3.x)
+// WEGIG – HOME PAGE (2025, Flutter 3.24+, Dart 3.5+, Riverpod 3.x)
 // Arquitetura: Instagram-style multi-profile, busca por área, mapa, carrossel flutuante, filtros, interesse otimista
 // Design System: AppColors, AppTheme, WIREFRAME.md
 // Refactored: Extracted sub-features (Map, Search, Feed) for better maintainability
@@ -7,13 +7,14 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:collection/collection.dart';
-import 'package:core_ui/features/post/domain/entities/post_entity.dart';
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
-import 'package:core_ui/models/search_params.dart';
-import 'package:core_ui/theme/app_colors.dart';
-import 'package:core_ui/theme/app_theme.dart';
+import 'package:core_ui/core_ui.dart';
+import 'package:core_ui/utils/debouncer.dart';
 import 'package:core_ui/utils/geo_utils.dart';
+import 'package:core_ui/utils/price_calculator.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -22,58 +23,116 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/features/home/data/datasources/gps_cache_service.dart';
+import 'package:wegig_app/features/home/presentation/providers/map_center_provider.dart';
 import 'package:wegig_app/features/home/presentation/widgets/feed/interest_service.dart';
 import 'package:wegig_app/features/home/presentation/widgets/map/map_controller.dart';
 import 'package:wegig_app/features/home/presentation/widgets/map/marker_builder.dart';
 import 'package:wegig_app/features/home/presentation/widgets/search/search_service.dart';
-import 'package:wegig_app/features/post/presentation/pages/post_detail_page.dart';
+import 'package:wegig_app/features/post/data/models/interest_document.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
+import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
-import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:wegig_app/utils/migrate_post_prices.dart';
 
 class HomePage extends ConsumerStatefulWidget {
-  const HomePage({super.key, this.searchNotifier, this.onOpenSearch});
+  const HomePage({
+    super.key,
+    this.searchNotifier,
+    this.onOpenSearch,
+    this.refreshNotifier,
+  });
   final ValueNotifier<SearchParams?>? searchNotifier;
   final VoidCallback? onOpenSearch;
+  final ValueNotifier<int>? refreshNotifier;
 
   @override
   ConsumerState<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends ConsumerState<HomePage>
-    with TickerProviderStateMixin {
+  with AutomaticKeepAliveClientMixin<HomePage>, TickerProviderStateMixin {
   // Controllers
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   
   // Services (extracted sub-features)
   final MapControllerWrapper _mapControllerWrapper = MapControllerWrapper();
-  final MarkerBuilder _markerBuilder = MarkerBuilder();
+  late final MarkerBuilder _markerBuilder;
   final SearchService _searchService = SearchService();
+  // ignore: unused_field
   final InterestService _interestService = InterestService();
+  final Debouncer _searchDebouncer = Debouncer(milliseconds: 300);
   
   // State
   List<PostEntity> _visiblePosts = [];
-  final Set<String> _sentInterests = <String>{};
   Set<Marker> _markers = {};
   String? _activePostId;
   bool _isCenteringLocation = false;
   bool _isRebuildingMarkers = false;
   DateTime? _lastMarkerRebuild;
+  ProviderSubscription<AsyncValue<PostState>>? _postsSubscription;
+  ProviderSubscription<AsyncValue<ProfileState>>? _profileSubscription;
+  Completer<GoogleMapController>? _mapControllerCompleter;
+  List<PostEntity> _cachedPosts = <PostEntity>[];
+  bool _isDisposed = false;
   
-  ProfileEntity? get _activeProfile =>
+  // PageView Controller para carrossel horizontal
+  late final PageController _pageController;
+  bool _isProgrammaticScroll = false; // Evita loops de sync
+  
+  // Flag para executar migração apenas uma vez
+  static bool _migrationExecuted = false;
+  
+    ProfileEntity? get _activeProfile =>
       ref.read(profileProvider).value?.activeProfile;
 
+    @override
+    bool get wantKeepAlive => true;
+
   Future<List<Map<String, dynamic>>> _fetchAddressSuggestions(String query) async {
-    return _searchService.fetchAddressSuggestions(query);
+    if (!mounted) return [];
+    
+    try {
+      return await _searchService.fetchAddressSuggestions(query);
+    } catch (e) {
+      debugPrint('⚠️ Erro ao buscar endereços: $e');
+      return [];
+    }
   }
 
   void _onAddressSelected(Map<String, dynamic> suggestion) {
+    if (_isDisposed || !mounted) return;
+    
     final coordinates = _searchService.parseAddressCoordinates(suggestion);
     if (coordinates != null && _mapControllerWrapper.controller != null) {
       _mapControllerWrapper.animateToPosition(coordinates, 14);
-      _searchController.text = _searchService.getDisplayName(suggestion) ?? '';
+
+      // Formato limpo para o texto exibido (igual ao das sugestões)
+      final address = suggestion['address'] as Map<String, dynamic>? ?? {};
+      final road = (address['road'] ?? address['pedestrian'] ?? '') as String;
+      final houseNumber = (address['house_number'] ?? '') as String;
+      final neighbourhood = (address['neighbourhood'] ??
+          address['suburb'] ??
+          address['quarter'] ??
+          '') as String;
+      final city = (address['city'] ??
+          address['town'] ??
+          address['village'] ??
+          address['municipality'] ??
+          '') as String;
+      final state = (address['state'] ?? '') as String;
+
+      final streetLine = [road, houseNumber].where((e) => e.isNotEmpty).join(', ');
+      final List<String> secondaryParts = [];
+      if (neighbourhood.isNotEmpty) secondaryParts.add(neighbourhood);
+      if (city.isNotEmpty) secondaryParts.add(city);
+      if (state.isNotEmpty) secondaryParts.add(state);
+
+      final cleanDisplay = [streetLine, secondaryParts.join(' • ')].where((e) => e.isNotEmpty).join(' • ');
+
+      _searchController.text = cleanDisplay.isNotEmpty ? cleanDisplay : _searchService.getDisplayName(suggestion) ?? '';
       _searchFocusNode.unfocus();
     }
   }
@@ -82,28 +141,125 @@ class _HomePageState extends ConsumerState<HomePage>
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(viewportFraction: 0.88);
+    _markerBuilder = MarkerBuilder();
     _initializePage();
+    widget.refreshNotifier?.addListener(_onExternalRefresh);
+    _initializePostListener();
+    _initializeProfileListener();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshNotifier != widget.refreshNotifier) {
+      oldWidget.refreshNotifier?.removeListener(_onExternalRefresh);
+      widget.refreshNotifier?.addListener(_onExternalRefresh);
+    }
   }
 
   @override
   void dispose() {
+    // ✅ FIX: Dispose all controllers to prevent memory leaks
+    // NOTA: Não usar ref.read() no dispose - causa "Cannot use ref after disposed"
+    _postsSubscription?.close();
+    _profileSubscription?.close();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     _mapControllerWrapper.dispose();
+    _searchDebouncer.dispose(); // ✅ Cancela Timer pendente
+    _markerBuilder.dispose();
+    _pageController.dispose(); // ✅ Dispose do PageController
     widget.searchNotifier?.removeListener(_onSearchChanged);
+    widget.refreshNotifier?.removeListener(_onExternalRefresh);
+    _isDisposed = true;
     super.dispose();
   }
 
+  void _initializePostListener() {
+    _postsSubscription?.close();
+    _postsSubscription = ref.listenManual(
+      postNotifierProvider,
+      (previous, next) {
+        if (next.hasValue) {
+          _cachedPosts = next.value?.posts ?? const <PostEntity>[];
+          _scheduleVisiblePostsRefresh();
+        } else if (next.hasError) {
+          _cachedPosts = <PostEntity>[];
+        }
+      },
+    );
+
+    final initialState = ref.read(postNotifierProvider);
+    if (initialState.hasValue) {
+      _cachedPosts = initialState.value?.posts ?? const <PostEntity>[];
+      _scheduleVisiblePostsRefresh();
+    } else if (initialState.hasError) {
+      _cachedPosts = <PostEntity>[];
+    }
+  }
+
+  void _initializeProfileListener() {
+    _profileSubscription?.close();
+    _profileSubscription = ref.listenManual(
+      profileProvider,
+      (previous, next) {
+        final previousId = previous?.valueOrNull?.activeProfile?.profileId;
+        final nextProfile = next.valueOrNull?.activeProfile;
+        final nextId = nextProfile?.profileId;
+
+        if (nextId == null || nextId == previousId) return;
+
+        ref.read(mapCenterProvider.notifier).reset(nextId);
+        _primeInitialCameraTarget(nextProfile);
+      },
+    );
+
+    final initialProfile = ref.read(profileProvider).valueOrNull?.activeProfile;
+    if (initialProfile != null) {
+      _primeInitialCameraTarget(initialProfile);
+    }
+  }
+
+  void _scheduleVisiblePostsRefresh() {
+    if (_isDisposed || !mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_onMapIdle());
+    });
+  }
+
   Future<void> _initializePage() async {
+    // Pré-carrega cache de marcadores customizados (alta qualidade)
+    await _markerBuilder.initialize();
     await _mapControllerWrapper.loadMapStyle();
-    await _determinePosition();
+    await _initializeMap();
     widget.searchNotifier?.addListener(_onSearchChanged);
+    
+    // Executar migração de preços apenas uma vez por sessão do app
+    if (!_migrationExecuted) {
+      _migrationExecuted = true;
+      try {
+        await migratePostPrices();
+      } catch (e) {
+        debugPrint('❌ Erro na migração de preços: $e');
+      }
+    }
   }
 
   // ========================= MÉTODOS DE LÓGICA =========================
 
   void _onSearchChanged() {
+    debugPrint('🔍 HomePage._onSearchChanged: searchNotifier.value = ${widget.searchNotifier?.value}');
     if (mounted) {
       setState(_onMapIdle);
     }
+  }
+
+  void _onExternalRefresh() {
+    if (!mounted) return;
+    ref.invalidate(postNotifierProvider);
+    unawaited(_centerOnUserLocation());
   }
 
   /// Calcula distância entre post e perfil ativo
@@ -125,29 +281,31 @@ class _HomePageState extends ConsumerState<HomePage>
     }).toList();
   }
 
-  Future<void> _rebuildMarkers() async {
+  Future<void> _rebuildMarkers({bool force = false}) async {
     if (!mounted || _isRebuildingMarkers) return;
 
     // Debounce: evitar rebuilds mais frequentes que 500ms
     final now = DateTime.now();
-    if (_lastMarkerRebuild != null &&
+    if (!force &&
+        _lastMarkerRebuild != null &&
         now.difference(_lastMarkerRebuild!).inMilliseconds < 500) {
+      debugPrint('🗺️ _rebuildMarkers: Pulando rebuild (debounce ${now.difference(_lastMarkerRebuild!).inMilliseconds}ms)');
       return;
     }
 
+    debugPrint('🗺️ _rebuildMarkers: Iniciando rebuild de ${_visiblePosts.length} posts...');
     _isRebuildingMarkers = true;
     _lastMarkerRebuild = now;
 
-    final newMarkers = await _markerBuilder.buildMarkersForPosts(
+    final markers = await _markerBuilder.buildMarkersForPosts(
       _visiblePosts,
       _activePostId,
       _onMarkerTapped,
     );
 
     if (mounted) {
-      setState(() {
-        _markers = newMarkers;
-      });
+      setState(() => _markers = markers);
+      debugPrint('🗺️ _rebuildMarkers: Marcadores atualizados (${markers.length})');
     }
 
     _isRebuildingMarkers = false;
@@ -155,202 +313,165 @@ class _HomePageState extends ConsumerState<HomePage>
 
   Future<void> _onMarkerTapped(PostEntity post) async {
     if (!mounted) return;
+    
+    final newActivePostId = _activePostId == post.id ? null : post.id;
+    
     setState(() {
-      _activePostId = _activePostId == post.id ? null : post.id;
+      _activePostId = newActivePostId;
     });
 
     if (_activePostId != null) {
+      // ✅ Anima para a posição do post mantendo o zoom atual (sem zoom in)
       await _mapControllerWrapper.animateToPosition(
         geoPointToLatLng(post.location),
-        15,
+        _mapControllerWrapper.currentZoom,
       );
+      
+      // ✅ Sync: Marcador → Card - anima o PageView para o card correspondente
+      final postIndex = _visiblePosts.indexWhere((p) => p.id == post.id);
+      if (postIndex != -1 && _pageController.hasClients) {
+        _isProgrammaticScroll = true;
+        await _pageController.animateToPage(
+          postIndex,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOut,
+        );
+        _isProgrammaticScroll = false;
+      }
     }
 
-    _rebuildMarkers();
+    // Reconstrói marcadores com novo estado ativo
+    await _rebuildMarkers(force: true);
+  }
+  
+  /// ✅ Sync: Card → Marcador - chamado quando o PageView muda de página
+  void _onPageChanged(int index) {
+    if (_isProgrammaticScroll || !mounted) return;
+    if (index < 0 || index >= _visiblePosts.length) return;
+    
+    final post = _visiblePosts[index];
+    
+    setState(() {
+      _activePostId = post.id;
+    });
+    
+    // ✅ Anima o mapa para a posição do post mantendo o zoom atual
+    _mapControllerWrapper.animateToPosition(
+      geoPointToLatLng(post.location),
+      _mapControllerWrapper.currentZoom,
+    );
+    
+    // Reconstrói marcadores com novo estado ativo
+    _rebuildMarkers(force: true);
   }
 
   void _closeCard() {
     if (!mounted) return;
     setState(() => _activePostId = null);
-    _rebuildMarkers();
+    // Reconstrói marcadores para remover estado ativo
+    _rebuildMarkers(force: true);
   }
 
+  /// Centraliza mapa no GPS do usuário com fallbacks
+  /// Ordem: Cache → GPS atual (10s) → LastKnown → Perfil
   Future<void> _centerOnUserLocation() async {
-    if (_isCenteringLocation) return;
+    if (!mounted || _isCenteringLocation) return;
 
     try {
       setState(() => _isCenteringLocation = true);
 
-      if (_mapControllerWrapper.controller == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Aguarde o mapa carregar...')),
-          );
-        }
-        return;
-      }
-
-      // Verificar permissões primeiro
-      final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Permissão de localização necessária'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-        return;
-      }
-
-      // Verificar se serviços de localização estão ativos
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('GPS desativado. Ative nas configurações.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
+      final controller = await _waitForMapController();
+      if (controller == null) {
+        AppSnackBar.showInfo(context, 'Aguarde o mapa carregar...');
         return;
       }
 
       LatLng? targetPos;
 
-      // Estratégia 1: Usar posição atual em cache se disponível e recente
+      // Estratégia 1: Cache GPS (<24h) - instantâneo
       if (_mapControllerWrapper.currentPosition != null) {
         targetPos = _mapControllerWrapper.currentPosition;
         debugPrint('📍 Usando posição em cache');
       } else {
-        // Estratégia 2: Tentar obter posição atual com timeout
-        debugPrint('📍 Obtendo localização do usuário...');
+        // Estratégia 2: GPS atual com timeout de 10s
+        final permission = await Geolocator.checkPermission();
+        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
-        try {
-          final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high,
-          ).timeout(const Duration(seconds: 8));
-          targetPos = LatLng(position.latitude, position.longitude);
-          if (mounted) {
-            setState(() => _mapControllerWrapper.setCurrentPosition(targetPos!));
-          }
-          debugPrint(
-              '📍 Localização obtida: ${targetPos.latitude}, ${targetPos.longitude}');
-        } catch (timeoutError) {
-          // Estratégia 3: Fallback para última posição conhecida
-          debugPrint(
-              '⚠️ Timeout ao obter localização, tentando última posição conhecida...');
-          final lastPosition = await Geolocator.getLastKnownPosition();
+        if (permission != LocationPermission.denied &&
+            permission != LocationPermission.deniedForever &&
+            serviceEnabled) {
+          try {
+            debugPrint('📍 Obtendo GPS atual...');
+            final position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high,
+            ).timeout(const Duration(seconds: 10));
 
-          if (lastPosition != null) {
-            targetPos = LatLng(lastPosition.latitude, lastPosition.longitude);
+            targetPos = LatLng(position.latitude, position.longitude);
             if (mounted) {
               setState(() => _mapControllerWrapper.setCurrentPosition(targetPos!));
             }
-            debugPrint('📍 Usando última posição conhecida');
+            await GpsCacheService.updateCache(targetPos);
+            debugPrint('✅ GPS atual obtido');
+            AppSnackBar.showSuccess(context, 'Localização atualizada');
+          } catch (timeoutError) {
+            debugPrint('⚠️ GPS timeout, tentando fallback...');
 
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Usando última localização conhecida'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            }
-          } else {
-            // Estratégia 4: Fallback para posição atual do mapa se disponível
-            debugPrint(
-                '⚠️ Nenhuma localização conhecida, tentando posição do mapa...');
-            if (_mapControllerWrapper.controller != null) {
-              try {
-                final cameraPosition = await _mapControllerWrapper.controller!.getVisibleRegion();
-                // Usar o centro do mapa atual
-                final centerLat = (cameraPosition.northeast.latitude +
-                        cameraPosition.southwest.latitude) /
-                    2;
-                final centerLng = (cameraPosition.northeast.longitude +
-                        cameraPosition.southwest.longitude) /
-                    2;
-                targetPos = LatLng(centerLat, centerLng);
-                debugPrint('📍 Centralizando na posição atual do mapa');
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'GPS indisponível. Movendo para área atual do mapa.'),
-                      duration: Duration(seconds: 3),
-                    ),
-                  );
-                }
-              } catch (e) {
-                // Estratégia 5: Usar posição padrão de SP como último recurso
-                targetPos = const LatLng(-23.55052, -46.633308);
-                debugPrint('📍 Usando posição padrão (São Paulo)');
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'GPS indisponível. Ative o GPS para ver sua localização.'),
-                      backgroundColor: Colors.orange,
-                      duration: Duration(seconds: 3),
-                    ),
-                  );
-                }
+            // Estratégia 3: LastKnown do Geolocator
+            final lastPosition = await Geolocator.getLastKnownPosition();
+            if (lastPosition != null) {
+              targetPos = LatLng(lastPosition.latitude, lastPosition.longitude);
+              if (mounted) {
+                setState(() => _mapControllerWrapper.setCurrentPosition(targetPos!));
               }
+              debugPrint('📍 Usando última posição conhecida');
+              AppSnackBar.showInfo(context, 'GPS timeout. Usando última localização.');
             } else {
-              // Sem mapa disponível, usar SP como padrão
-              targetPos = const LatLng(-23.55052, -46.633308);
-              debugPrint('📍 Usando posição padrão (São Paulo)');
+              // Estratégia 4: Localização do perfil (sempre disponível)
+              final profile = _activeProfile;
+              final profileLocation = profile?.location;
+              if (profileLocation != null) {
+                targetPos = geoPointToLatLng(profileLocation);
+                debugPrint('📍 Usando localização do perfil');
+                AppSnackBar.showInfo(context, 'GPS indisponível. Usando local do perfil.');
+              }
+            }
+          }
+        } else {
+          // Permissões negadas ou GPS desativado - ir direto para perfil
+          final profile = _activeProfile;
+          final profileLocation = profile?.location;
+          if (profileLocation != null) {
+            targetPos = geoPointToLatLng(profileLocation);
+            debugPrint('📍 GPS não disponível, usando perfil');
+            
+            if (!serviceEnabled) {
+              AppSnackBar.showWarning(context, 'GPS desativado. Ative nas configurações.');
+            } else {
+              AppSnackBar.showWarning(context, 'Permissão de localização necessária');
             }
           }
         }
       }
 
       // Centralizar no mapa
-      if (targetPos != null && _mapControllerWrapper.controller != null) {
-        await _mapControllerWrapper.controller!.animateCamera(
+      if (targetPos != null) {
+        await controller.animateCamera(
           CameraUpdate.newLatLngZoom(targetPos, 14),
         );
-        debugPrint('✅ Mapa centralizado com sucesso');
+      } else {
+        AppSnackBar.showError(context, 'Não foi possível obter localização');
       }
     } catch (e) {
-      debugPrint('❌ Erro ao centralizar no usuário: $e');
-
-      // Mensagem amigável baseada no tipo de erro
-      var errorMessage = 'Erro ao obter localização';
-      if (e.toString().contains('TimeoutException')) {
-        errorMessage = 'GPS não respondeu. Tente novamente.';
-      } else if (e.toString().contains('Location services are disabled')) {
-        errorMessage = 'Serviços de localização desativados';
-      } else if (e.toString().contains('denied')) {
-        errorMessage = 'Permissão de localização negada';
-      }
-
-      // Não mostrar snackbar para erro de canal - é esperado durante inicialização
-      if (mounted && !e.toString().contains('channel-error')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red.shade600,
-            duration: const Duration(seconds: 3),
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {},
-            ),
-          ),
-        );
+      debugPrint('❌ Erro ao centralizar: $e');
+      
+      if (!e.toString().contains('channel-error')) {
+        AppSnackBar.showError(context, 'Erro ao obter localização');
       }
     } finally {
       if (mounted) {
         setState(() => _isCenteringLocation = false);
+      } else {
+        _isCenteringLocation = false;
       }
     }
   }
@@ -360,122 +481,196 @@ class _HomePageState extends ConsumerState<HomePage>
   Future<void> _sendInterestNotification(PostEntity post) async {
     final currentUser = FirebaseAuth.instance.currentUser;
     final activeProfile = _activeProfile;
+    
     if (currentUser == null || activeProfile == null) {
       throw Exception('Usuário não autenticado ou perfil não ativo.');
     }
 
-    // TODO: Usar o NotificationService para criar a notificação.
-    // Temporariamente, usamos o método antigo para manter a funcionalidade.
-    await FirebaseFirestore.instance.collection('interests').add({
-      'postId': post.id,
-      'postAuthorUid': post.authorUid,
-      'postAuthorProfileId': post.authorProfileId,
-      'interestedUid': currentUser.uid,
-      'interestedProfileId': activeProfile.profileId,
-      'interestedName': activeProfile.name,
-      'createdAt': FieldValue.serverTimestamp(),
-      'read': false,
-    });
+    // ✅ VALIDAÇÃO CRÍTICA: Verificar se post tem authorUid
+    String authorUid = post.authorUid;
+    
+    if (authorUid.isEmpty) {
+      debugPrint('⚠️ AVISO: post.authorUid vazio, tentando recuperar do Firestore...');
+      
+      try {
+        // Tentar recarregar o post do Firestore para obter authorUid
+        final postDoc = await FirebaseFirestore.instance
+            .collection('posts')
+            .doc(post.id)
+            .get();
+        
+        if (!postDoc.exists) {
+          throw Exception('Post ${post.id} não encontrado no Firestore');
+        }
+        
+        final postData = postDoc.data()!;
+        authorUid = postData['authorUid'] as String? ?? '';
+        
+        if (authorUid.isEmpty) {
+          throw Exception('Post ${post.id} não tem authorUid no Firestore');
+        }
+        
+        debugPrint('✅ authorUid recuperado do Firestore: $authorUid');
+      } catch (e) {
+        debugPrint('❌ Erro ao recuperar authorUid: $e');
+        throw Exception('Post sem informações de autor válidas');
+      }
+    }
+
+    // Validar campos obrigatórios
+    if (post.id.isEmpty) throw Exception('postId está vazio');
+    if (post.authorProfileId.isEmpty) throw Exception('postAuthorProfileId está vazio');
+    if (activeProfile.profileId.isEmpty) throw Exception('interestedProfileId está vazio');
+    if (activeProfile.name.isEmpty) throw Exception('interestedProfileName está vazio');
+
+    debugPrint('✅ Criando documento de interesse:');
+    debugPrint('  - postId: ${post.id}');
+    debugPrint('  - postAuthorUid: $authorUid');
+    debugPrint('  - postAuthorProfileId: ${post.authorProfileId}');
+    debugPrint('  - interestedProfileId: ${activeProfile.profileId}');
+
+    // ✅ Usar factory padronizada para garantir estrutura consistente
+    final interestData = InterestDocumentFactory.create(
+      postId: post.id,
+      postAuthorUid: authorUid,
+      postAuthorProfileId: post.authorProfileId,
+      currentUserUid: currentUser.uid,
+      activeProfileUid: activeProfile.uid,
+      activeProfileId: activeProfile.profileId,
+      activeProfileName: activeProfile.name,
+      activeProfileUsername: activeProfile.username,
+      activeProfilePhotoUrl: activeProfile.photoUrl,
+    );
+
+    await FirebaseFirestore.instance.collection('interests').add(interestData);
+
+    debugPrint('✅ Documento de interesse criado com sucesso');
+
+    // ⚠️ REMOVIDO: Notificação duplicada - a Cloud Function `sendInterestNotification`
+    // já cria a notificação automaticamente via trigger onCreate em interests/{interestId}
+  }
+
+  double? _calculateDistanceToPost(PostEntity post, ProfileEntity profile) {
+    try {
+      return calculateDistanceBetweenGeoPoints(
+        post.location,
+        profile.location,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _sendInterestOptimistically(PostEntity post) async {
     if (!mounted) return;
-    setState(() => _sentInterests.add(post.id));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.favorite, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Interesse enviado! 🎵'),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
-    );
+    // ✅ LOG 1: Validação prévia
+    debugPrint('🔍 _sendInterestOptimistically: postId=${post.id}');
+    debugPrint('🔍 authorProfileId=${post.authorProfileId}');
+    debugPrint('🔍 authorUid=${post.authorUid}');
 
+    // ✅ VALIDAÇÃO PRÉVIA: Verificar se post tem dados necessários
+    if (post.id.isEmpty) {
+      AppSnackBar.showError(context, 'Erro: Post inválido (ID vazio)');
+      return;
+    }
+    if (post.authorProfileId.isEmpty) {
+      AppSnackBar.showError(context, 'Erro: Post sem autor');
+      return;
+    }
+
+    // ✅ MUDANÇA: Usar provider global ao invés de Set local
+    final interestNotifier = ref.read(interestNotifierProvider.notifier);
+    
+    // ✅ Verificar se já não demonstrou interesse (evitar duplicatas)
+    if (interestNotifier.hasInterest(post.id)) {
+      AppSnackBar.showInfo(context, 'Você já demonstrou interesse neste post');
+      return;
+    }
+
+    final isSalesPost = post.type == 'sales';
+    
     try {
-      await _sendInterestNotification(post);
-    } catch (e) {
-      debugPrint('Erro no envio otimista de interesse: $e');
+      // ✅ Chamar provider global (Optimistic Update já incluído)
+      // A Cloud Function `sendInterestNotification` cria a notificação automaticamente
+      // quando o documento é adicionado na collection `interests`
+      await interestNotifier.addInterest(
+        postId: post.id,
+        postAuthorUid: post.authorUid,
+        postAuthorProfileId: post.authorProfileId,
+      );
+
+      // ⚠️ REMOVIDO: Notificação duplicada - a Cloud Function já cria a notificação
+      // via trigger onCreate em interests/{interestId}
+
       if (mounted) {
-        setState(() => _sentInterests.remove(post.id));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Erro ao enviar interesse: $e')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-          ),
+        AppSnackBar.showSuccess(
+          context,
+          isSalesPost ? 'Anúncio salvo!' : 'Interesse enviado!',
         );
+      }
+      
+      debugPrint('Interesse registrado com sucesso para post ${post.id}');
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Erro ao enviar interesse: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      if (mounted) {
+        // Mensagem de erro específica baseada no tipo de exceção
+        String errorMessage = 'Erro ao enviar interesse';
+        if (e.toString().contains('authorUid') || e.toString().contains('autor')) {
+          errorMessage = 'Erro: Post sem informações de autor';
+        } else if (e.toString().contains('permission')) {
+          errorMessage = 'Erro: Sem permissão para criar interesse';
+        } else if (e.toString().contains('network') || e.toString().contains('connection')) {
+          errorMessage = 'Erro: Verifique sua conexão com a internet';
+        }
+        
+        AppSnackBar.showError(context, errorMessage);
       }
     }
   }
 
+  /// Remove interesse de um post (Abordagem Otimista)
   Future<void> _removeInterestOptimistically(PostEntity post) async {
     if (!mounted) return;
-    setState(() => _sentInterests.remove(post.id));
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.favorite_border, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Interesse removido 🎵'),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
-    );
 
     try {
-      final activeProfile = _activeProfile;
-      if (activeProfile == null) throw 'Perfil ativo não encontrado';
+      // ✅ MUDANÇA: Usar provider global
+      await ref.read(interestNotifierProvider.notifier).removeInterest(
+        postId: post.id,
+      );
 
-      final notificationsQuery = await FirebaseFirestore.instance
-          .collection('notifications')
-          .where('type', isEqualTo: 'interest')
-          .where('senderProfileId', isEqualTo: activeProfile.profileId)
-          .where('postId', isEqualTo: post.id)
-          .get();
-
-      for (final doc in notificationsQuery.docs) {
-        await doc.reference.delete();
-      }
-    } catch (e) {
-      debugPrint('Erro ao remover interesse: $e');
       if (mounted) {
-        setState(() => _sentInterests.add(post.id));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Erro ao remover interesse: $e')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showInfo(context, 'Interesse removido');
+      }
+      
+      debugPrint('Interesse removido com sucesso do Firestore');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Erro ao remover interesse: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      if (mounted) {
+        String errorMessage = 'Erro ao remover interesse';
+        if (e.toString().contains('permission')) {
+          errorMessage = 'Erro: Sem permissão para remover interesse';
+        } else if (e.toString().contains('not-found')) {
+          errorMessage = 'Interesse não encontrado';
+        }
+        
+        AppSnackBar.showError(context, errorMessage);
       }
     }
   }
 
   void _showInterestOptionsDialog(PostEntity post) {
-    final isInterestSent = _sentInterests.contains(post.id);
+    final isInterestSent = ref.read(interestNotifierProvider).contains(post.id);
     final isOwner = post.authorProfileId.isNotEmpty &&
         post.authorProfileId == _activeProfile?.profileId;
+    final isSalesPost = post.type == 'sales';
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -501,22 +696,40 @@ class _HomePageState extends ConsumerState<HomePage>
                 title: const Text('Editar Post'),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(
+                  final result = await Navigator.of(context).push<bool?>(
+                    MaterialPageRoute<bool?>(
                       builder: (_) => PostPage(
                         postType: post.type,
                         existingPostData: {
+                          // ✅ CAMPOS COMUNS A TODOS OS TIPOS
                           'postId': post.id,
                           'content': post.content,
-                          'instruments': post.instruments,
-                          'genres': post.genres,
-                          'seekingMusicians': post.seekingMusicians,
-                          'level': post.level,
-                          'photoUrl': post.photoUrl,
+                          'photoUrls': post.photoUrls,
                           'youtubeLink': post.youtubeLink,
                           'location': GeoPoint(
                               post.location.latitude, post.location.longitude),
                           'city': post.city,
+                          'neighborhood': post.neighborhood,
+                          'state': post.state,
+                          'createdAt': post.createdAt,
+                          'expiresAt': post.expiresAt,
+                          
+                          // ✅ CAMPOS ESPECÍFICOS DE MUSICIAN/BAND
+                          'instruments': post.instruments,
+                          'genres': post.genres,
+                          'seekingMusicians': post.seekingMusicians,
+                          'level': post.level,
+                          'availableFor': post.availableFor,
+                          
+                          // ✅ CAMPOS ESPECÍFICOS DE SALES
+                          'title': post.title,
+                          'salesType': post.salesType,
+                          'price': post.price,
+                          'discountMode': post.discountMode,
+                          'discountValue': post.discountValue,
+                          'promoStartDate': post.promoStartDate,
+                          'promoEndDate': post.promoEndDate,
+                          'whatsappNumber': post.whatsappNumber,
                         },
                       ),
                     ),
@@ -528,7 +741,7 @@ class _HomePageState extends ConsumerState<HomePage>
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
+                leading: const Icon(Iconsax.trash, color: Colors.red),
                 title: const Text('Deletar Post'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -540,8 +753,12 @@ class _HomePageState extends ConsumerState<HomePage>
             else ...[
               if (isInterestSent)
                 ListTile(
-                  leading: const Icon(Icons.favorite_border, color: Colors.red),
-                  title: const Text('Remover Interesse'),
+                    leading: Icon(
+                    isSalesPost ? Iconsax.tag5 : Iconsax.heart5,
+                    color: isSalesPost ? AppColors.primary : Colors.pink,
+                    size: 24,
+                    ),
+                  title: Text(isSalesPost ? 'Remover dos Salvos' : 'Remover Interesse'),
                   onTap: () {
                     Navigator.pop(ctx);
                     _removeInterestOptimistically(post);
@@ -549,15 +766,19 @@ class _HomePageState extends ConsumerState<HomePage>
                 )
               else
                 ListTile(
-                  leading: const Icon(Icons.favorite, color: Colors.pink),
-                  title: const Text('Demonstrar Interesse'),
+                  leading: Icon(
+                    isSalesPost ? Iconsax.tag : Iconsax.heart5,
+                    color: isSalesPost ? AppColors.primary : Colors.pink,
+                    size: 24,
+                  ),
+                  title: Text(isSalesPost ? 'Salvar Anúncio' : 'Demonstrar Interesse'),
                   onTap: () {
                     Navigator.pop(ctx);
                     _sendInterestOptimistically(post);
                   },
                 ),
               ListTile(
-                leading: const Icon(Icons.person, color: AppColors.primary),
+                leading: const Icon(Iconsax.user, color: AppColors.primary),
                 title: const Text('Ver Perfil'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -573,7 +794,7 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   void _confirmDeletePost(PostEntity post) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Deletar Post'),
@@ -600,19 +821,29 @@ class _HomePageState extends ConsumerState<HomePage>
   Future<void> _deletePost(PostEntity post) async {
     try {
       // Mostrar loading
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Deletando post...')),
-        );
-      }
+      AppSnackBar.showInfo(context, 'Deletando post...');
 
-      // Deletar foto do Storage se existir
-      if (post.photoUrl != null && post.photoUrl!.isNotEmpty) {
+      // Deletar TODAS as fotos do Storage se existirem (carrossel)
+      for (final photoUrl in post.photoUrls) {
+        if (photoUrl.isNotEmpty) {
+          try {
+            final ref = FirebaseStorage.instance.refFromURL(photoUrl);
+            await ref.delete();
+            debugPrint('✅ Foto deletada: $photoUrl');
+          } catch (e) {
+            debugPrint('⚠️ Erro ao deletar foto: $e');
+          }
+        }
+      }
+      // Fallback: deletar photoUrl antigo se existir e não estiver em photoUrls
+      if (post.photoUrl != null && 
+          post.photoUrl!.isNotEmpty && 
+          !post.photoUrls.contains(post.photoUrl)) {
         try {
           final ref = FirebaseStorage.instance.refFromURL(post.photoUrl!);
           await ref.delete();
         } catch (e) {
-          debugPrint('Erro ao deletar foto: $e');
+          debugPrint('⚠️ Erro ao deletar foto legada: $e');
         }
       }
 
@@ -625,22 +856,12 @@ class _HomePageState extends ConsumerState<HomePage>
       // Recarregar posts
       if (mounted) {
         ref.invalidate(postNotifierProvider);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post deletado com sucesso'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Post deletado com sucesso');
       }
     } catch (e) {
       debugPrint('Erro ao deletar post: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao deletar post: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Erro ao deletar post: $e');
       }
     }
   }
@@ -649,20 +870,7 @@ class _HomePageState extends ConsumerState<HomePage>
 
   @override
   Widget build(BuildContext context) {
-    final postsAsync = ref.watch(postNotifierProvider);
-    final profileAsync = ref.watch(profileProvider);
-
-    // Recalcular distâncias quando o perfil ativo mudar
-    profileAsync.whenData((profileState) {
-      if (profileState.activeProfile != null && _visiblePosts.isNotEmpty) {
-        // Usar WidgetsBinding para evitar setState durante build
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            setState(_updatePostDistances);
-          }
-        });
-      }
-    });
+    super.build(context);
 
     return Theme(
       data: AppTheme.light,
@@ -671,11 +879,6 @@ class _HomePageState extends ConsumerState<HomePage>
           backgroundColor: const Color(0xFFE47911), // Brand Orange
           foregroundColor: const Color(0xFFFAFAFA), // Off-white
           elevation: 2,
-          leading: IconButton(
-            icon: const Icon(Icons.filter_list),
-            tooltip: 'Filtros de busca',
-            onPressed: widget.onOpenSearch,
-          ),
           title: Image.asset(
             'assets/Logo/WeGig.png',
             height: 53.6, // 46.6 * 1.15 = 53.59 (arredondado para 53.6)
@@ -686,21 +889,17 @@ class _HomePageState extends ConsumerState<HomePage>
             },
           ),
           centerTitle: true,
-        ),
-        body: postsAsync.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+          actions: [
+            IconButton(
+              icon: const Icon(Iconsax.filter),
+              tooltip: 'Filtros de busca',
+              onPressed: widget.onOpenSearch,
             ),
-          ),
-          error: (err, stack) {
-            debugPrintStack(stackTrace: stack, label: err.toString());
-            return Center(child: Text('Erro ao carregar posts: $err'));
-          },
-          data: (posts) {
-            return Stack(
-              children: [
-                _buildMapView(),
+          ],
+        ),
+        body: Stack(
+          children: [
+            _buildMapView(),
                 // Máscara Airbnb - Vinheta nas bordas com gradientes visíveis
                 Positioned.fill(
                   child: IgnorePointer(
@@ -782,7 +981,16 @@ class _HomePageState extends ConsumerState<HomePage>
                           decoration: InputDecoration(
                             hintText:
                                 'Buscar localização (cidade, bairro, endereço...)',
-                            prefixIcon: const Icon(Icons.place),
+                            prefixIcon: const Icon(Iconsax.location, color: AppColors.primary),
+                            suffixIcon: controller.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Iconsax.close_circle, color: AppColors.textSecondary),
+                                    onPressed: () {
+                                      controller.clear();
+                                      focusNode.unfocus();
+                                    },
+                                  )
+                                : null,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(24),
                               borderSide: BorderSide.none,
@@ -795,11 +1003,50 @@ class _HomePageState extends ConsumerState<HomePage>
                           ),
                         );
                       },
-                      itemBuilder: (context, suggestion) {
+                      itemBuilder: (BuildContext context, Map<String, dynamic> suggestion) {
+                        final address = suggestion['address'] as Map<String, dynamic>? ?? {};
+
+                        // Extrai os componentes com fallback
+                        final road = (address['road'] ?? address['pedestrian'] ?? '') as String;
+                        final houseNumber = (address['house_number'] ?? '') as String;
+                        final neighbourhood = (address['neighbourhood'] ??
+                            address['suburb'] ??
+                            address['quarter'] ??
+                            '') as String;
+                        final city = (address['city'] ??
+                            address['town'] ??
+                            address['village'] ??
+                            address['municipality'] ??
+                            '') as String;
+                        final state = (address['state'] ?? '') as String;
+
+                        // Monta a linha principal (rua + número)
+                        final streetLine = [road, houseNumber].where((e) => e.isNotEmpty).join(', ');
+
+                        // Monta a linha secundária (bairro • cidade • estado)
+                        final List<String> secondaryParts = [];
+                        if (neighbourhood.isNotEmpty) secondaryParts.add(neighbourhood);
+                        if (city.isNotEmpty) secondaryParts.add(city);
+                        if (state.isNotEmpty) secondaryParts.add(state);
+
+                        final secondaryLine = secondaryParts.join(' • ');
+
                         return ListTile(
-                          leading: const Icon(Icons.location_on),
+                          leading: const Icon(Iconsax.location, color: AppColors.primary, size: 20),
                           title: Text(
-                              (suggestion['display_name'] as String?) ?? ''),
+                            streetLine.isNotEmpty ? streetLine : (suggestion['display_name'] as String?)?.split(',').first ?? 'Localização',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: secondaryLine.isNotEmpty
+                              ? Text(
+                                  secondaryLine,
+                                  style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : null,
                         );
                       },
                       onSelected: _onAddressSelected,
@@ -837,7 +1084,7 @@ class _HomePageState extends ConsumerState<HomePage>
                                 ),
                               )
                             : const Icon(
-                                Icons.my_location,
+                                Iconsax.gps,
                                 color: AppColors.primary,
                                 size: 28,
                               ),
@@ -875,7 +1122,7 @@ class _HomePageState extends ConsumerState<HomePage>
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.search,
+                                Icon(Iconsax.search_normal,
                                     color: Colors.white, size: 20),
                                 SizedBox(width: 8),
                                 Text(
@@ -893,11 +1140,9 @@ class _HomePageState extends ConsumerState<HomePage>
                       ),
                     ),
                   ),
-                // Card flutuante (só aparece quando um pin é clicado)
-                if (_activePostId != null) _buildFloatingCard(),
-              ],
-            );
-          },
+            // ✅ Carrossel horizontal de cards (sempre visível quando há posts)
+            if (_visiblePosts.isNotEmpty) _buildFloatingCard(),
+          ],
         ),
       ),
     );
@@ -922,12 +1167,16 @@ class _HomePageState extends ConsumerState<HomePage>
         mapToolbarEnabled: false,
         onMapCreated: (c) async {
           _mapControllerWrapper.setController(c);
+          _mapControllerCompleter ??= Completer<GoogleMapController>();
+          if (!_mapControllerCompleter!.isCompleted) {
+            _mapControllerCompleter!.complete(c);
+          }
 
           // Style já aplicado via GoogleMap.style property
           debugPrint('✅ Map criado com style customizado');
 
           // Aguardar mapa estar completamente pronto
-          await Future.delayed(const Duration(milliseconds: 300));
+          await Future<void>.delayed(const Duration(milliseconds: 300));
 
           if (_mapControllerWrapper.controller != null && mounted) {
             try {
@@ -936,7 +1185,7 @@ class _HomePageState extends ConsumerState<HomePage>
             } catch (e) {
               debugPrint('Erro ao inicializar mapa: $e');
               // Tentar novamente após mais delay
-              await Future.delayed(const Duration(milliseconds: 500));
+              await Future<void>.delayed(const Duration(milliseconds: 500));
               if (_mapControllerWrapper.controller != null && mounted) {
                 try {
                   _mapControllerWrapper.setLastSearchBounds(await _mapControllerWrapper.controller!.getVisibleRegion());
@@ -954,7 +1203,7 @@ class _HomePageState extends ConsumerState<HomePage>
         },
         onCameraIdle: () async {
           // Debounce para evitar chamadas excessivas
-          await Future.delayed(const Duration(milliseconds: 300));
+          await Future<void>.delayed(const Duration(milliseconds: 300));
           if (mounted && _mapControllerWrapper.controller != null) {
             try {
               await _onMapIdle();
@@ -970,29 +1219,32 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Future<void> _onMapIdle() async {
-    final postsAsync = ref.read(postNotifierProvider);
-    final allPosts = postsAsync.when(
-      data: (postState) => postState.posts,
-      loading: () => <PostEntity>[],
-      error: (_, __) => <PostEntity>[],
-    );
-    debugPrint(
-        '🗺️ _onMapIdle: Total de posts disponíveis: ${allPosts.length}');
+    if (_isDisposed || !mounted) return;
+    final controller = _mapControllerWrapper.controller;
+    if (controller == null) return;
 
-    if (_mapControllerWrapper.controller == null || !mounted) return;
+    final allPosts = List<PostEntity>.from(_cachedPosts);
+    debugPrint('🗺️ _onMapIdle: Total de posts disponíveis: ${allPosts.length}');
 
     try {
-      final bounds = await _mapControllerWrapper.controller!.getVisibleRegion();
+      final bounds = await controller.getVisibleRegion();
+      if (_isDisposed || !mounted) return;
       debugPrint(
           '🗺️ Bounds do mapa: NE=${bounds.northeast}, SW=${bounds.southwest}');
 
       if (!_boundsEqual(bounds, _mapControllerWrapper.lastSearchBounds)) {
-        if (mounted) setState(() => _mapControllerWrapper.setShowSearchAreaButton(true));
+        if (_isDisposed || !mounted) {
+          return;
+        }
+        if (mounted) {
+          setState(() => _mapControllerWrapper.setShowSearchAreaButton(true));
+        }
       }
 
       final visible = allPosts.where(
         (post) {
           final postLocation = post.location;
+          if (postLocation == null) return false;
           return _latLngInBounds(geoPointToLatLng(postLocation), bounds) &&
               _matchesFilters(post);
         },
@@ -1003,20 +1255,55 @@ class _HomePageState extends ConsumerState<HomePage>
       final visibleIds = visible.map((p) => p.id).toSet();
       final currentVisibleIds = _visiblePosts.map((p) => p.id).toSet();
 
-      if (!const SetEquality().equals(visibleIds, currentVisibleIds)) {
+      if (!const SetEquality<String>().equals(visibleIds, currentVisibleIds)) {
+        if (_isDisposed || !mounted) return;
+
         setState(() {
           _visiblePosts = visible;
           _updatePostDistances();
+          // ✅ Auto-seleciona o primeiro post quando a lista muda
+          if (visible.isNotEmpty) {
+            _activePostId = visible.first.id;
+          } else {
+            _activePostId = null;
+          }
         });
+        
+        // ✅ Reseta o PageController para a primeira página
+        if (_pageController.hasClients && visible.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _pageController.hasClients) {
+              _pageController.jumpToPage(0);
+            }
+          });
+        }
+        
         await _rebuildMarkers();
       }
     } catch (e) {
       debugPrint('Erro ao obter bounds do mapa: $e');
-      if (mounted && _visiblePosts.isEmpty) {
+      if (!mounted || _isDisposed) return;
+      if (_visiblePosts.isEmpty) {
         setState(() {
           _visiblePosts = allPosts;
           _updatePostDistances();
+          // ✅ Auto-seleciona o primeiro post quando a lista muda
+          if (allPosts.isNotEmpty) {
+            _activePostId = allPosts.first.id;
+          } else {
+            _activePostId = null;
+          }
         });
+        
+        // ✅ Reseta o PageController para a primeira página
+        if (_pageController.hasClients && allPosts.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _pageController.hasClients) {
+              _pageController.jumpToPage(0);
+            }
+          });
+        }
+        
         await _rebuildMarkers();
       }
     }
@@ -1039,99 +1326,131 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Widget _buildFloatingCard() {
-    // Encontrar o post ativo
-    final activePost =
-        _visiblePosts.firstWhereOrNull((p) => p.id == _activePostId);
-
-    if (activePost == null) {
+    // ✅ Carrossel horizontal de cards com PageView
+    if (_visiblePosts.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    // Card flutuante sobre o mapa (sem Positioned)
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
-        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
-        child: PostCard(
-          post: activePost,
-          isActive: true,
-          currentActiveProfileId: _activeProfile?.profileId,
-          isInterestSent: _sentInterests.contains(activePost.id),
-          onOpenOptions: () => _showInterestOptionsDialog(activePost),
-          onClose: _closeCard,
+        padding: const EdgeInsets.only(bottom: 24),
+        child: SizedBox(
+          height: 200, // Altura fixa do card original
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: _visiblePosts.length,
+            onPageChanged: _onPageChanged,
+            itemBuilder: (context, index) {
+              final post = _visiblePosts[index];
+              final isActive = post.id == _activePostId;
+              
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: PostCard(
+                  post: post,
+                  isActive: isActive,
+                  currentActiveProfileId: _activeProfile?.profileId,
+                  isInterestSent: ref.watch(interestNotifierProvider).contains(post.id),
+                  onOpenOptions: () => _showInterestOptionsDialog(post),
+                  onClose: _closeCard,
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
   }
 
-  Future<void> _determinePosition() async {
+  /// Inicializa posição do mapa na ordem: GPS atual → Perfil → Cache GPS
+  Future<void> _initializeMap() async {
     try {
-      debugPrint(
-          '📍 _determinePosition: Iniciando verificação de localização...');
+      debugPrint('📍 _initializeMap: Iniciando...');
 
+      // Estratégia 1: Tentar GPS atual (instantâneo, sem timeout)
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        debugPrint(
-            '⚠️ _determinePosition: Serviços de localização desativados');
-        return;
-      }
-
-      var permission = await Geolocator.checkPermission();
-      debugPrint('📍 _determinePosition: Permissão atual: $permission');
-
-      if (permission == LocationPermission.denied) {
-        debugPrint('📍 _determinePosition: Solicitando permissão...');
-        permission = await Geolocator.requestPermission();
-        debugPrint('📍 _determinePosition: Nova permissão: $permission');
-
+      if (serviceEnabled) {
+        var permission = await Geolocator.checkPermission();
+        
         if (permission == LocationPermission.denied) {
-          debugPrint('⚠️ _determinePosition: Permissão negada pelo usuário');
-          return;
+          permission = await Geolocator.requestPermission();
+        }
+
+        if (permission != LocationPermission.denied &&
+            permission != LocationPermission.deniedForever) {
+          try {
+            final position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high,
+            ).timeout(const Duration(seconds: 3));
+
+            final gpsPos = LatLng(position.latitude, position.longitude);
+            if (mounted) {
+              setState(() => _mapControllerWrapper.setCurrentPosition(gpsPos));
+            }
+            await GpsCacheService.updateCache(gpsPos);
+            debugPrint('✅ _initializeMap: GPS atual obtido');
+            return;
+          } catch (e) {
+            debugPrint('⚠️ _initializeMap: GPS timeout/erro: $e');
+          }
         }
       }
 
-      if (permission == LocationPermission.deniedForever) {
-        debugPrint('⚠️ _determinePosition: Permissão negada permanentemente');
+      // Estratégia 2: Usar localização do perfil (SEMPRE disponível)
+      final profile = _activeProfile;
+      final profileLocation = profile?.location;
+      if (profileLocation != null) {
+        final profilePos = geoPointToLatLng(profileLocation);
+        if (mounted) {
+          setState(() => _mapControllerWrapper.setCurrentPosition(profilePos));
+        }
+        debugPrint('✅ _initializeMap: Usando localização do perfil');
         return;
       }
 
-      debugPrint('📍 _determinePosition: Obtendo posição atual...');
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      ).timeout(const Duration(seconds: 10));
-
-      debugPrint(
-          '✅ _determinePosition: Posição obtida: ${position.latitude}, ${position.longitude}');
-
-      final newPos = LatLng(position.latitude, position.longitude);
+      // Estratégia 3: Fallback para cache GPS (<24h)
+      final cachedPos = await GpsCacheService.getLastKnownPosition();
       if (mounted) {
-        setState(() {
-          _mapControllerWrapper.setCurrentPosition(newPos);
-        });
-
-        // Animar câmera apenas se o mapa já estiver pronto
-        if (_mapControllerWrapper.controller != null) {
-          await _mapControllerWrapper.controller!
-              .animateCamera(CameraUpdate.newLatLng(newPos));
-          debugPrint(
-              '✅ _determinePosition: Câmera animada para posição inicial');
-        }
+        setState(() => _mapControllerWrapper.setCurrentPosition(cachedPos));
       }
+      debugPrint('✅ _initializeMap: Usando cache GPS');
+      
     } catch (e) {
-      debugPrint('❌ _determinePosition: Erro ao obter localização: $e');
-
-      // Tentar usar última posição conhecida como fallback
-      try {
-        final lastPosition = await Geolocator.getLastKnownPosition();
-        if (lastPosition != null && mounted) {
-          debugPrint('📍 _determinePosition: Usando última posição conhecida');
-          setState(() {
-            _mapControllerWrapper.setCurrentPosition(LatLng(lastPosition.latitude, lastPosition.longitude));
-          });
-        }
-      } catch (e2) {
-        debugPrint('❌ _determinePosition: Erro ao obter última posição: $e2');
+      debugPrint('❌ _initializeMap: Erro inesperado: $e');
+      
+      // Último recurso: localização do perfil
+      final profile = _activeProfile;
+      final profileLocation = profile?.location;
+      if (profileLocation != null && mounted) {
+        setState(() => _mapControllerWrapper.setCurrentPosition(
+          geoPointToLatLng(profileLocation)
+        ));
       }
+    }
+  }
+
+  void _primeInitialCameraTarget(ProfileEntity? profile) {
+    if (profile == null) return;
+    final location = profile.location;
+    if (location == null) return;
+    if (_mapControllerWrapper.currentPosition == null) {
+      _mapControllerWrapper.setCurrentPosition(geoPointToLatLng(location));
+    }
+  }
+
+
+
+  Future<GoogleMapController?> _waitForMapController() async {
+    if (_mapControllerWrapper.controller != null) {
+      return _mapControllerWrapper.controller;
+    }
+    try {
+      final completer = _mapControllerCompleter ??=
+          Completer<GoogleMapController>();
+      return await completer.future;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -1139,19 +1458,98 @@ class _HomePageState extends ConsumerState<HomePage>
     final params = widget.searchNotifier?.value;
     if (params == null) return true;
 
+    debugPrint('🔍 HomePage._matchesFilters: Checking post ${post.id} (type: ${post.type})');
+    debugPrint('🔍 Params: postType=${params.postType}, salesTypes=${params.salesTypes}, minPrice=${params.minPrice}, maxPrice=${params.maxPrice}');
+
+    // ✅ FILTROS DE SALES (Anúncios)
+    if (params.postType == 'sales') {
+      debugPrint('🔍 Applying SALES filters');
+      
+      // Tipo deve ser 'sales'
+      if (post.type != 'sales') {
+        debugPrint('🔍 Post rejected: type is ${post.type}, expected sales');
+        return false;
+      }
+      
+      // Tipo de anúncio (Gravação, Ensaios, etc)
+      if (params.salesTypes.isNotEmpty) {
+        if (!params.salesTypes.contains(post.salesType)) {
+          debugPrint('🔍 Post rejected: salesType is ${post.salesType}, expected one of ${params.salesTypes}');
+          return false;
+        }
+      }
+      
+      // Faixa de preço mínima
+      if (params.minPrice != null && params.minPrice! > 0) {
+        if (post.price == null || post.price! < params.minPrice!) {
+          debugPrint('🔍 Post rejected: price ${post.price} < minPrice ${params.minPrice}');
+          return false;
+        }
+      }
+      
+      // Faixa de preço máxima
+      if (params.maxPrice != null && params.maxPrice! < 5000) {
+        if (post.price == null || post.price! > params.maxPrice!) {
+          debugPrint('🔍 Post rejected: price ${post.price} > maxPrice ${params.maxPrice}');
+          return false;
+        }
+      }
+      
+      // Apenas com desconto
+      if (params.onlyWithDiscount == true) {
+        final hasDiscount = post.discountMode != null && 
+                           post.discountMode!.isNotEmpty && 
+                           post.discountMode != 'none' &&
+                           post.discountValue != null && 
+                           post.discountValue! > 0;
+        if (!hasDiscount) {
+          debugPrint('🔍 Post rejected: no valid discount (mode: ${post.discountMode}, value: ${post.discountValue})');
+          return false;
+        }
+      }
+      
+      // Apenas promoções ativas (não expiradas)
+      if (params.onlyActivePromos == true) {
+        final now = DateTime.now();
+        final hasActivePromo = post.promoStartDate != null && 
+                              post.promoEndDate != null && 
+                              post.promoStartDate!.isBefore(now) && 
+                              post.promoEndDate!.isAfter(now);
+        if (!hasActivePromo) {
+          debugPrint('🔍 Post rejected: promo not active (start: ${post.promoStartDate}, end: ${post.promoEndDate}, now: $now)');
+          return false;
+        }
+      }
+      
+      debugPrint('🔍 Post ${post.id} PASSED sales filters');
+      return true;
+    }
+
+    // ✅ FILTROS DE MÚSICOS/BANDAS (existente)
+    debugPrint('🔍 Applying MUSICIAN/BAND filters');
+    
     // Filtro: tipo de post (Banda ou Músico)
     if (params.postType != null && params.postType!.isNotEmpty) {
-      if (post.type != params.postType) return false;
+      if (post.type != params.postType) {
+        debugPrint('🔍 Post rejected: type mismatch');
+        return false;
+      }
     }
 
     // Filtro: nível
     if (params.level != null && params.level!.isNotEmpty) {
-      if (post.level != params.level) return false;
+      if (post.level != params.level) {
+        debugPrint('🔍 Post rejected: level mismatch');
+        return false;
+      }
     }
 
     // Filtro: YouTube
     if (params.hasYoutube ?? false) {
-      if (post.youtubeLink == null || post.youtubeLink!.isEmpty) return false;
+      if (post.youtubeLink == null || post.youtubeLink!.isEmpty) {
+        debugPrint('🔍 Post rejected: no YouTube link');
+        return false;
+      }
     }
 
     // Filtro: gêneros
@@ -1159,7 +1557,10 @@ class _HomePageState extends ConsumerState<HomePage>
       final hasGenreMatch = post.genres.any(
         params.genres.contains,
       );
-      if (!hasGenreMatch) return false;
+      if (!hasGenreMatch) {
+        debugPrint('🔍 Post rejected: genre mismatch');
+        return false;
+      }
     }
 
     // Filtro: instrumentos
@@ -1169,12 +1570,26 @@ class _HomePageState extends ConsumerState<HomePage>
       final hasInstrumentMatch = postInstruments.any(
         params.instruments.contains,
       );
-      if (!hasInstrumentMatch) return false;
+      if (!hasInstrumentMatch) {
+        debugPrint('🔍 Post rejected: instrument mismatch');
+        return false;
+      }
     }
 
-    // Filtro: availableFor (atualmente não está no modelo Post, então ignoramos)
-    // Se necessário adicionar no futuro, implementar aqui
+    // Filtro: availableFor (disponível para)
+    if (params.availableFor != null && params.availableFor!.isNotEmpty) {
+      if (post.availableFor.isEmpty) {
+        debugPrint('🔍 Post rejected: empty availableFor');
+        return false;
+      }
+      final hasAvailableForMatch = post.availableFor.contains(params.availableFor);
+      if (!hasAvailableForMatch) {
+        debugPrint('🔍 Post rejected: availableFor mismatch');
+        return false;
+      }
+    }
 
+    debugPrint('🔍 Post ${post.id} PASSED musician/band filters');
     return true;
   }
 }
@@ -1201,13 +1616,24 @@ class PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor =
-        post.type == 'band' ? AppColors.accent : AppColors.primary;
+    final primaryColor = post.type == 'band' ? AppColors.accent : AppColors.primary;
     final lightColor = primaryColor.withValues(alpha: 0.1);
     const textSecondary = AppColors.textSecondary;
 
     final isOwner = post.authorProfileId.isNotEmpty &&
         post.authorProfileId == currentActiveProfileId;
+    final avatarUrl = (post.activeProfilePhotoUrl != null &&
+        post.activeProfilePhotoUrl!.isNotEmpty)
+      ? post.activeProfilePhotoUrl!
+      : (post.authorPhotoUrl != null && post.authorPhotoUrl!.isNotEmpty
+        ? post.authorPhotoUrl!
+        : null);
+    final profileName = (post.activeProfileName != null &&
+        post.activeProfileName!.isNotEmpty)
+      ? post.activeProfileName!
+      : (post.authorName != null && post.authorName!.isNotEmpty
+        ? post.authorName!
+        : 'Perfil');
 
     return Container(
       height: 200,
@@ -1234,7 +1660,9 @@ class PostCard extends StatelessWidget {
                 Hero(
                   tag: 'post-photo-${post.id}',
                   child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: () {
+                      debugPrint('📍 PostCard: Tap na foto do post ${post.id}');
                       context.pushPostDetail(post.id);
                     },
                     child: ClipRRect(
@@ -1246,9 +1674,9 @@ class PostCard extends StatelessWidget {
                         width: double.infinity,
                         height: double.infinity,
                         child:
-                            (post.photoUrl != null && post.photoUrl!.isNotEmpty)
+                            (post.firstPhotoUrl != null && post.firstPhotoUrl!.isNotEmpty)
                                 ? CachedNetworkImage(
-                                    imageUrl: post.photoUrl!,
+                                    imageUrl: post.firstPhotoUrl!,
                                     fit: BoxFit.cover,
                                     memCacheWidth: 400,
                                     placeholder: (_, __) =>
@@ -1258,10 +1686,10 @@ class PostCard extends StatelessWidget {
                                       child: Center(
                                         child: Icon(
                                           post.type == 'band'
-                                              ? Icons.groups_rounded
-                                              : Icons.person_rounded,
+                                              ? Iconsax.people
+                                              : (post.type == 'sales' ? Iconsax.bookmark : Iconsax.user),
                                           size: 40,
-                                          color: primaryColor,
+                                          color: AppColors.primary,
                                         ),
                                       ),
                                     ),
@@ -1271,10 +1699,10 @@ class PostCard extends StatelessWidget {
                                     child: Center(
                                       child: Icon(
                                         post.type == 'band'
-                                            ? Icons.groups_rounded
-                                            : Icons.person_rounded,
+                                            ? Iconsax.people
+                                            : (post.type == 'sales' ? Iconsax.bookmark : Iconsax.user),
                                         size: 40,
-                                        color: primaryColor,
+                                        color: AppColors.primary,
                                       ),
                                     ),
                                   ),
@@ -1282,27 +1710,6 @@ class PostCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Botão fechar no canto superior esquerdo
-                if (onClose != null)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: GestureDetector(
-                      onTap: onClose,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close_rounded,
-                          size: 18,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),
@@ -1317,38 +1724,31 @@ class PostCard extends StatelessWidget {
                   // Nome do perfil + botões
                   Row(
                     children: [
-                      Icon(Icons.account_circle_rounded,
-                          size: 16, color: primaryColor),
-                      const SizedBox(width: 4),
                       Expanded(
                         child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
                           onTap: () {
+                            debugPrint('📍 PostCard: Tap no nome do perfil ${post.authorProfileId}');
                             context.pushProfile(post.authorProfileId);
                           },
-                          child: FutureBuilder<DocumentSnapshot>(
-                            future: FirebaseFirestore.instance
-                                .collection('profiles')
-                                .doc(post.authorProfileId)
-                                .get(),
-                            builder: (context, snapshot) {
-                              final profileName = snapshot.hasData
-                                  ? ((snapshot.data!.data()
-                                              as Map<String, dynamic>?)?['name']
-                                          as String?) ??
-                                      'Perfil'
-                                  : 'Perfil';
-                              return Text(
-                                profileName,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: primaryColor,
-                                  decoration: TextDecoration.underline,
+                          child: Row(
+                            children: [
+                              _ProfileAvatar(photoUrl: avatarUrl),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  profileName,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primary,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              );
-                            },
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -1356,8 +1756,8 @@ class PostCard extends StatelessWidget {
                       if (isOwner)
                         GestureDetector(
                           onTap: onOpenOptions,
-                          child: const Icon(Icons.more_vert_rounded,
-                              color: textSecondary, size: 20),
+                          child: const Icon(Iconsax.more,
+                              color: textSecondary, size: 22),
                         )
                       else
                         GestureDetector(
@@ -1367,47 +1767,48 @@ class PostCard extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: isInterestSent
                                   ? Colors.pink.withValues(alpha: 0.15)
-                                  : primaryColor.withValues(alpha: 0.1),
+                                  : AppColors.primary.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
-                              isInterestSent
-                                  ? Icons.favorite_rounded
-                                  : Icons.favorite_border_rounded,
-                              size: 16,
-                              color:
-                                  isInterestSent ? Colors.pink : primaryColor,
+                              isInterestSent 
+                                  ? (post.type == 'sales' ? Iconsax.tag5 : Iconsax.heart5)
+                                  : (post.type == 'sales' ? Iconsax.tag : Iconsax.heart),
+                              size: 18,
+                              color: isInterestSent ? Colors.pink : AppColors.primary,
                             ),
                           ),
                         ),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  // Header clicável
+                  // ✅ Header clicável: Tipo/Título
                   GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: () {
+                      debugPrint('📍 PostCard: Tap no header do post ${post.id}');
                       context.pushPostDetail(post.id);
                     },
                     child: Row(
                       children: [
                         Icon(
-                          post.type == 'band'
-                              ? Icons.person_search_rounded
-                              : Icons.music_note_rounded,
-                          size: 12,
-                          color: primaryColor,
+                          post.type == 'sales' 
+                              ? Iconsax.tag 
+                              : (post.type == 'band' ? Iconsax.search_favorite : Iconsax.musicnote),
+                          size: 14,
+                          color: AppColors.primary,
                         ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            post.type == 'band'
-                                ? 'Busca músico'
-                                : 'Busca banda',
+                            post.type == 'sales'
+                                ? (post.title ?? 'Anúncio')
+                                : (post.type == 'band' ? 'Busca músico' : 'Busca banda'),
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 15,
                               fontWeight: FontWeight.w600,
-                              color: primaryColor,
-                              decoration: TextDecoration.underline,
+                              color: AppColors.primary,
+                              decoration: TextDecoration.none,
                             ),
                             maxLines: 1,
                           ),
@@ -1416,79 +1817,79 @@ class PostCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // Instrumentos em scroll horizontal
-                  if (post.type == 'musician' && post.instruments.isNotEmpty)
-                    _buildHorizontalChips(
-                      icon: Icons.piano_rounded,
-                      items: post.instruments,
-                      color: primaryColor,
-                    )
-                  else if (post.type == 'band' &&
-                      post.seekingMusicians.isNotEmpty)
-                    _buildHorizontalChips(
-                      icon: Icons.search_rounded,
-                      items: post.seekingMusicians,
-                      color: primaryColor,
-                    ),
-                  const SizedBox(height: 3),
-                  // Nível
-                  if (post.level.isNotEmpty)
-                    _buildInfoRow(Icons.star_half_rounded, post.level,
-                        primaryColor, textSecondary),
-                  // Gêneros em scroll horizontal
-                  if (post.genres.isNotEmpty)
-                    _buildHorizontalChips(
-                      icon: Icons.library_music_rounded,
-                      items: post.genres,
-                      color: primaryColor,
-                    ),
-                  // Mensagem do post
-                  if (post.content.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.message_rounded,
-                            size: 11, color: textSecondary),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            post.content,
-                            style: const TextStyle(
-                              fontSize: 9,
-                              color: textSecondary,
-                              height: 1.3,
+                  // ✅ Conteúdo condicional: Sales vs Musician/Band
+                  if (post.type == 'sales')
+                    _buildSalesContent()
+                  else ...[
+                    // Instrumentos em scroll horizontal
+                    if (post.type == 'musician' && post.instruments.isNotEmpty)
+                      _buildHorizontalChips(
+                        icon: Iconsax.music,
+                        items: post.instruments,
+                        color: AppColors.primary,
+                      )
+                    else if (post.type == 'band' &&
+                        post.seekingMusicians.isNotEmpty)
+                      _buildHorizontalChips(
+                        icon: Iconsax.search_favorite,
+                        items: post.seekingMusicians,
+                        color: AppColors.primary,
+                      ),
+                    const SizedBox(height: 3),
+                    // Nível
+                    if (post.level.isNotEmpty)
+                      _buildInfoRow(Iconsax.star, post.level,
+                          AppColors.primary, textSecondary),
+                    // Mensagem do post
+                    if (post.content.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Iconsax.message,
+                            size: 16, color: textSecondary),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: MentionText(
+                              text: post.content,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: textSecondary,
+                                height: 1.35,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              onMentionTap: (username) {
+                                context.pushProfileByUsername(username);
+                              },
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ],
                   const Spacer(),
                   // Footer: distância + tempo
                   Row(
                     children: [
-                      Icon(Icons.location_on_rounded,
-                          size: 11, color: primaryColor),
+                        Icon(Iconsax.location,
+                          size: 16, color: AppColors.primary),
                       const SizedBox(width: 3),
                       Text(
                         '${post.distanceKm?.toStringAsFixed(1) ?? '0.0'}km',
                         style: TextStyle(
-                          fontSize: 11,
-                          color: primaryColor,
+                          fontSize: 14,
+                          color: AppColors.primary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Icon(Icons.access_time_rounded,
-                          size: 11, color: textSecondary),
+                        const Icon(Iconsax.clock,
+                          size: 16, color: textSecondary),
                       const SizedBox(width: 3),
                       Text(
                         _formatDaysAgo(post.createdAt),
                         style: const TextStyle(
-                          fontSize: 10,
+                          fontSize: 14,
                           color: textSecondary,
                         ),
                       ),
@@ -1509,13 +1910,13 @@ class PostCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 3),
       child: Row(
         children: [
-          Icon(icon, size: 11, color: iconColor),
+          Icon(icon, size: 16, color: iconColor),
           const SizedBox(width: 4),
           Expanded(
             child: Text(
               text,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 14,
                 color: textColor,
                 fontWeight: FontWeight.w500,
               ),
@@ -1534,10 +1935,10 @@ class PostCard extends StatelessWidget {
     required Color color,
   }) {
     return SizedBox(
-      height: 22,
+      height: 34,
       child: Row(
         children: [
-          Icon(icon, size: 11, color: color),
+          Icon(icon, size: 16, color: color),
           const SizedBox(width: 4),
           Expanded(
             child: ListView.separated(
@@ -1546,8 +1947,8 @@ class PostCard extends StatelessWidget {
               separatorBuilder: (_, __) => const SizedBox(width: 4),
               itemBuilder: (context, index) {
                 return Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -1555,7 +1956,7 @@ class PostCard extends StatelessWidget {
                   child: Text(
                     items[index],
                     style: TextStyle(
-                      fontSize: 9,
+                      fontSize: 14,
                       color: color,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1575,5 +1976,152 @@ class PostCard extends StatelessWidget {
     if (diff.inDays > 0) return '${diff.inDays}d';
     if (diff.inHours > 0) return '${diff.inHours}h';
     return '${diff.inMinutes}m';
+  }
+
+  // ✅ Conteúdo específico para Sales
+  Widget _buildSalesContent() {
+    // ✅ USAR PriceCalculator PARA CALCULOS CONSISTENTES
+    final priceData = PriceCalculator.getPriceDisplayData(post);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ✅ Se há desconto, mostra preço original riscado + badge de desconto
+        if (priceData.hasDiscount) ...[
+          Row(
+            children: [
+              Icon(Iconsax.percentage_circle, size: 14, color: Colors.grey[600]),
+              const SizedBox(width: 8),
+
+              // ✅ CORREÇÃO: Preço ORIGINAL riscado (post.price = preço sem desconto)
+              Expanded(
+                child: Text(
+                  _truncatePrice(NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ').format(priceData.originalPrice)),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+
+              const SizedBox(width: 8),
+              const Text('•', style: TextStyle(color: Colors.grey)),
+              const SizedBox(width: 8),
+
+              // Badge de desconto
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  priceData.discountLabel!,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+        ],
+
+        // ✅ CORREÇÃO: Preço FINAL destacado (calculado aplicando desconto)
+        Row(
+          children: [
+            const Icon(Iconsax.dollar_circle, size: 16, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _truncatePrice(NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ').format(priceData.finalPrice)),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 4),
+
+        // 3. Conteúdo/mensagem do post
+        if (post.content.isNotEmpty)
+          Text(
+            post.content,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              height: 1.35,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+      ],
+    );
+  }
+
+  // ✅ Função para truncar preço se for muito longo
+  String _truncatePrice(String price) {
+    // Se o preço for menor que 15 caracteres, retorna como está
+    if (price.length <= 15) return price;
+
+    // Para preços muito longos, formata de forma mais compacta
+    final numericValue = post.price ?? 0.0;
+
+    if (numericValue >= 1000000) {
+      // Para milhões: R$ 1,2M
+      final millions = numericValue / 1000000;
+      return 'R\$ ${millions.toStringAsFixed(1)}M';
+    } else if (numericValue >= 1000) {
+      // Para milhares: R$ 1,2K
+      final thousands = numericValue / 1000;
+      return 'R\$ ${thousands.toStringAsFixed(1)}K';
+    }
+
+    // Para valores menores, usa formatação padrão mas trunca se necessário
+    return price.length > 15 ? '${price.substring(0, 12)}...' : price;
+  }
+}
+
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({required this.photoUrl});
+
+  final String? photoUrl;
+
+  Widget _placeholder() {
+    return const CircleAvatar(
+      backgroundColor: AppColors.surfaceContainerHighest,
+      child: Icon(Iconsax.music, color: Colors.white54, size: 16),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (photoUrl == null || photoUrl!.isEmpty) {
+      return SizedBox(width: 32, height: 32, child: _placeholder());
+    }
+
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: photoUrl!,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => _placeholder(),
+          errorWidget: (_, __, ___) => _placeholder(),
+        ),
+      ),
+    );
   }
 }

@@ -7,7 +7,7 @@ echo "🔧 Configurando Firebase para DEV flavor..."
 PROJECT_DIR="${SRCROOT}"
 FIREBASE_DIR="${PROJECT_DIR}/Firebase"
 PLIST_DEV="${FIREBASE_DIR}/GoogleService-Info-dev.plist"
-PLIST_TARGET="${PROJECT_DIR}/Runner/GoogleService-Info.plist"
+PLIST_TARGET="${PROJECT_DIR}/WeGig/GoogleService-Info.plist"
 
 # Copiar arquivo correto
 if [ -f "$PLIST_DEV" ]; then

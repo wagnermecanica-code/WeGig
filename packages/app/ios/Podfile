@@ -4,10 +4,16 @@ platform :ios, '15.0'
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
-project 'Runner', {
+project 'WeGig', {
   'Debug' => :debug,
   'Profile' => :release,
   'Release' => :release,
+  'Debug-dev' => :debug,
+  'Release-dev' => :release,
+  'Profile-dev' => :release,
+  'Debug-staging' => :debug,
+  'Release-staging' => :release,
+  'Profile-staging' => :release,
 }
 
 def flutter_root
@@ -27,11 +33,11 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_ios_podfile_setup
 
-target 'Runner' do
-  use_frameworks!
+target 'WeGig' do
+  use_frameworks! :linkage => :static
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-  target 'RunnerTests' do
+  target 'WeGigTests' do
     inherit! :search_paths
   end
 end
@@ -42,5 +48,18 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
     end
+  end
+
+  # Patch the generated resources script so flutter_inappwebview_ios copies the storyboard from the plugin source
+  # instead of an already-compiled storyboardc that may not exist for some configurations.
+  resources_script = File.join(installer.sandbox.root, 'Target Support Files', 'Pods-WeGig', 'Pods-WeGig-resources.sh')
+  if File.exist?(resources_script)
+    script = File.read(resources_script)
+    storyboard_source = '${PODS_ROOT}/../.symlinks/plugins/flutter_inappwebview_ios/ios/Storyboards/WebView.storyboard'
+    updated_script = script.gsub(
+      '${BUILT_PRODUCTS_DIR}/flutter_inappwebview_ios/flutter_inappwebview_ios.framework/WebView.storyboardc',
+      storyboard_source
+    )
+    File.write(resources_script, updated_script)
   end
 end

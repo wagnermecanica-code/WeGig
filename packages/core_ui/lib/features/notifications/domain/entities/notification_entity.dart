@@ -5,7 +5,7 @@ import 'package:core_ui/core/json_converters.dart';
 part 'notification_entity.freezed.dart';
 part 'notification_entity.g.dart';
 
-/// Tipos de notificação suportados (9 tipos)
+/// Tipos de notificação suportados (10 tipos)
 enum NotificationType {
   interest,
   newMessage,
@@ -15,6 +15,7 @@ enum NotificationType {
   interestResponse,
   postUpdated,
   profileView,
+  savedPost,
   system,
 }
 
@@ -51,6 +52,7 @@ class NotificationEntity with _$NotificationEntity {
     String? senderUid,
     String? senderProfileId,
     String? senderName,
+    String? senderUsername,
     String? senderPhoto,
     @Default({}) Map<String, dynamic> data,
     @NullableNotificationActionTypeConverter() NotificationActionType? actionType,
@@ -59,6 +61,8 @@ class NotificationEntity with _$NotificationEntity {
     @Default(false) bool read,
     @NullableTimestampConverter() DateTime? readAt,
     @NullableTimestampConverter() DateTime? expiresAt,
+    // Documento Firestore para paginação cursor-based
+    @JsonKey(includeFromJson: false, includeToJson: false) DocumentSnapshot? document,
   }) = _NotificationEntity;
 
   // ============================================================================
@@ -78,9 +82,10 @@ class NotificationEntity with _$NotificationEntity {
       senderUid: data['senderUid'] as String?,
       senderProfileId: data['senderProfileId'] as String?,
       senderName: data['senderName'] as String?,
+      senderUsername: data['senderUsername'] as String?,
       senderPhoto: data['senderPhoto'] as String?,
       title: data['title'] as String? ?? '',
-      message: data['message'] as String? ?? '',
+      message: (data['message'] as String?) ?? (data['body'] as String? ?? ''),
       data: data['data'] != null && data['data'] is Map
           ? Map<String, dynamic>.from(data['data'] as Map)
           : {},
@@ -95,6 +100,7 @@ class NotificationEntity with _$NotificationEntity {
       read: data['read'] as bool? ?? false,
       readAt: (data['readAt'] as Timestamp?)?.toDate(),
       expiresAt: (data['expiresAt'] as Timestamp?)?.toDate(),
+      document: doc, // ✅ Armazena DocumentSnapshot para paginação
     );
   }
 
@@ -119,6 +125,108 @@ class NotificationEntity with _$NotificationEntity {
   bool get hasAction =>
       actionType != null && actionType != NotificationActionType.none;
 
+  /// Cidade associada à notificação (quando disponível)
+  String? get city {
+    final actionCity = actionData?['city'];
+    if (actionCity is String && actionCity.isNotEmpty) {
+      return actionCity;
+    }
+    final dataCity = data['city'];
+    if (dataCity is String && dataCity.isNotEmpty) {
+      return dataCity;
+    }
+    return null;
+  }
+
+  /// Distância (em quilômetros) associada à notificação (quando disponível)
+  double? get distance {
+    final rawDistance = actionData?['distance'] ?? data['distance'];
+    if (rawDistance is num) {
+      return rawDistance.toDouble();
+    }
+    if (rawDistance is String) {
+      return double.tryParse(rawDistance);
+    }
+    return null;
+  }
+
+  /// Identificador do recurso alvo (postId, conversationId, etc.)
+  String? get targetId {
+    final actionPostId = actionData?['postId'];
+    if (actionPostId is String && actionPostId.isNotEmpty) {
+      return actionPostId;
+    }
+
+    final dataPostId = data['postId'];
+    if (dataPostId is String && dataPostId.isNotEmpty) {
+      return dataPostId;
+    }
+
+    final explicitTarget = data['targetId'];
+    if (explicitTarget is String && explicitTarget.isNotEmpty) {
+      return explicitTarget;
+    }
+
+    return null;
+  }
+
+  // ============================================================================
+  // HELPERS TIPADOS PARA actionData (evita casts manuais)
+  // ============================================================================
+
+  /// Extrai userId de actionData com fallback para senderUid
+  String? get actionUserId {
+    final userId = actionData?['userId'];
+    if (userId is String && userId.isNotEmpty) return userId;
+    return senderUid;
+  }
+
+  /// Extrai profileId de actionData com fallback para senderProfileId
+  String? get actionProfileId {
+    final profileId = actionData?['profileId'];
+    if (profileId is String && profileId.isNotEmpty) return profileId;
+    return senderProfileId;
+  }
+
+  /// Extrai conversationId de actionData
+  String? get actionConversationId {
+    final conversationId = actionData?['conversationId'];
+    if (conversationId is String && conversationId.isNotEmpty) {
+      return conversationId;
+    }
+    return null;
+  }
+
+  /// Extrai otherUserId de actionData com fallback para senderUid
+  String? get actionOtherUserId {
+    final otherUserId = actionData?['otherUserId'];
+    if (otherUserId is String && otherUserId.isNotEmpty) return otherUserId;
+    return senderUid;
+  }
+
+  /// Extrai otherProfileId de actionData com fallback para senderProfileId
+  String? get actionOtherProfileId {
+    final otherProfileId = actionData?['otherProfileId'];
+    if (otherProfileId is String && otherProfileId.isNotEmpty) {
+      return otherProfileId;
+    }
+    return senderProfileId;
+  }
+
+  /// Extrai postId de actionData com fallback para targetId
+  String? get actionPostId {
+    final postId = actionData?['postId'];
+    if (postId is String && postId.isNotEmpty) return postId;
+    return targetId;
+  }
+
+  /// Extrai route de actionData (para NotificationActionType.navigate)
+  String? get actionRoute {
+    final route = actionData?['route'];
+    if (route is String && route.isNotEmpty) return route;
+    return null;
+  }
+
   /// Ícone baseado no tipo
   String get iconName {
     switch (type) {
@@ -138,6 +246,8 @@ class NotificationEntity with _$NotificationEntity {
         return 'update';
       case NotificationType.profileView:
         return 'visibility';
+      case NotificationType.savedPost:
+        return 'bookmark';
       case NotificationType.system:
         return 'info';
     }
@@ -152,9 +262,11 @@ class NotificationEntity with _$NotificationEntity {
       'senderUid': senderUid,
       'senderProfileId': senderProfileId,
       'senderName': senderName,
+      'senderUsername': senderUsername,
       'senderPhoto': senderPhoto,
       'title': title,
       'message': message,
+      'body': message,
       'data': data,
       'actionType': actionType?.name,
       'actionData': actionData,
@@ -173,6 +285,11 @@ class NotificationEntity with _$NotificationEntity {
   static NotificationType parseType(String type) {
     switch (type) {
       case 'interest':
+      case 'interest_received':
+      case 'interestReceived':
+      case 'newInterest':
+      case 'interestNotification':
+      case 'interest_notification':
         return NotificationType.interest;
       case 'newMessage':
         return NotificationType.newMessage;
@@ -188,6 +305,8 @@ class NotificationEntity with _$NotificationEntity {
         return NotificationType.postUpdated;
       case 'profileView':
         return NotificationType.profileView;
+      case 'savedPost':
+        return NotificationType.savedPost;
       case 'system':
         return NotificationType.system;
       default:

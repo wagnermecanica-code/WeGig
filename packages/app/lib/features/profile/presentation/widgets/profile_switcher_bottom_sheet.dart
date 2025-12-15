@@ -1,15 +1,17 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:iconsax/iconsax.dart';
 // import 'package:wegig_app/models/user_profile.dart'; // Removido: use apenas Profile
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
-import 'package:core_ui/theme/app_colors.dart';
-import 'package:core_ui/theme/app_typography.dart';
+import 'package:core_ui/core_ui.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_switcher_provider.dart';
 import 'package:wegig_app/features/profile/presentation/widgets/profile_transition_overlay.dart';
+import 'package:wegig_app/features/notifications_new/presentation/providers/notifications_new_providers.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/providers/mensagens_new_providers.dart';
 
 /// BottomSheet para alternar entre perfis do usuário
 /// Agora com animações melhoradas e componentes do Design System
@@ -20,7 +22,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
     super.key,
   });
   final String? activeProfileId;
-  final Function(String profileId) onProfileSelected;
+  final void Function(String profileId) onProfileSelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -67,7 +69,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
             padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Row(
               children: [
-                Icon(Icons.swap_horiz, color: AppColors.primary, size: 24),
+                Icon(Iconsax.repeat, color: AppColors.primary, size: 24),
                 SizedBox(width: 12),
                 Text(
                   'Alternar Perfil',
@@ -102,7 +104,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.error_outline,
+                        Icon(Iconsax.info_circle,
                             color: AppColors.error, size: 40),
                         SizedBox(height: 8),
                         Text(
@@ -139,7 +141,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(
-                          Icons.person_add_outlined,
+                          Iconsax.user_add,
                           size: 64,
                           color: AppColors.textSecondary,
                         ),
@@ -160,34 +162,18 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                         ElevatedButton.icon(
                           onPressed: () async {
                             Navigator.pop(context);
-                            final result = await Navigator.push(
+                            final result = await Navigator.push<bool?>(
                               context,
-                              MaterialPageRoute(
+                              MaterialPageRoute<bool?>(
                                 builder: (context) =>
                                     const EditProfilePage(isNewProfile: true),
                               ),
                             );
                             if (result == true && context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Row(
-                                    children: [
-                                      Icon(Icons.check_circle,
-                                          color: Colors.white),
-                                      SizedBox(width: 12),
-                                      Text('Perfil criado com sucesso!'),
-                                    ],
-                                  ),
-                                  backgroundColor: AppColors.success,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              );
+                              AppSnackBar.showSuccess(context, 'Perfil criado com sucesso!');
                             }
                           },
-                          icon: const Icon(Icons.add),
+                          icon: const Icon(Iconsax.add),
                           label: const Text('Criar Primeiro Perfil'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
@@ -210,7 +196,13 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                       const Divider(height: 1, indent: 72),
                   itemBuilder: (context, index) {
                     final profile = profiles[index];
+                    // ✅ FIX: Comparação correta do perfil ativo
                     final isActive = profile.profileId == activeProfileId;
+                    
+                    // Debug para verificar se comparação está correta
+                    if (isActive) {
+                      debugPrint('✅ ProfileSwitcher: Perfil ATIVO - ${profile.name} (${profile.profileId})');
+                    }
 
                     // Card com animação FadeIn
                     return AnimatedOpacity(
@@ -218,7 +210,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                       opacity: 1,
                       child: Semantics(
                         label:
-                            '${profile.name}, ${profile.isBand ? 'Banda' : 'Músico'}${isActive ? ', perfil ativo' : ''}',
+                            '${profile.name}, ${_getProfileTypeLabel(profile.profileType)}${isActive ? ', perfil ativo' : ''}',
                         button: true,
                         enabled: !isActive,
                         child: ListTile(
@@ -236,7 +228,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                   : null,
                               child: profile.photoUrl == null ||
                                       profile.photoUrl!.isEmpty
-                                  ? const Icon(Icons.person, size: 28)
+                                  ? const Icon(Iconsax.user, size: 30)
                                   : null,
                             ),
                           ),
@@ -253,13 +245,13 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                           subtitle: Row(
                             children: [
                               Icon(
-                                profile.isBand ? Icons.groups : Icons.person,
+                                _getProfileTypeIcon(profile.profileType),
                                 size: 14,
                                 color: AppColors.textSecondary,
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                profile.isBand ? 'Banda' : 'Músico',
+                                _getProfileTypeLabel(profile.profileType),
                                 style: AppTypography.captionLight,
                               ),
                             ],
@@ -267,20 +259,13 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // Badge counters para perfis não ativos
+                              // Badge counter unificado para perfis não ativos
                               if (!isActive) ...[
-                                _ProfileBadgeCounter(
+                                _UnifiedBadgeCounter(
                                   profileId: profile.profileId,
-                                  icon: Icons.notifications,
-                                  isNotification: true,
+                                  uid: profile.uid,
                                 ),
-                                const SizedBox(width: 4),
-                                _ProfileBadgeCounter(
-                                  profileId: profile.profileId,
-                                  icon: Icons.message,
-                                  isNotification: false,
-                                ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 12),
                               ],
                               if (isActive)
                                 Container(
@@ -293,7 +278,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                   child: const Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.check_circle,
+                                      Icon(Iconsax.tick_circle,
                                           size: 14, color: Colors.white),
                                       SizedBox(width: 4),
                                       Text('Ativo',
@@ -305,13 +290,13 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                 )
                               else
                                 const Icon(
-                                  Icons.chevron_right,
+                                  Iconsax.arrow_right_3,
                                   color: AppColors.textSecondary,
                                 ),
                               // Menu de opções (editar/excluir)
                               PopupMenuButton<String>(
                                 icon: const Icon(
-                                  Icons.more_vert,
+                                  Iconsax.more,
                                   color: AppColors.textSecondary,
                                   size: 20,
                                 ),
@@ -327,7 +312,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                     value: 'edit',
                                     child: Row(
                                       children: [
-                                        Icon(Icons.edit,
+                                        Icon(Iconsax.edit,
                                             size: 18, color: AppColors.primary),
                                         SizedBox(width: 8),
                                         Text('Editar'),
@@ -336,14 +321,13 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                   ),
                                   PopupMenuItem(
                                     value: 'delete',
-                                    enabled: profile.profileId !=
-                                        user.uid, // Não permite excluir perfil principal
+                                    enabled: !isActive, // ✅ Não permite excluir perfil ativo
                                     child: Row(
                                       children: [
                                         Icon(
-                                          Icons.delete,
+                                          Iconsax.trash,
                                           size: 18,
-                                          color: profile.profileId != user.uid
+                                          color: !isActive
                                               ? AppColors.error
                                               : AppColors.textSecondary,
                                         ),
@@ -351,7 +335,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                         Text(
                                           'Excluir',
                                           style: TextStyle(
-                                            color: profile.profileId != user.uid
+                                            color: !isActive
                                                 ? AppColors.error
                                                 : AppColors.textSecondary,
                                           ),
@@ -372,8 +356,9 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                   }
 
                                   // Aguarda um frame para garantir que o modal foi fechado
-                                  await Future.delayed(
-                                      const Duration(milliseconds: 100));
+                                  await Future<void>.delayed(
+                                    const Duration(milliseconds: 100),
+                                  );
 
                                   if (!context.mounted) return;
 
@@ -383,7 +368,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                         ProfileTransitionOverlay.show(
                                       context,
                                       profileName: profile.name,
-                                      isBand: profile.isBand,
+                                      profileType: profile.profileType.name,
                                       photoUrl: profile.photoUrl,
                                       onComplete: () {
                                         // Chama o callback para recarregar os dados
@@ -391,15 +376,14 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                       },
                                     );
 
-                                    // Atualiza o perfil ativo usando ProfileRepository
-                                    // Faz isso em paralelo com a animação do overlay
-                                    // TODO: Implementar switchActiveProfile via profileProvider
+                                    // ✅ NOVO: Usar ProfileSwitcherNotifier centralizado
+                                    // Troca perfil + invalida TODOS os caches automaticamente
                                     await Future.wait(<Future<dynamic>>[
-                                      Future.delayed(const Duration(
-                                          milliseconds: 100)), // Placeholder
-                                      Future.delayed(const Duration(
-                                          milliseconds:
-                                              1300)), // Duração mínima do overlay
+                                      ref.read(profileSwitcherNotifierProvider.notifier)
+                                          .switchToProfile(profile.profileId),
+                                      Future<void>.delayed(const Duration(
+                                        milliseconds: 1300,
+                                      )), // Duração mínima do overlay
                                     ]);
 
                                     // Aguarda o overlay fechar completamente
@@ -412,24 +396,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                     }
 
                                     // Mostra mensagem de erro
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Row(
-                                            children: [
-                                              const Icon(Icons.error,
-                                                  color: Colors.white),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                  child: Text(
-                                                      'Erro ao trocar perfil: $e')),
-                                            ],
-                                          ),
-                                          backgroundColor: AppColors.error,
-                                        ),
-                                      );
-                                    }
+                                    // Error already shown by AppSnackBar above
                                   }
                                 },
                         ),
@@ -443,89 +410,97 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
 
           const Divider(height: 1),
 
-          // Botão adicionar novo perfil com gradiente
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Semantics(
-              label: 'Adicionar novo perfil',
-              button: true,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          const EditProfilePage(isNewProfile: true),
+          // Botão adicionar novo perfil com gradiente (esconde quando há 5 perfis)
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('profiles')
+                .where('uid', isEqualTo: user.uid)
+                .snapshots(),
+            builder: (context, snapshot) {
+              final profileCount = snapshot.data?.docs.length ?? 0;
+              
+              // Esconder botão se já tem 5 perfis
+              if (profileCount >= 5) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Você atingiu o limite de 5 perfis',
+                    style: AppTypography.captionLight.copyWith(
+                      color: AppColors.textSecondary,
                     ),
-                  );
-                  // Se retornou um profileId (String), perfil foi criado com sucesso
-                  if (result is String && result.isNotEmpty) {
-                    try {
-                      // Atualiza activeProfileId para o novo perfil
-                      await FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(user.uid)
-                          .update({'activeProfileId': result});
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+              
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Semantics(
+                  label: 'Adicionar novo perfil',
+                  button: true,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      final result = await Navigator.push<String?>(
+                        context,
+                        MaterialPageRoute<String?>(
+                          builder: (context) =>
+                              const EditProfilePage(isNewProfile: true),
+                        ),
+                      );
 
-                      // Chama callback para recarregar dados
-                      onProfileSelected(result);
+                      if (result is String && result.isNotEmpty) {
+                        onProfileSelected(result);
 
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Row(
-                              children: [
-                                Icon(Icons.check_circle, color: Colors.white),
-                                SizedBox(width: 12),
-                                Text('Perfil alterado'),
-                              ],
-                            ),
-                            backgroundColor: AppColors.success,
-                            duration: const Duration(seconds: 2),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        );
+                        if (context.mounted) {
+                          AppSnackBar.showSuccess(
+                            context,
+                            'Novo perfil ativado!',
+                          );
+                        }
                       }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                const Icon(Icons.error, color: Colors.white),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                    child:
-                                        Text('Erro ao ativar novo perfil: $e')),
-                              ],
-                            ),
-                            backgroundColor: AppColors.error,
-                          ),
-                        );
-                      }
-                    }
-                  }
-                },
-                icon: const Icon(Icons.person_add),
-                label: const Text('Adicionar Novo Perfil'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    },
+                    icon: const Icon(Iconsax.user_add),
+                    label: const Text('Adicionar Novo Perfil'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
 
           SizedBox(height: MediaQuery.of(context).padding.bottom),
         ],
       ),
     );
+  }
+
+  /// ✅ Obtém o ícone baseado no tipo de perfil
+  IconData _getProfileTypeIcon(ProfileType profileType) {
+    switch (profileType) {
+      case ProfileType.band:
+        return Iconsax.people;
+      case ProfileType.space:
+        return Iconsax.building;
+      case ProfileType.musician:
+        return Iconsax.user;
+    }
+  }
+
+  /// ✅ Obtém o label baseado no tipo de perfil
+  String _getProfileTypeLabel(ProfileType profileType) {
+    switch (profileType) {
+      case ProfileType.band:
+        return 'Banda';
+      case ProfileType.space:
+        return 'Espaço';
+      case ProfileType.musician:
+        return 'Músico';
+    }
   }
 
   /// Edita um perfil existente
@@ -535,9 +510,9 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final result = await Navigator.push(
+    final result = await Navigator.push<String?>(
       context,
-      MaterialPageRoute(
+      MaterialPageRoute<String?>(
         builder: (context) =>
             EditProfilePage(profileIdToEdit: profile.profileId),
       ),
@@ -548,23 +523,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
       // Recarrega dados através do callback
       onProfileSelected(result);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 12),
-              Text('Perfil atualizado!'),
-            ],
-          ),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      AppSnackBar.showSuccess(context, 'Perfil atualizado!');
     }
   }
 
@@ -574,20 +533,22 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Não permite excluir perfil principal
-    if (profile.profileId == user.uid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.error, color: Colors.white),
-              SizedBox(width: 12),
-              Expanded(
-                  child: Text('Não é possível excluir o perfil principal')),
-            ],
-          ),
-          backgroundColor: AppColors.error,
-        ),
+    // ✅ Obter todos os perfis do provider
+    final profileState = ref.read(profileProvider);
+    final allProfiles = profileState.value?.profiles ?? <ProfileEntity>[];
+    final activeProfile = profileState.value?.activeProfile;
+
+    // ✅ Verifica se tem mais de um perfil
+    if (allProfiles.length <= 1) {
+      AppSnackBar.showWarning(context, 'Você deve ter pelo menos um perfil');
+      return;
+    }
+
+    // ✅ Não permite excluir o perfil ativo
+    if (profile.profileId == activeProfile?.profileId) {
+      AppSnackBar.showWarning(
+        context,
+        'Para excluir este perfil, primeiro troque para outro perfil',
       );
       return;
     }
@@ -599,14 +560,13 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.warning_rounded, color: AppColors.warning, size: 28),
+            Icon(Iconsax.warning_2, color: AppColors.warning, size: 28),
             SizedBox(width: 12),
             Text('Confirmar Exclusão'),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Tem certeza que deseja excluir o perfil "${profile.name}"?',
@@ -616,13 +576,15 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.error.withOpacity(0.1),
+                color: AppColors.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                border: Border.all(
+                  color: AppColors.error.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline,
+                  const Icon(Iconsax.info_circle,
                       size: 20, color: AppColors.error),
                   const SizedBox(width: 8),
                   Expanded(
@@ -661,81 +623,42 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
 
     if (confirmed != true) return;
 
+    // ✅ CORREÇÃO: Capturar TODAS as referências ANTES de fechar o bottom sheet
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final profileNotifier = ref.read(profileProvider.notifier);
+    final profileIdToDelete = profile.profileId;
+
     try {
-      // TODO: Implementar getAllProfiles via profileProvider
-      final profileState = ref.read(profileProvider);
-      final allProfiles = profileState.value?.profiles ?? <ProfileEntity>[];
+      debugPrint('🗑️ ProfileSwitcher: Iniciando deleção do perfil $profileIdToDelete');
+      
+      // ✅ CORREÇÃO: Executar deleção ANTES de fechar o bottom sheet
+      await profileNotifier.deleteProfile(profileIdToDelete);
 
-      // Verifica se tem mais de um perfil
-      if (allProfiles.length <= 1) {
-        if (context.mounted) {
-          // Não fecha o bottom sheet, apenas mostra o erro.
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.error, color: Colors.white),
-                  SizedBox(width: 12),
-                  Expanded(
-                      child: Text('Você precisa ter pelo menos um perfil')),
-                ],
-              ),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
-        return;
-      }
+      debugPrint('✅ ProfileSwitcher: Perfil deletado com sucesso');
 
-      // Fecha o bottom sheet antes de excluir
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
+      // ✅ CORREÇÃO: Fechar o bottom sheet DEPOIS da deleção bem-sucedida
+      navigator.pop();
 
-      // TODO: Implementar deleteProfile via profileProvider
-      await ref.read(profileProvider.notifier).deleteProfile(profile.profileId);
-
-      if (context.mounted) {
-        // Se excluiu o perfil ativo, recarrega com o novo perfil ativo
-        final newActiveProfile =
-            ref.read(profileProvider).value?.activeProfile;
-        if (newActiveProfile != null) {
-          onProfileSelected(newActiveProfile.profileId);
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Perfil excluído com sucesso'),
-              ],
-            ),
-            backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
+      // ✅ CORREÇÃO: Usar scaffoldMessenger salvo anteriormente
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text('Perfil excluído com sucesso'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Erro ao excluir perfil: $e')),
-              ],
-            ),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      debugPrint('❌ ProfileSwitcher: Erro ao deletar perfil - $e');
+      
+      // ✅ CORREÇÃO: Usar scaffoldMessenger salvo anteriormente
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Erro ao excluir perfil: $e'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -743,9 +666,9 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
   static void show(
     BuildContext context, {
     required String? activeProfileId,
-    required Function(String) onProfileSelected,
+    required void Function(String) onProfileSelected,
   }) {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
@@ -757,59 +680,56 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
   }
 }
 
-/// Widget: Badge counter para notificações/mensagens de um perfil específico
-class _ProfileBadgeCounter extends ConsumerWidget {
-  const _ProfileBadgeCounter({
+/// Widget: Badge counter unificado para notificações + mensagens de um perfil
+/// Padrão: Circular/oblongo com cor #FF2828
+class _UnifiedBadgeCounter extends ConsumerWidget {
+  const _UnifiedBadgeCounter({
     required this.profileId,
-    required this.icon,
-    required this.isNotification,
+    required this.uid,
   });
   final String profileId;
-  final IconData icon;
-  final bool isNotification;
+  final String uid;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // TODO: Implementar unread count providers para notificações e mensagens
-    // Temporariamente desabilitado
-    return const SizedBox.shrink();
-
-    /* CÓDIGO ORIGINAL COMENTADO - REQUER IMPLEMENTAÇÃO DOS PROVIDERS
-    // Obter o AsyncValue do provider correto baseado no tipo
-    final countAsync = isNotification
-        ? ref.watch(unreadNotificationCountForProfileProvider(profileId))
-        : ref.watch(unreadMessageCountForProfileProvider(profileId));
+    // Soma de notificações + mensagens
+    // ✅ FIX: Passar uid para match com Security Rules
+    final notificationsAsync = ref.watch(unreadNotificationCountNewStreamProvider(profileId, uid));
+    final messagesAsync = ref.watch(unreadMessagesNewCountProvider(profileId: profileId, profileUid: uid));
     
-    return countAsync.when(
-      data: (int count) {
-        if (count <= 0) return const SizedBox.shrink();
-        
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 10, color: Colors.white),
-              const SizedBox(width: 2),
-              Text(
-                count > 99 ? '99+' : count.toString(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+    // Aguardar ambos os providers carregarem
+    if (notificationsAsync.isLoading || messagesAsync.isLoading) {
+      return const SizedBox.shrink();
+    }
+    
+    final notificationCount = notificationsAsync.value ?? 0;
+    final messageCount = messagesAsync.value ?? 0;
+    final totalCount = notificationCount + messageCount;
+    
+    if (totalCount <= 0) return const SizedBox.shrink();
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.badgeRed,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      constraints: const BoxConstraints(
+        minWidth: 20,
+        minHeight: 20,
+      ),
+      child: Text(
+        totalCount > 99 ? '99+' : totalCount.toString(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+        textAlign: TextAlign.center,
+      ),
     );
-    */
   }
 }

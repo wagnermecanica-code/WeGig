@@ -12,7 +12,7 @@
 - [x] **`android/app/src/main/AndroidManifest.xml`** - Browser key para Google Maps
 - [x] **`android/app/google-services.json`** - Android key (auto-gerenciado)
 - [x] **`ios/GoogleService-Info.plist`** - iOS key (auto-gerenciado)
-- [x] **`ios/Runner/Info.plist`** - OAuth Client ID para Google Sign-In
+- [x] **`ios/WeGig/Info.plist`** - OAuth Client ID para Google Sign-In
 - [x] **`.env.example`** - Template atualizado
 
 ---
@@ -79,7 +79,7 @@ Acesse: https://console.cloud.google.com/apis/credentials?project=to-sem-banda-8
 4. [ ] Nome: `WeGig iOS`
 5. [ ] Bundle ID: `com.example.toSemBanda`
 6. [ ] Criar e copiar Client ID
-7. [ ] Atualizar `GIDClientID` em `ios/Runner/Info.plist`
+7. [ ] Atualizar `GIDClientID` em `ios/WeGig/Info.plist`
 8. [ ] Atualizar `CFBundleURLSchemes` com reverso do Client ID
 9. [ ] Baixar novo `GoogleService-Info.plist` do Firebase Console
 10. [ ] Substituir arquivo em `ios/GoogleService-Info.plist`

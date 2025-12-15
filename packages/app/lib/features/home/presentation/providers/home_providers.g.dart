@@ -109,7 +109,7 @@ final searchProfilesUseCaseProvider =
 // ignore: unused_element
 typedef SearchProfilesUseCaseRef
     = AutoDisposeProviderRef<SearchProfilesUseCase>;
-String _$nearbyPostsStreamHash() => r'692aea45931febb23eb8bb0cc2fcf73f3ac9a654';
+String _$nearbyPostsStreamHash() => r'b52293b7e355bc4623ed4c9323a77ce4e577d40b';
 
 /// Copied from Dart SDK
 class _SystemHash {

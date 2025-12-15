@@ -1,90 +1,100 @@
-import 'package:core_ui/features/messages/domain/entities/conversation_entity.dart';
-import 'package:core_ui/features/messages/domain/entities/message_entity.dart';
+import 'package:wegig_app/features/mensagens_new/domain/entities/conversation_new_entity.dart';
+import 'package:wegig_app/features/mensagens_new/domain/entities/message_new_entity.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:wegig_app/features/messages/data/datasources/messages_remote_datasource.dart';
-import 'package:wegig_app/features/messages/domain/repositories/messages_repository.dart';
-import 'package:wegig_app/features/messages/domain/usecases/delete_conversation.dart';
-import 'package:wegig_app/features/messages/domain/usecases/load_conversations.dart';
-import 'package:wegig_app/features/messages/domain/usecases/load_messages.dart';
-import 'package:wegig_app/features/messages/domain/usecases/mark_as_read.dart';
-import 'package:wegig_app/features/messages/domain/usecases/mark_as_unread.dart';
-import 'package:wegig_app/features/messages/domain/usecases/send_image.dart';
-import 'package:wegig_app/features/messages/domain/usecases/send_message.dart';
-import 'package:wegig_app/features/messages/presentation/providers/messages_providers.dart';
+import 'package:wegig_app/features/mensagens_new/data/datasources/mensagens_new_remote_datasource.dart';
+import 'package:wegig_app/features/mensagens_new/domain/repositories/mensagens_new_repository.dart';
+import 'package:wegig_app/features/mensagens_new/domain/usecases/conversation_usecases.dart';
+import 'package:wegig_app/features/mensagens_new/domain/usecases/message_usecases.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/providers/mensagens_new_providers.dart';
 
 // ============================================================================
 // MOCK CLASSES
 // ============================================================================
 
-class _MockMessagesRemoteDataSource implements IMessagesRemoteDataSource {
+class _MockMessagesRemoteDataSource implements IMensagensNewRemoteDataSource {
   @override
-  Stream<List<ConversationEntity>> watchConversations(String profileId) {
+  Future<void> addReaction(String conversationId, String messageId, String userId, String reaction) async {}
+
+  @override
+  Future<void> removeReaction(String conversationId, String messageId, String userId) async {}
+
+  @override
+  Future<void> deleteMessage(String conversationId, String messageId) async {}
+
+  @override
+  Stream<List<ConversationNewEntity>> watchConversations(String profileId,
+      {int limit = 20, String? profileUid}) {
     return Stream.value([]);
   }
 
   @override
-  Stream<List<MessageEntity>> watchMessages(String conversationId) {
+  Stream<List<MessageNewEntity>> watchMessages(
+    String conversationId, {
+    int limit = 20,
+  }) {
     return Stream.value([]);
   }
 
   @override
-  Stream<int> watchUnreadCount(String profileId) {
+  Stream<int> watchUnreadCount(String profileId, {String? profileUid}) {
     return Stream.value(0);
   }
 
   @override
-  Future<List<ConversationEntity>> getConversations({
+  Future<List<ConversationNewEntity>> getConversations({
     required String profileId,
     int limit = 20,
-    ConversationEntity? startAfter,
+    ConversationNewEntity? startAfter,
+    String? profileUid,
   }) async {
     return [];
   }
 
   @override
-  Future<ConversationEntity?> getConversationById(String conversationId) async {
+  Future<ConversationNewEntity?> getConversationById(String conversationId) async {
     return null;
   }
 
   @override
-  Future<ConversationEntity> getOrCreateConversation({
+  Future<ConversationNewEntity> getOrCreateConversation({
     required String currentProfileId,
     required String otherProfileId,
     required String currentUid,
     required String otherUid,
+    String? profileUid,
   }) async {
     throw UnimplementedError();
   }
 
   @override
-  Future<List<MessageEntity>> getMessages({
+  Future<List<MessageNewEntity>> getMessages({
     required String conversationId,
     int limit = 20,
-    MessageEntity? startAfter,
+    MessageNewEntity? startAfter,
   }) async {
     return [];
   }
 
   @override
-  Future<MessageEntity> sendMessage({
+  Future<MessageNewEntity> sendMessage({
     required String conversationId,
     required String senderId,
     required String senderProfileId,
     required String text,
-    MessageReplyEntity? replyTo,
+    MessageReplyData? replyTo,
   }) async {
     throw UnimplementedError();
   }
 
   @override
-  Future<MessageEntity> sendImageMessage({
+  Future<MessageNewEntity> sendImageMessage({
     required String conversationId,
     required String senderId,
     required String senderProfileId,
     required String imageUrl,
     String text = '',
-    MessageReplyEntity? replyTo,
+    MessageReplyData? replyTo,
   }) async {
     throw UnimplementedError();
   }
@@ -99,79 +109,106 @@ class _MockMessagesRemoteDataSource implements IMessagesRemoteDataSource {
   Future<void> deleteConversation(String conversationId, String profileId) async {}
 
   @override
-  Future<int> getUnreadMessageCount(String profileId) async {
+  Future<int> getUnreadMessageCount(String profileId, {String? profileUid}) async {
     return 0;
   }
 }
 
-class _MockMessagesRepository implements MessagesRepository {
+class _MockMensagensNewRepository implements MensagensNewRepository {
   @override
-  Stream<List<ConversationEntity>> watchConversations(String profileId) {
+  Future<void> addReaction({
+    required String conversationId,
+    required String messageId,
+    required String userId,
+    required String reaction,
+  }) async {}
+
+  @override
+  Future<void> removeReaction({
+    required String conversationId,
+    required String messageId,
+    required String userId,
+  }) async {}
+
+  @override
+  Future<void> deleteMessage({
+    required String conversationId,
+    required String messageId,
+  }) async {}
+
+  @override
+  Stream<List<ConversationNewEntity>> watchConversations(String profileId,
+      {int limit = 20, String? profileUid}) {
     return Stream.value([]);
   }
 
   @override
-  Stream<List<MessageEntity>> watchMessages(String conversationId) {
+  Stream<List<MessageNewEntity>> watchMessages(
+    String conversationId, {
+    int limit = 20,
+  }) {
     return Stream.value([]);
   }
 
   @override
-  Stream<int> watchUnreadCount(String profileId) {
+  Stream<int> watchUnreadCount(String profileId, {String? profileUid}) {
     return Stream.value(0);
   }
 
   @override
-  Future<List<ConversationEntity>> getConversations({
+  Future<List<ConversationNewEntity>> getConversations({
     required String profileId,
     int limit = 20,
-    ConversationEntity? startAfter,
+    ConversationNewEntity? startAfter,
+    String? profileUid,
   }) async {
     return [];
   }
 
   @override
-  Future<ConversationEntity?> getConversationById(String conversationId) async {
+  Future<ConversationNewEntity?> getConversationById(String conversationId) async {
     return null;
   }
 
   @override
-  Future<ConversationEntity> getOrCreateConversation({
+  Future<ConversationNewEntity> getOrCreateConversation({
     required String currentProfileId,
     required String otherProfileId,
     required String currentUid,
     required String otherUid,
+    String? profileUid,
   }) async {
     throw UnimplementedError();
   }
 
   @override
-  Future<List<MessageEntity>> getMessages({
+  Future<List<MessageNewEntity>> getMessages({
     required String conversationId,
     int limit = 20,
-    MessageEntity? startAfter,
+    MessageNewEntity? startAfter,
   }) async {
     return [];
   }
 
   @override
-  Future<MessageEntity> sendMessage({
+  Future<MessageNewEntity> sendMessage({
     required String conversationId,
     required String senderId,
     required String senderProfileId,
     required String text,
-    MessageReplyEntity? replyTo,
+    MessageReplyData? replyTo,
   }) async {
     throw UnimplementedError();
   }
 
   @override
-  Future<MessageEntity> sendImageMessage({
+  Future<MessageNewEntity> sendImageMessage({
     required String conversationId,
     required String senderId,
     required String senderProfileId,
     required String imageUrl,
     String text = '',
-    MessageReplyEntity? replyTo,
+    MessageReplyData? replyTo,
   }) async {
     throw UnimplementedError();
   }
@@ -195,7 +232,7 @@ class _MockMessagesRepository implements MessagesRepository {
   }) async {}
 
   @override
-  Future<int> getUnreadMessageCount(String profileId) async {
+  Future<int> getUnreadMessageCount(String profileId, {String? profileUid}) async {
     return 0;
   }
 }
@@ -209,12 +246,12 @@ void main() {
 
   setUp(() {
     final mockDataSource = _MockMessagesRemoteDataSource();
-    final mockRepository = _MockMessagesRepository();
+    final mockRepository = _MockMensagensNewRepository();
 
     container = ProviderContainer(
       overrides: [
-        messagesRemoteDataSourceProvider.overrideWithValue(mockDataSource),
-        messagesRepositoryNewProvider.overrideWithValue(mockRepository),
+        mensagensNewRemoteDataSourceProvider.overrideWithValue(mockDataSource),
+        mensagensNewRepositoryProvider.overrideWithValue(mockRepository),
       ],
     );
   });
@@ -224,112 +261,112 @@ void main() {
   });
 
   group('Messages Providers - Data Layer', () {
-    test('messagesRemoteDataSourceProvider returns singleton', () {
-      final ds1 = container.read(messagesRemoteDataSourceProvider);
-      final ds2 = container.read(messagesRemoteDataSourceProvider);
+    test('mensagensNewRemoteDataSourceProvider returns singleton', () {
+      final ds1 = container.read(mensagensNewRemoteDataSourceProvider);
+      final ds2 = container.read(mensagensNewRemoteDataSourceProvider);
       expect(identical(ds1, ds2), isTrue,
           reason: 'DataSource is singleton, must return same instance');
     });
 
-    test('messagesRemoteDataSourceProvider returns MessagesRemoteDataSource',
+    test('mensagensNewRemoteDataSourceProvider returns MessagesRemoteDataSource',
         () {
-      final dataSource = container.read(messagesRemoteDataSourceProvider);
-      expect(dataSource, isA<IMessagesRemoteDataSource>());
+      final dataSource = container.read(mensagensNewRemoteDataSourceProvider);
+      expect(dataSource, isA<IMensagensNewRemoteDataSource>());
     });
 
-    test('messagesRepositoryNewProvider returns MessagesRepository', () {
-      final repository = container.read(messagesRepositoryNewProvider);
-      expect(repository, isA<MessagesRepository>());
+    test('mensagensNewRepositoryProvider returns MensagensNewRepository', () {
+      final repository = container.read(mensagensNewRepositoryProvider);
+      expect(repository, isA<MensagensNewRepository>());
     });
 
-    test('messagesRepositoryNewProvider returns singleton', () {
-      final repo1 = container.read(messagesRepositoryNewProvider);
-      final repo2 = container.read(messagesRepositoryNewProvider);
+    test('mensagensNewRepositoryProvider returns singleton', () {
+      final repo1 = container.read(mensagensNewRepositoryProvider);
+      final repo2 = container.read(mensagensNewRepositoryProvider);
       expect(identical(repo1, repo2), isTrue,
           reason: 'Repository is singleton, must return same instance');
     });
   });
 
   group('Messages Providers - Use Cases', () {
-    test('loadConversationsUseCaseProvider returns LoadConversations', () {
-      final useCase = container.read(loadConversationsUseCaseProvider);
-      expect(useCase, isA<LoadConversations>());
+    test('loadConversationsNewUseCaseProvider returns LoadConversationsNewUseCase', () {
+      final useCase = container.read(loadConversationsNewUseCaseProvider);
+      expect(useCase, isA<LoadConversationsNewUseCase>());
     });
 
-    test('loadMessagesUseCaseProvider returns LoadMessages', () {
-      final useCase = container.read(loadMessagesUseCaseProvider);
-      expect(useCase, isA<LoadMessages>());
+    test('loadMessagesNewUseCaseProvider returns LoadMessagesNewUseCase', () {
+      final useCase = container.read(loadMessagesNewUseCaseProvider);
+      expect(useCase, isA<LoadMessagesNewUseCase>());
     });
 
-    test('sendMessageUseCaseProvider returns SendMessage', () {
-      final useCase = container.read(sendMessageUseCaseProvider);
-      expect(useCase, isA<SendMessage>());
+    test('sendMessageNewUseCaseProvider returns SendMessageNewUseCase', () {
+      final useCase = container.read(sendMessageNewUseCaseProvider);
+      expect(useCase, isA<SendMessageNewUseCase>());
     });
 
-    test('sendImageUseCaseProvider returns SendImage', () {
-      final useCase = container.read(sendImageUseCaseProvider);
-      expect(useCase, isA<SendImage>());
+    test('sendImageMessageNewUseCaseProvider returns SendImageMessageNewUseCase', () {
+      final useCase = container.read(sendImageMessageNewUseCaseProvider);
+      expect(useCase, isA<SendImageMessageNewUseCase>());
     });
 
-    test('markAsReadUseCaseProvider returns MarkAsRead', () {
-      final useCase = container.read(markAsReadUseCaseProvider);
-      expect(useCase, isA<MarkAsRead>());
+    test('markAsReadNewUseCaseProvider returns MarkAsReadNewUseCase', () {
+      final useCase = container.read(markAsReadNewUseCaseProvider);
+      expect(useCase, isA<MarkAsReadNewUseCase>());
     });
 
-    test('markAsUnreadUseCaseProvider returns MarkAsUnread', () {
-      final useCase = container.read(markAsUnreadUseCaseProvider);
-      expect(useCase, isA<MarkAsUnread>());
+    test('markAsUnreadNewUseCaseProvider returns MarkAsUnreadNewUseCase', () {
+      final useCase = container.read(markAsUnreadNewUseCaseProvider);
+      expect(useCase, isA<MarkAsUnreadNewUseCase>());
     });
 
-    test('deleteConversationUseCaseProvider returns DeleteConversation', () {
-      final useCase = container.read(deleteConversationUseCaseProvider);
-      expect(useCase, isA<DeleteConversation>());
+    test('deleteConversationNewUseCaseProvider returns DeleteConversationNewUseCase', () {
+      final useCase = container.read(deleteConversationNewUseCaseProvider);
+      expect(useCase, isA<DeleteConversationNewUseCase>());
     });
 
-    test('All use cases depend on messagesRepositoryNewProvider', () {
+    test('All use cases depend on mensagensNewRepositoryProvider', () {
       final repositoryCallCount = 7; // 7 use cases
       var actualCalls = 0;
 
       // Read repository through each use case
-      container.read(loadConversationsUseCaseProvider);
+      container.read(loadConversationsNewUseCaseProvider);
       actualCalls++;
-      container.read(loadMessagesUseCaseProvider);
+      container.read(loadMessagesNewUseCaseProvider);
       actualCalls++;
-      container.read(sendMessageUseCaseProvider);
+      container.read(sendMessageNewUseCaseProvider);
       actualCalls++;
-      container.read(sendImageUseCaseProvider);
+      container.read(sendImageMessageNewUseCaseProvider);
       actualCalls++;
-      container.read(markAsReadUseCaseProvider);
+      container.read(markAsReadNewUseCaseProvider);
       actualCalls++;
-      container.read(markAsUnreadUseCaseProvider);
+      container.read(markAsUnreadNewUseCaseProvider);
       actualCalls++;
-      container.read(deleteConversationUseCaseProvider);
+      container.read(deleteConversationNewUseCaseProvider);
       actualCalls++;
 
       expect(actualCalls, equals(repositoryCallCount),
           reason:
-              'All 7 use cases should depend on messagesRepositoryNewProvider');
+              'All 7 use cases should depend on mensagensNewRepositoryProvider');
     });
 
     test('Use cases are singletons within the same container', () {
-      final useCase1 = container.read(sendMessageUseCaseProvider);
-      final useCase2 = container.read(sendMessageUseCaseProvider);
+      final useCase1 = container.read(sendMessageNewUseCaseProvider);
+      final useCase2 = container.read(sendMessageNewUseCaseProvider);
       expect(identical(useCase1, useCase2), isTrue,
           reason: 'Use cases should be singletons');
     });
   });
 
   group('Messages Providers - Overrides', () {
-    test('Can override messagesRepositoryNewProvider', () {
-      final customRepository = _MockMessagesRepository();
+    test('Can override mensagensNewRepositoryProvider', () {
+      final customRepository = _MockMensagensNewRepository();
       final containerWithOverride = ProviderContainer(
         overrides: [
-          messagesRepositoryNewProvider.overrideWithValue(customRepository),
+          mensagensNewRepositoryProvider.overrideWithValue(customRepository),
         ],
       );
 
       final repository =
-          containerWithOverride.read(messagesRepositoryNewProvider);
+          containerWithOverride.read(mensagensNewRepositoryProvider);
       expect(identical(repository, customRepository), isTrue,
           reason: 'Should use overridden repository');
 
@@ -337,16 +374,16 @@ void main() {
     });
 
     test('Can override use case providers', () {
-      final customRepository = _MockMessagesRepository();
+      final customRepository = _MockMensagensNewRepository();
       final containerWithOverride = ProviderContainer(
         overrides: [
-          messagesRepositoryNewProvider.overrideWithValue(customRepository),
+          mensagensNewRepositoryProvider.overrideWithValue(customRepository),
         ],
       );
 
       final useCase =
-          containerWithOverride.read(sendMessageUseCaseProvider);
-      expect(useCase, isA<SendMessage>(),
+          containerWithOverride.read(sendMessageNewUseCaseProvider);
+      expect(useCase, isA<SendMessageNewUseCase>(),
           reason: 'Use case should be created with overridden repository');
 
       containerWithOverride.dispose();
@@ -354,23 +391,23 @@ void main() {
   });
 
   group('Messages Providers - Stream Providers', () {
-    test('conversationsStreamProvider can be read without errors', () {
+    test('conversationsNewStreamProvider can be read without errors', () {
       // StreamProvider with @riverpod annotation
-      expect(() => container.read(conversationsStreamProvider('profile-123')),
+      expect(() => container.read(conversationsNewStreamProvider(profileId: 'profile-123', profileUid: 'uid-123')),
           returnsNormally,
           reason: 'Should be able to read conversations stream provider');
     });
 
-    test('messagesStreamProvider can be read without errors', () {
-      expect(() => container.read(messagesStreamProvider('conversation-123')),
+    test('messagesNewStreamProvider can be read without errors', () {
+      expect(() => container.read(messagesNewStreamProvider('conversation-123')),
           returnsNormally,
           reason: 'Should be able to read messages stream provider');
     });
 
-    test('unreadMessageCountForProfileProvider can be read without errors', () {
+    test('unreadMessagesNewCountProvider can be read without errors', () {
       expect(
           () => container
-              .read(unreadMessageCountForProfileProvider('profile-123')),
+              .read(unreadMessagesNewCountProvider(profileId: 'profile-123', profileUid: 'uid-123')),
           returnsNormally,
           reason: 'Should be able to read unread count stream provider');
     });
@@ -381,13 +418,13 @@ void main() {
       var isDisposed = false;
       final testContainer = ProviderContainer(
         overrides: [
-          messagesRemoteDataSourceProvider
+          mensagensNewRemoteDataSourceProvider
               .overrideWithValue(_MockMessagesRemoteDataSource()),
         ],
       );
 
       // Read provider to initialize it
-      testContainer.read(messagesRemoteDataSourceProvider);
+      testContainer.read(mensagensNewRemoteDataSourceProvider);
 
       testContainer.dispose();
       isDisposed = true;

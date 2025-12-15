@@ -1,0 +1,198 @@
+name: CI - Build & Test
+
+on:
+  push:
+    branches: [main, develop, feat/*]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: "3.27.1"
+
+jobs:
+  # Job de análise e testes
+  analyze-and-test:
+    name: Analyze & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: "stable"
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            .dart_tool
+            packages/app/.dart_tool
+            packages/core_ui/.dart_tool
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install root dependencies
+        run: flutter pub get
+
+      - name: Bootstrap monorepo # Melos 3.0+
+        run: dart run melos bootstrap
+
+      - name: Run build_runner
+        run: dart run melos run build_runner
+
+      - name: Verify formatting
+        run: |
+          cd packages/app
+          dart format --set-exit-if-changed lib/ test/
+        continue-on-error: true
+
+      - name: Analyze code
+        run: |
+          cd packages/app
+          flutter analyze --no-fatal-infos
+
+      - name: Run tests
+        run: |
+          cd packages/app
+          flutter test --coverage --reporter expanded
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: packages/app/coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Generate API documentation
+        run: |
+          cd packages/app
+          dart doc --output ../../docs/api
+        continue-on-error: true
+
+      - name: Upload API documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-documentation
+          path: docs/api
+          retention-days: 30
+          if-no-files-found: warn
+
+  # Job de build iOS
+  build-ios:
+    name: Build iOS (Debug)
+    runs-on: macos-latest
+    needs: analyze-and-test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: "stable"
+          cache: true
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/app/ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-pods-${{ hashFiles('packages/app/ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Install root dependencies
+        run: flutter pub get
+
+      - name: Bootstrap monorepo # Melos 3.0+
+        run: dart run melos bootstrap
+
+      - name: Run build_runner
+        run: dart run melos run build_runner
+
+      - name: Pod install
+        run: |
+          cd packages/app/ios
+          pod install
+
+      - name: Build iOS (Debug)
+        run: |
+          cd packages/app
+          flutter build ios --debug --no-codesign --flavor dev -t lib/main_dev.dart
+
+      - name: Verify build settings
+        run: |
+          cd packages/app
+          xcodebuild -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Debug-dev \
+            -showBuildSettings | grep -E "(PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN|DEVELOPMENT_TEAM)"
+
+  # Job de build Android
+  build-android:
+    name: Build Android (Debug)
+    runs-on: ubuntu-latest
+    needs: analyze-and-test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: "stable"
+          cache: true
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            packages/app/android/.gradle
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Install root dependencies
+        run: flutter pub get
+
+      - name: Bootstrap monorepo # Melos 3.0+
+        run: dart run melos bootstrap
+
+      - name: Run build_runner
+        run: dart run melos run build_runner
+
+      - name: Build Android APK
+        run: |
+          cd packages/app
+          flutter build apk --debug --flavor dev -t lib/main_dev.dart
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-dev-debug
+          path: packages/app/build/app/outputs/apk/dev/debug/app-dev-debug.apk
+          retention-days: 7
+          if-no-files-found: warn

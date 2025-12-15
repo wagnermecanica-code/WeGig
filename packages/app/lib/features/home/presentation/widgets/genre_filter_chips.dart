@@ -11,7 +11,7 @@ class GenreFilterChips extends StatelessWidget {
     this.maxGenres = 5,
   });
   final Set<String> selectedGenres;
-  final Function(String) onGenreToggle;
+  final void Function(String) onGenreToggle;
   final int maxGenres;
 
   static const List<String> genreOptions = <String>[

@@ -1,17 +1,22 @@
 // lib/app/router/app_router.dart
-import 'package:core_ui/navigation/bottom_nav_scaffold.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../navigation/bottom_nav_scaffold.dart';
+import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:wegig_app/features/auth/presentation/pages/auth_page.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
-import 'package:wegig_app/features/messages/presentation/pages/chat_detail_page.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_detail_page.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:wegig_app/features/settings/presentation/pages/settings_page.dart';
+import 'package:wegig_app/features/notifications_new/presentation/pages/notifications_new_page.dart';
 
 part 'app_router.g.dart';
 
@@ -26,8 +31,11 @@ class AppRoutes {
   /// Auth route path
   static const String auth = '/auth';
 
+  /// Splash/loading route path
+  static const String splash = '/loading';
+
   /// Create profile route path
-  static const String createProfile = '/create-profile';
+  static const String createProfile = '/profiles/new';
 
   /// Home route path
   static const String home = '/home';
@@ -38,12 +46,19 @@ class AppRoutes {
   /// Post detail route template
   static String postDetail(String postId) => '/post/$postId';
 
-  /// Conversation/chat route template
+  /// Conversation/chat route template (legacy - ChatDetailPage)
   static String conversation(String conversationId) =>
       '/conversation/$conversationId';
 
+  /// Chat new route template (MensagensNew feature)
+  static String chatNew(String conversationId) =>
+      '/chat-new/$conversationId';
+
   /// Edit profile route template
   static String editProfile(String profileId) => '/profile/$profileId/edit';
+
+  /// Notifications new route path
+  static const String notificationsNew = '/notifications-new';
 }
 
 // ============================================
@@ -51,97 +66,231 @@ class AppRoutes {
 // ============================================
 
 /// Provider do GoRouter com auth guard e redirect logic usando rotas tipadas
+CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) {
+  final slideTween = Tween<Offset>(
+    begin: const Offset(
+        0.02, 0.04), // Leve deslocamento para reduzir flashes brancos
+    end: Offset.zero,
+  );
+
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    transitionDuration: const Duration(milliseconds: 320),
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    barrierColor: Colors.transparent,
+    maintainState: true,
+    child: child,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      // Apenas Slide - removido FadeTransition
+      final Animation<Offset> slideAnimation = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      ).drive(slideTween);
+
+      return SlideTransition(
+        position: slideAnimation,
+        child: child,
+      );
+    },
+  );
+}
+
+// ✅ NOVA TRANSIÇÃO: Slide lateral completo (estilo nativo iOS/Android)
+CustomTransitionPage<void> _slideLeftPage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
+    child: child,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      const begin = Offset(1.0, 0.0); // Começa da direita
+      const end = Offset.zero;
+      const curve = Curves.easeInOut;
+
+      var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+      var offsetAnimation = animation.drive(tween);
+
+      return SlideTransition(
+        position: offsetAnimation,
+        child: child,
+      );
+    },
+  );
+}
+
 @riverpod
 GoRouter goRouter(Ref ref) {
   final authState = ref.watch(authStateProvider);
-  final profileState = ref.watch(profileProvider);
+  final profileState = authState.valueOrNull != null ? ref.watch(profileProvider) : AsyncValue<ProfileState>.data(ProfileState());
 
   return GoRouter(
-    initialLocation: '/home',
+    initialLocation: AppRoutes.auth,
     debugLogDiagnostics: true,
     redirect: (BuildContext context, GoRouterState state) {
-      final isLoggedIn = authState.value != null;
-      final isGoingToAuth = state.matchedLocation == '/auth';
-      final isGoingToCreateProfile = state.matchedLocation == '/create-profile';
-      final hasProfile = profileState.value?.activeProfile != null;
+      final user = authState.valueOrNull;
+      final isLoggedIn = user != null;
+      final isGoingToAuth = state.matchedLocation == AppRoutes.auth;
+      final isGoingToSplash = state.matchedLocation == AppRoutes.splash;
+      final isGoingToCreateProfile =
+          state.matchedLocation == AppRoutes.createProfile;
 
-      // Se não está logado e não vai para auth, redireciona para auth
-      if (!isLoggedIn && !isGoingToAuth) {
-        return '/auth';
+      debugPrint('Router: location=${state.matchedLocation}, isLoggedIn=$isLoggedIn, isGoingToAuth=$isGoingToAuth, isGoingToSplash=$isGoingToSplash, isGoingToCreateProfile=$isGoingToCreateProfile');
+
+      final profileData = profileState.valueOrNull;
+      final hasProfileData = profileState is AsyncData<ProfileState>;
+      final hasAnyProfile = (profileData?.profiles.isNotEmpty ?? false);
+      final hasActiveProfile = profileData?.activeProfile != null;
+      
+      // ✅ FIX: Considerar como "checking" se:
+      // 1. Auth está carregando
+      // 2. Auth OK mas profile está carregando
+      // 3. Auth OK mas profile tem erro (pode ser transitório, tentar novamente)
+      final isCheckingAuth = authState.isLoading ||
+          (isLoggedIn && (profileState.isLoading || profileState.hasError));
+
+      debugPrint('Router: authState.isLoading=${authState.isLoading}, authState.hasError=${authState.hasError}, user=$user');
+      debugPrint('Router: profileState.isLoading=${profileState.isLoading}, profileState.hasError=${profileState.hasError}');
+      debugPrint('Router: isCheckingAuth=$isCheckingAuth, hasProfileData=$hasProfileData, hasAnyProfile=$hasAnyProfile, hasActiveProfile=$hasActiveProfile');
+
+      if (isCheckingAuth) {
+        debugPrint('Router: isCheckingAuth, returning splash');
+        return AppRoutes.splash;
       }
 
-      // Se está logado e vai para auth, redireciona para home
-      if (isLoggedIn && isGoingToAuth) {
-        return '/home';
+      if (!isLoggedIn) {
+        debugPrint('Router: not logged in, returning auth');
+        return AppRoutes.auth;
       }
 
-      // Se está logado, mas não tem perfil e não está indo para criar perfil
-      if (isLoggedIn && !hasProfile && !isGoingToCreateProfile) {
-        return '/create-profile';
+      // Agora sabemos que está logado E profileState carregou com sucesso
+      if (hasProfileData && !hasAnyProfile) {
+        debugPrint('Router: logged in but no profiles, returning createProfile');
+        return AppRoutes.createProfile;
       }
 
-      // Caso contrário, permite navegação
+      // Usuário logado com perfis - verificar se está em rota permitida
+      // Se está indo para auth/splash/createProfile, redireciona para home
+      if (isGoingToAuth || isGoingToSplash || isGoingToCreateProfile) {
+        debugPrint('Router: logged in with profiles, redirecting to home');
+        return AppRoutes.home;
+      }
+
+      // Rota atual é válida (home, profile, post, conversation, etc) - não redirecionar
+      debugPrint('Router: logged in with profiles, allowing current route: ${state.matchedLocation}');
       return null;
     },
     routes: <RouteBase>[
       GoRoute(
-        path: '/auth',
-        name: 'auth',
-        builder: (BuildContext context, GoRouterState state) =>
-            const AuthPage(),
+        path: AppRoutes.splash,
+        name: 'splash',
+        pageBuilder: (context, state) => _fadePage(state, const _SplashPage()),
       ),
       GoRoute(
-        path: '/create-profile',
+        path: '/auth',
+        name: 'auth',
+        pageBuilder: (context, state) => _fadePage(state, const AuthPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.createProfile,
         name: 'createProfile',
-        builder: (BuildContext context, GoRouterState state) =>
-            const EditProfilePage(isNewProfile: true),
+        pageBuilder: (context, state) =>
+            _fadePage(state, const EditProfilePage(isNewProfile: true)),
       ),
       GoRoute(
         path: '/home',
         name: 'home',
-        builder: (BuildContext context, GoRouterState state) =>
-            const BottomNavScaffold(),
+        pageBuilder: (context, state) =>
+            _fadePage(state, const BottomNavScaffold()),
       ),
       GoRoute(
         path: '/profile/:profileId',
         name: 'profile',
-        builder: (BuildContext context, GoRouterState state) {
+        pageBuilder: (context, state) {
           final profileId = state.pathParameters['profileId']!;
-          return ViewProfilePage(profileId: profileId);
+          return CupertinoPage<void>(
+            key: state.pageKey,
+            child: ViewProfilePage(profileId: profileId),
+          );
         },
       ),
       GoRoute(
         path: '/post/:postId',
         name: 'postDetail',
-        builder: (BuildContext context, GoRouterState state) {
+        pageBuilder: (context, state) {
           final postId = state.pathParameters['postId']!;
-          return PostDetailPage(postId: postId);
+          return CupertinoPage<void>(
+            key: state.pageKey,
+            child: PostDetailPage(postId: postId),
+          );
         },
       ),
       GoRoute(
         path: '/conversation/:conversationId',
         name: 'conversation',
-        builder: (BuildContext context, GoRouterState state) {
+        pageBuilder: (context, state) {
           final conversationId = state.pathParameters['conversationId']!;
           final otherUserId = state.uri.queryParameters['otherUserId'];
           final otherProfileId = state.uri.queryParameters['otherProfileId'];
           final otherUserName = state.uri.queryParameters['otherUserName'];
           final otherUserPhoto = state.uri.queryParameters['otherUserPhoto'];
-          return ChatDetailPage(
-            conversationId: conversationId,
-            otherUserId: otherUserId ?? '',
-            otherProfileId: otherProfileId ?? '',
-            otherUserName: otherUserName ?? '',
-            otherUserPhoto: otherUserPhoto ?? '',
+          return _fadePage(
+            state,
+            ChatNewPage(
+              conversationId: conversationId,
+              otherUid: otherUserId ?? '',
+              otherProfileId: otherProfileId ?? '',
+              otherName: otherUserName ?? '',
+              otherPhotoUrl: otherUserPhoto ?? '',
+            ),
           );
         },
+      ),
+      // ✅ NOVA ROTA: Notifications New (substituindo a antiga)
+      GoRoute(
+        path: '/notifications-new',
+        name: 'notificationsNew',
+        pageBuilder: (context, state) =>
+            _slideLeftPage(state, const NotificationsNewPage()),
+      ),
+      // ✅ NOVA ROTA: Chat New (MensagensNew feature)
+      GoRoute(
+        path: '/chat-new/:conversationId',
+        name: 'chatNew',
+        pageBuilder: (context, state) {
+          final conversationId = state.pathParameters['conversationId']!;
+          final otherUid = state.uri.queryParameters['otherUid'] ?? '';
+          final otherProfileId = state.uri.queryParameters['otherProfileId'] ?? '';
+          final otherName = state.uri.queryParameters['otherName'] ?? '';
+          final otherPhotoUrl = state.uri.queryParameters['otherPhotoUrl'];
+          return _slideLeftPage(
+            state,
+            ChatNewPage(
+              conversationId: conversationId,
+              otherUid: otherUid,
+              otherProfileId: otherProfileId,
+              otherName: otherName,
+              otherPhotoUrl: otherPhotoUrl,
+            ),
+          );
+        },
+      ),
+      // ✅ NOVA ROTA: Settings com transição Slide
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        pageBuilder: (context, state) =>
+            _slideLeftPage(state, const SettingsPage()),
       ),
       GoRoute(
         path: '/profile/:profileId/edit',
         name: 'editProfile',
-        builder: (BuildContext context, GoRouterState state) {
+        pageBuilder: (context, state) {
           final profileId = state.pathParameters['profileId']!;
-          return EditProfilePage(profileIdToEdit: profileId);
+          return _fadePage(
+            state,
+            EditProfilePage(profileIdToEdit: profileId),
+          );
         },
       ),
     ],
@@ -171,6 +320,23 @@ GoRouter goRouter(Ref ref) {
       ),
     ),
   );
+}
+
+class _SplashPage extends StatelessWidget {
+  const _SplashPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: CircularProgressIndicator(),
+        ),
+      ),
+    );
+  }
 }
 
 // ============================================
@@ -248,6 +414,82 @@ extension TypedNavigationExtension on BuildContext {
     push(uri.toString());
   }
 
+  /// Navigate to chat new page (MensagensNew feature)
+  void goToChatNew(
+    String conversationId, {
+    required String otherUid,
+    required String otherProfileId,
+    required String otherName,
+    String? otherPhotoUrl,
+  }) {
+    _logNavigation('chat_new', {'conversationId': conversationId});
+    final uri = Uri(
+      path: AppRoutes.chatNew(conversationId),
+      queryParameters: {
+        'otherUid': otherUid,
+        'otherProfileId': otherProfileId,
+        'otherName': otherName,
+        if (otherPhotoUrl != null) 'otherPhotoUrl': otherPhotoUrl,
+      },
+    );
+    go(uri.toString());
+  }
+
+  /// Push to chat new page (MensagensNew feature - adds to stack)
+  void pushChatNew(
+    String conversationId, {
+    required String otherUid,
+    required String otherProfileId,
+    required String otherName,
+    String? otherPhotoUrl,
+  }) {
+    _logNavigation('chat_new', {'conversationId': conversationId});
+    final uri = Uri(
+      path: AppRoutes.chatNew(conversationId),
+      queryParameters: {
+        'otherUid': otherUid,
+        'otherProfileId': otherProfileId,
+        'otherName': otherName,
+        if (otherPhotoUrl != null) 'otherPhotoUrl': otherPhotoUrl,
+      },
+    );
+    push(uri.toString());
+  }
+
+  /// Push profile screen resolving from @username
+  Future<void> pushProfileByUsername(String username) async {
+    final sanitized = username.trim().replaceAll('@', '');
+    if (sanitized.isEmpty) {
+      AppSnackBar.showError(this, 'Perfil não encontrado');
+      return;
+    }
+
+    try {
+      final query = await FirebaseFirestore.instance
+          .collection('profiles')
+          .where(
+            'usernameLowercase',
+            isEqualTo: sanitized.toLowerCase(),
+          )
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) {
+        AppSnackBar.showError(this, 'Perfil não encontrado');
+        return;
+      }
+
+      pushProfile(query.docs.first.id);
+    } catch (error, stackTrace) {
+      debugPrint('pushProfileByUsername error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      AppSnackBar.showError(
+        this,
+        'Não conseguimos abrir esse perfil agora.',
+      );
+    }
+  }
+
   /// Navigate to edit profile page
   void goToEditProfile(String profileId) {
     _logNavigation('edit_profile', {'profileId': profileId});
@@ -261,8 +503,11 @@ extension TypedNavigationExtension on BuildContext {
   }
 
   /// Log navigation event to Firebase Analytics
+  /// CRITICAL: Includes active_profile_id for proper analytics segmentation
   void _logNavigation(String screenName, Map<String, String> parameters) {
     try {
+      // Note: active_profile_id is set via setUserProperty in ProfileNotifier
+      // Here we just log the navigation event
       FirebaseAnalytics.instance.logEvent(
         name: 'navigate_$screenName',
         parameters: parameters,

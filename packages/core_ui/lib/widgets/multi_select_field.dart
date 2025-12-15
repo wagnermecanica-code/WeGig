@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:iconsax/iconsax.dart';
 
 class MultiSelectField extends StatefulWidget {
   final String title;
@@ -46,7 +47,6 @@ class _MultiSelectFieldState extends State<MultiSelectField> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           widget.title,
@@ -106,7 +106,7 @@ class _MultiSelectFieldState extends State<MultiSelectField> {
                 ),
                 const SizedBox(width: 8),
                 Icon(
-                  Icons.arrow_drop_down,
+                  Iconsax.arrow_down,
                   color: Colors.grey[600],
                   size: 28,
                 ),
@@ -151,6 +151,7 @@ class _MultiSelectModalState extends State<_MultiSelectModal> {
 
   @override
   void dispose() {
+    if (!mounted) return;
     _searchController.dispose();
     super.dispose();
   }
@@ -249,10 +250,10 @@ class _MultiSelectModalState extends State<_MultiSelectModal> {
                         controller: _searchController,
                         decoration: InputDecoration(
                           hintText: 'Buscar...',
-                          prefixIcon: const Icon(Icons.search),
+                          prefixIcon: const Icon(Iconsax.search_normal),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear),
+                                  icon: const Icon(Iconsax.close_circle),
                                   onPressed: () {
                                     setState(() {
                                       _searchController.clear();
@@ -299,7 +300,7 @@ class _MultiSelectModalState extends State<_MultiSelectModal> {
                           height: 56,
                           alignment: Alignment.center,
                           child: const Icon(
-                            Icons.check,
+                            Iconsax.tick_circle,
                             color: Colors.white,
                             size: 28,
                           ),

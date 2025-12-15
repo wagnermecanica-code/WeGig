@@ -1,10 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/mention_text.dart';
 import 'package:flutter/material.dart';
+import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_detail_page.dart';
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Widget de card de post para feed
 /// Design: Foto à esquerda (35%), conteúdo à direita (65%)
@@ -62,9 +66,9 @@ class FeedPostCard extends StatelessWidget {
                   tag: 'post-photo-${post.id}',
                   child: GestureDetector(
                     onTap: () {
-                      Navigator.push(
+                      Navigator.push<void>(
                         context,
-                        MaterialPageRoute(
+                        MaterialPageRoute<void>(
                           builder: (_) => PostDetailPage(postId: post.id),
                         ),
                       );
@@ -78,9 +82,10 @@ class FeedPostCard extends StatelessWidget {
                         width: double.infinity,
                         height: double.infinity,
                         child:
-                            (post.photoUrl != null && post.photoUrl!.isNotEmpty)
+                            (post.firstPhotoUrl != null && post.firstPhotoUrl!.isNotEmpty)
                                 ? CachedNetworkImage(
-                                    imageUrl: post.photoUrl!,
+                                    cacheManager: WeGigImageCacheManager.instance,
+                                    imageUrl: post.firstPhotoUrl!,
                                     fit: BoxFit.cover,
                                     memCacheWidth: 400,
                                     placeholder: (_, __) =>
@@ -90,8 +95,8 @@ class FeedPostCard extends StatelessWidget {
                                       child: Center(
                                         child: Icon(
                                           post.type == 'band'
-                                              ? Icons.groups_rounded
-                                              : Icons.person_rounded,
+                                              ? Iconsax.people
+                                              : Iconsax.user,
                                           size: 40,
                                           color: primaryColor,
                                         ),
@@ -103,8 +108,8 @@ class FeedPostCard extends StatelessWidget {
                                     child: Center(
                                       child: Icon(
                                         post.type == 'band'
-                                            ? Icons.groups_rounded
-                                            : Icons.person_rounded,
+                                            ? Iconsax.people
+                                            : Iconsax.user,
                                         size: 40,
                                         color: primaryColor,
                                       ),
@@ -128,7 +133,7 @@ class FeedPostCard extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
-                          Icons.close_rounded,
+                          Iconsax.close_circle,
                           size: 18,
                           color: Colors.white,
                         ),
@@ -149,14 +154,14 @@ class FeedPostCard extends StatelessWidget {
                   // Nome do perfil + botões
                   Row(
                     children: [
-                      Icon(Icons.account_circle_rounded,
+                      Icon(Iconsax.profile_circle,
                           size: 16, color: primaryColor),
                       const SizedBox(width: 4),
                       Expanded(
                         child: GestureDetector(
                           onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute<void>(
                                 builder: (_) => ViewProfilePage(
                                   userId: post.authorUid,
                                   profileId: post.authorProfileId,
@@ -195,7 +200,7 @@ class FeedPostCard extends StatelessWidget {
                       if (isOwner)
                         GestureDetector(
                           onTap: onOpenOptions,
-                          child: const Icon(Icons.more_vert_rounded,
+                          child: const Icon(Iconsax.more,
                               color: textSecondary, size: 20),
                         )
                       else
@@ -211,8 +216,8 @@ class FeedPostCard extends StatelessWidget {
                             ),
                             child: Icon(
                               isInterestSent
-                                  ? Icons.favorite_rounded
-                                  : Icons.favorite_border_rounded,
+                                  ? Iconsax.heart5
+                                  : Iconsax.heart,
                               size: 16,
                               color:
                                   isInterestSent ? Colors.pink : primaryColor,
@@ -225,9 +230,9 @@ class FeedPostCard extends StatelessWidget {
                   // Header clicável
                   GestureDetector(
                     onTap: () {
-                      Navigator.push(
+                      Navigator.push<void>(
                         context,
-                        MaterialPageRoute(
+                        MaterialPageRoute<void>(
                           builder: (_) => PostDetailPage(postId: post.id),
                         ),
                       );
@@ -236,8 +241,8 @@ class FeedPostCard extends StatelessWidget {
                       children: [
                         Icon(
                           post.type == 'band'
-                              ? Icons.person_search_rounded
-                              : Icons.music_note_rounded,
+                              ? Iconsax.search_favorite
+                              : Iconsax.musicnote,
                           size: 12,
                           color: primaryColor,
                         ),
@@ -263,26 +268,26 @@ class FeedPostCard extends StatelessWidget {
                   // Instrumentos em scroll horizontal
                   if (post.type == 'musician' && post.instruments.isNotEmpty)
                     _buildHorizontalChips(
-                      icon: Icons.piano_rounded,
+                      icon: Iconsax.music,
                       items: post.instruments,
                       color: primaryColor,
                     )
                   else if (post.type == 'band' &&
                       post.seekingMusicians.isNotEmpty)
                     _buildHorizontalChips(
-                      icon: Icons.search_rounded,
+                      icon: Iconsax.search_favorite,
                       items: post.seekingMusicians,
                       color: primaryColor,
                     ),
                   const SizedBox(height: 3),
                   // Nível
                   if (post.level.isNotEmpty)
-                    _buildInfoRow(Icons.star_half_rounded, post.level,
+                    _buildInfoRow(Iconsax.star, post.level,
                         primaryColor, textSecondary),
                   // Gêneros em scroll horizontal
                   if (post.genres.isNotEmpty)
                     _buildHorizontalChips(
-                      icon: Icons.library_music_rounded,
+                      icon: Iconsax.music_library_2,
                       items: post.genres,
                       color: primaryColor,
                     ),
@@ -290,14 +295,13 @@ class FeedPostCard extends StatelessWidget {
                   if (post.content.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.message_rounded,
+                        const Icon(Iconsax.message,
                             size: 11, color: textSecondary),
                         const SizedBox(width: 4),
                         Expanded(
-                          child: Text(
-                            post.content,
+                          child: MentionText(
+                            text: post.content,
                             style: const TextStyle(
                               fontSize: 9,
                               color: textSecondary,
@@ -305,6 +309,9 @@ class FeedPostCard extends StatelessWidget {
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
+                            onMentionTap: (username) {
+                              context.pushProfileByUsername(username);
+                            },
                           ),
                         ),
                       ],
@@ -314,7 +321,7 @@ class FeedPostCard extends StatelessWidget {
                   // Footer: distância + tempo
                   Row(
                     children: [
-                      Icon(Icons.location_on_rounded,
+                      Icon(Iconsax.location,
                           size: 11, color: primaryColor),
                       const SizedBox(width: 3),
                       Text(
@@ -326,7 +333,7 @@ class FeedPostCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Icon(Icons.access_time_rounded,
+                      const Icon(Iconsax.clock,
                           size: 11, color: textSecondary),
                       const SizedBox(width: 3),
                       Text(

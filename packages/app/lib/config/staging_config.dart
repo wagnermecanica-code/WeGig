@@ -32,8 +32,8 @@ class StagingConfig {
   static const bool skipOnboarding = false;
 
   // Bundle IDs
-  static const String androidApplicationId = 'com.tosembanda.wegig.staging';
-  static const String iosBundleId = 'com.tosembanda.wegig.staging';
+  static const String androidApplicationId = 'com.wegig.wegig.staging';
+  static const String iosBundleId = 'com.wegig.wegig.staging';
 
   /// Verifica se está em ambiente de staging
   static bool get isDevelopment => false;

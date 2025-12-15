@@ -716,7 +716,7 @@ widgets/
 ```
 lib/firebase_options.dart                    (Gerado pelo FlutterFire CLI)
 android/app/google-services.json             (Android Firebase config)
-ios/Runner/GoogleService-Info.plist          (iOS Firebase config)
+ios/WeGig/GoogleService-Info.plist          (iOS Firebase config)
 ```
 
 **Funções:**

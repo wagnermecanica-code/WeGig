@@ -1,3 +1,5 @@
+// ignore_for_file: override_on_non_overriding_member
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wegig_app/features/auth/domain/entities/auth_result.dart';
 import 'package:wegig_app/features/auth/domain/repositories/auth_repository.dart';
@@ -5,6 +7,7 @@ import 'package:wegig_app/features/auth/domain/repositories/auth_repository.dart
 class MockAuthRepository implements AuthRepository {
   String? lastEmail;
   String? lastPassword;
+    String? lastUsername;
   AuthResult? _mockedResponse;
 
   void setupSuccessResponse() {
@@ -54,9 +57,18 @@ class MockAuthRepository implements AuthRepository {
   @override
   Future<void> signOut() async {}
 
-  @override
-  Future<AuthResult> signUpWithEmail(String email, String password) async =>
-      const AuthFailure(message: 'Not implemented', code: 'test-error');
+    @override
+    Future<AuthResult> signUpWithEmail(
+        String email,
+        String password,
+        String username,
+    ) async {
+        lastEmail = email;
+        lastPassword = password;
+        lastUsername = username;
+        return _mockedResponse ??
+                const AuthFailure(message: 'Not implemented', code: 'test-error');
+    }
 }
 
 class _MockUser implements User {
@@ -149,8 +161,8 @@ class _MockUser implements User {
   Future<void> updateDisplayName(String? displayName) =>
       throw UnimplementedError();
 
-  @override
-  Future<void> updateEmail(String newEmail) => throw UnimplementedError();
+    @override
+    Future<void> updateEmail(String newEmail) => throw UnimplementedError();
 
   @override
   Future<void> updatePassword(String newPassword) => throw UnimplementedError();
@@ -162,8 +174,8 @@ class _MockUser implements User {
   @override
   Future<void> updatePhotoURL(String? photoURL) => throw UnimplementedError();
 
-  @override
-  Future<void> updateProfile({String? displayName, String? photoURL}) =>
+    @override
+    Future<void> updateProfile({String? displayName, String? photoURL}) =>
       throw UnimplementedError();
 
   @override

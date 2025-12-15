@@ -13,10 +13,16 @@ import 'package:wegig_app/features/auth/domain/usecases/sign_up_with_email.dart'
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 
 void main() {
+
   late ProviderContainer container;
 
   setUp(() {
-    container = ProviderContainer();
+    final mockDataSource = _MockAuthRemoteDataSource();
+    container = ProviderContainer(
+      overrides: [
+        authRemoteDataSourceProvider.overrideWithValue(mockDataSource),
+      ],
+    );
   });
 
   tearDown(() {
@@ -242,34 +248,22 @@ void main() {
 
   group('Auth Providers - State Providers', () {
     test('authStateProvider provides Stream<User?>', () {
-      // Act
       final authStateValue = container.read(authStateProvider);
-
-      // Assert - Should have AsyncValue with initial state
       expect(authStateValue, isA<AsyncValue<User?>>());
     });
 
     test('currentUserProvider returns null when not authenticated', () {
-      // Act
       final currentUser = container.read(currentUserProvider);
-
-      // Assert
       expect(currentUser, isNull);
     });
 
     test('isAuthenticatedProvider returns false when not authenticated', () {
-      // Act
       final isAuthenticated = container.read(isAuthenticatedProvider);
-
-      // Assert
       expect(isAuthenticated, isFalse);
     });
 
     test('isEmailVerifiedProvider returns false when not authenticated', () {
-      // Act
       final isVerified = container.read(isEmailVerifiedProvider);
-
-      // Assert
       expect(isVerified, isFalse);
     });
   });
@@ -337,7 +331,49 @@ void main() {
 /// Mock class for AuthRemoteDataSource
 class _MockAuthRemoteDataSource implements AuthRemoteDataSource {
   @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  Stream<User?> get authStateChanges => const Stream.empty();
+
+  @override
+  User? get currentUser => null;
+
+  @override
+  Future<User?> signInWithApple() => throw UnimplementedError();
+
+  @override
+  Future<User?> signInWithGoogle() => throw UnimplementedError();
+
+  @override
+  Future<User> signInWithEmail(String email, String password) =>
+      throw UnimplementedError();
+
+  @override
+  Future<User> signUpWithEmail(
+    String email,
+    String password,
+    String username,
+  ) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> signOut() => throw UnimplementedError();
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> sendEmailVerification() => throw UnimplementedError();
+
+  @override
+  Future<void> createUserDocument(
+    User user,
+    String provider, {
+    String? username,
+  }) =>
+      throw UnimplementedError();
+
+  @override
+  Future<bool> userDocumentExists(String uid) => throw UnimplementedError();
 }
 
 /// Mock class for testing provider overrides

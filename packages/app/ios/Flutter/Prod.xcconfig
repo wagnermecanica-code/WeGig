@@ -1,4 +1,5 @@
+#include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.debug.xcconfig"
 #include "Generated.xcconfig"
 
-PRODUCT_BUNDLE_IDENTIFIER = com.tosembanda.wegig
+PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig
 DISPLAY_NAME = WeGig

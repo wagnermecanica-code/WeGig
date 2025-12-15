@@ -29,7 +29,11 @@ abstract class AuthRepository {
   /// Returns:
   /// - AuthSuccess(requiresEmailVerification: true, requiresProfileCreation: true)
   /// - AuthFailure se erro (email já existe, senha fraca, etc)
-  Future<AuthResult> signUpWithEmail(String email, String password);
+  Future<AuthResult> signUpWithEmail(
+    String email,
+    String password,
+    String username,
+  );
 
   /// Login com Google
   ///

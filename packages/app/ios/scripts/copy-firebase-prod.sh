@@ -7,7 +7,7 @@ echo "🔧 Configurando Firebase para PROD flavor..."
 PROJECT_DIR="${SRCROOT}"
 FIREBASE_DIR="${PROJECT_DIR}/Firebase"
 PLIST_PROD="${FIREBASE_DIR}/GoogleService-Info-prod.plist"
-PLIST_TARGET="${PROJECT_DIR}/Runner/GoogleService-Info.plist"
+PLIST_TARGET="${PROJECT_DIR}/WeGig/GoogleService-Info.plist"
 
 # Copiar arquivo correto
 if [ -f "$PLIST_PROD" ]; then

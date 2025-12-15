@@ -2,10 +2,14 @@
 
 App Flutter para conectar músicos e bandas usando arquitetura multi-perfil estilo Instagram.
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.9.2+-02569B?logo=flutter)](https://flutter.dev)
-[![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?logo=dart)](https://dart.dev)
+[![Flutter](https://img.shields.io/badge/Flutter-3.27.1+-02569B?logo=flutter)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.10+-0175C2?logo=dart)](https://dart.dev)
 [![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%7C%20Auth%20%7C%20Storage-FFCA28?logo=firebase)](https://firebase.google.com)
 [![Riverpod](https://img.shields.io/badge/Riverpod-3.x-00A699)](https://riverpod.dev)
+[![CI](https://github.com/wagnermecanica-code/ToSemBandaRepo/workflows/CI%20-%20Build%20%26%20Test/badge.svg)](https://github.com/wagnermecanica-code/ToSemBandaRepo/actions)
+[![codecov](https://codecov.io/gh/wagnermecanica-code/ToSemBandaRepo/branch/main/graph/badge.svg)](https://codecov.io/gh/wagnermecanica-code/ToSemBandaRepo)
+[![Tests](https://img.shields.io/badge/Tests-270%20passing-success?logo=flutter)](https://github.com/wagnermecanica-code/ToSemBandaRepo/actions)
+[![Documentation](https://img.shields.io/badge/Docs-DartDoc-blue?logo=dart)](./docs/api/index.html)
 
 ## 🎯 Visão Geral
 
@@ -13,11 +17,12 @@ App Flutter para conectar músicos e bandas usando arquitetura multi-perfil esti
 
 **Stack Principal:**
 
-- **Frontend:** Flutter 3.9.2+, Dart 3.5+
+- **Frontend:** Flutter 3.27.1, Dart 3.10
 - **Backend:** Firebase (Firestore, Auth, Storage, Cloud Functions)
 - **State Management:** Riverpod 3.x (AsyncNotifier pattern)
 - **Mapas:** Google Maps, Geolocator
 - **Cloud Functions:** Node.js (notificações de proximidade)
+- **CI/CD:** GitHub Actions (iOS + Android automated builds)
 
 ---
 
@@ -75,11 +80,11 @@ App Flutter para conectar músicos e bandas usando arquitetura multi-perfil esti
 
 O projeto usa **flutter_flavorizr** para gerenciar 3 ambientes isolados:
 
-| Flavor      | App Name      | Bundle ID                      | Firebase             | Logs   | Obfuscation |
-| ----------- | ------------- | ------------------------------ | -------------------- | ------ | ----------- |
-| **dev**     | WeGig DEV     | `com.tosembanda.wegig.dev`     | to-sem-banda-dev     | ✅ On  | ❌ Off      |
-| **staging** | WeGig STAGING | `com.tosembanda.wegig.staging` | to-sem-banda-staging | ✅ On  | ✅ On       |
-| **prod**    | WeGig         | `com.tosembanda.wegig`         | to-sem-banda-83e19   | ❌ Off | ✅ On       |
+| Flavor      | App Name      | Bundle ID (iOS)           | Package (Android)              | Firebase Project   | Logs   | Crashlytics |
+| ----------- | ------------- | ------------------------- | ------------------------------ | ------------------ | ------ | ----------- |
+| **dev**     | WeGig DEV     | `com.wegig.wegig.dev`     | `com.tosembanda.wegig.dev`     | wegig-dev          | ✅ On  | ❌ Off      |
+| **staging** | WeGig STAGING | `com.wegig.wegig.staging` | `com.tosembanda.wegig.staging` | wegig-staging      | ⚠️ On  | ✅ On       |
+| **prod**    | WeGig         | `com.wegig.wegig`         | `com.wegig.wegig`              | to-sem-banda-83e19 | ❌ Off | ✅ On       |
 
 **Rodar por flavor:**
 
@@ -98,17 +103,17 @@ flutter run --flavor prod -t lib/main_prod.dart
 
 ```bash
 # Produção (AAB + obfuscation)
-./scripts/build_release.sh prod
+./.tools/scripts/build_release.sh prod
 
 # Staging (APK para teste interno)
-./scripts/build_release.sh staging
+./.tools/scripts/build_release.sh staging
 
 # Dev (APK rápido sem obfuscation)
-./scripts/build_release.sh dev
+./.tools/scripts/build_release.sh dev
 
 # Especificar plataforma
-./scripts/build_release.sh prod android
-./scripts/build_release.sh staging ios
+./.tools/scripts/build_release.sh prod android
+./.tools/scripts/build_release.sh staging ios
 ```
 
 **Configuração por flavor:**
@@ -125,6 +130,27 @@ if (AppConfig.isDevelopment) {
 final apiUrl = AppConfig.apiBaseUrl;
 final enableLogs = AppConfig.enableLogs;
 ```
+
+#### Checklist por plataforma
+
+- **Android**: coloque cada `google-services.json` em `android/app/src/<flavor>/` (ex.: `src/dev/google-services.json`). Rode `flutter clean` após trocar arquivos para o Gradle detectar alterações.
+- **iOS**: o scheme `WeGig-dev` usa `ios/Flutter/Dev.xcconfig` com `PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig.dev`. O build phase `[CP] Copy GoogleService-Info.plist` agora copia automaticamente `ios/Firebase/GoogleService-Info-<flavor>.plist` para `WeGig/GoogleService-Info.plist` antes do build. Garanta que cada arquivo exista (`GoogleService-Info-dev.plist`, `-staging`, `-prod`).
+- **Firebase Projects**: ⚠️ **CRITICAL** - Cada flavor aponta para um projeto Firebase isolado:
+  - `dev` → `wegig-dev`
+  - `staging` → `wegig-staging`
+  - `prod` → `to-sem-banda-83e19`
+  - Validação em runtime via `expectedProjectId` no bootstrap para evitar dados cruzados.
+
+#### Script de sanidade do Firebase
+
+Execute `dart run tool/print_firebase_context.dart <flavor>` dentro de `packages/app` para imprimir `projectId`, `appId`, `iosBundleId` e a API key mascarada. Exemplo:
+
+```bash
+cd packages/app
+dart run tool/print_firebase_context.dart dev
+```
+
+O comando alerta quando `dev` não está ligado a `to-sem-banda-83e19` e ajuda a investigar mismatches antes de fazer login.
 
 **Arquivos de configuração:**
 
@@ -169,6 +195,18 @@ ref.invalidate(profileProvider);
 
 - Firestore rules: `resource.data.uid == request.auth.uid` (Firebase UID)
 - App logic: `authorProfileId == activeProfile.profileId` (isolamento de perfis)
+
+### 🍎 Sign in with Apple (flavor dev)
+
+1. **Bundle Identifier correto**: `com.wegig.wegig.dev` (definido em `ios/Flutter/Dev.xcconfig`) deve estar registrado no Apple Developer Portal e ter a capability **Sign In with Apple** habilitada para o target `WeGig-dev`.
+2. **Firebase Auth Provider**: no projeto `to-sem-banda-83e19`, habilite o provedor Apple e associe o mesmo Services ID usado no Apple Developer. Se trocar de projeto, atualize também os arquivos `GoogleService-Info-dev.plist`/`google-services.json`.
+3. **Checklist de teste**:
+
+- Rode `WeGig-dev` em dispositivo físico iOS.
+- Faça login com o mesmo Apple ID duas vezes (instalação limpa + reinstalação) e confirme que o UID retornado pelo Firebase permanece idêntico.
+- Se o UID mudar, verifique se o bundle ID corresponde ao provisionado e se o app aponta para o mesmo projeto Firebase do provedor Apple.
+
+4. Consulte `ios/SIGN_IN_WITH_APPLE_SETUP.md` para screenshots e passos detalhados.
 
 ### Posts & Queries
 
@@ -290,7 +328,7 @@ flutter pub get
 2. **Firebase config:**
 
    - Baixe `google-services.json` (Android) e `GoogleService-Info.plist` (iOS)
-   - Coloque em `android/app/` e `ios/Runner/`
+   - Coloque em `android/app/` e `ios/WeGig/`
 
 3. **Environment variables (.env):**
 
@@ -374,7 +412,7 @@ lib/
    ├─ profile_switcher_bottom_sheet.dart
    └─ app_loading_overlay.dart
 
-functions/
+.tools/functions/
 └─ index.js                     # Cloud Functions (190 linhas)
 
 firestore.rules                 # Security rules
@@ -385,14 +423,18 @@ firestore.indexes.json          # 13 composite indexes
 
 ## 🐛 Troubleshooting
 
-| Problema                     | Solução                                                                   |
-| ---------------------------- | ------------------------------------------------------------------------- |
-| `Query/Index Errors`         | Deploy indexes: `firebase deploy --only firestore:indexes`                |
-| `Missing Location Data`      | Execute: `scripts/check_posts.sh`                                         |
-| `Profile State Bugs`         | Sempre usar `ref.read(profileProvider).value?.activeProfile`              |
-| `Image Upload Freeze`        | Certificar padrão `compute()` isolate (ver `post_page.dart:442`)          |
-| `Cloud Functions Not Firing` | Verificar logs: `firebase functions:log --only onPostCreated`             |
-| `LateInitializationError`    | Reiniciar app (hot restart) - Riverpod não suporta hot reload após logout |
+| Problema                                                               | Solução                                                                                                                                                                                                        |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[core/duplicate-app] A Firebase App named "[DEFAULT]" already exists` | Garante que apenas `bootstrapCoreServices` inicialize o Firebase (um por flavor). Se aparecer após hot restart, pare o app, rode `flutter clean`, e suba novamente usando o target correto.                    |
+| `cloud_firestore/permission-denied` ao ler `/profiles`                 | Deploy as regras simplificadas (`firebase deploy --only firestore:rules`) e confirme que o usuário está autenticado. Em dev, o provider Apple precisa estar apontando para `to-sem-banda-83e19`.               |
+| `Query/Index Errors`                                                   | Deploy indexes: `firebase deploy --only firestore:indexes`                                                                                                                                                     |
+| `Missing Location Data`                                                | Execute: `.tools/scripts/check_posts.sh`                                                                                                                                                                       |
+| `Profile State Bugs`                                                   | Sempre usar `ref.read(profileProvider).value?.activeProfile`                                                                                                                                                   |
+| `Image Upload Freeze`                                                  | Certificar padrão `compute()` isolate (ver `post_page.dart:442`)                                                                                                                                               |
+| `Cloud Functions Not Firing`                                           | Verificar logs: `firebase functions:log --only onPostCreated`                                                                                                                                                  |
+| `LateInitializationError`                                              | Reiniciar app (hot restart) - Riverpod não suporta hot reload após logout                                                                                                                                      |
+| Aviso de dSYM/Crashlytics no Xcode                                     | Confirme se o build phase `FlutterFire: flutterfire upload-crashlytics-symbols` está habilitado e se `firebase login` está ativo antes de arquivar.                                                            |
+| Push não chegando / alerta sobre method swizzling                      | Verifique se o handler `_firebaseMessagingBackgroundHandler` está registrado uma única vez e protegido por `Firebase.apps.isEmpty`. Evite chamar `Firebase.initializeApp` em serviços ou isolates secundários. |
 
 ---
 
@@ -438,6 +480,48 @@ firebase deploy --only functions
 
 ---
 
+## 🚀 CI/CD Pipeline
+
+O WeGig possui pipelines automatizados de CI/CD no GitHub Actions:
+
+### Workflows Disponíveis
+
+1. **CI - Build & Test** (`ci.yml`)
+
+   - ✅ Análise estática e testes
+   - ✅ Build iOS (sem codesign)
+   - ✅ Build Android com APK artifact
+   - ⏱️ ~15-25 minutos total
+
+2. **iOS Build & Sign** (`ios-build.yml`)
+   - ✅ Build com code signing
+   - ✅ Export IPA + dSYM
+   - ✅ Upload automático para TestFlight
+   - ⏱️ ~20-30 minutos total
+
+### Quick Start
+
+```bash
+# Testar CI localmente:
+cd packages/app
+flutter analyze
+flutter test
+flutter build ios --debug --no-codesign --flavor dev -t lib/main_dev.dart
+
+# Trigger CI no GitHub:
+git checkout -b feat/nova-feature
+git push origin feat/nova-feature
+gh pr create  # Executa ci.yml automaticamente
+```
+
+**Documentação completa:**
+
+- [Pipeline Detalhado](./docs/CI_CD_PIPELINE.md)
+- [Quick Start Guide](./docs/CI_CD_QUICK_START.md)
+- [Flow Diagram](./docs/CI_CD_FLOW_DIAGRAM.md)
+
+---
+
 ## 📊 Status do Projeto
 
 ### Features Completas
@@ -451,17 +535,31 @@ firebase deploy --only functions
 - ✅ Cache de markers (performance)
 - ✅ Design system Material 3
 - ✅ Push notifications FCM (100% funcional)
+- ✅ CI/CD pipelines (GitHub Actions)
+- ✅ Monorepo migration (packages/app + packages/core_ui)
+- ✅ Firebase dependencies updated (4.x/6.x series)
 
-### Refatoração em Andamento (29/11/2025)
+### Última Atualização (06/12/2025)
 
-- ✅ **Post Feature:** 0 erros (100% completo - Freezed removed)
-- 🚧 **Profile Feature:** 60 erros (próximo target)
-- 🚧 **Notifications Feature:** 40 erros
-- 🚧 **Auth Feature:** 10 erros
-- 🚧 **Outros:** 4 erros
+#### Correções Críticas
 
-**Total:** 1183 erros → Meta: 0 erros  
-**Ver detalhes:** `SESSION_ATUAL_29_NOV_2025.md`
+- ✅ **GoRouter Navigation:** Corrigido redirect infinito - navegação para `/profile/:id` e `/post/:id` agora funciona
+- ✅ **Firebase Multi-Ambiente:** Auditoria completa - `main_prod.dart` corrigido para `to-sem-banda-83e19`
+- ✅ **Notificações:** Latência reduzida (300ms → 50ms), tratamento de erros melhorado
+- ✅ **NotificationsModal:** Bottom sheet não mostra mais erro para perfis sem notificações
+
+#### Melhorias de Performance
+
+- ⚡ **Debounce otimizado:** Streams de notificações com 50ms (antes 300ms)
+- ⚡ **Memory leaks:** Fixados 8 vazamentos (home_page dispose, profile_transition_overlay)
+- ⚡ **Query optimization:** `recipientUid` + filtro client-side por `profileId`
+
+#### Configuração Multi-Ambiente
+
+- ✅ **DEV:** `wegig-dev` (logs ON, Crashlytics OFF)
+- ✅ **STAGING:** `wegig-staging` (logs ON, Crashlytics ON)
+- ✅ **PROD:** `to-sem-banda-83e19` (logs OFF, Crashlytics ON)
+- ✅ **Validação:** Runtime check via `expectedProjectId` previne dados cruzados
 
 ---
 

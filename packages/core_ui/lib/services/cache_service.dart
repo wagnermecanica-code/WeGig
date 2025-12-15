@@ -39,8 +39,8 @@ class CacheService {
       final jsonString = prefs.getString(_postsKey);
       if (jsonString == null) return null;
       
-      final List<dynamic> decoded = jsonDecode(jsonString);
-      return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+      final List<dynamic> decoded = jsonDecode(jsonString) as List<dynamic>;
+      return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (e) {
       debugPrint('Erro ao recuperar cache de posts: $e');
       return null;
@@ -65,8 +65,8 @@ class CacheService {
       final jsonString = prefs.getString(_profilesKey);
       if (jsonString == null) return null;
       
-      final List<dynamic> decoded = jsonDecode(jsonString);
-      return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+      final List<dynamic> decoded = jsonDecode(jsonString) as List<dynamic>;
+      return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (e) {
       debugPrint('Erro ao recuperar cache de perfis: $e');
       return null;

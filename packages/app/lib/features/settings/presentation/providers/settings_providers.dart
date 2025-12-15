@@ -38,6 +38,8 @@ SettingsRepository settingsRepository(Ref ref) {
 /// Provider for user settings with AsyncNotifier
 @riverpod
 class UserSettings extends _$UserSettings {
+  String? _loadedProfileId;
+  
   @override
   Future<UserSettingsEntity?> build() async {
     // Initially return null (no profile selected)
@@ -45,12 +47,20 @@ class UserSettings extends _$UserSettings {
   }
 
   /// Load settings for a profile
-  Future<void> loadSettings(String profileId) async {
+  /// ✅ FIX: Evita recarregar do Firestore se já tem dados para o mesmo profile
+  Future<void> loadSettings(String profileId, {bool forceReload = false}) async {
+    // Se já tem dados carregados para este profile e não é forceReload, pula
+    if (!forceReload && _loadedProfileId == profileId && state.hasValue && state.value != null) {
+      return;
+    }
+    
     state = const AsyncValue.loading();
 
     state = await AsyncValue.guard(() async {
       final repository = ref.read(settingsRepositoryProvider);
-      return repository.getSettings(profileId);
+      final settings = await repository.getSettings(profileId);
+      _loadedProfileId = profileId;
+      return settings;
     });
   }
 

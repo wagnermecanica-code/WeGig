@@ -4,11 +4,13 @@ import 'package:wegig_app/features/post/domain/repositories/post_repository.dart
 /// UseCase: Criar um novo post
 /// Valida campos obrigatórios antes de criar
 class CreatePost {
+  /// Cria uma instância de CreatePost
   CreatePost(this._repository);
   final PostRepository _repository;
 
+  /// Executa a criação do post com validações
   Future<PostEntity> call(PostEntity post) async {
-    // Validações
+    // Validações comuns
     if (post.content.trim().isEmpty) {
       throw Exception('Conteúdo é obrigatório');
     }
@@ -25,19 +27,31 @@ class CreatePost {
       throw Exception('Localização é obrigatória');
     }
 
-    if (post.instruments.isEmpty && post.type == 'musician') {
-      throw Exception('Selecione pelo menos um instrumento');
+    // Validações específicas por tipo
+    if (post.type == 'sales') {
+      // Sales: validar campos específicos (SEM gêneros/instrumentos/nível)
+      if (post.title == null || post.title!.trim().isEmpty) {
+        throw Exception('Título é obrigatório para anúncios');
+      }
+      if (post.price == null || post.price! <= 0) {
+        throw Exception('Preço deve ser maior que zero');
+      }
+    } else {
+      // Musician/Band: validar gêneros, instrumentos e nível
+      if (post.instruments.isEmpty && post.type == 'musician') {
+        throw Exception('Selecione pelo menos um instrumento');
+      }
+
+      if (post.genres.isEmpty) {
+        throw Exception('Selecione pelo menos um gênero musical');
+      }
+
+      if (post.level.trim().isEmpty) {
+        throw Exception('Selecione o nível de experiência');
+      }
     }
 
-    if (post.genres.isEmpty) {
-      throw Exception('Selecione pelo menos um gênero musical');
-    }
-
-    if (post.level.trim().isEmpty) {
-      throw Exception('Selecione o nível de experiência');
-    }
-
-    // YouTube validation (if provided)
+    // YouTube validation (opcional para todos)
     if (post.youtubeLink != null && post.youtubeLink!.isNotEmpty) {
       final link = post.youtubeLink!;
       if (!link.contains('youtube.com') && !link.contains('youtu.be')) {

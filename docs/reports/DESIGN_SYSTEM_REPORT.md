@@ -1,4 +1,4 @@
-# Tô Sem Banda - Design System Report
+# WeGig - Design System Report
 
 ## Relatório Técnico de Design Visual
 
@@ -11,7 +11,7 @@
 
 ## 📋 Executive Summary
 
-O **Tô Sem Banda** implementa um design system moderno inspirado no Airbnb 2025, com foco em clareza visual, hierarquia tipográfica robusta e uma paleta de cores dual-purpose que diferencia semanticamente os dois tipos principais de usuários: **Músicos (Teal)** e **Bandas (Coral)**.
+O **WeGig** implementa um design system moderno inspirado no Airbnb 2025, com foco em clareza visual, hierarquia tipográfica robusta e uma paleta de cores minimalista que diferencia semanticamente os dois tipos principais de usuários: **Músicos (Escuro #37475A)** e **Bandas (Laranja #E47911)**.
 
 O sistema utiliza Material Design 3 como fundação, com customizações estratégicas para criar uma identidade visual única e funcional para o contexto de matchmaking musical geolocalizado.
 
@@ -106,6 +106,23 @@ Sistema de estados para feedback visual de ações do usuário.
 | `success` | `#4CAF50` | `rgb(76, 175, 80)` | Confirmações, toast success, badges de status |
 | `error`   | `#E53935` | `rgb(229, 57, 53)` | Alertas, validação de forms, error states     |
 | `warning` | `#FB8C00` | `rgb(251, 140, 0)` | Avisos não-críticos, expiration warnings      |
+
+### Badge Counter Palette
+
+Cores específicas para indicadores de notificações e contadores.
+
+| Token      | Hex       | RGB                | Usage                                                          |
+| ---------- | --------- | ------------------ | -------------------------------------------------------------- |
+| `badgeRed` | `#FF2828` | `rgb(255, 40, 40)` | Notification badges, unread count indicators (circular/oblong) |
+
+**Design Pattern:**
+
+- **Shape:** Circular para números de 1 dígito (1-9), oblong/pill para 2+ dígitos (10-99+)
+- **Padding:** `horizontal: 6-8px, vertical: 4px` para garantir proporção adequada
+- **Typography:** White text, 10-11px, bold, center-aligned
+- **Position:** Top-right offset (-4px, -4px) sobre ícones
+- **Min Dimensions:** 20x20px para garantir touch target adequado
+- **Border Radius:** 12px (oblong/pill shape que se adapta ao conteúdo)
 
 ---
 

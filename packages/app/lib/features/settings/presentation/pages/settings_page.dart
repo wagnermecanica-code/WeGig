@@ -1,17 +1,22 @@
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
+import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
+import 'package:wegig_app/features/notifications_new/domain/services/notification_service.dart';
+import 'package:wegig_app/features/notifications_new/presentation/providers/push_notification_new_provider.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/settings/presentation/providers/settings_providers.dart';
 import 'package:wegig_app/features/settings/presentation/widgets/settings_section.dart';
 import 'package:wegig_app/features/settings/presentation/widgets/settings_tile.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Tela de Configurações do perfil ativo
 /// Design Airbnb 2025: Clean, minimalista, switches e botões bem organizados
@@ -24,19 +29,26 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
+  // Variável para rastrear posição inicial do swipe (Swipe to go back)
+  double _swipeStartX = 0;
+
   @override
   void initState() {
     super.initState();
-    // Load settings when page initializes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final profileState = ref.read(profileProvider);
-      final activeProfile = profileState.value?.activeProfile;
-      if (activeProfile != null) {
-        ref
-            .read(userSettingsProvider.notifier)
-            .loadSettings(activeProfile.profileId);
-      }
-    });
+    // ✅ FIX: Carregar settings imediatamente, sem aguardar frame
+    // Isso reduz a latência perceptível ao abrir a tela
+    _loadSettingsEagerly();
+  }
+  
+  void _loadSettingsEagerly() {
+    final profileState = ref.read(profileProvider);
+    final activeProfile = profileState.value?.activeProfile;
+    if (activeProfile != null) {
+      // Carregar diretamente sem addPostFrameCallback para reduzir latência
+      ref
+          .read(userSettingsProvider.notifier)
+          .loadSettings(activeProfile.profileId);
+    }
   }
 
   @override
@@ -44,53 +56,73 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final profileState = ref.read(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Configurações',
-            style: AppTypography.headlineMedium.copyWith(color: Colors.white)),
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-        children: [
-          // Seção: Perfil
-          const SettingsSection(title: 'Perfil', icon: Icons.person_outline),
-          const SizedBox(height: 12),
-          SettingsTile(
-            icon: Icons.edit_outlined,
-            title: 'Editar Perfil',
-            subtitle: 'Atualize suas informações',
-            onTap: () async {
-              if (activeProfile == null) {
-                _showError('Perfil ativo não encontrado');
-                return;
-              }
+    return GestureDetector(
+      // Detecta início do swipe
+      onHorizontalDragStart: (details) {
+        _swipeStartX = details.globalPosition.dx;
+      },
+      // Detecta movimento do swipe
+      onHorizontalDragUpdate: (details) {
+        // Só permite swipe se começou da borda esquerda (primeiros 50px)
+        // E movimento para a direita (delta.dx > 0)
+        if (_swipeStartX < 50 && details.delta.dx > 10) {
+          // Executa o pop (volta para ViewProfilePage)
+          if (Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Configurações',
+              style: AppTypography.headlineMedium.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          centerTitle: true,
+        ),
+        body: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          children: [
+            // Seção: Perfil
+            const SettingsSection(title: 'Perfil', icon: Iconsax.user),
+            const SizedBox(height: 12),
+            SettingsTile(
+              icon: Iconsax.edit,
+              title: 'Editar Perfil',
+              subtitle: 'Atualize suas informações',
+              onTap: () async {
+                if (activeProfile == null) {
+                  _showError('Perfil ativo não encontrado');
+                  return;
+                }
 
-              // Capturar context antes de operação async
-              final navigator = Navigator.of(context);
-              final messenger = ScaffoldMessenger.of(context);
+                // Capturar context antes de operação async
+                final navigator = Navigator.of(context);
+                final messenger = ScaffoldMessenger.of(context);
 
-              final result = await navigator.push(
-                MaterialPageRoute(
-                  builder: (context) => const EditProfilePage(),
-                ),
-              );
+                final result = await navigator.push<String?>(
+                  MaterialPageRoute<String?>(
+                    builder: (context) => EditProfilePage(
+                      profileIdToEdit: activeProfile.profileId,
+                    ),
+                  ),
+                );
 
-              // Se o perfil foi atualizado (retornou profileId), atualiza providers
-              if (result is String && result.isNotEmpty) {
+                final didUpdateProfile = result is String && result.isNotEmpty;
+                if (!didUpdateProfile) {
+                  return;
+                }
+
                 await ref.read(profileProvider.notifier).refresh();
                 // Invalida posts para garantir que posts do perfil sejam atualizados
                 ref.invalidate(postNotifierProvider);
-              }
 
-              if (mounted) {
-                messenger.showSnackBar(
-                  const SnackBar(
-                    content: Row(
+                if (mounted) {
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Row(
                       children: [
-                        Icon(Icons.check_circle, color: Colors.white),
+                        Icon(Iconsax.tick_circle, color: Colors.white),
                         SizedBox(width: 12),
                         Text('Perfil atualizado!'),
                       ],
@@ -103,7 +135,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           const SizedBox(height: 8),
           SettingsTile(
-            icon: Icons.share_outlined,
+            icon: Iconsax.share,
             title: 'Compartilhar Perfil',
             subtitle: 'Compartilhe com amigos',
             onTap: () => _shareProfile(activeProfile),
@@ -115,7 +147,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
           // Seção: Notificações
           const SettingsSection(
-              title: 'Notificações', icon: Icons.notifications_outlined),
+              title: 'Notificações', icon: Iconsax.notification),
           const SizedBox(height: 12),
           _buildNotificationSettings(),
 
@@ -123,12 +155,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const Divider(),
           const SizedBox(height: 24),
 
+          // Seção: Push Notifications (FCM)
+          const SettingsSection(
+              title: 'Push Notifications', icon: Iconsax.notification_bing),
+          const SizedBox(height: 12),
+          _buildPushNotificationsCard(activeProfile),
+
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 24),
+
           // Seção: Conta
           const SettingsSection(
-              title: 'Conta', icon: Icons.account_circle_outlined),
+              title: 'Conta', icon: Iconsax.profile_circle),
           const SizedBox(height: 12),
           SettingsTile(
-            icon: Icons.logout,
+            icon: Iconsax.logout,
             title: 'Sair da Conta',
             subtitle: 'Desconectar do aplicativo',
             iconColor: AppColors.error,
@@ -139,6 +181,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const SizedBox(height: 40),
         ],
       ),
+    ),
     );
   }
 
@@ -169,7 +212,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
-                    Icons.location_on_outlined,
+                    Iconsax.location,
                     color: AppColors.primary,
                     size: 24,
                   ),
@@ -187,7 +230,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                 ),
                 value: settings.notifyNearbyPosts,
-                activeThumbColor: AppColors.primary,
+                // ✅ FIX: Melhorar cores dos toggles para maior visibilidade
+                activeColor: AppColors.primary,
+                thumbColor: WidgetStateProperty.resolveWith<Color?>(
+                  (states) => states.contains(WidgetState.selected)
+                      ? Colors.white  // Thumb branco quando ativo
+                      : AppColors.textSecondary.withValues(alpha: 0.6),
+                ),
+                trackColor: WidgetStateProperty.resolveWith<Color?>(
+                  (states) => states.contains(WidgetState.selected)
+                      ? AppColors.primary  // Track colorido quando ativo
+                      : AppColors.border,  // Track cinza quando inativo
+                ),
+                trackOutlineColor: WidgetStateProperty.resolveWith<Color?>(
+                  (states) => states.contains(WidgetState.selected)
+                      ? AppColors.primary
+                      : AppColors.border,
+                ),
+                thumbIcon: WidgetStateProperty.resolveWith<Icon?>(
+                  (states) => null, // Thumb com sombra padrão
+                ),
                 onChanged: (value) {
                   ref
                       .read(userSettingsProvider.notifier)
@@ -206,14 +268,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     ? Padding(
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Divider(),
                             const SizedBox(height: 12),
                             Row(
                               children: [
                                 const Icon(
-                                  Icons.map_outlined,
+                                  Iconsax.map,
                                   color: AppColors.primary,
                                   size: 18,
                                 ),
@@ -362,7 +423,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         return Column(
           children: [
             SettingsSwitchTile(
-              icon: Icons.favorite_outline,
+              icon: Iconsax.heart,
               title: 'Interesses',
               subtitle: 'Notificação quando alguém demonstra interesse',
               value: settings.notifyInterests,
@@ -375,7 +436,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             const SizedBox(height: 8),
             SettingsSwitchTile(
-              icon: Icons.message_outlined,
+              icon: Iconsax.message,
               title: 'Mensagens',
               subtitle: 'Notificação de novas mensagens',
               value: settings.notifyMessages,
@@ -413,6 +474,220 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  /// Card de Push Notifications (FCM) - status de permissão e botão de teste
+  Widget _buildPushNotificationsCard(ProfileEntity? activeProfile) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Status de Permissão FCM
+            FutureBuilder<NotificationSettings>(
+              future: FirebaseMessaging.instance.getNotificationSettings(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    ),
+                  );
+                }
+                
+                final status = snapshot.data!.authorizationStatus;
+                final isAuthorized = status == AuthorizationStatus.authorized;
+                final statusText = _getPermissionStatusText(status);
+                
+                return Column(
+                  children: [
+                    // Status atual
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: (isAuthorized ? AppColors.success : AppColors.error)
+                              .withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          isAuthorized ? Iconsax.tick_circle : Iconsax.danger,
+                          color: isAuthorized ? AppColors.success : AppColors.error,
+                          size: 24,
+                        ),
+                      ),
+                      title: Text(
+                        'Status das Notificações',
+                        style: AppTypography.titleMedium.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        statusText,
+                        style: AppTypography.caption.copyWith(
+                          color: isAuthorized ? AppColors.success : AppColors.error,
+                        ),
+                      ),
+                    ),
+                    
+                    // Botão solicitar permissão (se não autorizado)
+                    if (!isAuthorized) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _requestPushPermission(activeProfile),
+                          icon: const Icon(Iconsax.notification),
+                          label: const Text('Solicitar Permissão'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    
+                    // Botão de Teste
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Iconsax.send_2,
+                          color: AppColors.primary,
+                          size: 24,
+                        ),
+                      ),
+                      title: Text(
+                        'Testar Notificações',
+                        style: AppTypography.titleMedium.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Envie uma notificação de teste',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      trailing: TextButton(
+                        onPressed: isAuthorized
+                            ? () => _sendTestNotification(activeProfile)
+                            : null,
+                        child: Text(
+                          'Enviar',
+                          style: TextStyle(
+                            color: isAuthorized
+                                ? AppColors.primary
+                                : AppColors.textHint,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Retorna texto legível do status de permissão FCM
+  String _getPermissionStatusText(AuthorizationStatus status) {
+    switch (status) {
+      case AuthorizationStatus.authorized:
+        return 'Notificações habilitadas ✅';
+      case AuthorizationStatus.denied:
+        return 'Permissão negada ❌';
+      case AuthorizationStatus.notDetermined:
+        return 'Aguardando permissão ⏳';
+      case AuthorizationStatus.provisional:
+        return 'Permissão provisória 📱';
+    }
+  }
+
+  /// Solicita permissão de push notifications (FCM)
+  Future<void> _requestPushPermission(ProfileEntity? activeProfile) async {
+    if (!mounted) return;
+
+    try {
+      final pushService = ref.read(pushNotificationNewServiceProvider);
+      final settings = await pushService.requestPermission();
+
+      if (!mounted) return;
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        // Salvar token para perfil ativo
+        if (activeProfile != null) {
+          await pushService.saveTokenForProfile(activeProfile.profileId);
+        }
+
+        AppSnackBar.showSuccess(context, '✅ Permissão concedida!');
+        
+        // Rebuild UI para atualizar status
+        setState(() {});
+      } else {
+        AppSnackBar.showError(context, '❌ Permissão negada');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.showError(context, 'Erro: $e');
+    }
+  }
+
+  /// Envia notificação de teste
+  Future<void> _sendTestNotification(ProfileEntity? activeProfile) async {
+    if (!mounted || activeProfile == null) return;
+
+    try {
+      // Criar notificação in-app de teste usando NotificationService
+      final notificationService = ref.read(notificationServiceProvider);
+      await notificationService.create(
+        recipientProfileId: activeProfile.profileId,
+        recipientUid: activeProfile.uid, // ✅ FIX: Obrigatório para Security Rules
+        type: 'system',
+        title: '🧪 Notificação de Teste',
+        body: 'Push notifications estão funcionando perfeitamente!',
+        data: {
+          'test': true,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+
+      if (!mounted) return;
+
+      AppSnackBar.showSuccess(
+        context,
+        '✅ Notificação de teste enviada! Verifique a aba de notificações.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.showError(context, 'Erro ao enviar teste: $e');
+    }
+  }
+
   /// Compartilha o deep link do perfil via WhatsApp, Instagram, etc
   void _shareProfile(ProfileEntity? profile) {
     if (profile == null) {
@@ -424,17 +699,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       name: profile.name,
       isBand: profile.isBand,
       city: profile.city,
+      neighborhood: profile.neighborhood,
+      state: profile.state,
       userId: profile.uid,
       profileId: profile.profileId,
       instruments: profile.instruments ?? [],
       genres: profile.genres ?? [],
     );
 
-    Share.share(message, subject: 'Perfil no WeGig');
+    SharePlus.instance.share(
+      ShareParams(
+        text: message,
+        subject: 'Perfil no WeGig',
+      ),
+    );
   }
 
   void _showLogoutDialog() {
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false, // Prevenir fechar acidentalmente
       builder: (context) => AlertDialog(
@@ -443,7 +725,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
         title: const Row(
           children: [
-            Icon(Icons.logout, color: AppColors.error),
+            Icon(Iconsax.logout, color: AppColors.error),
             SizedBox(width: 12),
             Text('Sair da Conta'),
           ],
@@ -474,48 +756,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<void> _performLogout() async {
     if (!mounted) return;
 
-    // Capturar navigator e messenger ANTES de operações async
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
+    // Capturar TUDO ANTES de operações async (crítico!)
+    final authService = ref.read(authServiceProvider);  // ✅ Capturar ANTES!
 
     try {
       debugPrint('🔓 SettingsPage: Iniciando processo de logout...');
 
-      // CRÍTICO: Pop a tela de configurações imediatamente
-      if (navigator.canPop()) {
-        debugPrint('🔙 SettingsPage: Fechando tela de configurações...');
-        navigator.pop();
-      }
-
-      // Aguardar frame para garantir que o pop foi processado
-      await Future.delayed(const Duration(milliseconds: 150));
-
-      // Invalidar todos os providers ANTES do logout para limpar cache
-      debugPrint('🧹 SettingsPage: Invalidando providers...');
-      ref.invalidate(profileProvider);
-      ref.invalidate(postNotifierProvider);
-
-      // Aguardar mais um frame para garantir que invalidação foi processada
-      await Future.delayed(const Duration(milliseconds: 150));
-
-      // Executar logout no AuthService (Firebase + cache cleanup)
+      // ✅ FIX: Executar logout PRIMEIRO, antes de qualquer invalidação
+      // Isso garante que o router redirecione para AuthPage antes de invalidar providers
       debugPrint('🔓 SettingsPage: Executando signOut...');
-      final authService = ref.read(authServiceProvider);
       await authService.signOut();
 
-      debugPrint('✅ SettingsPage: Logout completo com sucesso!');
-      debugPrint(
-          '🔄 SettingsPage: authStateProvider detectará mudança e mostrará AuthPage automaticamente');
+      // ✅ FIX: Após signOut, o authStateProvider detectará a mudança
+      // e o GoRouter redirecionará para /auth automaticamente.
+      // NÃO invalidar providers aqui pois o widget pode já estar desmontado.
+      // O router fará o cleanup ao navegar para /auth.
+      
+      debugPrint('✅ SettingsPage: Logout completo - aguardando redirect automático do router');
     } catch (e) {
       debugPrint('❌ SettingsPage: Erro ao fazer logout: $e');
 
       // Tratar erro apenas se widget ainda estiver montado
       if (mounted) {
-        messenger.showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.error, color: Colors.white),
+                const Icon(Iconsax.danger, color: Colors.white),
                 const SizedBox(width: 12),
                 Expanded(child: Text('Erro ao sair: $e')),
               ],
@@ -538,7 +805,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.white, size: 20),
+            const Icon(Iconsax.tick_circle, color: Colors.white, size: 22),
             const SizedBox(width: 12),
             Text(message),
           ],

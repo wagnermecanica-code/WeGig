@@ -4,16 +4,16 @@
 
 App para conectar músicos e bandas via busca geolocalizada com sistema de múltiplos perfis.
 
-**Última atualização**: 30 de novembro de 2025 (Code Quality - 100% COMPLETO!)  
+**Última atualização**: 05 de dezembro de 2025 (Code Quality Audit Complete)  
 **Status**: 🎉 Instagram-Style Architecture - PRONTO PARA PRODUÇÃO (100%)  
 **App Name**: WeGig (rebranding completo de "Tô Sem Banda")  
 **Website**: https://wegig.com.br (GitHub Pages, design Airbnb 2025)  
 **Paleta de Cores**: Tom escuro (#37475A) + Laranja vibrante (#E47911) - `lib/theme/app_colors.dart`  
-**Progresso MVP**: 🎉 100% Completo (implementação + code quality)  
+**Progresso MVP**: 🎉 100% Completo (implementação + code quality + security audit)  
 **Telas Documentadas**: 17 páginas completas (Auth, Home, Notifications, Post, Messages, Chat, ViewProfile, ProfileSwitcher, ProfileForm, EditProfile, Search, Settings, NotificationSettings, PostDetail, EditPost, PhotoViewer, DeepLinks) + 20+ widgets reutilizáveis  
-**Code Quality**: 🎉 100% COMPLETO - Task 3.2 Home Page Refactor finalizado (30/11)  
-**Últimos Features**: ✅ Home refactor completo (4 sub-features, -71 linhas, 0 erros) ✅ **30/11**  
-**Documentação**: ✅ Todos os wireframes visuais completos + CONTRIBUTING.md + SESSION_16
+**Code Quality**: 🎉 100% COMPLETO - 270 testes passando, 0 warnings críticos, analyzer limpo  
+**Últimos Features**: ✅ profileUid enforcement em posts/msgs/interests **05/12** ✅ Tipos explícitos em MaterialPageRoute/showDialog/showModalBottomSheet **05/12** ✅ Transições GoRouter sem flash (fade + slide) ✅ Markers -30% no mapa ✅ `_initializeFirebaseSafely()` garante init único com fallback visual **03/12**  
+**Documentação**: ✅ Todos os wireframes visuais completos + CONTRIBUTING.md + SESSION_16 + CODE_QUALITY_REPORT
 
 ---
 
@@ -26,6 +26,8 @@ App para conectar músicos e bandas via busca geolocalizada com sistema de múlt
 │                                         ↑ Long press = switch│
 └─────────────────────────────────────────────────────────────┘
 ```
+
+**Transições**: Todas as rotas usam `CustomTransitionPage` com fade + slide (320ms/220ms) e `maintainState = true`, eliminando o flash branco observado ao sair de modais ou trocar tabs profundos.
 
 ---
 
@@ -98,6 +100,8 @@ App para conectar músicos e bandas via busca geolocalizada com sistema de múlt
 - Design Airbnb 2025 (clean, card flat)
 - Loading states em todos os botões
 - Tratamento de 10+ códigos de erro Firebase
+- Inicialização segura do Firebase: `_initializeFirebaseSafely()` conclui antes de renderizar e aciona `ErrorApp` se falhar
+- Mensagens de senha fraca sincronizadas com a política mínima (6+ chars) no domínio e na UI
 - Criação automática de documento users/{uid}
 - Fluxo fluido (sem flash da tela Novo Perfil)
 - **Logo WeGig aumentado (120px, +50%)** ✅ **27/11**
@@ -180,6 +184,7 @@ App para conectar músicos e bandas via busca geolocalizada com sistema de múlt
 **Elementos:**
 - AppBar: Logo WeGig centralizada + botão filtros (esquerda) ✅ **27/11**
 - Google Maps com pins coloridos (Purple/Orange - WeGig style)
+- Pins renderizados 30% menores para reduzir sobreposição em áreas densas
 - Toggle Map/List View
 - PostCard: Imagem, Nome, Instrumentos, Distância, Botões
 - Infinite scroll com paginação
@@ -823,6 +828,7 @@ App para conectar músicos e bandas via busca geolocalizada com sistema de múlt
 - Botão deletar perfil (dialog de confirmação)
 - Image compression em isolate (prevent UI freeze)
 - CachedNetworkImage para avatar existente
+- Após salvar, aguarda refresh do ProfileProvider e volta direto ao View Profile (router.go) para evitar salto para Home (02/12)
 
 **Arquivo:** `lib/pages/edit_profile_page.dart` (1081 linhas)
 
@@ -1864,7 +1870,7 @@ Consulte `.github/copilot-instructions.md` para padrões detalhados.
 
 ---
 
-**Última atualização**: 30 de novembro de 2025 (Code Quality 100% + Home Refactor Completo)  
+**Última atualização**: 03 de dezembro de 2025 (Firebase init seguro + senha mínima sincronizada)  
 **Versão do App**: 1.0.0-MVP (WeGig)  
 **Status**: 🎉 PRONTO PARA PRODUÇÃO + Code Quality 100%  
 **Flutter**: 3.9.2+  

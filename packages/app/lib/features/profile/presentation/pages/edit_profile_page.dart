@@ -1,14 +1,20 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
-import 'package:core_ui/navigation/bottom_nav_scaffold.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_type.dart';
 import 'package:core_ui/profile_result.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/utils/app_snackbar.dart';
+import 'package:core_ui/utils/debouncer.dart';
+import 'package:core_ui/utils/location_utils.dart';
 import 'package:core_ui/widgets/multi_select_field.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,6 +25,8 @@ import 'package:http/http.dart' as http;
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
+import 'package:go_router/go_router.dart';
+import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
@@ -41,16 +49,25 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   final _bioController = TextEditingController();
   final _birthYearController = TextEditingController();
   final _locationController = TextEditingController();
+  final _profileUsernameController = TextEditingController();
   final _locationFocusNode = FocusNode();
   final _youtubeController = TextEditingController();
   final _instagramController = TextEditingController();
   final _tiktokController = TextEditingController();
+  // Space-specific controllers
+  final _phoneController = TextEditingController();
+  final _operatingHoursController = TextEditingController();
+  final _websiteController = TextEditingController();
 
   bool _isSaving = false;
   bool _isLoadingProfile = true;
   ProfileEntity? _profile;
   String? _photoUrl;
-  bool? _isBand;
+  ProfileType? _profileType;
+  // Space-specific state
+  String? _selectedSpaceType;
+  Set<String> _selectedAmenities = {};
+  final _locationDebouncer = Debouncer(milliseconds: 500);
   String? _selectedLevel;
   Set<String> _selectedInstruments = {};
   Set<String> _selectedGenres = {};
@@ -59,9 +76,16 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   String? _selectedCity;
   String? _selectedNeighborhood;
   String? _selectedState;
+  String? _accountUsername;
 
   // Computed property para evitar lógica no build
   bool get _isFirstAccess => _profile == null && !_isLoadingProfile;
+  bool get _canNavigateBack => widget.isNewProfile || !_isFirstAccess;
+
+  bool get _isUsernameLocked {
+    final savedUsername = (_profile?.username ?? _accountUsername)?.trim();
+    return !widget.isNewProfile && (savedUsername?.isNotEmpty ?? false);
+  }
 
   static const int maxBioLength = 110;
   static const int maxInstruments = 5;
@@ -85,15 +109,54 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     'Saxofone',
     'Flauta',
     'Trompete',
+    'Trombone',
+    'Clarinete',
+    'Oboé',
+    'Fagote',
     'Violino',
+    'Viola',
     'Cello',
-    'Voz (cantor)',
+    'Contrabaixo Acústico',
+    'Voz',
+    'Voz (Soprano)',
+    'Voz (Contralto)',
+    'Voz (Tenor)',
+    'Voz (Barítono)',
+    'Voz (Baixo)',
     'DJ',
     'Percussão',
+    'Bateria Eletrônica',
+    'Caixa',
+    'Cajón',
+    'Bongô',
+    'Pandeiro',
+    'Zabumba',
+    'Timbal',
     'Harmônica',
+    'Gaita',
+    'Acordeon',
+    'Sanfona',
+    'Bandolim',
+    'Cavaquinho',
     'Ukulele',
+    'Banjo',
+    'Harpa',
+    'Sitar',
+    'Alaúde',
+    'Guitarra Clássica',
+    'Berimbau',
+    'Escaleta',
+    'Melódica',
+    'Theremin',
+    'Sintetizador',
+    'Teclado MIDI',
+    'Sampler',
+    'Produtor Musical',
+    'Beatmaker',
+    'Outros',
   ];
 
+  // ✨ EXPANDIDO: Lista completa de gêneros musicais com opção "Outros"
   static const List<String> _genreOptions = [
     'Rock',
     'Pop',
@@ -105,20 +168,81 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     'Reggae',
     'MPB',
     'Sertanejo',
+    'Sertanejo Universitário',
+    'Sertanejo Raiz',
     'Forró',
+    'Forró Eletrônico',
     'Axé',
     'Hip-Hop',
     'Rap',
+    'Trap',
+    'Drill',
     'Eletrônica',
+    'House',
+    'Techno',
+    'Trance',
+    'Dubstep',
+    'Drum and Bass',
+    'EDM',
     'Folk',
     'Country',
     'Classical',
+    'Ópera',
     'Metal',
+    'Heavy Metal',
+    'Death Metal',
+    'Black Metal',
+    'Thrash Metal',
+    'Power Metal',
     'Punk',
+    'Punk Rock',
+    'Hardcore',
+    'Post-Punk',
     'Indie',
+    'Indie Rock',
+    'Alternative',
+    'Grunge',
     'Samba',
+    'Samba-Enredo',
+    'Pagode',
     'Bossa Nova',
     'Gospel',
+    'Música Católica',
+    'Música Evangélica',
+    'Choro',
+    'Baião',
+    'Maracatu',
+    'Frevo',
+    'Salsa',
+    'Merengue',
+    'Bachata',
+    'Tango',
+    'Flamenco',
+    'Brega',
+    'Piseiro',
+    'Arrocha',
+    'Música Sertaneja',
+    'Música Gaúcha',
+    'Música Caipira',
+    'Rock Progressivo',
+    'Psicodélico',
+    'Disco',
+    'New Wave',
+    'Synth-pop',
+    'Ska',
+    'Reggaeton',
+    'K-Pop',
+    'J-Pop',
+    'World Music',
+    'Afrobeat',
+    'Zouk',
+    'Ambient',
+    'Experimental',
+    'Avant-garde',
+    'Minimalista',
+    'Lo-fi',
+    'Vaporwave',
+    'Outros',
   ];
 
   @override
@@ -129,14 +253,21 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
   @override
   void dispose() {
+    if (!mounted) return;
     _nameController.dispose();
     _bioController.dispose();
     _birthYearController.dispose();
     _locationController.dispose();
+    _profileUsernameController.dispose();
     _locationFocusNode.dispose();
     _youtubeController.dispose();
     _instagramController.dispose();
     _tiktokController.dispose();
+    // Space-specific controllers
+    _phoneController.dispose();
+    _operatingHoursController.dispose();
+    _websiteController.dispose();
+    _locationDebouncer.dispose(); // ✅ Cancela Timer pendente
     super.dispose();
   }
 
@@ -144,6 +275,22 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     setState(() => _isLoadingProfile = true);
 
     try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+        final username = (userDoc.data()?['username'] as String?)?.trim();
+        if (username != null && username.isNotEmpty) {
+          _accountUsername = username;
+          if (_profileUsernameController.text.isEmpty) {
+            _profileUsernameController.text =
+                _sanitizeProfileUsername(username);
+          }
+        }
+      }
+
       // Se é novo perfil, deixa tudo vazio
       if (widget.isNewProfile) {
         debugPrint('EditProfile: Modo novo perfil - campos vazios');
@@ -163,6 +310,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         if (doc.exists) {
           final profile = ProfileEntity.fromFirestore(doc);
           _profile = profile;
+          _accountUsername ??= profile.username;
+          _profileUsernameController.text = profile.username ?? '';
           _nameController.text = profile.name;
           _bioController.text = profile.bio ?? '';
           _birthYearController.text = profile.birthYear?.toString() ?? '';
@@ -171,25 +320,27 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           _selectedNeighborhood = profile.neighborhood;
           _selectedState = profile.state;
 
-          final parts = <String>[];
-          if (profile.neighborhood != null &&
-              profile.neighborhood!.isNotEmpty) {
-            parts.add(profile.neighborhood!);
-          }
-          if (profile.city.isNotEmpty) parts.add(profile.city);
-          if (profile.state != null && profile.state!.isNotEmpty) {
-            parts.add(profile.state!);
-          }
-          _locationController.text = parts.join(', ');
+          _locationController.text = formatCleanLocation(
+            neighborhood: profile.neighborhood,
+            city: profile.city,
+            state: profile.state,
+            fallback: '',
+          );
 
           _youtubeController.text = profile.youtubeLink ?? '';
           _instagramController.text = profile.instagramLink ?? '';
           _tiktokController.text = profile.tiktokLink ?? '';
           _photoUrl = profile.photoUrl;
-          _isBand = profile.isBand;
+          _profileType = profile.profileType;
           _selectedLevel = profile.level;
           _selectedInstruments = {...?profile.instruments};
           _selectedGenres = {...?profile.genres};
+          // Space-specific fields
+          _selectedSpaceType = profile.spaceType;
+          _phoneController.text = profile.phone ?? '';
+          _operatingHoursController.text = profile.operatingHours ?? '';
+          _websiteController.text = profile.website ?? '';
+          _selectedAmenities = {...?profile.amenities};
         }
       } else {
         // Carrega perfil ativo
@@ -198,6 +349,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
         if (activeProfile != null) {
           _profile = activeProfile;
+          _accountUsername ??= activeProfile.username;
+          _profileUsernameController.text = activeProfile.username ?? '';
           _nameController.text = activeProfile.name;
           _bioController.text = activeProfile.bio ?? '';
           _birthYearController.text = activeProfile.birthYear?.toString() ?? '';
@@ -206,25 +359,27 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           _selectedNeighborhood = activeProfile.neighborhood;
           _selectedState = activeProfile.state;
 
-          final parts = <String>[];
-          if (activeProfile.neighborhood != null &&
-              activeProfile.neighborhood!.isNotEmpty) {
-            parts.add(activeProfile.neighborhood!);
-          }
-          if (activeProfile.city.isNotEmpty) parts.add(activeProfile.city);
-          if (activeProfile.state != null && activeProfile.state!.isNotEmpty) {
-            parts.add(activeProfile.state!);
-          }
-          _locationController.text = parts.join(', ');
+          _locationController.text = formatCleanLocation(
+            neighborhood: activeProfile.neighborhood,
+            city: activeProfile.city,
+            state: activeProfile.state,
+            fallback: '',
+          );
 
           _youtubeController.text = activeProfile.youtubeLink ?? '';
           _instagramController.text = activeProfile.instagramLink ?? '';
           _tiktokController.text = activeProfile.tiktokLink ?? '';
           _photoUrl = activeProfile.photoUrl;
-          _isBand = activeProfile.isBand;
+          _profileType = activeProfile.profileType;
           _selectedLevel = activeProfile.level;
           _selectedInstruments = {...?activeProfile.instruments};
           _selectedGenres = {...?activeProfile.genres};
+          // Space-specific fields
+          _selectedSpaceType = activeProfile.spaceType;
+          _phoneController.text = activeProfile.phone ?? '';
+          _operatingHoursController.text = activeProfile.operatingHours ?? '';
+          _websiteController.text = activeProfile.website ?? '';
+          _selectedAmenities = {...?activeProfile.amenities};
         }
       }
     } catch (e) {
@@ -237,21 +392,37 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   Future<List<Map<String, dynamic>>> _fetchAddressSuggestions(
       String query) async {
     if (query.isEmpty) return [];
-    final url = Uri.parse(
-      'https://nominatim.openstreetmap.org/search?q=$query&format=json&addressdetails=1&limit=5',
-    );
-    final response = await http.get(
-      url,
-      headers: {'User-Agent': 'to-sem-banda-app'},
-    );
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body) as List<dynamic>;
-      return data
-          .map<Map<String, dynamic>>(
-              (dynamic item) => item as Map<String, dynamic>)
-          .toList();
-    }
-    return <Map<String, dynamic>>[];
+
+    // Debounce: aguarda 500ms após parar de digitar para fazer chamada API
+    final completer = Completer<List<Map<String, dynamic>>>();
+
+    _locationDebouncer.run(() async {
+      try {
+        debugPrint('🔍 Debounced search: $query');
+        final url = Uri.parse(
+          'https://nominatim.openstreetmap.org/search?q=$query&format=json&addressdetails=1&limit=5',
+        );
+        final response = await http.get(
+          url,
+          headers: {'User-Agent': 'to-sem-banda-app'},
+        );
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body) as List<dynamic>;
+          final results = data
+              .map<Map<String, dynamic>>(
+                  (dynamic item) => item as Map<String, dynamic>)
+              .toList();
+          completer.complete(results);
+        } else {
+          completer.complete([]);
+        }
+      } catch (e) {
+        debugPrint('❌ Erro ao buscar endereços: $e');
+        completer.complete([]);
+      }
+    });
+
+    return completer.future;
   }
 
   void _onAddressSelected(Map<String, dynamic> suggestion) {
@@ -273,16 +444,16 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           '';
       final state = (address?['state'] as String?) ?? '';
 
-      // Montar string formatada: bairro, cidade, estado
-      final parts = <String>[];
-      if (neighbourhood.isNotEmpty) parts.add(neighbourhood);
-      if (city.isNotEmpty) parts.add(city);
-      if (state.isNotEmpty) parts.add(state);
-
       setState(() {
         _selectedLocation = GeoPoint(lat, lon);
-        _locationController.text = parts.isNotEmpty
-            ? parts.join(', ')
+        final formatted = formatCleanLocation(
+          neighbourhood: neighbourhood,
+          city: city,
+          state: state,
+          fallback: '',
+        );
+        _locationController.text = formatted.isNotEmpty
+            ? formatted
             : (suggestion['display_name'] as String?) ?? '';
         _selectedCity = city;
         _selectedNeighborhood = neighbourhood.isEmpty ? null : neighbourhood;
@@ -297,8 +468,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       debugPrint('EditProfile: Iniciando seleção de imagem...');
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
-        maxWidth: 2000,
-        maxHeight: 2000,
         imageQuality: 95,
       );
 
@@ -309,40 +478,59 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
       debugPrint('EditProfile: Imagem selecionada: ${picked.path}');
 
+      // Crop da imagem com opções de aspect ratio
       final cropped = await ImageCropper().cropImage(
         sourcePath: picked.path,
+        compressQuality: 85,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        compressFormat: ImageCompressFormat.jpg,
         uiSettings: [
           AndroidUiSettings(
-            toolbarTitle: 'Cortar imagem',
+            toolbarTitle: 'Editar Foto de Perfil',
             toolbarColor: AppColors.primary,
             toolbarWidgetColor: Colors.white,
-            aspectRatioPresets: [CropAspectRatioPreset.square],
-            lockAspectRatio: true,
+            statusBarColor: AppColors.primary,
+            backgroundColor: Colors.black,
+            activeControlsWidgetColor: AppColors.primary,
+            hideBottomControls: false,
+            cropFrameColor: AppColors.primary,
+            cropGridColor: Colors.white24,
+            dimmedLayerColor: Colors.black.withValues(alpha: 0.8),
+            initAspectRatio: CropAspectRatioPreset.square,
+            aspectRatioPresets: [
+              CropAspectRatioPreset.square,
+              CropAspectRatioPreset.ratio3x2,
+              CropAspectRatioPreset.ratio4x3,
+              CropAspectRatioPreset.ratio16x9,
+              CropAspectRatioPreset.original,
+            ],
+            lockAspectRatio: false,
           ),
           IOSUiSettings(
-            title: 'Cortar imagem',
-            aspectRatioPresets: [CropAspectRatioPreset.square],
-            aspectRatioLockEnabled: true,
+            title: 'Editar Foto de Perfil',
+            minimumAspectRatio: 0.5,
+            aspectRatioLockDimensionSwapEnabled: true,
+            rotateButtonsHidden: false,
+            resetButtonHidden: false,
+            aspectRatioPresets: [
+              CropAspectRatioPreset.square,
+              CropAspectRatioPreset.ratio3x2,
+              CropAspectRatioPreset.ratio4x3,
+              CropAspectRatioPreset.ratio16x9,
+              CropAspectRatioPreset.original,
+            ],
           ),
         ],
       );
 
-      String? croppedPath = picked.path;
-      if (cropped != null) {
-        try {
-          croppedPath = (cropped as dynamic).path as String?;
-          debugPrint('EditProfile: Imagem cortada: $croppedPath');
-        } catch (e) {
-          debugPrint('EditProfile: Erro ao extrair path do cropped: $e');
-        }
-      } else {
-        debugPrint('EditProfile: Crop cancelado, usando imagem original');
-      }
-
-      if (croppedPath == null) {
-        debugPrint('EditProfile: Caminho da imagem é null, abortando');
+      if (cropped == null) {
+        debugPrint('EditProfile: Crop cancelado pelo usuário');
         return;
       }
+
+      final croppedPath = cropped.path;
+      debugPrint('EditProfile: Imagem cortada: $croppedPath');
 
       debugPrint('EditProfile: Iniciando compressão da imagem...');
       final tempDir = Directory.systemTemp;
@@ -369,16 +557,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           debugPrint('EditProfile: _photoUrl atualizado para: $_photoUrl');
         });
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Foto selecionada! Clique em "Salvar Alterações" para confirmar.'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
+        // Evita mostrar snackbar redundante; feedback visual já atualiza o avatar.
       } else {
         debugPrint(
             'EditProfile: Compressão retornou null ou widget não montado');
@@ -386,10 +565,89 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     } catch (e) {
       debugPrint('EditProfile: ERRO ao selecionar imagem: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao selecionar imagem: $e')),
+        AppSnackBar.showError(
+          context,
+          'Erro ao selecionar imagem: $e',
         );
       }
+    }
+  }
+
+  Future<void> _handleSuccessfulProfileSave(
+    ProfileEntity profile, {
+    required bool isCreation,
+    required ProfileNotifier profileNotifier,
+  }) async {
+    try {
+      await profileNotifier.refresh();
+    } catch (_) {
+      // Se falhar o refresh, silenciosamente ignora
+      // pois o perfil já foi salvo com sucesso
+    }
+
+    if (!mounted) return;
+
+    final navigator = Navigator.of(context);
+    final router = GoRouter.of(context);
+
+    AppSnackBar.showSuccess(
+      context,
+      isCreation
+          ? 'Perfil criado com sucesso!'
+          : 'Perfil atualizado com sucesso!',
+    );
+
+    // Para primeiro perfil criado (isNewProfile), vai direto para home
+    // Para edição de perfil, volta para a página do perfil
+    if (widget.isNewProfile && isCreation) {
+      debugPrint('EditProfile: Primeiro perfil criado, indo para home');
+      router.go(AppRoutes.home);
+    } else {
+      if (navigator.canPop()) {
+        navigator.pop(profile.profileId);
+      }
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Executa navegação após a finalização do pop para evitar flicker
+        router.go(AppRoutes.profile(profile.profileId));
+      });
+    }
+  }
+
+  Future<void> _waitForUserDocumentUsername(String uid) async {
+    final docRef = FirebaseFirestore.instance.collection('users').doc(uid);
+    try {
+      await docRef.snapshots().firstWhere((snapshot) {
+        final username = (snapshot.data()?['username'] as String?)?.trim();
+        return username != null && username.isNotEmpty;
+      }).timeout(const Duration(seconds: 5));
+    } catch (error) {
+      debugPrint(
+        'EditProfile: Timeout aguardando username em users/$uid: $error',
+      );
+    }
+  }
+
+  Future<void> _ensureUsernameLowercaseField(
+    String profileId,
+    String? username,
+  ) async {
+    final value = username?.trim();
+    if (value == null || value.isEmpty) return;
+
+    final lowercase = value.toLowerCase();
+    try {
+      await FirebaseFirestore.instance
+          .collection('profiles')
+          .doc(profileId)
+          .set(
+        {'usernameLowercase': lowercase},
+        SetOptions(merge: true),
+      );
+    } catch (error) {
+      debugPrint(
+        'EditProfile: Falha ao garantir usernameLowercase para $profileId: $error',
+      );
     }
   }
 
@@ -397,28 +655,64 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     if (!_formKey.currentState!.validate()) return;
 
     // Validar tipo de perfil (obrigatório na primeira edição)
-    if (_isBand == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text('Por favor, selecione o tipo de perfil (Músico ou Banda)'),
-          backgroundColor: Colors.red,
-        ),
+    if (_profileType == null) {
+      AppSnackBar.showWarning(
+        context,
+        'Por favor, selecione o tipo de perfil (Músico, Banda ou Espaço)',
       );
       return;
     }
 
+    // Validar campos específicos de Espaço
+    if (_profileType == ProfileType.space) {
+      if (_selectedSpaceType == null) {
+        AppSnackBar.showWarning(
+          context,
+          'Por favor, selecione o tipo de espaço',
+        );
+        return;
+      }
+    }
+
     debugPrint('📝 EditProfile: Iniciando salvamento de perfil...');
+
     setState(() => _isSaving = true);
 
     try {
-      final user = ref.read(authStateProvider).value;
-      if (user == null) {
+      final auth = FirebaseAuth.instance;
+      final currentUser = auth.currentUser;
+      if (currentUser == null) {
         throw Exception('Usuário não autenticado');
       }
-      debugPrint('📝 EditProfile: Usuário autenticado - uid=${user.uid}');
+      await currentUser.reload();
+      final user = auth.currentUser ?? currentUser;
+      debugPrint(
+          '📝 EditProfile: Usuário autenticado (fresh) - uid=${user.uid}');
 
       var uploadedPhotoUrl = _photoUrl;
+      final normalizedProfileUsername =
+          _sanitizeProfileUsername(_profileUsernameController.text);
+      final currentProfileUsername = _profile?.username != null
+          ? _sanitizeProfileUsername(_profile!.username!)
+          : '';
+      final profileIdToExclude = _profile?.profileId ?? widget.profileIdToEdit;
+      final requiresUsername =
+          widget.isNewProfile || currentProfileUsername.isEmpty;
+
+      if (requiresUsername && normalizedProfileUsername.isEmpty) {
+        throw Exception('Informe um nome de usuário para este perfil');
+      }
+
+      final profileUsernameToSave = normalizedProfileUsername.isNotEmpty
+          ? normalizedProfileUsername
+          : (currentProfileUsername.isNotEmpty ? currentProfileUsername : null);
+
+      if (profileUsernameToSave != null) {
+        await _ensureProfileUsernameUnique(
+          profileUsernameToSave,
+          excludeProfileId: profileIdToExclude,
+        );
+      }
 
       // Upload da foto se for um arquivo local
       if (_photoUrl != null && !_photoUrl!.startsWith('http')) {
@@ -459,6 +753,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           profileId: FirebaseFirestore.instance.collection('profiles').doc().id,
           uid: user.uid,
           name: _nameController.text.trim(),
+          username: profileUsernameToSave,
           bio: _bioController.text.trim().isEmpty
               ? null
               : _bioController.text.trim(),
@@ -470,8 +765,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           neighborhood: _selectedNeighborhood,
           state: _selectedState,
           photoUrl: uploadedPhotoUrl,
-          isBand: _isBand!,
-          level: !_isBand! ? _selectedLevel : null,
+          isBand: _profileType == ProfileType.band,
+          profileType: _profileType!,
+          level: _profileType == ProfileType.musician ? _selectedLevel : null,
           instruments: _selectedInstruments.toList(),
           genres: _selectedGenres.toList(),
           youtubeLink: _youtubeController.text.trim().isEmpty
@@ -483,66 +779,59 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           tiktokLink: _tiktokController.text.trim().isEmpty
               ? null
               : _tiktokController.text.trim(),
+          // Space-specific fields
+          spaceType: _selectedSpaceType,
+          phone: _phoneController.text.trim().isEmpty
+              ? null
+              : _phoneController.text.trim(),
+          operatingHours: _operatingHoursController.text.trim().isEmpty
+              ? null
+              : _operatingHoursController.text.trim(),
+          website: _websiteController.text.trim().isEmpty
+              ? null
+              : _websiteController.text.trim(),
+          amenities: _selectedAmenities.isEmpty
+              ? null
+              : _selectedAmenities.toList(),
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
 
+        // ✅ Capturar notifier ANTES das operações assíncronas para evitar "ref after disposed"
+        final profileNotifier = ref.read(profileProvider.notifier);
+        
         // ✅ Usar profileProvider.notifier (Clean Architecture)
-        final result =
-            await ref.read(profileProvider.notifier).createProfile(newProfile);
+        final result = await profileNotifier.createProfile(newProfile);
 
         switch (result) {
           case ProfileSuccess(:final profile):
             debugPrint(
                 '✅ EditProfile: Perfil criado - ID=${profile.profileId}');
 
-            if (mounted) {
-              // ✅ Definir manualmente o activeProfileId no users doc
-              final user = FirebaseAuth.instance.currentUser;
-              if (user != null) {
-                debugPrint(
-                    '🔄 EditProfile: Atualizando activeProfileId para ${profile.profileId}...');
-                await FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(user.uid)
-                    .set({'activeProfileId': profile.profileId},
-                        SetOptions(merge: true));
+            await _ensureUsernameLowercaseField(
+              profile.profileId,
+              profile.username,
+            );
 
-                debugPrint(
-                    '✅ EditProfile: activeProfileId atualizado no Firestore');
+            await profileNotifier.switchProfile(profile.profileId);
 
-                // ✅ Invalidar ProfileProvider para forçar reload com novo activeProfileId
-                ref.invalidate(profileProvider);
-                debugPrint('🔄 EditProfile: ProfileProvider invalidado');
+            final userDocRef =
+                FirebaseFirestore.instance.collection('users').doc(user.uid);
+            await userDocRef.set(
+              {
+                'username': profile.username,
+                'activeProfileId': profile.profileId,
+              },
+              SetOptions(merge: true),
+            );
 
-                // ✅ Aguardar ProfileProvider recarregar
-                await Future.delayed(const Duration(milliseconds: 300));
+            await _waitForUserDocumentUsername(user.uid);
 
-                // ✅ Verificar se perfil está ativo
-                final profileState = ref.read(profileProvider);
-                if (profileState.hasValue) {
-                  debugPrint(
-                      '✅ EditProfile: Perfil ativo atual: ${profileState.value?.activeProfile?.name} (${profileState.value?.activeProfile?.profileId})');
-                }
-              }
-
-              // ✅ Navegação baseada no contexto
-              if (mounted && context.mounted) {
-                // Se é primeiro acesso (isNewProfile sem profileIdToEdit), redirecionar para home
-                if (widget.isNewProfile && widget.profileIdToEdit == null) {
-                  debugPrint(
-                      '🏠 EditProfile: Primeiro acesso - redirecionando para home');
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => const BottomNavScaffold(),
-                    ),
-                  );
-                } else {
-                  // Caso contrário, retornar o profileId para o caller
-                  Navigator.of(context).pop(profile.profileId);
-                }
-              }
-            }
+            await _handleSuccessfulProfileSave(
+              profile,
+              isCreation: true,
+              profileNotifier: profileNotifier,
+            );
             return;
 
           case ProfileFailure(:final message):
@@ -572,6 +861,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
         final updatedProfile = currentProfile.copyWith(
           name: _nameController.text.trim(),
+          username: profileUsernameToSave ?? currentProfile.username,
           bio: _bioController.text.trim().isEmpty
               ? null
               : _bioController.text.trim(),
@@ -583,8 +873,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           neighborhood: _selectedNeighborhood,
           state: _selectedState,
           photoUrl: uploadedPhotoUrl,
-          isBand: _isBand,
-          level: !_isBand! ? _selectedLevel : null,
+          isBand: _profileType == ProfileType.band,
+          profileType: _profileType ?? ProfileType.musician,
+          level: _profileType == ProfileType.musician ? _selectedLevel : null,
           instruments: _selectedInstruments.toList(),
           genres: _selectedGenres.toList(),
           youtubeLink: _youtubeController.text.trim().isEmpty
@@ -596,32 +887,44 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           tiktokLink: _tiktokController.text.trim().isEmpty
               ? null
               : _tiktokController.text.trim(),
+          // Space-specific fields
+          spaceType: _selectedSpaceType,
+          phone: _phoneController.text.trim().isEmpty
+              ? null
+              : _phoneController.text.trim(),
+          operatingHours: _operatingHoursController.text.trim().isEmpty
+              ? null
+              : _operatingHoursController.text.trim(),
+          website: _websiteController.text.trim().isEmpty
+              ? null
+              : _websiteController.text.trim(),
+          amenities: _selectedAmenities.isEmpty
+              ? null
+              : _selectedAmenities.toList(),
           updatedAt: DateTime.now(),
         );
 
+        // ✅ Capturar notifier ANTES das operações assíncronas para evitar "ref after disposed"
+        final profileNotifierUpdate = ref.read(profileProvider.notifier);
+        
         // ✅ Usar profileProvider.notifier (Clean Architecture)
-        final result = await ref
-            .read(profileProvider.notifier)
-            .updateProfile(updatedProfile);
+        final result = await profileNotifierUpdate.updateProfile(updatedProfile);
 
         switch (result) {
           case ProfileSuccess(:final profile):
             debugPrint(
                 '✅ EditProfile: Perfil atualizado - ID=${profile.profileId}');
 
-            // ✅ Invalidar providers dependentes
-            ref.invalidate(profileProvider);
+            await _ensureUsernameLowercaseField(
+              profile.profileId,
+              profile.username,
+            );
 
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Perfil atualizado com sucesso!'),
-                  backgroundColor: Colors.green,
-                  duration: Duration(seconds: 2),
-                ),
-              );
-              Navigator.of(context).pop(profile.profileId);
-            }
+            await _handleSuccessfulProfileSave(
+              profile,
+              isCreation: false,
+              profileNotifier: profileNotifierUpdate,
+            );
             return;
 
           case ProfileFailure(:final message):
@@ -650,23 +953,47 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
       if (mounted) {
         // Mensagens de erro específicas
-        var errorMessage = 'Erro ao salvar perfil';
-
-        if (e.toString().contains('permission-denied')) {
-          errorMessage = 'Você não tem permissão para realizar esta operação';
-        } else if (e.toString().contains('network')) {
-          errorMessage = 'Erro de conexão. Verifique sua internet';
-        } else if (e.toString().contains('Localização')) {
-          errorMessage = e.toString();
-        } else if (e is Exception) {
-          errorMessage = e.toString().replaceAll('Exception: ', '');
+        final errorString = e.toString();
+        
+        // Validações de campo (warnings)
+        if (errorString.contains('Este nome de usuário já está em uso')) {
+          AppSnackBar.showWarning(
+            context,
+            'Este nome de usuário já está em uso. Escolha outro.',
+          );
+          return;
+        }
+        
+        if (errorString.contains('Informe um nome de usuário')) {
+          AppSnackBar.showWarning(
+            context,
+            'Por favor, informe um nome de usuário para o perfil',
+          );
+          return;
+        }
+        
+        if (errorString.contains('Localização')) {
+          AppSnackBar.showWarning(
+            context,
+            'Por favor, selecione uma localização válida',
+          );
+          return;
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-          ),
+        // Erros do sistema
+        var errorMessage = 'Erro ao salvar perfil';
+
+        if (errorString.contains('permission-denied')) {
+          errorMessage = 'Você não tem permissão para realizar esta operação';
+        } else if (errorString.contains('network')) {
+          errorMessage = 'Erro de conexão. Verifique sua internet';
+        } else if (e is Exception) {
+          errorMessage = errorString.replaceAll('Exception: ', '');
+        }
+
+        AppSnackBar.showError(
+          context,
+          errorMessage,
         );
       }
     } finally {
@@ -677,18 +1004,37 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      // Prevenir voltar no primeiro acesso
-      canPop: !_isFirstAccess,
+      // Prevenir voltar apenas quando realmente bloqueado
+      canPop: _canNavigateBack,
+      // NÃO mostrar snackbar ao sair sem salvar (removido conforme solicitado)
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        // Apenas fecha sem alertas
+      },
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
-          leading: _isFirstAccess
+          leading: !_canNavigateBack
               ? null
               : IconButton(
-                  icon: const Icon(Icons.close, color: Colors.black),
-                  onPressed: () => Navigator.of(context).pop(),
+                  icon: Icon(
+                    widget.isNewProfile
+                        ? Iconsax.arrow_left
+                        : Iconsax.close_circle,
+                    color: Colors.black,
+                  ),
+                  onPressed: () async {
+                    if (widget.isNewProfile) {
+                      // Novo perfil após autenticação: fazer logout e voltar para auth
+                      await ref.read(authServiceProvider).signOut();
+                      if (mounted) {
+                        context.go(AppRoutes.auth);
+                      }
+                    } else {
+                      Navigator.of(context).maybePop();
+                    }
+                  },
                 ),
           title: Text(
             widget.isNewProfile
@@ -719,9 +1065,16 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                     _buildEssentialBlock(),
                     const SizedBox(height: 24),
 
-                    // C. Bloco de Habilidades (adaptável)
-                    _buildSkillsBlock(),
-                    const SizedBox(height: 24),
+                    // C. Bloco de Habilidades (apenas músicos/bandas) ou Espaço
+                    if (_profileType == ProfileType.musician ||
+                        _profileType == ProfileType.band) ...[
+                      _buildSkillsBlock(),
+                      const SizedBox(height: 24),
+                    ],
+                    if (_profileType == ProfileType.space) ...[
+                      _buildSpaceDetailsBlock(),
+                      const SizedBox(height: 24),
+                    ],
 
                     // D. Bloco de Links Sociais e Mídia
                     _buildSocialLinksBlock(),
@@ -737,7 +1090,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -781,8 +1134,16 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   }
 
   Widget _buildEssentialBlock() {
+    final activeProfile = ref.watch(profileProvider).value?.activeProfile;
+    final usernameValue = (activeProfile?.username ?? _profile?.username ?? _accountUsername)?.trim();
+    final hasUsername = usernameValue != null && usernameValue.isNotEmpty;
+    final sanitizedUsername = hasUsername
+      ? (usernameValue.startsWith('@')
+        ? usernameValue.substring(1)
+        : usernameValue)
+      : null;
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Informações Essenciais',
@@ -803,6 +1164,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
               _pickAndCropProfileImage();
             },
             child: Stack(
+              clipBehavior: Clip.none,
               children: [
                 CircleAvatar(
                   radius: 60,
@@ -814,7 +1176,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                           : FileImage(File(_photoUrl!)))
                       : null,
                   child: _photoUrl == null
-                      ? Icon(Icons.person, size: 60, color: Colors.grey[600])
+                      ? Icon(Iconsax.user, size: 64, color: Colors.grey[600])
                       : null,
                 ),
                 Positioned(
@@ -826,7 +1188,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                       color: AppColors.primary,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.camera_alt,
+                    child: const Icon(Iconsax.camera,
                         size: 20, color: Colors.white),
                   ),
                 ),
@@ -836,16 +1198,65 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         ),
         const SizedBox(height: 20),
 
+        if (_isUsernameLocked && hasUsername && sanitizedUsername != null) ...[
+          TextFormField(
+            key: ValueKey('username-field-${sanitizedUsername.toLowerCase()}'),
+            initialValue: '@$sanitizedUsername',
+            readOnly: true,
+            decoration: InputDecoration(
+              labelText: 'Nome de usuário',
+              prefixIcon: const Icon(
+                Icons.alternate_email,
+                color: AppColors.primary,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'O nome de usuário não pode ser alterado após o cadastro.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 16),
+        ] else ...[
+          TextFormField(
+            controller: _profileUsernameController,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            decoration: InputDecoration(
+              labelText: 'Nome de usuário do perfil',
+              hintText: 'Escolha um @username único',
+              helperText:
+                  'Único por perfil. Use letras, números, ponto e underline.',
+              prefixText: '@',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              prefixIcon:
+                  const Icon(Icons.alternate_email, color: AppColors.primary),
+            ),
+            validator: _validateProfileUsername,
+            textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.none,
+          ),
+        ],
+        const SizedBox(height: 16),
+
         // Nome
         TextFormField(
           controller: _nameController,
           decoration: InputDecoration(
             labelText: 'Nome',
-            hintText: _isBand ?? false ? 'Nome da banda' : 'Seu nome',
+            hintText: _profileType == ProfileType.band
+                ? 'Nome da banda'
+                : _profileType == ProfileType.space
+                    ? 'Nome do espaço'
+                    : 'Seu nome',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            prefixIcon: const Icon(Icons.person_outline),
+            prefixIcon: const Icon(Iconsax.user),
           ),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
@@ -863,13 +1274,15 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           maxLength: maxBioLength,
           decoration: InputDecoration(
             labelText: 'Biografia',
-            hintText: _isBand ?? false
+            hintText: _profileType == ProfileType.band
                 ? 'Conte sobre a banda, estilo, história...'
-                : 'Conte sobre você, experiência, objetivos...',
+                : _profileType == ProfileType.space
+                    ? 'Descreva o espaço, serviços, diferenciais...'
+                    : 'Conte sobre você, experiência, objetivos...',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            prefixIcon: const Icon(Icons.edit_note),
+            prefixIcon: const Icon(Iconsax.note),
             counterText: '${_bioController.text.length}/$maxBioLength',
           ),
           onChanged: (value) => setState(() {}),
@@ -882,16 +1295,22 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           decoration: InputDecoration(
-            labelText:
-                _isBand ?? false ? 'Ano de formação' : 'Ano de nascimento',
-            hintText: _isBand ?? false
+            labelText: _profileType == ProfileType.band
+                ? 'Ano de formação'
+                : _profileType == ProfileType.space
+                    ? 'Ano de fundação'
+                    : 'Ano de nascimento',
+            hintText: _profileType == ProfileType.band
                 ? 'Quando a banda foi formada'
-                : 'Seu ano de nascimento',
+                : _profileType == ProfileType.space
+                    ? 'Ano de fundação do espaço'
+                    : 'Seu ano de nascimento',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            prefixIcon:
-                Icon(_isBand ?? false ? Icons.calendar_today : Icons.cake),
+            prefixIcon: Icon(
+              _profileType == ProfileType.musician ? Iconsax.cake : Iconsax.calendar,
+            ),
           ),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
@@ -907,8 +1326,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
             final currentYear = DateTime.now().year;
 
-            if (_isBand ?? false) {
-              // BANDAS: Validação de ano de formação
+            if (_profileType == ProfileType.band || _profileType == ProfileType.space) {
+              // BANDAS/ESPAÇOS: Validação de ano de formação/fundação
               if (year < 1900) {
                 return 'Ano muito antigo (mínimo: 1900)';
               }
@@ -950,65 +1369,81 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           ),
         ),
         const SizedBox(height: 12),
-        TypeAheadField<Map<String, dynamic>>(
-          controller: _locationController,
-          focusNode: _locationFocusNode,
-          suggestionsCallback: _fetchAddressSuggestions,
-          builder: (context, controller, focusNode) {
-            return TextFormField(
-              controller: controller,
-              focusNode: focusNode,
-              decoration: InputDecoration(
-                hintText: 'Buscar localização (cidade, bairro, endereço...)',
-                prefixIcon: const Icon(Icons.place, color: AppColors.primary),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 2,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 2,
-                  ),
-                ),
+          TypeAheadField<Map<String, dynamic>>(
+            controller: _locationController,
+            focusNode: _locationFocusNode,
+            debounceDuration: const Duration(milliseconds: 600), // nativo!
+            suggestionsCallback: _fetchAddressSuggestions,
+            loadingBuilder: (context) => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+            emptyBuilder: (context) => Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Iconsax.search_normal, color: Colors.grey[400]),
+                  const SizedBox(width: 8),
+                  Text('Digite para buscar endereço', style: TextStyle(color: Colors.grey[600])),
+                ],
               ),
-              validator: (v) => _selectedLocation == null
-                  ? 'Selecione uma localização'
-                  : null,
-            );
-          },
-          itemBuilder: (BuildContext context, Map<String, dynamic> suggestion) {
-            return ListTile(
-              leading: const Icon(Icons.location_on, color: AppColors.primary),
-              title: Text(
-                (suggestion['display_name'] as String?) ?? '',
-                style: const TextStyle(fontSize: 14),
-              ),
-            );
-          },
-          onSelected: _onAddressSelected,
-          emptyBuilder: (context) => const Padding(
-            padding: EdgeInsets.all(8),
-            child: Text('Nenhum endereço encontrado'),
+            ),
+            builder: (context, controller, focusNode) {
+              return TextFormField(
+                controller: controller,
+                focusNode: focusNode,
+                decoration: InputDecoration(
+                  hintText: 'Buscar localização (cidade, bairro, endereço...)',
+                  prefixIcon: const Icon(Iconsax.location, color: AppColors.primary),
+                  suffixIcon: controller.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Iconsax.close_circle, color: AppColors.textSecondary),
+                          onPressed: () {
+                            controller.clear();
+                            setState(() {
+                              _selectedLocation = null;
+                              _selectedCity = null;
+                              _selectedNeighborhood = null;
+                              _selectedState = null;
+                            });
+                            focusNode.unfocus();
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.primary),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                  ),
+                ),
+                validator: (_) => _selectedLocation == null ? 'Selecione uma localização' : null,
+              );
+            },
+            itemBuilder: (context, suggestion) {
+              final displayName = suggestion['display_name'] as String? ?? '';
+              return ListTile(
+                leading: const Icon(Iconsax.location, color: AppColors.primary),
+                title: Text(
+                  displayName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              );
+            },
+            onSelected: _onAddressSelected,
           ),
-        ),
       ],
     );
   }
 
   Widget _buildTypologyBlock() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Tipo de Perfil',
@@ -1019,7 +1454,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           ),
         ),
         const SizedBox(height: 8),
-        if (_isBand == null)
+        if (_profileType == null)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1029,12 +1464,12 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
+                Icon(Iconsax.info_circle, color: Colors.orange[700], size: 22),
                 const SizedBox(width: 12),
-                Expanded(
+                const Expanded(
                   child: Text(
                     'Esta escolha é importante e afeta como seu perfil será exibido',
-                    style: TextStyle(fontSize: 13, color: Colors.orange[900]),
+                    style: TextStyle(fontSize: 13, color: Color(0xFF7A4100)),
                   ),
                 ),
               ],
@@ -1045,19 +1480,28 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           children: [
             Expanded(
               child: _buildTypeCard(
-                icon: Icons.person,
+                icon: Iconsax.user,
                 label: 'Músico',
-                isSelected: _isBand == false,
-                onTap: () => setState(() => _isBand = false),
+                isSelected: _profileType == ProfileType.musician,
+                onTap: () => setState(() => _profileType = ProfileType.musician),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildTypeCard(
-                icon: Icons.people,
+                icon: Iconsax.people,
                 label: 'Banda',
-                isSelected: _isBand ?? false,
-                onTap: () => setState(() => _isBand = true),
+                isSelected: _profileType == ProfileType.band,
+                onTap: () => setState(() => _profileType = ProfileType.band),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildTypeCard(
+                icon: Iconsax.building,
+                label: 'Espaço',
+                isSelected: _profileType == ProfileType.space,
+                onTap: () => setState(() => _profileType = ProfileType.space),
               ),
             ),
           ],
@@ -1079,7 +1523,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         padding: const EdgeInsets.symmetric(vertical: 20),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withOpacity(0.1)
+              ? AppColors.primary.withValues(alpha: 0.1)
               : Colors.grey[100],
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -1111,7 +1555,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
   Widget _buildSkillsBlock() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Habilidades e Estilos',
@@ -1142,7 +1585,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
         // Instrumentos
         MultiSelectField(
-          title: _isBand ?? false ? 'Instrumentação' : 'Instrumentos',
+          title: _profileType == ProfileType.band ? 'Instrumentação' : 'Instrumentos',
           placeholder: 'Selecione até 5 instrumentos',
           options: _instrumentOptions,
           selectedItems: _selectedInstruments,
@@ -1158,7 +1601,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         const SizedBox(height: 16),
 
         // Nível (apenas para músicos)
-        if (_isBand == false) ...[
+        if (_profileType == ProfileType.musician) ...[
           const Text(
             'Nível',
             style: TextStyle(
@@ -1169,7 +1612,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            initialValue: _selectedLevel,
+            value: _selectedLevel,
             items: _levelOptions
                 .map(
                   (level) => DropdownMenuItem(
@@ -1191,6 +1634,205 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildSpaceDetailsBlock() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Detalhes do Espaço',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Tipo de Espaço (obrigatório)
+        const Text(
+          'Tipo de Espaço *',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _selectedSpaceType,
+          items: SpaceType.values
+              .map(
+                (type) => DropdownMenuItem(
+                  value: type.value,
+                  child: Text(type.label),
+                ),
+              )
+              .toList(),
+          onChanged: (value) => setState(() => _selectedSpaceType = value),
+          decoration: InputDecoration(
+            hintText: 'Selecione o tipo de espaço',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: AppColors.primary,
+                width: 2,
+              ),
+            ),
+            prefixIcon: const Icon(Iconsax.building_4),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Tipo de espaço é obrigatório';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // Telefone/WhatsApp (opcional)
+        TextFormField(
+          controller: _phoneController,
+          keyboardType: TextInputType.phone,
+          inputFormatters: [
+            // Formatação brasileira para telefone
+            _BrazilianPhoneFormatter(),
+          ],
+          decoration: InputDecoration(
+            labelText: 'Telefone/WhatsApp',
+            hintText: '(11) 99999-9999',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            prefixIcon: const Icon(Iconsax.call),
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return null; // Campo opcional
+            }
+            // Remove caracteres não numéricos
+            final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
+            if (digitsOnly.length < 10 || digitsOnly.length > 11) {
+              return 'Telefone inválido';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // Horário de Funcionamento (opcional)
+        TextFormField(
+          controller: _operatingHoursController,
+          decoration: InputDecoration(
+            labelText: 'Horário de Funcionamento',
+            hintText: 'Ex: Seg-Sex 9h-18h',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            prefixIcon: const Icon(Iconsax.clock),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Website (opcional)
+        TextFormField(
+          controller: _websiteController,
+          keyboardType: TextInputType.url,
+          decoration: InputDecoration(
+            labelText: 'Website',
+            hintText: 'https://seusite.com.br',
+            suffixIcon: _websiteController.text.isEmpty
+                ? null
+                : _isValidWebsiteUrl(_websiteController.text)
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : const Icon(Icons.error_outline, color: Colors.red),
+            helperText: _websiteController.text.isNotEmpty
+                ? (_isValidWebsiteUrl(_websiteController.text)
+                    ? '✓ URL válida'
+                    : '✗ URL deve começar com http:// ou https://')
+                : null,
+            helperStyle: TextStyle(
+              color: _isValidWebsiteUrl(_websiteController.text)
+                  ? Colors.green
+                  : Colors.red,
+              fontSize: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            prefixIcon: const Icon(Iconsax.global),
+          ),
+          onChanged: (_) => setState(() {}),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) return null;
+            final url = value.trim();
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+              return 'URL deve começar com http:// ou https://';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // Comodidades (opcional)
+        const Text(
+          'Comodidades',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildAmenityChip('Wi-Fi grátis'),
+            _buildAmenityChip('Estacionamento'),
+            _buildAmenityChip('Ar-condicionado'),
+            _buildAmenityChip('Aberto 24 horas'),
+            _buildAmenityChip('Área para fumantes'),
+            _buildAmenityChip('Aceita pix'),
+            _buildAmenityChip('Técnico de som'),
+            _buildAmenityChip('Bebidas disponíveis'),
+            _buildAmenityChip('Comida disponível'),
+            _buildAmenityChip('Palco para apresentações'),
+            _buildAmenityChip('Live streaming'), 
+            _buildAmenityChip('Acessibilidade'),
+            _buildAmenityChip('Próximo ao metrô'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAmenityChip(String amenity) {
+    final isSelected = _selectedAmenities.contains(amenity);
+    return FilterChip(
+      label: Text(amenity),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          if (selected) {
+            _selectedAmenities.add(amenity);
+          } else {
+            _selectedAmenities.remove(amenity);
+          }
+        });
+      },
+      selectedColor: AppColors.primary.withValues(alpha: 0.2),
+      checkmarkColor: AppColors.primary,
+      labelStyle: TextStyle(
+        color: isSelected ? AppColors.primary : Colors.grey[700],
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+      ),
+      side: BorderSide(
+        color: isSelected ? AppColors.primary : Colors.grey[300]!,
+        width: isSelected ? 2 : 1,
+      ),
     );
   }
 
@@ -1221,9 +1863,14 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     return youtubeRegex.hasMatch(url.trim());
   }
 
+  bool _isValidWebsiteUrl(String url) {
+    if (url.trim().isEmpty) return false;
+    final trimmedUrl = url.trim();
+    return trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://');
+  }
+
   Widget _buildSocialLinksBlock() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Links Sociais e Mídia',
@@ -1260,7 +1907,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            prefixIcon: const Icon(Icons.photo_camera),
+            prefixIcon: const Icon(Iconsax.camera),
           ),
           onChanged: (_) => setState(() {}),
         ),
@@ -1291,7 +1938,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            prefixIcon: const Icon(Icons.music_note),
+            prefixIcon: const Icon(Iconsax.musicnote),
           ),
           onChanged: (_) => setState(() {}),
         ),
@@ -1324,11 +1971,119 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            prefixIcon: const Icon(Icons.play_circle_outline),
+            prefixIcon: const Icon(Iconsax.play_circle),
           ),
           onChanged: (_) => setState(() {}),
         ),
       ],
+    );
+  }
+
+  String _sanitizeProfileUsername(String value) {
+    final trimmed = value.trim();
+    final withoutAt = trimmed.startsWith('@') ? trimmed.substring(1) : trimmed;
+    return withoutAt.replaceAll(RegExp(r'\s+'), '');
+  }
+
+  String? _validateProfileUsername(String? value) {
+    if (_isUsernameLocked) {
+      return null;
+    }
+    final sanitized = _sanitizeProfileUsername(value ?? '');
+    if (sanitized.isEmpty) {
+      return 'Nome de usuário é obrigatório';
+    }
+    if (sanitized.length < 3) {
+      return 'Mínimo de 3 caracteres';
+    }
+    final regex = RegExp(r'^[A-Za-z0-9._]+$');
+    if (!regex.hasMatch(sanitized)) {
+      return 'Use letras, números, ponto ou underline';
+    }
+    return null;
+  }
+
+  Future<void> _ensureProfileUsernameUnique(
+    String username, {
+    String? excludeProfileId,
+  }) async {
+    final usernameLowercase = username.toLowerCase();
+    final snapshot = await FirebaseFirestore.instance
+        .collection('profiles')
+        .where('usernameLowercase', isEqualTo: usernameLowercase)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return;
+
+    final existingId = snapshot.docs.first.id;
+    if (excludeProfileId == null || existingId != excludeProfileId) {
+      throw Exception('Este nome de usuário já está em uso');
+    }
+  }
+}
+
+class _BrazilianPhoneFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Permite digitação livre se estiver apagando
+    if (newValue.text.length < oldValue.text.length) {
+      return newValue;
+    }
+
+    String text = newValue.text;
+
+    // Remove todos os caracteres não numéricos
+    text = text.replaceAll(RegExp(r'\D'), '');
+
+    // Limita a 11 dígitos (DDD + 9 dígitos)
+    if (text.length > 11) {
+      text = text.substring(0, 11);
+    }
+
+    final buffer = StringBuffer();
+
+    if (text.isEmpty) {
+      return TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+
+    // Aplica formatação progressiva
+    if (text.length <= 2) {
+      buffer.write('(');
+      buffer.write(text);
+    } else if (text.length <= 6) {
+      buffer.write('(');
+      buffer.write(text.substring(0, 2));
+      buffer.write(') ');
+      buffer.write(text.substring(2));
+    } else if (text.length <= 10) {
+      buffer.write('(');
+      buffer.write(text.substring(0, 2));
+      buffer.write(') ');
+      buffer.write(text.substring(2, 6));
+      buffer.write('-');
+      buffer.write(text.substring(6));
+    } else {
+      // 11 dígitos: (XX) XXXXX-XXXX
+      buffer.write('(');
+      buffer.write(text.substring(0, 2));
+      buffer.write(') ');
+      buffer.write(text.substring(2, 7));
+      buffer.write('-');
+      buffer.write(text.substring(7));
+    }
+
+    final formattedText = buffer.toString();
+
+    return TextEditingValue(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: formattedText.length),
     );
   }
 }

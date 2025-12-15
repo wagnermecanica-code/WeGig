@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Widgets reutilizáveis para tela de autenticação
 /// 
@@ -186,7 +187,7 @@ class ErrorMessageBox extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: AppColors.error, size: 20),
+          Icon(Iconsax.danger, color: AppColors.error, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -280,7 +281,7 @@ class AuthHeader extends StatelessWidget {
     return Column(
       children: [
         Icon(
-          Icons.music_note_rounded,
+          Iconsax.musicnote,
           size: 80,
           color: AppColors.primary,
         ),

@@ -1,0 +1,9 @@
+export 'data/datasources/mensagens_new_remote_datasource.dart';
+export 'data/repositories/mensagens_new_repository_impl.dart';
+export 'domain/entities/entities.dart';
+export 'domain/repositories/mensagens_new_repository.dart';
+export 'domain/usecases/usecases.dart';
+export 'presentation/pages/pages.dart';
+export 'presentation/providers/chat_new_controller.dart';
+export 'presentation/providers/mensagens_new_providers.dart';
+export 'presentation/widgets/widgets.dart';

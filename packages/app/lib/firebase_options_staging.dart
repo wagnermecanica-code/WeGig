@@ -67,6 +67,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '27906769066',
     projectId: 'wegig-staging',
     storageBucket: 'wegig-staging.firebasestorage.app',
-    iosBundleId: 'com.tosembanda.wegig.staging',
+    iosBundleId: 'com.wegig.wegig',
   );
 }

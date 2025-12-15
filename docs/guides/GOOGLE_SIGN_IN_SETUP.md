@@ -56,7 +56,7 @@ Client ID (iOS): 278498777601-XXXXXXXXXXXXXXXXXXXXXXXX.apps.googleusercontent.co
 
 ### Passo 4: Atualizar Info.plist (se necessário)
 
-Edite: `ios/Runner/Info.plist`
+Edite: `ios/WeGig/Info.plist`
 
 ```xml
 <key>GIDClientID</key>

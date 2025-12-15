@@ -1,0 +1,32 @@
+# ~/.frunclean
+# =============================================
+# COMANDO DE EMERGÊNCIA — só use quando o build travar 20+ min
+# =============================================
+
+frunclean() {
+  echo ""
+  echo "LIMPEZA NUCLEAR ATIVADA — matando tudo que trava o Xcode"
+  echo ""
+  
+  killall Xcode 2>/dev/null
+  killall dart 2>/dev/null
+  
+  cd /Users/wagneroliveira/to_sem_banda/packages/app || return
+  
+  echo "→ fvm flutter clean"
+  fvm flutter clean
+  
+  echo "→ Removendo DerivedData, Pods e cache..."
+  rm -rf ~/Library/Developer/Xcode/DerivedData/* 2>/dev/null
+  rm -rf ios/Pods ios/Podfile.lock 2>/dev/null
+  
+  echo "→ Reconstruindo Pods..."
+  (cd ios && pod install --repo-update > /dev/null 2>&1)
+  
+  echo ""
+  echo "PRONTO! Build limpo."
+  echo "Agora é só rodar: frun"
+  echo ""
+}
+
+export -f frunclean 2>/dev/null || true

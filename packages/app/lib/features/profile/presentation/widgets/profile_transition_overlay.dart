@@ -2,19 +2,21 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 
 /// Widget de transição animada ao trocar de perfil
 /// Exibe overlay com animação de fade e profile info
 class ProfileTransitionOverlay extends StatefulWidget {
   const ProfileTransitionOverlay({
     required this.profileName,
-    required this.isBand,
+    required this.profileType,
     required this.onComplete,
     super.key,
     this.photoUrl,
   });
   final String profileName;
-  final bool isBand;
+  /// Tipo do perfil: 'band', 'musician' ou 'space'
+  final String profileType;
   final String? photoUrl;
   final VoidCallback onComplete;
 
@@ -27,17 +29,17 @@ class ProfileTransitionOverlay extends StatefulWidget {
   static Future<void> show(
     BuildContext context, {
     required String profileName,
-    required bool isBand,
+    required String profileType,
     required VoidCallback onComplete,
     String? photoUrl,
   }) async {
-    await showDialog(
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (context) => ProfileTransitionOverlay(
         profileName: profileName,
-        isBand: isBand,
+        profileType: profileType,
         photoUrl: photoUrl,
         onComplete: onComplete,
       ),
@@ -76,10 +78,15 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
 
     // Inicia animação e fecha após completar
     _controller.forward().then((_) {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
+      Future<void>.delayed(const Duration(milliseconds: 500), () {
+        // ✅ FIX: Verificar mounted ANTES de acessar Navigator.of(context)
+        if (!mounted) return;
+        // Usando try-catch para evitar exceção se o widget já foi descartado
+        try {
           Navigator.of(context).pop();
           widget.onComplete();
+        } catch (e) {
+          debugPrint('ProfileTransitionOverlay: Navegação já foi descartada: $e');
         }
       });
     });
@@ -91,11 +98,37 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
     super.dispose();
   }
 
+  /// Obtém o ícone baseado no tipo de perfil
+  IconData _getProfileTypeIcon() {
+    switch (widget.profileType.toLowerCase()) {
+      case 'band':
+        return Iconsax.people;
+      case 'space':
+        return Iconsax.building;
+      case 'musician':
+      default:
+        return Iconsax.user;
+    }
+  }
+
+  /// Obtém o label baseado no tipo de perfil
+  String _getProfileTypeLabel() {
+    switch (widget.profileType.toLowerCase()) {
+      case 'band':
+        return 'Banda';
+      case 'space':
+        return 'Espaço';
+      case 'musician':
+      default:
+        return 'Músico';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final color = widget.isBand ? AppColors.accent : AppColors.primary;
-    final lightColor =
-        widget.isBand ? AppColors.accentLight : AppColors.primaryLight;
+    // ✅ Cores fixas: sempre usar primary (0xFF37475A)
+    const color = AppColors.primary;
+    const lightColor = AppColors.primaryLight;
 
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -146,7 +179,7 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
                             : null,
                     child: widget.photoUrl == null || widget.photoUrl!.isEmpty
                         ? Icon(
-                            widget.isBand ? Icons.groups : Icons.person,
+                            _getProfileTypeIcon(),
                             size: 50,
                             color: color,
                           )
@@ -192,13 +225,13 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        widget.isBand ? Icons.groups : Icons.person,
+                        _getProfileTypeIcon(),
                         size: 14,
                         color: color,
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        widget.isBand ? 'Banda' : 'Músico',
+                        _getProfileTypeLabel(),
                         style: AppTypography.captionLight.copyWith(
                           color: color,
                           fontWeight: FontWeight.w600,

@@ -32,6 +32,7 @@ mixin _$NotificationEntity {
   String? get senderUid => throw _privateConstructorUsedError;
   String? get senderProfileId => throw _privateConstructorUsedError;
   String? get senderName => throw _privateConstructorUsedError;
+  String? get senderUsername => throw _privateConstructorUsedError;
   String? get senderPhoto => throw _privateConstructorUsedError;
   Map<String, dynamic> get data => throw _privateConstructorUsedError;
   @NullableNotificationActionTypeConverter()
@@ -43,7 +44,10 @@ mixin _$NotificationEntity {
   @NullableTimestampConverter()
   DateTime? get readAt => throw _privateConstructorUsedError;
   @NullableTimestampConverter()
-  DateTime? get expiresAt => throw _privateConstructorUsedError;
+  DateTime? get expiresAt =>
+      throw _privateConstructorUsedError; // Documento Firestore para paginação cursor-based
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  DocumentSnapshot<Object?>? get document => throw _privateConstructorUsedError;
 
   /// Serializes this NotificationEntity to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -72,6 +76,7 @@ abstract class $NotificationEntityCopyWith<$Res> {
       String? senderUid,
       String? senderProfileId,
       String? senderName,
+      String? senderUsername,
       String? senderPhoto,
       Map<String, dynamic> data,
       @NullableNotificationActionTypeConverter()
@@ -80,7 +85,9 @@ abstract class $NotificationEntityCopyWith<$Res> {
       @NotificationPriorityConverter() NotificationPriority priority,
       bool read,
       @NullableTimestampConverter() DateTime? readAt,
-      @NullableTimestampConverter() DateTime? expiresAt});
+      @NullableTimestampConverter() DateTime? expiresAt,
+      @JsonKey(includeFromJson: false, includeToJson: false)
+      DocumentSnapshot<Object?>? document});
 }
 
 /// @nodoc
@@ -108,6 +115,7 @@ class _$NotificationEntityCopyWithImpl<$Res, $Val extends NotificationEntity>
     Object? senderUid = freezed,
     Object? senderProfileId = freezed,
     Object? senderName = freezed,
+    Object? senderUsername = freezed,
     Object? senderPhoto = freezed,
     Object? data = null,
     Object? actionType = freezed,
@@ -116,6 +124,7 @@ class _$NotificationEntityCopyWithImpl<$Res, $Val extends NotificationEntity>
     Object? read = null,
     Object? readAt = freezed,
     Object? expiresAt = freezed,
+    Object? document = freezed,
   }) {
     return _then(_value.copyWith(
       notificationId: null == notificationId
@@ -158,6 +167,10 @@ class _$NotificationEntityCopyWithImpl<$Res, $Val extends NotificationEntity>
           ? _value.senderName
           : senderName // ignore: cast_nullable_to_non_nullable
               as String?,
+      senderUsername: freezed == senderUsername
+          ? _value.senderUsername
+          : senderUsername // ignore: cast_nullable_to_non_nullable
+              as String?,
       senderPhoto: freezed == senderPhoto
           ? _value.senderPhoto
           : senderPhoto // ignore: cast_nullable_to_non_nullable
@@ -190,6 +203,10 @@ class _$NotificationEntityCopyWithImpl<$Res, $Val extends NotificationEntity>
           ? _value.expiresAt
           : expiresAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      document: freezed == document
+          ? _value.document
+          : document // ignore: cast_nullable_to_non_nullable
+              as DocumentSnapshot<Object?>?,
     ) as $Val);
   }
 }
@@ -213,6 +230,7 @@ abstract class _$$NotificationEntityImplCopyWith<$Res>
       String? senderUid,
       String? senderProfileId,
       String? senderName,
+      String? senderUsername,
       String? senderPhoto,
       Map<String, dynamic> data,
       @NullableNotificationActionTypeConverter()
@@ -221,7 +239,9 @@ abstract class _$$NotificationEntityImplCopyWith<$Res>
       @NotificationPriorityConverter() NotificationPriority priority,
       bool read,
       @NullableTimestampConverter() DateTime? readAt,
-      @NullableTimestampConverter() DateTime? expiresAt});
+      @NullableTimestampConverter() DateTime? expiresAt,
+      @JsonKey(includeFromJson: false, includeToJson: false)
+      DocumentSnapshot<Object?>? document});
 }
 
 /// @nodoc
@@ -247,6 +267,7 @@ class __$$NotificationEntityImplCopyWithImpl<$Res>
     Object? senderUid = freezed,
     Object? senderProfileId = freezed,
     Object? senderName = freezed,
+    Object? senderUsername = freezed,
     Object? senderPhoto = freezed,
     Object? data = null,
     Object? actionType = freezed,
@@ -255,6 +276,7 @@ class __$$NotificationEntityImplCopyWithImpl<$Res>
     Object? read = null,
     Object? readAt = freezed,
     Object? expiresAt = freezed,
+    Object? document = freezed,
   }) {
     return _then(_$NotificationEntityImpl(
       notificationId: null == notificationId
@@ -297,6 +319,10 @@ class __$$NotificationEntityImplCopyWithImpl<$Res>
           ? _value.senderName
           : senderName // ignore: cast_nullable_to_non_nullable
               as String?,
+      senderUsername: freezed == senderUsername
+          ? _value.senderUsername
+          : senderUsername // ignore: cast_nullable_to_non_nullable
+              as String?,
       senderPhoto: freezed == senderPhoto
           ? _value.senderPhoto
           : senderPhoto // ignore: cast_nullable_to_non_nullable
@@ -329,6 +355,10 @@ class __$$NotificationEntityImplCopyWithImpl<$Res>
           ? _value.expiresAt
           : expiresAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      document: freezed == document
+          ? _value.document
+          : document // ignore: cast_nullable_to_non_nullable
+              as DocumentSnapshot<Object?>?,
     ));
   }
 }
@@ -347,6 +377,7 @@ class _$NotificationEntityImpl extends _NotificationEntity {
       this.senderUid,
       this.senderProfileId,
       this.senderName,
+      this.senderUsername,
       this.senderPhoto,
       final Map<String, dynamic> data = const {},
       @NullableNotificationActionTypeConverter() this.actionType,
@@ -355,7 +386,8 @@ class _$NotificationEntityImpl extends _NotificationEntity {
       this.priority = NotificationPriority.medium,
       this.read = false,
       @NullableTimestampConverter() this.readAt,
-      @NullableTimestampConverter() this.expiresAt})
+      @NullableTimestampConverter() this.expiresAt,
+      @JsonKey(includeFromJson: false, includeToJson: false) this.document})
       : _data = data,
         _actionData = actionData,
         super._();
@@ -385,6 +417,8 @@ class _$NotificationEntityImpl extends _NotificationEntity {
   final String? senderProfileId;
   @override
   final String? senderName;
+  @override
+  final String? senderUsername;
   @override
   final String? senderPhoto;
   final Map<String, dynamic> _data;
@@ -422,10 +456,14 @@ class _$NotificationEntityImpl extends _NotificationEntity {
   @override
   @NullableTimestampConverter()
   final DateTime? expiresAt;
+// Documento Firestore para paginação cursor-based
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  final DocumentSnapshot<Object?>? document;
 
   @override
   String toString() {
-    return 'NotificationEntity(notificationId: $notificationId, type: $type, recipientUid: $recipientUid, recipientProfileId: $recipientProfileId, title: $title, message: $message, createdAt: $createdAt, senderUid: $senderUid, senderProfileId: $senderProfileId, senderName: $senderName, senderPhoto: $senderPhoto, data: $data, actionType: $actionType, actionData: $actionData, priority: $priority, read: $read, readAt: $readAt, expiresAt: $expiresAt)';
+    return 'NotificationEntity(notificationId: $notificationId, type: $type, recipientUid: $recipientUid, recipientProfileId: $recipientProfileId, title: $title, message: $message, createdAt: $createdAt, senderUid: $senderUid, senderProfileId: $senderProfileId, senderName: $senderName, senderUsername: $senderUsername, senderPhoto: $senderPhoto, data: $data, actionType: $actionType, actionData: $actionData, priority: $priority, read: $read, readAt: $readAt, expiresAt: $expiresAt, document: $document)';
   }
 
   @override
@@ -450,6 +488,8 @@ class _$NotificationEntityImpl extends _NotificationEntity {
                 other.senderProfileId == senderProfileId) &&
             (identical(other.senderName, senderName) ||
                 other.senderName == senderName) &&
+            (identical(other.senderUsername, senderUsername) ||
+                other.senderUsername == senderUsername) &&
             (identical(other.senderPhoto, senderPhoto) ||
                 other.senderPhoto == senderPhoto) &&
             const DeepCollectionEquality().equals(other._data, _data) &&
@@ -462,31 +502,36 @@ class _$NotificationEntityImpl extends _NotificationEntity {
             (identical(other.read, read) || other.read == read) &&
             (identical(other.readAt, readAt) || other.readAt == readAt) &&
             (identical(other.expiresAt, expiresAt) ||
-                other.expiresAt == expiresAt));
+                other.expiresAt == expiresAt) &&
+            (identical(other.document, document) ||
+                other.document == document));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      notificationId,
-      type,
-      recipientUid,
-      recipientProfileId,
-      title,
-      message,
-      createdAt,
-      senderUid,
-      senderProfileId,
-      senderName,
-      senderPhoto,
-      const DeepCollectionEquality().hash(_data),
-      actionType,
-      const DeepCollectionEquality().hash(_actionData),
-      priority,
-      read,
-      readAt,
-      expiresAt);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        notificationId,
+        type,
+        recipientUid,
+        recipientProfileId,
+        title,
+        message,
+        createdAt,
+        senderUid,
+        senderProfileId,
+        senderName,
+        senderUsername,
+        senderPhoto,
+        const DeepCollectionEquality().hash(_data),
+        actionType,
+        const DeepCollectionEquality().hash(_actionData),
+        priority,
+        read,
+        readAt,
+        expiresAt,
+        document
+      ]);
 
   /// Create a copy of NotificationEntity
   /// with the given fields replaced by the non-null parameter values.
@@ -507,26 +552,28 @@ class _$NotificationEntityImpl extends _NotificationEntity {
 
 abstract class _NotificationEntity extends NotificationEntity {
   const factory _NotificationEntity(
-          {required final String notificationId,
-          @NotificationTypeConverter() required final NotificationType type,
-          required final String recipientUid,
-          required final String recipientProfileId,
-          required final String title,
-          required final String message,
-          @TimestampConverter() required final DateTime createdAt,
-          final String? senderUid,
-          final String? senderProfileId,
-          final String? senderName,
-          final String? senderPhoto,
-          final Map<String, dynamic> data,
-          @NullableNotificationActionTypeConverter()
-          final NotificationActionType? actionType,
-          final Map<String, dynamic>? actionData,
-          @NotificationPriorityConverter() final NotificationPriority priority,
-          final bool read,
-          @NullableTimestampConverter() final DateTime? readAt,
-          @NullableTimestampConverter() final DateTime? expiresAt}) =
-      _$NotificationEntityImpl;
+      {required final String notificationId,
+      @NotificationTypeConverter() required final NotificationType type,
+      required final String recipientUid,
+      required final String recipientProfileId,
+      required final String title,
+      required final String message,
+      @TimestampConverter() required final DateTime createdAt,
+      final String? senderUid,
+      final String? senderProfileId,
+      final String? senderName,
+      final String? senderUsername,
+      final String? senderPhoto,
+      final Map<String, dynamic> data,
+      @NullableNotificationActionTypeConverter()
+      final NotificationActionType? actionType,
+      final Map<String, dynamic>? actionData,
+      @NotificationPriorityConverter() final NotificationPriority priority,
+      final bool read,
+      @NullableTimestampConverter() final DateTime? readAt,
+      @NullableTimestampConverter() final DateTime? expiresAt,
+      @JsonKey(includeFromJson: false, includeToJson: false)
+      final DocumentSnapshot<Object?>? document}) = _$NotificationEntityImpl;
   const _NotificationEntity._() : super._();
 
   factory _NotificationEntity.fromJson(Map<String, dynamic> json) =
@@ -555,6 +602,8 @@ abstract class _NotificationEntity extends NotificationEntity {
   @override
   String? get senderName;
   @override
+  String? get senderUsername;
+  @override
   String? get senderPhoto;
   @override
   Map<String, dynamic> get data;
@@ -573,7 +622,10 @@ abstract class _NotificationEntity extends NotificationEntity {
   DateTime? get readAt;
   @override
   @NullableTimestampConverter()
-  DateTime? get expiresAt;
+  DateTime? get expiresAt; // Documento Firestore para paginação cursor-based
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  DocumentSnapshot<Object?>? get document;
 
   /// Create a copy of NotificationEntity
   /// with the given fields replaced by the non-null parameter values.

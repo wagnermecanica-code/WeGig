@@ -41,6 +41,21 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      
+      # Optimization: Reduce linking time by disabling debug symbol generation
+      config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf'
+      
+      # Optimization: Enable parallel compilation
+      config.build_settings['COMPILER_INDEX_STORE_ENABLE'] = 'NO'
+      
+      # Optimization: Disable bitcode (deprecated in Xcode 14+)
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+      
+      # Optimization: Reduce Swift optimization level for debug builds
+      if config.name == 'Debug' || config.name.include?('Debug')
+        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+        config.build_settings['GCC_OPTIMIZATION_LEVEL'] = '0'
+      end
     end
   end
 end

@@ -1,21 +1,28 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/post_result.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wegig_app/features/post/data/datasources/post_remote_datasource.dart';
 import 'package:wegig_app/features/post/data/repositories/post_repository_impl.dart';
 import 'package:wegig_app/features/post/domain/repositories/post_repository.dart';
+import 'package:wegig_app/features/post/domain/models/post_form_input.dart';
 import 'package:wegig_app/features/post/domain/usecases/create_post.dart';
 import 'package:wegig_app/features/post/domain/usecases/delete_post.dart';
 import 'package:wegig_app/features/post/domain/usecases/load_interested_users.dart';
 import 'package:wegig_app/features/post/domain/usecases/toggle_interest.dart';
 import 'package:wegig_app/features/post/domain/usecases/update_post.dart';
+import 'package:wegig_app/features/post/domain/services/post_service.dart';
+import 'package:wegig_app/features/post/presentation/providers/post_cache_provider.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:uuid/uuid.dart';
 
 part 'post_providers.freezed.dart';
 part 'post_providers.g.dart';
@@ -30,6 +37,16 @@ IPostRemoteDataSource postRemoteDataSource(Ref ref) {
   return PostRemoteDataSource();
 }
 
+/// Provider para FirebaseAuth (facilita override em testes)
+final postFirebaseAuthProvider = Provider<FirebaseAuth>(
+  (ref) => FirebaseAuth.instance,
+);
+
+/// Provider para serviço utilitário de posts
+final postServiceProvider = Provider<PostService>(
+  (ref) => PostService(),
+);
+
 /// Provider para PostRepository (singleton)
 @riverpod
 PostRepository postRepositoryNew(Ref ref) {
@@ -41,30 +58,35 @@ PostRepository postRepositoryNew(Ref ref) {
 /// USE CASE LAYER - Dependency Injection
 /// ============================================
 
+/// Provider para CreatePost use case
 @riverpod
 CreatePost createPostUseCase(Ref ref) {
   final repository = ref.read(postRepositoryNewProvider);
   return CreatePost(repository);
 }
 
+/// Provider para UpdatePost use case
 @riverpod
 UpdatePost updatePostUseCase(Ref ref) {
   final repository = ref.read(postRepositoryNewProvider);
   return UpdatePost(repository);
 }
 
+/// Provider para DeletePost use case
 @riverpod
 DeletePost deletePostUseCase(Ref ref) {
   final repository = ref.read(postRepositoryNewProvider);
   return DeletePost(repository);
 }
 
+/// Provider para ToggleInterest use case
 @riverpod
 ToggleInterest toggleInterestUseCase(Ref ref) {
   final repository = ref.read(postRepositoryNewProvider);
   return ToggleInterest(repository);
 }
 
+/// Provider para LoadInterestedUsers use case
 @riverpod
 LoadInterestedUsers loadInterestedUsersUseCase(Ref ref) {
   final repository = ref.read(postRepositoryNewProvider);
@@ -85,9 +107,21 @@ class PostState with _$PostState {
   }) = _PostState;
 }
 
-/// PostNotifier - Manages post state with Clean Architecture
+/// PostNotifier - Gerencia estado de posts com Clean Architecture
+///
+/// Responsável por:
+/// - Carregar posts do usuário/perfil
+/// - Criar, atualizar e deletar posts
+/// - Toggle de interesse (like)
+/// - Carregar lista de perfis interessados
+/// - Refresh manual (pull-to-refresh)
 @riverpod
 class PostNotifier extends _$PostNotifier {
+  ProfileEntity? _activeProfile() {
+    final profileState = ref.read(profileProvider);
+    return profileState.value?.activeProfile;
+  }
+
   @override
   FutureOr<PostState> build() async {
     return PostState(posts: await _loadPosts());
@@ -95,20 +129,49 @@ class PostNotifier extends _$PostNotifier {
 
   Future<List<PostEntity>> _loadPosts() async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) return [];
+      final uid = ref.read(postFirebaseAuthProvider).currentUser?.uid;
+      if (uid == null) {
+        debugPrint('❌ PostNotifier: Usuário não autenticado (uid=null)');
+        return [];
+      }
+      
+      debugPrint('✅ PostNotifier: Usuário autenticado (uid=$uid)');
 
+      // ✅ NOVO: Usar PostCacheNotifier do Riverpod
+      final cache = ref.read(postCacheNotifierProvider);
+      final cacheNotifier = ref.read(postCacheNotifierProvider.notifier);
+      
+      // ⚡ Retorna cache se válido
+      if (cacheNotifier.isCacheValid && cache.isNotEmpty) {
+        debugPrint('⚡ PostNotifier: Usando cache Riverpod (${cache.length} posts, ${cacheNotifier.cacheAgeInSeconds}s)');
+        return cache;
+      }
+
+      // Cache miss ou expirado - buscar do repositório
+      debugPrint('🔄 PostNotifier: Buscando posts do Firestore...');
       final repository = ref.read(postRepositoryNewProvider);
-      return await repository.getAllPosts(uid);
+      final posts = await repository.getAllPosts(uid);
+      
+      // ⚡ Atualizar cache Riverpod
+      cacheNotifier.updateCache(posts, null);
+      debugPrint('✅ PostNotifier: ${posts.length} posts carregados e cached');
+      
+      return posts;
     } catch (e) {
       debugPrint('❌ PostNotifier: Erro ao carregar posts - $e');
       return [];
     }
   }
 
+  /// Invalida cache (agora delega para PostCacheNotifier)
+  void _invalidateCache() {
+    ref.read(postCacheNotifierProvider.notifier).invalidate();
+  }
+
+  /// Cria um novo post
   Future<PostResult> createPost(PostEntity post) async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = ref.read(postFirebaseAuthProvider).currentUser?.uid;
       if (uid == null) {
         return const PostFailure(message: 'Usuário não autenticado');
       }
@@ -116,7 +179,8 @@ class PostNotifier extends _$PostNotifier {
       final createUseCase = ref.read(createPostUseCaseProvider);
       await createUseCase(post);
 
-      // Refresh state
+      // Invalidate cache and refresh state
+      _invalidateCache();
       state = AsyncValue.data(PostState(posts: await _loadPosts()));
       return PostSuccess(post: post);
     } catch (e) {
@@ -128,9 +192,10 @@ class PostNotifier extends _$PostNotifier {
     }
   }
 
+  /// Atualiza um post existente
   Future<PostResult> updatePost(PostEntity post) async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = ref.read(postFirebaseAuthProvider).currentUser?.uid;
       if (uid == null) {
         return const PostFailure(message: 'Usuário não autenticado');
       }
@@ -138,7 +203,8 @@ class PostNotifier extends _$PostNotifier {
       final updateUseCase = ref.read(updatePostUseCaseProvider);
       await updateUseCase(post, post.authorProfileId);
 
-      // Refresh state
+      // Invalidate cache and refresh state
+      _invalidateCache();
       state = AsyncValue.data(PostState(posts: await _loadPosts()));
       return PostSuccess(post: post);
     } catch (e) {
@@ -150,12 +216,134 @@ class PostNotifier extends _$PostNotifier {
     }
   }
 
+  /// Novo fluxo único de criação/edição usado pelo PostPage.
+  Future<PostResult> savePost(PostFormInput input) async {
+    try {
+      debugPrint('📝 PostNotifier.savePost: Iniciando - type=${input.type}, isEditing=${input.isEditing}');
+      
+      final profile = _activeProfile();
+      if (profile == null) {
+        debugPrint('❌ PostNotifier.savePost: Perfil ativo não encontrado');
+        return const PostFailure(
+          message: 'Perfil ativo não encontrado. Tente novamente.',
+        );
+      }
+      
+      debugPrint('✅ PostNotifier.savePost: Perfil encontrado - ${profile.profileId}');
+
+      final postService = ref.read(postServiceProvider);
+      final postId = input.postId ?? const Uuid().v4();
+      
+      // Upload de múltiplas fotos
+      final List<String> photoUrls = [...input.existingPhotoUrls];
+      
+      if (input.localPhotoPaths.isNotEmpty) {
+        debugPrint('📷 PostNotifier.savePost: Fazendo upload de ${input.localPhotoPaths.length} imagens...');
+        for (int i = 0; i < input.localPhotoPaths.length; i++) {
+          final path = input.localPhotoPaths[i];
+          final file = File(path);
+          if (file.existsSync()) {
+            final imageId = '${postId}_$i';
+            final url = await postService.uploadPostImage(file, imageId);
+            photoUrls.add(url);
+            debugPrint('✅ PostNotifier.savePost: Upload ${i + 1}/${input.localPhotoPaths.length} concluído - $url');
+          }
+        }
+      }
+
+      final now = DateTime.now();
+      
+      // Calcular preço final para posts de vendas
+      double? finalPrice = input.price;
+      if (input.type == 'sales' && input.price != null && input.discountMode != null && input.discountMode != 'none' && input.discountValue != null) {
+        if (input.discountMode == 'percentage') {
+          finalPrice = input.price! * (1 - input.discountValue! / 100);
+        } else if (input.discountMode == 'fixed') {
+          finalPrice = input.price! - input.discountValue!;
+        }
+      }
+      
+      final post = PostEntity(
+        id: postId,
+        authorProfileId: profile.profileId,
+        authorUid: profile.uid,
+        content: input.content,
+        location: input.location,
+        city: input.city,
+        neighborhood: input.neighborhood,
+        state: input.state,
+        photoUrls: photoUrls,
+        youtubeLink: input.youtubeLink?.isEmpty == true ? null : input.youtubeLink,
+        type: input.type,
+        level: input.level ?? '',
+        instruments: input.type == 'musician'
+            ? input.selectedInstruments
+            : <String>[],
+        genres: input.genres,
+        seekingMusicians: input.type == 'band'
+            ? input.selectedInstruments
+            : <String>[],
+        availableFor: input.availableFor,
+        createdAt: input.createdAt ?? now,
+        expiresAt: input.expiresAt ?? now.add(const Duration(days: 30)),
+        authorName: profile.name,
+        authorPhotoUrl: profile.photoUrl,
+        activeProfileName: profile.name,
+        activeProfilePhotoUrl: profile.photoUrl,
+        // Sales-specific fields - CORREÇÃO: salvar preço ORIGINAL, não final
+        title: input.title,
+        salesType: input.salesType,
+        price: input.price, // ✅ ORIGINAL price (sem desconto)
+        discountMode: input.discountMode,
+        discountValue: input.discountValue,
+        promoStartDate: input.promoStartDate,
+        promoEndDate: input.promoEndDate,
+        whatsappNumber: input.whatsappNumber,
+      );
+
+      debugPrint('📝 PostNotifier.savePost: Validando entidade...');
+      postService.validatePostEntity(post);
+      debugPrint('✅ PostNotifier.savePost: Validação OK');
+
+      if (input.isEditing) {
+        debugPrint('📝 PostNotifier.savePost: Atualizando post existente...');
+        final updateUseCase = ref.read(updatePostUseCaseProvider);
+        await updateUseCase(post, profile.profileId);
+        debugPrint('✅ PostNotifier.savePost: Post atualizado');
+      } else {
+        debugPrint('📝 PostNotifier.savePost: Criando novo post...');
+        final createUseCase = ref.read(createPostUseCaseProvider);
+        await createUseCase(post);
+        debugPrint('✅ PostNotifier.savePost: Post criado');
+      }
+
+      debugPrint('📦 PostNotifier.savePost: Invalidando cache e recarregando...');
+      _invalidateCache();
+      state = AsyncValue.data(PostState(posts: await _loadPosts()));
+      debugPrint('✅ PostNotifier.savePost: Concluído com sucesso');
+
+      return PostSuccess(
+        post: post,
+        message:
+            input.isEditing ? 'Post atualizado com sucesso' : 'Post criado com sucesso',
+      );
+    } catch (e) {
+      debugPrint('❌ PostNotifier.savePost: Erro - $e');
+      return PostFailure(
+        message: 'Erro ao salvar post: $e',
+        exception: e is Exception ? e : null,
+      );
+    }
+  }
+
+  /// Deleta um post por ID
   Future<PostResult> deletePost(String postId, String profileId) async {
     try {
       final deleteUseCase = ref.read(deletePostUseCaseProvider);
       await deleteUseCase(postId, profileId);
 
-      // Refresh state
+      // Invalidate cache and refresh state
+      _invalidateCache();
       state = AsyncValue.data(PostState(posts: await _loadPosts()));
 
       // Return success with dummy post (just need the id)
@@ -186,22 +374,20 @@ class PostNotifier extends _$PostNotifier {
     }
   }
 
-  Future<PostResult> toggleInterest(String postId, String profileId) async {
+  /// Adiciona ou remove interesse em um post
+  Future<bool> toggleInterest(String postId, String profileId) async {
     try {
       final toggleUseCase = ref.read(toggleInterestUseCaseProvider);
       final hasInterest = await toggleUseCase(postId, profileId);
-
-      return InterestToggleSuccess(hasInterest);
+      return hasInterest;
     } catch (e) {
       debugPrint('❌ PostNotifier: Erro ao toggle interest - $e');
-      return PostFailure(
-        message: 'Erro ao demonstrar interesse: $e',
-        exception: e is Exception ? e : null,
-      );
+      return false;
     }
   }
 
-  Future<List<String>> getInterestedUsers(String postId) async {
+  /// Carrega a lista de perfis interessados em um post
+  Future<List<String>> loadInterestedUsers(String postId) async {
     try {
       final loadUseCase = ref.read(loadInterestedUsersUseCaseProvider);
       return await loadUseCase(postId);
@@ -211,7 +397,9 @@ class PostNotifier extends _$PostNotifier {
     }
   }
 
+  /// Força o refresh da lista de posts (pull-to-refresh)
   Future<void> refresh() async {
+    _invalidateCache();
     state = AsyncValue.data(PostState(posts: await _loadPosts()));
   }
 }

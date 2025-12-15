@@ -102,12 +102,10 @@ class MockProfileRepository implements ProfileRepository {
     return profile;
   }
 
-  @override
   Stream<ProfileEntity?> watchActiveProfile(String uid) {
     return Stream.value(_activeProfile);
   }
 
-  @override
   Stream<List<ProfileEntity>> watchAllProfiles(String uid) {
     return Stream.value(_existingProfiles);
   }

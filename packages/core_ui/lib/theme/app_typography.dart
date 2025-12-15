@@ -60,7 +60,7 @@ class AppTypography {
 
   static const TextStyle titleSmall = TextStyle(
     fontFamily: 'Cereal',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     height: 1.4,
@@ -85,16 +85,16 @@ class AppTypography {
 
   static const TextStyle bodySmall = TextStyle(
     fontFamily: 'Cereal',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
-    height: 1.5,
+    height: 1.45,
   );
 
   // Label styles (buttons, chips)
   static const TextStyle labelLarge = TextStyle(
     fontFamily: 'Cereal',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: FontWeight.w600,
     color: Colors.white,
     height: 1.2,
@@ -102,7 +102,7 @@ class AppTypography {
 
   static const TextStyle labelMedium = TextStyle(
     fontFamily: 'Cereal',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: FontWeight.w600,
     color: Colors.white,
     height: 1.2,
@@ -110,8 +110,8 @@ class AppTypography {
 
   static const TextStyle labelSmall = TextStyle(
     fontFamily: 'Cereal',
-    fontSize: 11,
-    fontWeight: FontWeight.w600,
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
     color: Colors.white,
     height: 1.2,
   );
@@ -119,18 +119,18 @@ class AppTypography {
   // Caption styles (hints, helper text)
   static const TextStyle caption = TextStyle(
     fontFamily: 'Cereal',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: FontWeight.w400,
     color: AppColors.textHint,
-    height: 1.3,
+    height: 1.35,
   );
 
   static const TextStyle captionLight = TextStyle(
     fontFamily: 'Cereal',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
-    height: 1.3,
+    height: 1.35,
   );
 
   // Aliases for backward compatibility (old naming conventions)
@@ -159,7 +159,7 @@ class AppTypography {
   // Error text style
   static const TextStyle error = TextStyle(
     fontFamily: 'Cereal',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: FontWeight.w400,
     color: AppColors.error,
     height: 1.3,
