@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="WeGig - Plataforma que conecta músicos e bandas através de geolocalização"
+    />
+    <meta
+      name="keywords"
+      content="músicos, bandas, música, networking, geolocalização"
+    />
+    <title>WeGig - Conectando Músicos</title>
+    <link rel="stylesheet" href="style.css?v=8" />
+    <link rel="shortcut icon" href="favicon-32.png?v=7" />
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=7" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=7" />
+    <link rel="icon" type="image/png" sizes="192x192" href="app_icon.png?v=7" />
+    <link rel="apple-touch-icon" href="app_icon.png?v=7" />
+
+    <!-- Firebase SDK -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        query,
+        where,
+        orderBy,
+        limit,
+        getDocs,
+        Timestamp,
+      } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
+      // Firebase config - PROD (to-sem-banda-83e19)
+      const firebaseConfig = {
+        apiKey: "AIzaSyDSf3JS9jg2LInpQma25FgIm1qWeToFXSQ",
+        authDomain: "to-sem-banda-83e19.firebaseapp.com",
+        projectId: "to-sem-banda-83e19",
+        storageBucket: "to-sem-banda-83e19.firebasestorage.app",
+        messagingSenderId: "278498777601",
+        appId: "1:278498777601:web:b0c425b0b641d9589ebe00",
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      // Export for use in main script
+      window.firebaseDb = db;
+      window.firebaseQuery = query;
+      window.firebaseCollection = collection;
+      window.firebaseWhere = where;
+      window.firebaseOrderBy = orderBy;
+      window.firebaseLimit = limit;
+      window.firebaseGetDocs = getDocs;
+      window.firebaseTimestamp = Timestamp;
+      window.firebaseReady = true;
+
+      // Dispatch event when Firebase is ready
+      window.dispatchEvent(new Event("firebase-ready"));
+    </script>
+
+    <script>
+      // Redirect Firebase domain to custom domain
+      if (
+        window.location.hostname.includes("web.app") ||
+        window.location.hostname.includes("firebaseapp.com")
+      ) {
+        window.location.replace(
+          "https://wegig.com.br" +
+            window.location.pathname +
+            window.location.search +
+            window.location.hash
+        );
+      }
+    </script>
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div class="logo">
+          <img
+            src="WeGigSloganTransparente.png?v=7"
+            alt="WeGig - Conectando Músicos"
+          />
+        </div>
+        <nav>
+          <a href="#sobre">Sobre</a>
+          <a href="#funcionalidades">Funcionalidades</a>
+          <a href="#posts-recentes">Posts Recentes</a>
+          <a href="termos.html">Termos de Uso</a>
+          <a href="privacidade.html">Privacidade</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container">
+          <h2>Encontre músicos e bandas próximos a você</h2>
+          <p>
+            Busca geolocalizada, sistema de múltiplos perfis e conexões em tempo
+            real
+          </p>
+          <div class="cta-buttons">
+            <a href="#download" class="btn btn-primary">Baixar App</a>
+            <a href="#sobre" class="btn btn-secondary">Saiba Mais</a>
+          </div>
+        </div>
+      </section>
+
+      <section id="sobre" class="about">
+        <div class="container">
+          <h2>Sobre o WeGig</h2>
+          <p>
+            WeGig é uma plataforma social que conecta músicos e bandas através
+            de busca geolocalizada. Encontre oportunidades musicais próximas a
+            você, crie múltiplos perfis e construa sua rede musical.
+          </p>
+
+          <div class="stats">
+            <div class="stat">
+              <h3>Geolocalizado</h3>
+              <p>Busca por proximidade (0-100km)</p>
+            </div>
+            <div class="stat">
+              <h3>Multi-Perfil</h3>
+              <p>Até 5 perfis independentes</p>
+            </div>
+            <div class="stat">
+              <h3>Posts Efêmeros</h3>
+              <p>Expira em 30 dias</p>
+            </div>
+            <div class="stat">
+              <h3>Chat Real-Time</h3>
+              <p>Conexão instantânea</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="funcionalidades" class="features">
+        <div class="container">
+          <h2>Funcionalidades</h2>
+
+          <div class="feature-grid">
+            <div class="feature">
+              <div class="icon">📍</div>
+              <h3>Busca Geolocalizada</h3>
+              <p>
+                Encontre músicos e bandas próximos à sua localização com
+                precisão de até 100 metros
+              </p>
+            </div>
+
+            <div class="feature">
+              <div class="icon">👥</div>
+              <h3>Sistema Multi-Perfil</h3>
+              <p>
+                Crie até 5 perfis independentes (músico ou banda) com isolamento
+                total de dados
+              </p>
+            </div>
+
+            <div class="feature">
+              <div class="icon">⏰</div>
+              <h3>Posts Efêmeros</h3>
+              <p>
+                Oportunidades expiram automaticamente após 30 dias, mantendo
+                conteúdo relevante
+              </p>
+            </div>
+
+            <div class="feature">
+              <div class="icon">💬</div>
+              <h3>Chat em Tempo Real</h3>
+              <p>
+                Converse diretamente com outros músicos e bandas de forma
+                instantânea
+              </p>
+            </div>
+
+            <div class="feature">
+              <div class="icon">🔔</div>
+              <h3>Notificações Inteligentes</h3>
+              <p>
+                Receba alertas sobre posts próximos com base em seus interesses
+                musicais
+              </p>
+            </div>
+
+            <div class="feature">
+              <div class="icon">🎸</div>
+              <h3>Filtros Avançados</h3>
+              <p>
+                Busque por instrumentos, gêneros musicais, nível de experiência
+                e muito mais
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="download" class="download">
+        <div class="container">
+          <h2>Baixe o WeGig</h2>
+          <p>Disponível para iOS e Android</p>
+
+          <div class="download-buttons">
+            <a href="#" class="store-btn">
+              <img
+                src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg"
+                alt="Download na App Store"
+              />
+            </a>
+            <a href="#" class="store-btn">
+              <img
+                src="https://play.google.com/intl/en_us/badges/static/images/badges/pt-br_badge_web_generic.png"
+                alt="Disponível no Google Play"
+              />
+            </a>
+          </div>
+
+          <p class="coming-soon">Em breve nas lojas de aplicativos</p>
+        </div>
+      </section>
+
+      <section id="posts-recentes" class="posts-feed">
+        <div class="container">
+          <h2>Posts Recentes</h2>
+          <p class="section-subtitle">
+            Veja as últimas oportunidades compartilhadas pela comunidade
+          </p>
+
+          <div class="posts-map-container">
+            <!-- Mapa à esquerda -->
+            <div class="map-side">
+              <div id="posts-map" class="posts-map"></div>
+              <div class="map-legend">
+                <div class="legend-item">
+                  <span class="legend-dot musician"></span>
+                  <span>Músico</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot band"></span>
+                  <span>Banda</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot sales"></span>
+                  <span>Espaço</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Carrossel à direita -->
+            <div class="carousel-side">
+              <div class="posts-carousel" id="posts-carousel">
+                <!-- Posts serão inseridos dinamicamente -->
+                <div class="loading-posts">
+                  <div class="spinner"></div>
+                  <p>Carregando posts...</p>
+                </div>
+              </div>
+              <div class="carousel-cta">
+                <p>
+                  Quer ver mais? Baixe o app e explore oportunidades na sua
+                  região!
+                </p>
+                <a href="#download" class="btn btn-primary">Baixar App</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-section">
+            <img src="LogoSite.png?v=7" alt="WeGig" class="footer-logo" />
+            <p>Conectando músicos e bandas através da tecnologia</p>
+            <p class="copyright">
+              &copy; 2025 WeGig. Todos os direitos reservados.
+            </p>
+          </div>
+
+          <div class="footer-section">
+            <h4>Links</h4>
+            <ul>
+              <li><a href="#sobre">Sobre</a></li>
+              <li><a href="#funcionalidades">Funcionalidades</a></li>
+              <li><a href="#download">Baixar App</a></li>
+            </ul>
+          </div>
+
+          <div class="footer-section">
+            <h4>Legal</h4>
+            <ul>
+              <li><a href="termos.html">Termos de Uso</a></li>
+              <li><a href="privacidade.html">Política de Privacidade</a></li>
+            </ul>
+          </div>
+
+          <div class="footer-section">
+            <h4>Contato</h4>
+            <ul>
+              <li>
+                Email:
+                <a href="mailto:contato@wegig.com.br">contato@wegig.com.br</a>
+              </li>
+              <li>
+                Privacidade:
+                <a href="mailto:privacidade@wegig.com.br"
+                  >privacidade@wegig.com.br</a
+                >
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="footer-bottom">
+          <p>
+            Desenvolvido por WeGig | Última atualização: 15 de dezembro de 2025
+          </p>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Google Maps API with Advanced Markers -->
+    <script>
+      function initMap() {
+        window.googleMapsReady = true;
+        window.dispatchEvent(new Event("google-maps-ready"));
+      }
+    </script>
+    <script
+      async
+      defer
+      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA3Rq-Fmlsrwn-fywriTBp7xZsOo7i5fyQ&map_ids=b7134f9dc59c2ad97d5b292e&libraries=marker&callback=initMap"
+    ></script>
+
+    <!-- Posts Feed Script -->
+    <script src="posts-feed.js?v=8"></script>
+  </body>
+</html>

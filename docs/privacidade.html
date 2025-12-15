@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Política de Privacidade - WeGig">
+    <title>Política de Privacidade - WeGig</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <h1>WeGig</h1>
+                <p class="tagline">Conectando Músicos</p>
+            </div>
+            <nav>
+                <a href="index.html">Home</a>
+                <a href="termos.html">Termos de Uso</a>
+                <a href="privacidade.html">Privacidade</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="legal-page">
+        <a href="index.html" class="back-button">← Voltar para Home</a>
+        <h1>Política de Privacidade - WeGig</h1>
+
+<strong>Última atualização:</strong> 27 de novembro de 2025  
+<strong>Versão:</strong> 1.0  
+<strong>URL:</strong> https://wegig.com.br/privacidade.html
+
+<p>
+---
+</p>
+
+<h2>1. Introdução</h2>
+
+<p>
+Esta Política de Privacidade descreve como o WeGig ("nós", "nosso", "Plataforma") coleta, usa, armazena e protege os dados pessoais de nossos usuários ("você", "seu"), em conformidade com:
+</p>
+
+<ul>
+<li><strong>Lei Geral de Proteção de Dados (LGPD)</strong> - Lei nº 13.709/2018 (Brasil)</li>
+<li><strong>General Data Protection Regulation (GDPR)</strong> - Regulamento (UE) 2016/679 (União Europeia)</li>
+<li><strong>California Consumer Privacy Act (CCPA)</strong> - EUA</li>
+</ul>
+
+<strong>Ao criar uma conta no WeGig, você consente expressamente com:</strong>
+
+<ul>
+<li>Coleta e processamento de seus <strong>dados de geolocalização em tempo real</strong></li>
+<li>Funcionamento do <strong>sistema de múltiplos perfis</strong> e isolamento de dados</li>
+<li>Armazenamento de dados em Firebase Cloud Firestore (Google Cloud Platform)</li>
+<li>Uso de Google Maps API para visualização de mapas e cálculo de distâncias</li>
+</ul>
+
+<p>
+---
+</p>
+
+<h2>2. Controlador de Dados e Encarregado (DPO)</h2>
+
+<strong>Controlador de Dados:</strong>  
+<p>
+WeGig  
+Email: privacidade@wegig.com.br  
+Endereço: [A ser definido quando empresa for formalizada]
+</p>
+
+<strong>Encarregado de Dados (DPO/Responsável LGPD):</strong>  
+<p>
+WeGig  
+Email: dpo@wegig.com.br  
+Telefone: [A ser definido]
+</p>
+
+<strong>Para exercer seus direitos:</strong> Entre em contato via email acima ou exclua sua conta através das Configurações do App.
+
+<p>
+---
+</p>
+
+<h2>3. Dados Coletados</h2>
+
+<h3>3.1. Dados de Cadastro (Obrigatórios)</h3>
+
+<p>
+Ao criar uma conta, coletamos:
+</p>
+
+<p>
+| Dado                | Finalidade                                       | Base Legal (LGPD)                |
+| ------------------- | ------------------------------------------------ | -------------------------------- |
+| <strong>Email</strong>           | Autenticação, recuperação de senha, comunicações | Execução de contrato (Art. 7, V) |
+| <strong>Senha</strong> (hash)    | Segurança da conta                               | Execução de contrato (Art. 7, V) |
+| <strong>UID Firebase</strong>    | Identificação única do usuário                   | Execução de contrato (Art. 7, V) |
+| <strong>Data de criação</strong> | Auditoria, análise de crescimento                | Legítimo interesse (Art. 7, IX)  |
+</p>
+
+<strong>Autenticação Opcional (OAuth2):</strong>
+
+<ul>
+<li><strong>Google Sign-In</strong>: Nome, email, foto (se autorizado)</li>
+<li><strong>Sign In with Apple</strong>: Email (pode ser oculto/anônimo), nome</li>
+</ul>
+
+<h3>3.2. Dados de Perfil (Sistema Multi-Perfil)</h3>
+
+<p>
+Cada usuário pode criar até <strong>5 perfis</strong> independentes. Para cada perfil, coletamos:
+</p>
+
+<p>
+| Dado                           | Obrigatório | Finalidade                                    | Base Legal                             |
+| ------------------------------ | ----------- | --------------------------------------------- | -------------------------------------- |
+| <strong>Nome do perfil</strong>             | <span class="emoji">✅</span> Sim      | Identificação pública                         | Consentimento (Art. 7, I)              |
+| <strong>Tipo</strong> (Músico/Banda)        | <span class="emoji">✅</span> Sim      | Categorização, busca                          | Consentimento (Art. 7, I)              |
+| <strong>Localização (GeoPoint)</strong>     | <span class="emoji">✅</span> Sim      | Busca geográfica, notificações de proximidade | <strong>Consentimento expresso</strong> (Art. 7, I) |
+| <strong>Cidade</strong>                     | <span class="emoji">✅</span> Sim      | Exibição pública, filtros                     | Consentimento (Art. 7, I)              |
+| <strong>Bairro</strong>                     | <span class="emoji">❌</span> Não      | Precisão de localização                       | Consentimento (Art. 7, I)              |
+| <strong>Estado</strong>                     | <span class="emoji">❌</span> Não      | Estatísticas regionais                        | Consentimento (Art. 7, I)              |
+| <strong>Foto do perfil</strong>             | <span class="emoji">❌</span> Não      | Identificação visual                          | Consentimento (Art. 7, I)              |
+| <strong>Instrumentos</strong> (array)       | <span class="emoji">✅</span> Sim      | Busca por habilidade                          | Consentimento (Art. 7, I)              |
+| <strong>Gêneros musicais</strong> (array)   | <span class="emoji">✅</span> Sim      | Busca por estilo                              | Consentimento (Art. 7, I)              |
+| <strong>Nível</strong> (iniciante/avançado) | <span class="emoji">❌</span> Não      | Compatibilidade                               | Consentimento (Art. 7, I)              |
+| <strong>Bio</strong> (110 chars)            | <span class="emoji">❌</span> Não      | Descrição pessoal                             | Consentimento (Art. 7, I)              |
+| <strong>Idade</strong>                      | <span class="emoji">❌</span> Não      | Estatísticas                                  | Consentimento (Art. 7, I)              |
+| <strong>YouTube link</strong>               | <span class="emoji">❌</span> Não      | Portfolio                                     | Consentimento (Art. 7, I)              |
+| <strong>Instagram</strong>                  | <span class="emoji">❌</span> Não      | Redes sociais                                 | Consentimento (Art. 7, I)              |
+| <strong>TikTok</strong>                     | <span class="emoji">❌</span> Não      | Redes sociais                                 | Consentimento (Art. 7, I)              |
+</p>
+
+<strong>Estrutura de Armazenamento (Firebase Firestore):</strong>
+
+<pre><code>users/{uid}:
+<p>
+  email: "usuario@email.com"
+  createdAt: Timestamp
+  activeProfileId: "profile_123"
+  profiles: [
+    { profileId: "profile_123", name: "João Silva", photo: "url", type: "musician", city: "São Paulo" }
+  ]
+</p>
+
+<p>
+profiles/{profileId}:
+  uid: "firebase_uid_xyz"
+  name: "João Silva"
+  isBand: false
+  location: GeoPoint(-23.5505199, -46.6333094)  # <span class="emoji">⚠️</span> DADO SENSÍVEL
+  city: "São Paulo"
+  neighborhood: "Vila Mariana"
+  state: "SP"
+  photoUrl: "https://storage.googleapis.com/..."
+  instruments: ["Guitarra", "Baixo"]
+  genres: ["Rock", "Blues"]
+  level: "Avançado"
+  bio: "Guitarrista com 10 anos de experiência..."
+  age: 28
+  youtubeLink: "https://youtube.com/..."
+  instagramHandle: "@joaosilva"
+  tiktokHandle: "@joaosilva"
+  createdAt: Timestamp
+  updatedAt: Timestamp</code></pre>
+</p>
+
+<h3>3.3. Dados de Geolocalização (<span class="emoji">⚠️</span> CRÍTICO)</h3>
+
+<strong>Como Coletamos:</strong>
+
+<ul>
+<li><strong>Permissão do dispositivo</strong>: Solicitamos acesso a GPS/Location Services</li>
+<li><strong>Google Places API</strong>: Autocomplete de endereços durante cadastro/edição</li>
+<li><strong>Geocodificação reversa</strong>: Convertemos coordenadas em cidade/bairro</li>
+<li><strong>Armazenamento</strong>: Salvamos GeoPoint (latitude/longitude) no Firestore</li>
+</ul>
+
+<strong>Dados de Localização Armazenados:</strong>
+
+<p>
+| Dado                                  | Precisão                 | Visibilidade              | Retenção                  |
+| ------------------------------------- | ------------------------ | ------------------------- | ------------------------- |
+| <strong>GeoPoint (lat/lng)</strong>                | ~11cm (6 casas decimais) | <span class="emoji">🔒</span> Privado (backend only) | Enquanto perfil existir   |
+| <strong>Cidade</strong>                            | Municipal                | 🌐 Público                | Enquanto perfil existir   |
+| <strong>Bairro</strong>                            | ~1km                     | 🌐 Público                | Enquanto perfil existir   |
+| <strong>Distância calculada</strong>               | ~100m                    | 🌐 Público (ex: "2.5km")  | Calculado em tempo real   |
+| <strong>Histórico de localização de posts</strong> | Por post                 | 🌐 Público                | 30 dias (expira com post) |
+</p>
+
+<strong><span class="emoji">⚠️</span> IMPORTANTE:</strong>
+
+<ul>
+<li>Suas coordenadas <strong>exatas</strong> não são exibidas na interface do app</li>
+<li>Outros usuários veem apenas: <strong>"São Paulo, Vila Mariana - 2.5km"</strong></li>
+<li>Não rastreamos seu movimento (apenas localização estática de perfil/post)</li>
+<li>Você pode alterar localização a qualquer momento editando o perfil</li>
+</ul>
+
+<strong>Finalidades de Uso:</strong>
+
+<ul>
+<li><strong>Busca geográfica</strong>: Encontrar posts/perfis dentro de raio de X km</li>
+<li><strong>Notificações de proximidade</strong>: Alertar sobre posts próximos (se ativado)</li>
+<li><strong>Cálculo de distância</strong>: Exibir "João Silva - 2.5km" nos cards</li>
+<li><strong>Estatísticas regionais</strong>: Análise de densidade de usuários por cidade (dados anonimizados)</li>
+<li><strong>Prevenção de fraude</strong>: Detectar perfis com localizações suspeitas (ex: 0,0)</li>
+</ul>
+
+<h3>3.4. Dados de Uso (Posts, Mensagens, Interações)</h3>
+
+<strong>Posts (Efêmeros - 30 dias):</strong>
+
+<ul>
+<li>authorUid, authorProfileId, authorName, authorPhotoUrl</li>
+<li>type: 'musician' | 'band'</li>
+<li>location: GeoPoint <span class="emoji">⚠️</span></li>
+<li>city, neighborhood, state</li>
+<li>instruments, genres, level, description (max 1000 chars)</li>
+<li>seekingMusicians (para bandas): array de tipos procurados</li>
+<li>photoUrl (opcional)</li>
+<li>youtubeLink (opcional)</li>
+<li>expiresAt: Timestamp (createdAt + 30 dias)</li>
+<li>createdAt, updatedAt</li>
+</ul>
+
+<strong>Mensagens (Chat):</strong>
+
+<ul>
+<li>conversationId (entre 2 profileIds)</li>
+<li>senderId, recipientId (profileIds)</li>
+<li>text, timestamp</li>
+<li>read: boolean</li>
+<li>Retenção: Enquanto conversa não for deletada por ambos os participantes</li>
+</ul>
+
+<strong>Interesses:</strong>
+
+<ul>
+<li>postId, interestedUid, interestedProfileId</li>
+<li>createdAt</li>
+<li>Retenção: 30 dias (expira com post) ou até deleção manual</li>
+</ul>
+
+<strong>Notificações:</strong>
+
+<ul>
+<li>type: 'interest', 'newMessage', 'nearbyPost', etc.</li>
+<li>recipientProfileId <span class="emoji">⚠️</span></li>
+<li>senderProfileId, postId (quando aplicável)</li>
+<li>message, createdAt, expiresAt</li>
+<li>read: boolean</li>
+<li>Retenção: 30 dias (alguns tipos) ou permanente (outros)</li>
+</ul>
+
+<h3>3.5. Dados Técnicos e Metadados</h3>
+
+<p>
+Coletamos automaticamente:
+</p>
+
+<ul>
+<li><strong>Endereço IP</strong>: Segurança, prevenção de fraude (não armazenado permanentemente)</li>
+<li><strong>User-Agent</strong>: Tipo de dispositivo, SO, versão do app</li>
+<li><strong>Logs de acesso</strong>: Timestamp, ação realizada (criação de post, login, etc.)</li>
+<li><strong>Firebase Analytics</strong>: Eventos de uso (não identifica usuário individual)</li>
+<li><strong>Crashlytics</strong>: Relatórios de erros (anonimizados)</li>
+</ul>
+
+<strong>Retenção de Logs:</strong> 90 dias (exceto logs de auditoria obrigatórios: 6 meses)
+
+<h3>3.6. Dados NÃO Coletados</h3>
+
+<span class="emoji">❌</span> <strong>Não coletamos:</strong>
+
+<ul>
+<li>Números de telefone (não é obrigatório)</li>
+<li>Documentos (CPF, RG, passaporte)</li>
+<li>Dados biométricos (impressões digitais, reconhecimento facial)</li>
+<li>Rastreamento contínuo de localização (apenas estático em perfil/post)</li>
+<li>Gravações de áudio/vídeo sem consentimento explícito</li>
+<li>Dados de pagamento (app é gratuito, sem in-app purchases)</li>
+</ul>
+
+<p>
+---
+</p>
+
+<h2>4. Como Usamos Seus Dados</h2>
+
+<h3>4.1. Finalidades Específicas</h3>
+
+<p>
+| Finalidade                      | Dados Usados                                 | Base Legal LGPD                  |
+| ------------------------------- | -------------------------------------------- | -------------------------------- |
+| <strong>Autenticação</strong>                | Email, senha (hash), UID                     | Execução de contrato (Art. 7, V) |
+| <strong>Busca geográfica</strong>            | GeoPoint, city, instruments, genres          | Consentimento (Art. 7, I)        |
+| <strong>Notificações de proximidade</strong> | GeoPoint, notification settings              | Consentimento (Art. 7, I)        |
+| <strong>Sistema de múltiplos perfis</strong> | activeProfileId, profiles summary            | Execução de contrato (Art. 7, V) |
+| <strong>Chat em tempo real</strong>          | conversationId, messages, profileIds         | Execução de contrato (Art. 7, V) |
+| <strong>Demonstração de interesse</strong>   | postId, interestedProfileId                  | Consentimento (Art. 7, I)        |
+| <strong>Recomendações</strong>               | Histórico de interesses, genres, instruments | Legítimo interesse (Art. 7, IX)  |
+| <strong>Prevenção de fraude</strong>         | IP, logs de acesso, padrões de uso           | Legítimo interesse (Art. 7, IX)  |
+| <strong>Melhoria do serviço</strong>         | Firebase Analytics (anonimizado)             | Legítimo interesse (Art. 7, IX)  |
+| <strong>Suporte técnico</strong>             | Email, logs de erro (Crashlytics)            | Execução de contrato (Art. 7, V) |
+</p>
+
+<h3>4.2. Processamento Automatizado</h3>
+
+<strong>Algoritmos de Busca:</strong>
+
+<ul>
+<li>Cálculo de distância Haversine (lat/lng → km)</li>
+<li>Filtros combinados (instrumentos AND gêneros AND raio)</li>
+<li>Ordenação por proximidade (distância crescente)</li>
+</ul>
+
+<strong>Notificações Inteligentes:</strong>
+
+<ul>
+<li>Cloud Function <code>notifyNearbyPosts</code>: Dispara ao criar post</li>
+<li>Verifica perfis dentro do raio configurado (0-100km)</li>
+<li>Filtra por interesses compatíveis (instruments/genres match)</li>
+<li>Envia notificação apenas se match > 50%</li>
+</ul>
+
+<strong>Você NÃO está sujeito a decisões automatizadas que produzam efeitos jurídicos</strong> (LGPD Art. 20). Todas as conexões/interações dependem de ação humana (você decide demonstrar interesse, enviar mensagem, etc).
+
+<p>
+---
+</p>
+
+<h2>5. Compartilhamento de Dados</h2>
+
+<h3>5.1. Com Terceiros (Subprocessadores)</h3>
+
+<strong>Firebase (Google Cloud Platform):</strong>
+
+<ul>
+<li><strong>Finalidade</strong>: Armazenamento de dados, autenticação, notificações push</li>
+<li><strong>Dados compartilhados</strong>: Todos os dados descritos na seção 3</li>
+<li><strong>Localização</strong>: Servidores em <code>southamerica-east1</code> (São Paulo, Brasil)</li>
+<li><strong>Contrato</strong>: DPA (Data Processing Agreement) assinado com Google</li>
+<li><strong>Conformidade</strong>: LGPD, GDPR, ISO 27001, SOC 2</li>
+</ul>
+
+<strong>Google Maps Platform:</strong>
+
+<ul>
+<li><strong>Finalidade</strong>: Autocomplete de endereços, visualização de mapas</li>
+<li><strong>Dados compartilhados</strong>: Cidade/endereço digitado (não coordenadas exatas)</li>
+<li><strong>Privacidade</strong>: <a href="https://cloud.google.com/maps-platform/terms">Termos do Google Maps</a></li>
+</ul>
+
+<strong>Firebase Cloud Messaging (FCM):</strong>
+
+<ul>
+<li><strong>Finalidade</strong>: Envio de notificações push</li>
+<li><strong>Dados compartilhados</strong>: FCM token (identificador anônimo), profileId</li>
+<li><strong>Não compartilhamos</strong>: Conteúdo de mensagens/posts</li>
+</ul>
+
+<h3>5.2. NÃO Compartilhamos com Terceiros</h3>
+
+<span class="emoji">❌</span> <strong>Não vendemos, alugamos ou compartilhamos seus dados com:</strong>
+
+<ul>
+<li>Anunciantes (app não tem anúncios)</li>
+<li>Data brokers (corretores de dados)</li>
+<li>Redes sociais (exceto se você usar OAuth2 para login)</li>
+<li>Empresas de marketing</li>
+</ul>
+
+<h3>5.3. Divulgação Legal</h3>
+
+<p>
+Podemos divulgar dados se <strong>legalmente obrigados</strong>:
+</p>
+
+<ul>
+<li>Ordem judicial (mandado de busca e apreensão)</li>
+<li>Requisição de autoridade policial (com processo formal)</li>
+<li>Cumprimento de lei federal/estadual</li>
+<li>Proteção de direitos, segurança e propriedade (ex: investigação de fraude)</li>
+</ul>
+
+<strong>Notificaremos você</strong> sempre que possível, exceto se proibido por lei.
+
+<p>
+---
+</p>
+
+<h2>6. Sistema de Múltiplos Perfis (Isolamento de Dados)</h2>
+
+<h3>6.1. Como Funciona</h3>
+
+<p>
+O WeGig implementa <strong>isolamento de dados por perfil</strong>, semelhante ao Instagram:
+</p>
+
+<pre><code>Usuário A (uid: user_123)
+<p>
+├─ Perfil 1: "João Silva" (musician)
+│  ├─ Posts: 5 posts ativos
+│  ├─ Conversas: 3 chats
+│  ├─ Notificações: 12 não lidas
+│  └─ Localização: São Paulo, Vila Mariana
+│
+├─ Perfil 2: "The Rock Band" (band)
+│  ├─ Posts: 2 posts ativos
+│  ├─ Conversas: 1 chat
+│  ├─ Notificações: 5 não lidas
+│  └─ Localização: São Paulo, Centro
+│
+└─ Perfil 3: "Maria Santos" (musician)
+   ├─ Posts: 0 posts
+   ├─ Conversas: 0 chats
+   ├─ Notificações: 0
+   └─ Localização: Rio de Janeiro, Copacabana</code></pre>
+</p>
+
+<h3>6.2. Privacidade e Isolamento</h3>
+
+<span class="emoji">✅</span> <strong>Garantias de Privacidade:</strong>
+
+<ul>
+<li><strong>Isolamento total</strong>: Dados de um perfil não são visíveis em outro</li>
+<li><strong>activeProfileId</strong>: Apenas 1 perfil ativo por vez (armazenado em <code>users/{uid}</code>)</li>
+<li><strong>Troca de contexto</strong>: Ao trocar perfil, app recarrega dados do novo perfil</li>
+<li><strong>Firestore Security Rules</strong>: Validam propriedade por <code>authorProfileId</code></li>
+<li><strong>Anonimato</strong>: Impossível descobrir que 2 perfis pertencem ao mesmo usuário (a menos que você revele)</li>
+</ul>
+
+<span class="emoji">✅</span> <strong>Dados Isolados por Perfil:</strong>
+
+<ul>
+<li>Posts criados (authorProfileId)</li>
+<li>Conversas (participantProfileIds)</li>
+<li>Notificações recebidas (recipientProfileId)</li>
+<li>Interesses demonstrados (interestedProfileId)</li>
+<li>Badge counters (unread counts)</li>
+</ul>
+
+<span class="emoji">✅</span> <strong>Dados Compartilhados (Nível de Usuário):</strong>
+
+<ul>
+<li>Email de cadastro (único para todos os perfis)</li>
+<li>UID Firebase (identificador global)</li>
+<li>Histórico de login/logout (auditoria)</li>
+<li>Configurações gerais (idioma, tema - futuro)</li>
+</ul>
+
+<h3>6.3. Implicações de Privacidade</h3>
+
+<span class="emoji">⚠️</span> <strong>IMPORTANTE:</strong>
+
+<ul>
+<li>Ao trocar de perfil, você <strong>não pode</strong> acessar mensagens/posts de outros perfis seus</li>
+<li>Se você revelar publicamente que "João Silva" e "The Rock Band" são seus, não podemos impedir outros de fazerem essa conexão</li>
+<li>Deletar perfil é <strong>permanente</strong> - posts órfãos permanecem mas sem vínculo editável</li>
+<li>Outros usuários podem salvar screenshots de conversas antes de você deletar</li>
+</ul>
+
+<p>
+---
+</p>
+
+<h2>7. Segurança de Dados</h2>
+
+<h3>7.1. Medidas Técnicas</h3>
+
+<strong>Criptografia:</strong>
+
+<ul>
+<li><span class="emoji">🔒</span> <strong>Em trânsito</strong>: TLS 1.3 (HTTPS) para todas as comunicações</li>
+<li><span class="emoji">🔒</span> <strong>Em repouso</strong>: AES-256 (Firebase Firestore padrão)</li>
+<li><span class="emoji">🔒</span> <strong>Senhas</strong>: Bcrypt hash com salt (Firebase Auth)</li>
+</ul>
+
+<strong>Controles de Acesso:</strong>
+
+<ul>
+<li>Firestore Security Rules (profile-level ownership validation)</li>
+<li>Firebase Auth tokens (JWT) com expiração de 1 hora</li>
+<li>Rate limiting: 3 tentativas de login por minuto (client-side)</li>
+<li>Cloud Functions rate limiting: 20 posts/dia, 50 interesses/dia</li>
+</ul>
+
+<strong>Backup e Recuperação:</strong>
+
+<ul>
+<li>Backup automático diário (Firebase Firestore)</li>
+<li>Ponto de restauração: até 7 dias anteriores</li>
+<li>Dados deletados: backups retidos por 90 dias (recuperação de emergência)</li>
+</ul>
+
+<h3>7.2. Medidas Organizacionais</h3>
+
+<strong>Acesso Interno:</strong>
+
+<ul>
+<li>Apenas equipe autorizada da WeGig tem acesso a dados de produção</li>
+<li>Acesso via Firebase Console (logs auditados)</li>
+<li>Sem acesso direto a senhas (apenas hashes)</li>
+<li>Acesso a dados reais apenas para debugging crítico (com consentimento)</li>
+</ul>
+
+<strong>Auditoria:</strong>
+
+<ul>
+<li>Logs de acesso administrativo (Firebase Audit Logs)</li>
+<li>Revisão mensal de Security Rules</li>
+<li>Testes de segurança trimestrais (penetration testing)</li>
+</ul>
+
+<h3>7.3. Incidentes de Segurança</h3>
+
+<strong>Em caso de vazamento de dados:</strong>
+
+<ul>
+<li>Notificação à ANPD (Autoridade Nacional de Proteção de Dados) em <strong>72 horas</strong></li>
+<li>Notificação a usuários afetados via email/notificação in-app</li>
+<li>Descrição do incidente, dados comprometidos e medidas tomadas</li>
+<li>Assistência gratuita (ex: monitoramento de crédito se CPF vazado)</li>
+</ul>
+
+<strong>Histórico:</strong> Nenhum incidente de segurança registrado até 27/11/2025.
+
+<p>
+---
+</p>
+
+<h2>8. Retenção de Dados</h2>
+
+<h3>8.1. Período de Armazenamento</h3>
+
+<p>
+| Tipo de Dado                     | Período de Retenção | Motivo                                                 |
+| -------------------------------- | ------------------- | ------------------------------------------------------ |
+| <strong>Conta ativa</strong>                  | Indefinido          | Enquanto você usar o serviço                           |
+| <strong>Posts</strong>                        | 30 dias             | Auto-expiração (expiresAt)                             |
+| <strong>Mensagens</strong>                    | Indefinido          | Até deleção manual por ambos os participantes          |
+| <strong>Notificações</strong>                 | 7-30 dias           | Varia por tipo (nearbyPost: 7 dias, interest: 30 dias) |
+| <strong>Logs de acesso</strong>               | 90 dias             | Segurança e debugging                                  |
+| <strong>Logs de auditoria</strong>            | 6 meses             | Obrigação legal (LGPD Art. 46)                         |
+| <strong>Dados após exclusão de conta</strong> | 90 dias (backup)    | Recuperação de emergência                              |
+| <strong>Dados anonimizados</strong>           | 5 anos              | Estatísticas agregadas (sem identificação pessoal)     |
+</p>
+
+<h3>8.2. Deleção Automática</h3>
+
+<strong>Posts Efêmeros:</strong>
+
+<ul>
+<li>Cloud Function <code>cleanupExpiredPosts</code> executa diariamente às 3h BRT</li>
+<li>Deleta posts com <code>expiresAt < now()</code></li>
+<li>Deleta fotos associadas no Firebase Storage</li>
+<li>Deleta notificações de interesse relacionadas</li>
+</ul>
+
+<strong>Notificações Expiradas:</strong>
+
+<ul>
+<li>Cloud Function <code>cleanupExpiredNotifications</code> executa diariamente</li>
+<li>Deleta notificações com <code>expiresAt < now()</code></li>
+</ul>
+
+<p>
+---
+</p>
+
+<h2>9. Seus Direitos (LGPD Art. 18)</h2>
+
+<h3>9.1. Direito de Acesso (Art. 18, I e II)</h3>
+
+<p>
+Você tem direito a:
+</p>
+
+<ul>
+<li>Confirmar se processamos seus dados</li>
+<li>Solicitar cópia completa de todos os dados armazenados</li>
+</ul>
+
+<strong>Como exercer:</strong>
+
+<ul>
+<li>Acesse <strong>Configurações</strong> → <strong>Meus Dados</strong> → <strong>Baixar Meus Dados</strong></li>
+<li>Ou envie email para <code>privacidade@wegig.com.br</code></li>
+<li>Receberá arquivo JSON com todos os dados em até <strong>15 dias úteis</strong></li>
+</ul>
+
+<strong>Formato do arquivo (exemplo):</strong>
+
+<pre><code>{
+<p>
+  "user": {
+    "uid": "user_123",
+    "email": "usuario@email.com",
+    "createdAt": "2025-01-15T10:30:00Z"
+  },
+  "profiles": [
+    {
+      "profileId": "profile_123",
+      "name": "João Silva",
+      "isBand": false,
+      "location": {"latitude": -23.5505, "longitude": -46.6333},
+      "city": "São Paulo",
+      "instruments": ["Guitarra", "Baixo"],
+      "genres": ["Rock", "Blues"]
+    }
+  ],
+  "posts": [...],
+  "messages": [...],
+  "notifications": [...]
+}</code></pre>
+</p>
+
+<h3>9.2. Direito de Correção (Art. 18, III)</h3>
+
+<p>
+Você pode <strong>editar dados incorretos</strong> a qualquer momento:
+</p>
+
+<ul>
+<li><strong>Perfil</strong>: Configurações → Editar Perfil</li>
+<li><strong>Localização</strong>: Altere cidade/coordenadas</li>
+<li><strong>Email</strong>: Entre em contato (requer verificação)</li>
+</ul>
+
+<h3>9.3. Direito de Eliminação (Art. 18, VI)</h3>
+
+<strong>Deleção de Perfil Específico:</strong>
+
+<ul>
+<li>Acesse perfil desejado → Menu → <strong>Excluir Perfil</strong></li>
+<li>Confirme exclusão (ação irreversível)</li>
+<li>Dados deletados: posts, conversas, notificações desse perfil</li>
+</ul>
+
+<strong>Deleção de Conta Completa:</strong>
+
+<ul>
+<li>Configurações → <strong>Excluir Conta</strong></li>
+<li>Confirme exclusão (ação irreversível)</li>
+<li><strong>Todos os perfis, posts, mensagens e fotos serão deletados permanentemente</strong></li>
+<li>Backups retidos por 90 dias (recuperação de emergência)</li>
+</ul>
+
+<strong>Exceções (não deletamos):</strong>
+
+<ul>
+<li>Logs de auditoria (obrigação legal - 6 meses)</li>
+<li>Dados anonimizados para estatísticas</li>
+<li>Mensagens enviadas para outros usuários (permanecem no histórico deles)</li>
+</ul>
+
+<h3>9.4. Direito de Portabilidade (Art. 18, V)</h3>
+
+<p>
+Você pode <strong>exportar seus dados</strong> em formato estruturado (JSON):
+</p>
+
+<ul>
+<li>Configurações → <strong>Baixar Meus Dados</strong></li>
+<li>Arquivo ZIP contém: perfis, posts, mensagens, notificações</li>
+<li>Pode importar para outro serviço (se compatível)</li>
+</ul>
+
+<h3>9.5. Direito de Revogação de Consentimento (Art. 18, IX)</h3>
+
+<p>
+Você pode <strong>retirar consentimento</strong> a qualquer momento:
+</p>
+
+<ul>
+<li><strong>Geolocalização</strong>: Edite perfil e altere para localização genérica (desativa notificações de proximidade)</li>
+<li><strong>Notificações de proximidade</strong>: Configurações → Notificações → Desativar "Posts Próximos"</li>
+<li><strong>Compartilhamento de dados</strong>: Exclua conta (única forma de revogar completamente)</li>
+</ul>
+
+<strong><span class="emoji">⚠️</span> Consequência:</strong> Revogar consentimento de geolocalização impede funcionamento correto da busca (campo obrigatório). Recomendamos deletar perfil se não quiser fornecer localização.
+
+<h3>9.6. Direito de Oposição (Art. 18, VIII)</h3>
+
+<p>
+Você pode <strong>se opor a tratamentos</strong> baseados em legítimo interesse:
+</p>
+
+<ul>
+<li><strong>Análise de perfil</strong> (recomendações): Não implementado ainda</li>
+<li><strong>Marketing</strong>: Não fazemos marketing (app sem anúncios)</li>
+</ul>
+
+<h3>9.7. Direito de Revisão de Decisões Automatizadas (Art. 20)</h3>
+
+<p>
+Você tem direito a <strong>solicitar revisão humana</strong> de decisões automatizadas.  
+</p>
+<strong><span class="emoji">⚠️</span> Não aplicável:</strong> App não toma decisões automatizadas que produzam efeitos jurídicos. Todas as conexões dependem de ação humana.
+
+<p>
+---
+</p>
+
+<h2>10. Transferência Internacional de Dados</h2>
+
+<h3>10.1. Localização dos Dados</h3>
+
+<strong>Servidores Primários:</strong>
+
+<ul>
+<li><strong>Firebase Firestore</strong>: <code>southamerica-east1</code> (São Paulo, Brasil)</li>
+<li><strong>Firebase Storage</strong>: <code>southamerica-east1</code> (São Paulo, Brasil)</li>
+<li><strong>Cloud Functions</strong>: <code>southamerica-east1</code> (São Paulo, Brasil)</li>
+</ul>
+
+<strong>Servidores de Backup (Google Cloud):</strong>
+
+<ul>
+<li>Multi-region: <code>us</code>, <code>eu</code> (backup redundante)</li>
+</ul>
+
+<h3>10.2. Conformidade GDPR (União Europeia)</h3>
+
+<p>
+Se você é residente da UE, seus dados podem ser transferidos para Brasil.  
+</p>
+<strong>Garantias de Proteção:</strong>
+
+<ul>
+<li>Google Cloud Platform possui <strong>Standard Contractual Clauses (SCCs)</strong></li>
+<li>Firebase certificado: ISO 27001, SOC 2, ISO 27017, ISO 27018</li>
+<li>GDPR Compliance: <a href="https://firebase.google.com/support/privacy">Firebase GDPR</a></li>
+</ul>
+
+<h3>10.3. Conformidade CCPA (Califórnia, EUA)</h3>
+
+<p>
+Se você é residente da Califórnia:
+</p>
+
+<ul>
+<li>Tem direito de saber quais dados coletamos (seção 3)</li>
+<li>Pode solicitar deleção (seção 9.3)</li>
+<li>Não vendemos seus dados (seção 5.2)</li>
+</ul>
+
+<p>
+---
+</p>
+
+<h2>11. Cookies e Tecnologias de Rastreamento</h2>
+
+<h3>11.1. Uso de Cookies</h3>
+
+<span class="emoji">❌</span> <strong>Não usamos cookies</strong> (app nativo, não é website).
+
+<h3>11.2. Identificadores de Dispositivo</h3>
+
+<p>
+Usamos identificadores anônimos:
+</p>
+
+<ul>
+<li><strong>Firebase Instance ID</strong>: Token único do dispositivo (FCM)</li>
+<li><strong>Firebase Analytics ID</strong>: Identificador anônimo para eventos</li>
+<li><strong>UUID de sessão</strong>: Temporário (resetado a cada login)</li>
+</ul>
+
+<strong>Você pode resetar:</strong>
+
+<ul>
+<li>Desinstale e reinstale o app</li>
+<li>Ou revogue permissões no Android/iOS (Settings → Apps → WeGig → Reset)</li>
+</ul>
+
+<p>
+---
+</p>
+
+<h2>12. Privacidade de Crianças (Menores de 18 anos)</h2>
+
+<h3>12.1. Idade Mínima</h3>
+
+<p>
+O WeGig <strong>não é destinado a menores de 18 anos</strong>. Não coletamos intencionalmente dados de crianças.
+</p>
+
+<strong>Se descobrirmos que coletamos dados de menor de 18 anos sem consentimento parental:</strong>
+
+<ul>
+<li>Deletaremos conta imediatamente</li>
+<li>Notificaremos responsável legal (se identificável)</li>
+<li>Removeremos todos os dados associados</li>
+</ul>
+
+<strong>Se você é pai/mãe</strong> e descobriu que seu filho criou conta, entre em contato: <code>privacidade@wegig.com.br</code>
+
+<p>
+---
+</p>
+
+<h2>13. Alterações nesta Política</h2>
+
+<h3>13.1. Notificação de Mudanças</h3>
+
+<p>
+Podemos atualizar esta Política de Privacidade periodicamente. Você será notificado:
+</p>
+
+<ul>
+<li><strong>Mudanças substanciais</strong>: Email + notificação in-app + banner no app</li>
+<li><strong>Mudanças menores</strong>: Apenas atualização da data no topo</li>
+</ul>
+
+<h3>13.2. Histórico de Versões</h3>
+
+<p>
+| Versão | Data       | Mudanças                               |
+| ------ | ---------- | -------------------------------------- |
+| 1.0    | 27/11/2025 | Primeira versão - LGPD/GDPR compliance |
+</p>
+
+<p>
+Versões anteriores disponíveis em: <code>https://wegig.com.br/privacidade/historico</code>
+</p>
+
+<p>
+---
+</p>
+
+<h2>14. Contato e Exercício de Direitos</h2>
+
+<h3>14.1. Encarregado de Dados (DPO)</h3>
+
+<strong>Empresa:</strong> WeGig  
+<strong>Email:</strong> dpo@wegig.com.br  
+<strong>Privacidade:</strong> privacidade@wegig.com.br  
+<strong>Suporte:</strong> contato@wegig.com.br
+
+<strong>Horário de Atendimento:</strong> Segunda a Sexta, 9h às 18h (horário de Brasília)  
+<strong>Prazo de Resposta:</strong>
+
+<ul>
+<li>Solicitações simples: Até 72 horas úteis</li>
+<li>Exportação de dados: Até 15 dias úteis</li>
+<li>Deleção de conta: Imediata (via app) ou até 5 dias úteis (via email)</li>
+</ul>
+
+<h3>14.2. Como Exercer Seus Direitos</h3>
+
+<strong>Via App (recomendado):</strong>
+
+<ul>
+<li>Acesse <strong>Configurações</strong> → <strong>Privacidade e Dados</strong></li>
+<li>Escolha ação desejada:</li>
+</ul>
+<p>
+   - Baixar Meus Dados (portabilidade)
+   - Editar Dados (correção)
+   - Excluir Conta (eliminação)
+</p>
+
+<strong>Via Email:</strong>
+
+<ul>
+<li>Envie mensagem para <code>privacidade@wegig.com.br</code></li>
+<li>Assunto: [LGPD] Solicitação de [Acesso/Correção/Eliminação/Portabilidade]</li>
+<li>Inclua: Nome, email cadastrado, descrição da solicitação</li>
+<li>Responderemos em até 72 horas úteis</li>
+</ul>
+
+<h3>14.3. Autoridade de Proteção de Dados</h3>
+
+<strong>Brasil - ANPD (Autoridade Nacional de Proteção de Dados):</strong>
+
+<ul>
+<li>Website: https://www.gov.br/anpd</li>
+<li>Email: atendimento@anpd.gov.br</li>
+<li>Telefone: 0800 071 2003</li>
+</ul>
+
+<strong>União Europeia - EDPB (European Data Protection Board):</strong>
+
+<ul>
+<li>Website: https://edpb.europa.eu</li>
+<li>Contato: Supervisory Authority do seu país</li>
+</ul>
+
+<p>
+---
+</p>
+
+<h2>15. Glossário de Termos Técnicos</h2>
+
+<ul>
+<li><strong>GeoPoint</strong>: Par de coordenadas geográficas (latitude/longitude)</li>
+<li><strong>UID</strong>: User Identifier (identificador único do Firebase Auth)</li>
+<li><strong>profileId</strong>: Identificador único de perfil (ex: <code>profile_123</code>)</li>
+<li><strong>authorProfileId</strong>: Perfil que criou um post/mensagem</li>
+<li><strong>recipientProfileId</strong>: Perfil que recebe notificação/mensagem</li>
+<li><strong>Firebase Firestore</strong>: Banco de dados NoSQL em nuvem do Google</li>
+<li><strong>Firebase Storage</strong>: Armazenamento de arquivos (fotos) do Google</li>
+<li><strong>Cloud Functions</strong>: Código backend executado em servidores Google</li>
+<li><strong>OAuth2</strong>: Protocolo de autenticação (Google/Apple Sign-In)</li>
+<li><strong>JWT</strong>: JSON Web Token (token de autenticação criptografado)</li>
+<li><strong>TLS</strong>: Transport Layer Security (criptografia HTTPS)</li>
+<li><strong>AES-256</strong>: Padrão de criptografia de dados em repouso</li>
+</ul>
+
+<p>
+---
+</p>
+
+<h2>16. Consentimento Expresso</h2>
+
+<strong>AO ACEITAR ESTA POLÍTICA DE PRIVACIDADE, VOCÊ DECLARA EXPRESSAMENTE QUE:</strong>
+
+<span class="emoji">✅</span> <strong>Compreendo e Concordo com:</strong>
+
+<ul>
+<li>Coleta e armazenamento de meus <strong>dados de geolocalização (GeoPoint, cidade, bairro)</strong></li>
+<li>Exibição pública de minha <strong>localização aproximada</strong> (cidade e distância)</li>
+<li>Uso de minha localização para <strong>notificações de proximidade</strong> (posso desativar)</li>
+<li>Funcionamento do <strong>sistema de múltiplos perfis</strong> e isolamento de dados</li>
+<li>Armazenamento de dados em <strong>servidores Firebase (Google Cloud Platform)</strong></li>
+<li>Uso de <strong>Google Maps API</strong> para visualização de mapas</li>
+<li>Processamento de dados conforme descrito nesta Política</li>
+</ul>
+
+<span class="emoji">✅</span> <strong>Estou Ciente Que:</strong>
+
+<ul>
+<li>Posso <strong>revogar consentimento</strong> a qualquer momento (impacta funcionalidade)</li>
+<li>Tenho direito a <strong>acessar, corrigir, deletar e exportar</strong> meus dados</li>
+<li>Posso <strong>desativar notificações de proximidade</strong> nas Configurações</li>
+<li><strong>Deletar perfil/conta é permanente</strong> (não há recuperação após 90 dias)</li>
+<li>Outros usuários podem <strong>salvar screenshots</strong> de conversas antes de eu deletar</li>
+</ul>
+
+<span class="emoji">✅</span> <strong>Declaro Que:</strong>
+
+<ul>
+<li>Tenho pelo menos <strong>18 anos de idade</strong> ou consentimento dos responsáveis</li>
+<li>Li e compreendi integralmente esta Política de Privacidade</li>
+<li>Concordo com todos os termos descritos acima</li>
+</ul>
+
+<p>
+---
+</p>
+
+<strong>Ao clicar em "Aceito os termos de uso e política de privacidade" durante o cadastro, você confirma que leu, compreendeu e concorda com esta Política.</strong>
+
+<strong>Versão:</strong> 1.0  
+<strong>Data:</strong> 27 de novembro de 2025  
+<strong>Documento gerado para conformidade LGPD/GDPR/CCPA</strong>
+
+<p>
+---
+</p>
+
+<strong>Para dúvidas ou exercício de direitos, entre em contato:</strong>  
+<span class="emoji">📧</span> <strong>privacidade@wegig.com.br</strong>  
+<span class="emoji">🕒</span> <strong>Prazo de resposta: 72 horas úteis</strong>
+
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>WeGig</h4>
+                    <p>Conectando músicos e bandas através da tecnologia</p>
+                    <p class="copyright">&copy; 2025 WeGig. Todos os direitos reservados.</p>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Links</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="index.html#sobre">Sobre</a></li>
+                        <li><a href="index.html#funcionalidades">Funcionalidades</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Legal</h4>
+                    <ul>
+                        <li><a href="termos.html">Termos de Uso</a></li>
+                        <li><a href="privacidade.html">Política de Privacidade</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Contato</h4>
+                    <ul>
+                        <li>Email: <a href="mailto:contato@wegig.com.br">contato@wegig.com.br</a></li>
+                        <li>Privacidade: <a href="mailto:privacidade@wegig.com.br">privacidade@wegig.com.br</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>Desenvolvido por WeGig | Última atualização: 1 de dezembro de 2025</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
