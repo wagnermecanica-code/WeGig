@@ -442,8 +442,8 @@ nav a:hover {
 }
 
 .pc--active {
-  box-shadow: 0 0 0 2px var(--primary-color), 0 4px 12px rgba(0, 0, 0, 0.1);
-  transform: scale(1.01);
+  box-shadow: 0 6px 20px rgba(55, 71, 90, 0.35), 0 2px 8px rgba(0, 0, 0, 0.15);
+  transform: scale(1.02);
 }
 
 /* Content - flex grow */
