@@ -135,6 +135,7 @@ async function loadPosts() {
   const postsQuery = q(
     postsRef,
     whereClause("expiresAt", ">", now),
+    orderByClause("expiresAt", "asc"),  // REQUIRED: must orderBy the inequality field first
     orderByClause("createdAt", "desc"),
     limitClause(CONFIG.MAX_POSTS)
   );
