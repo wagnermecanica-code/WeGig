@@ -27,8 +27,8 @@
         <a href="index.html" class="back-button">← Voltar para Home</a>
         <h1>Política de Privacidade - WeGig</h1>
 
-<strong>Última atualização:</strong> 27 de novembro de 2025  
-<strong>Versão:</strong> 1.0  
+<strong>Última atualização:</strong> 7 de junho de 2025  
+<strong>Versão:</strong> 1.1  
 <strong>URL:</strong> https://wegig.com.br/privacidade.html
 
 <p>
@@ -116,21 +116,41 @@ Cada usuário pode criar até <strong>5 perfis</strong> independentes. Para cada
 | Dado                           | Obrigatório | Finalidade                                    | Base Legal                             |
 | ------------------------------ | ----------- | --------------------------------------------- | -------------------------------------- |
 | <strong>Nome do perfil</strong>             | <span class="emoji">✅</span> Sim      | Identificação pública                         | Consentimento (Art. 7, I)              |
-| <strong>Tipo</strong> (Músico/Banda)        | <span class="emoji">✅</span> Sim      | Categorização, busca                          | Consentimento (Art. 7, I)              |
+| <strong>Tipo</strong> (Músico/Banda/Espaço)  | <span class="emoji">✅</span> Sim      | Categorização, busca                          | Consentimento (Art. 7, I)              |
+| <strong>Tipo de Espaço</strong> (se aplicável) | <span class="emoji">✅</span>*         | Subcategoria de espaços musicais              | Consentimento (Art. 7, I)              |
 | <strong>Localização (GeoPoint)</strong>     | <span class="emoji">✅</span> Sim      | Busca geográfica, notificações de proximidade | <strong>Consentimento expresso</strong> (Art. 7, I) |
 | <strong>Cidade</strong>                     | <span class="emoji">✅</span> Sim      | Exibição pública, filtros                     | Consentimento (Art. 7, I)              |
 | <strong>Bairro</strong>                     | <span class="emoji">❌</span> Não      | Precisão de localização                       | Consentimento (Art. 7, I)              |
 | <strong>Estado</strong>                     | <span class="emoji">❌</span> Não      | Estatísticas regionais                        | Consentimento (Art. 7, I)              |
 | <strong>Foto do perfil</strong>             | <span class="emoji">❌</span> Não      | Identificação visual                          | Consentimento (Art. 7, I)              |
-| <strong>Instrumentos</strong> (array)       | <span class="emoji">✅</span> Sim      | Busca por habilidade                          | Consentimento (Art. 7, I)              |
-| <strong>Gêneros musicais</strong> (array)   | <span class="emoji">✅</span> Sim      | Busca por estilo                              | Consentimento (Art. 7, I)              |
+| <strong>Instrumentos</strong> (array)       | <span class="emoji">✅</span>*         | Busca por habilidade (Músicos/Bandas)         | Consentimento (Art. 7, I)              |
+| <strong>Gêneros musicais</strong> (array)   | <span class="emoji">✅</span>*         | Busca por estilo (Músicos/Bandas)             | Consentimento (Art. 7, I)              |
 | <strong>Nível</strong> (iniciante/avançado) | <span class="emoji">❌</span> Não      | Compatibilidade                               | Consentimento (Art. 7, I)              |
 | <strong>Bio</strong> (110 chars)            | <span class="emoji">❌</span> Não      | Descrição pessoal                             | Consentimento (Art. 7, I)              |
-| <strong>Idade</strong>                      | <span class="emoji">❌</span> Não      | Estatísticas                                  | Consentimento (Art. 7, I)              |
+| <strong>Idade/Ano Fundação</strong>        | <span class="emoji">❌</span> Não      | Estatísticas                                  | Consentimento (Art. 7, I)              |
 | <strong>YouTube link</strong>               | <span class="emoji">❌</span> Não      | Portfolio                                     | Consentimento (Art. 7, I)              |
 | <strong>Instagram</strong>                  | <span class="emoji">❌</span> Não      | Redes sociais                                 | Consentimento (Art. 7, I)              |
 | <strong>TikTok</strong>                     | <span class="emoji">❌</span> Não      | Redes sociais                                 | Consentimento (Art. 7, I)              |
+| <strong>Telefone</strong>                   | <span class="emoji">✅</span>*         | Contato direto (Espaços)                      | Consentimento (Art. 7, I)              |
+| <strong>Horário de Funcionamento</strong>   | <span class="emoji">❌</span> Não      | Informação comercial (Espaços)                | Consentimento (Art. 7, I)              |
+| <strong>Website</strong>                    | <span class="emoji">❌</span> Não      | Informação comercial (Espaços)                | Consentimento (Art. 7, I)              |
+| <strong>Facilidades</strong> (array)        | <span class="emoji">❌</span> Não      | Wi-Fi, Estacionamento, etc. (Espaços)         | Consentimento (Art. 7, I)              |
 </p>
+
+<p>* Obrigatório dependendo do tipo de perfil</p>
+
+<strong>Tipos de Espaço (SpaceType):</strong>
+<ul>
+<li>Estúdio de Gravação/Ensaios</li>
+<li>Loja de Instrumentos</li>
+<li>Bar/Casa de Show</li>
+<li>Escola de Música</li>
+<li>Produtora de Eventos</li>
+<li>Aluguel de Equipamento</li>
+<li>Luthieria</li>
+<li>Selo/Distribuidora</li>
+<li>Outro</li>
+</ul>
 
 <strong>Estrutura de Armazenamento (Firebase Firestore):</strong>
 
@@ -147,21 +167,27 @@ Cada usuário pode criar até <strong>5 perfis</strong> independentes. Para cada
 <p>
 profiles/{profileId}:
   uid: "firebase_uid_xyz"
-  name: "João Silva"
-  isBand: false
+  name: "João Silva" | "The Rock Band" | "Studio XYZ"
+  profileType: "musician" | "band" | "space"  # <span class="emoji">✅</span> NOVO
+  spaceType: "recording_studio"  # Apenas para Espaços
   location: GeoPoint(-23.5505199, -46.6333094)  # <span class="emoji">⚠️</span> DADO SENSÍVEL
   city: "São Paulo"
   neighborhood: "Vila Mariana"
   state: "SP"
   photoUrl: "https://storage.googleapis.com/..."
-  instruments: ["Guitarra", "Baixo"]
-  genres: ["Rock", "Blues"]
+  instruments: ["Guitarra", "Baixo"]  # Músicos/Bandas
+  genres: ["Rock", "Blues"]  # Músicos/Bandas
   level: "Avançado"
-  bio: "Guitarrista com 10 anos de experiência..."
-  age: 28
+  bio: "Descrição do perfil..."
+  birthYear: 1997  # Ano nascimento/formação/fundação
   youtubeLink: "https://youtube.com/..."
   instagramHandle: "@joaosilva"
   tiktokHandle: "@joaosilva"
+  # Campos específicos de Espaço:
+  phone: "+5511999999999"  # Espaços
+  operatingHours: "Seg-Sex 9h-18h"  # Espaços
+  website: "https://studioxyz.com.br"  # Espaços
+  amenities: ["Wi-Fi", "Estacionamento", "Ar-condicionado"]  # Espaços
   createdAt: Timestamp
   updatedAt: Timestamp</code></pre>
 </p>
@@ -212,16 +238,40 @@ profiles/{profileId}:
 
 <strong>Posts (Efêmeros - 30 dias):</strong>
 
+<p>
+Existem três tipos de posts, cada um com campos específicos:
+</p>
+
+<strong>Posts de Músicos/Bandas:</strong>
 <ul>
 <li>authorUid, authorProfileId, authorName, authorPhotoUrl</li>
 <li>type: 'musician' | 'band'</li>
 <li>location: GeoPoint <span class="emoji">⚠️</span></li>
 <li>city, neighborhood, state</li>
-<li>instruments, genres, level, description (max 1000 chars)</li>
+<li>instruments, genres, level, description (max 600 chars)</li>
 <li>seekingMusicians (para bandas): array de tipos procurados</li>
-<li>photoUrl (opcional)</li>
+<li>photoUrls: array de até 9 fotos</li>
 <li>youtubeLink (opcional)</li>
 <li>expiresAt: Timestamp (createdAt + 30 dias)</li>
+</ul>
+
+<strong>Posts de Anúncio/Sales (Espaços):</strong>
+<ul>
+<li>authorUid, authorProfileId, authorName, authorPhotoUrl</li>
+<li>type: 'sales'</li>
+<li>title: Título do anúncio (obrigatório)</li>
+<li>salesType: Tipo de serviço (Gravação, Ensaio, Aula, etc.)</li>
+<li>content: Descrição do serviço/produto (max 600 chars)</li>
+<li>price: Preço base em reais</li>
+<li>discountMode: 'percentage' | 'fixed' | null</li>
+<li>discountValue: Valor do desconto</li>
+<li>promoStartDate, promoEndDate: Período promocional</li>
+<li>whatsappNumber: Número para contato direto <span class="emoji">⚠️</span></li>
+<li>photoUrls: array de até 9 fotos</li>
+<li>location: GeoPoint <span class="emoji">⚠️</span></li>
+<li>city, neighborhood, state</li>
+<li>expiresAt: Timestamp (createdAt + 30 dias)</li>
+</ul></li>
 <li>createdAt, updatedAt</li>
 </ul>
 
@@ -253,6 +303,36 @@ profiles/{profileId}:
 <li>read: boolean</li>
 <li>Retenção: 30 dias (alguns tipos) ou permanente (outros)</li>
 </ul>
+
+<strong>Denúncias (Reports):</strong>
+
+<ul>
+<li>reporterId: ID do perfil que denunciou</li>
+<li>reporterUid: UID Firebase do denunciante</li>
+<li>targetType: 'post' | 'profile'</li>
+<li>targetId: ID do conteúdo denunciado</li>
+<li>reason: Categoria da denúncia (spam, harassment, etc.)</li>
+<li>description: Texto explicativo (opcional)</li>
+<li>status: 'pending' | 'reviewed' | 'resolved' | 'dismissed'</li>
+<li>adminNotes: Notas internas (não visíveis ao usuário)</li>
+<li>createdAt, reviewedAt</li>
+<li>Retenção: 6 meses após resolução (obrigação legal)</li>
+</ul>
+
+<strong>Categorias de Denúncia:</strong>
+
+<p>
+| Para Posts                  | Para Perfis              |
+| --------------------------- | ------------------------ |
+| Spam ou propaganda          | Perfil falso/impostor    |
+| Conteúdo inapropriado       | Assédio ou bullying      |
+| Assédio ou bullying         | Conteúdo inapropriado    |
+| Informações falsas          | Golpe ou fraude          |
+| Golpe ou fraude             | Discurso de ódio         |
+| Violência ou ameaças        | Spam ou propaganda       |
+| Discurso de ódio            | Menor de idade           |
+| Violação de direitos autorais| Outro                    |
+</p>
 
 <h3>3.5. Dados Técnicos e Metadados</h3>
 
@@ -300,6 +380,9 @@ Coletamos automaticamente:
 | <strong>Sistema de múltiplos perfis</strong> | activeProfileId, profiles summary            | Execução de contrato (Art. 7, V) |
 | <strong>Chat em tempo real</strong>          | conversationId, messages, profileIds         | Execução de contrato (Art. 7, V) |
 | <strong>Demonstração de interesse</strong>   | postId, interestedProfileId                  | Consentimento (Art. 7, I)        |
+| <strong>Anúncios comerciais (Sales)</strong> | Preços, descontos, WhatsApp, fotos           | Consentimento (Art. 7, I)        |
+| <strong>Sistema de denúncias</strong>        | reporterUid, targetId, reason, description   | Legítimo interesse (Art. 7, IX)  |
+| <strong>Moderação de conteúdo</strong>       | Reports, adminNotes, status                  | Legítimo interesse (Art. 7, IX)  |
 | <strong>Recomendações</strong>               | Histórico de interesses, genres, instruments | Legítimo interesse (Art. 7, IX)  |
 | <strong>Prevenção de fraude</strong>         | IP, logs de acesso, padrões de uso           | Legítimo interesse (Art. 7, IX)  |
 | <strong>Melhoria do serviço</strong>         | Firebase Analytics (anonimizado)             | Legítimo interesse (Art. 7, IX)  |
@@ -413,7 +496,13 @@ O WeGig implementa <strong>isolamento de dados por perfil</strong>, semelhante a
 │  ├─ Notificações: 5 não lidas
 │  └─ Localização: São Paulo, Centro
 │
-└─ Perfil 3: "Maria Santos" (musician)
+├─ Perfil 3: "Studio XYZ" (space - recording_studio)
+│  ├─ Posts: 3 anúncios ativos (sales)
+│  ├─ Conversas: 5 chats
+│  ├─ Notificações: 8 não lidas
+│  └─ Localização: São Paulo, Pinheiros
+│
+└─ Perfil 4: "Maria Santos" (musician)
    ├─ Posts: 0 posts
    ├─ Conversas: 0 chats
    ├─ Notificações: 0
@@ -436,9 +525,11 @@ O WeGig implementa <strong>isolamento de dados por perfil</strong>, semelhante a
 
 <ul>
 <li>Posts criados (authorProfileId)</li>
+<li>Anúncios comerciais/Sales (authorProfileId)</li>
 <li>Conversas (participantProfileIds)</li>
 <li>Notificações recebidas (recipientProfileId)</li>
 <li>Interesses demonstrados (interestedProfileId)</li>
+<li>Denúncias enviadas (reporterProfileId)</li>
 <li>Badge counters (unread counts)</li>
 </ul>
 
@@ -820,6 +911,7 @@ Podemos atualizar esta Política de Privacidade periodicamente. Você será noti
 <p>
 | Versão | Data       | Mudanças                               |
 | ------ | ---------- | -------------------------------------- |
+| 1.1    | 07/06/2025 | Adicionado: Perfis tipo Espaço, Posts tipo Anúncio/Sales, Sistema de Denúncias |
 | 1.0    | 27/11/2025 | Primeira versão - LGPD/GDPR compliance |
 </p>
 
@@ -924,7 +1016,9 @@ Versões anteriores disponíveis em: <code>https://wegig.com.br/privacidade/hist
 <li>Coleta e armazenamento de meus <strong>dados de geolocalização (GeoPoint, cidade, bairro)</strong></li>
 <li>Exibição pública de minha <strong>localização aproximada</strong> (cidade e distância)</li>
 <li>Uso de minha localização para <strong>notificações de proximidade</strong> (posso desativar)</li>
-<li>Funcionamento do <strong>sistema de múltiplos perfis</strong> e isolamento de dados</li>
+<li>Funcionamento do <strong>sistema de múltiplos perfis</strong> (músico, banda ou espaço) e isolamento de dados</li>
+<li>Criação de <strong>anúncios comerciais (sales)</strong> com preços, descontos e WhatsApp públicos</li>
+<li>Funcionamento do <strong>sistema de denúncias</strong> para moderação de conteúdo</li>
 <li>Armazenamento de dados em <strong>servidores Firebase (Google Cloud Platform)</strong></li>
 <li>Uso de <strong>Google Maps API</strong> para visualização de mapas</li>
 <li>Processamento de dados conforme descrito nesta Política</li>
@@ -938,6 +1032,8 @@ Versões anteriores disponíveis em: <code>https://wegig.com.br/privacidade/hist
 <li>Posso <strong>desativar notificações de proximidade</strong> nas Configurações</li>
 <li><strong>Deletar perfil/conta é permanente</strong> (não há recuperação após 90 dias)</li>
 <li>Outros usuários podem <strong>salvar screenshots</strong> de conversas antes de eu deletar</li>
+<li>Posso <strong>denunciar conteúdos inadequados</strong> e minha conta pode ser suspensa por violações</li>
+<li>Denúncias falsas ou abusivas podem resultar em <strong>suspensão da minha conta</strong></li>
 </ul>
 
 <span class="emoji">✅</span> <strong>Declaro Que:</strong>
@@ -954,8 +1050,8 @@ Versões anteriores disponíveis em: <code>https://wegig.com.br/privacidade/hist
 
 <strong>Ao clicar em "Aceito os termos de uso e política de privacidade" durante o cadastro, você confirma que leu, compreendeu e concorda com esta Política.</strong>
 
-<strong>Versão:</strong> 1.0  
-<strong>Data:</strong> 27 de novembro de 2025  
+<strong>Versão:</strong> 1.1  
+<strong>Data:</strong> 7 de junho de 2025  
 <strong>Documento gerado para conformidade LGPD/GDPR/CCPA</strong>
 
 <p>

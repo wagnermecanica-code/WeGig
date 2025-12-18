@@ -27,8 +27,8 @@
         <a href="index.html" class="back-button">← Voltar para Home</a>
         <h1>Termos de Uso - WeGig</h1>
 
-<strong>Última atualização:</strong> 27 de novembro de 2025  
-<strong>Versão:</strong> 1.0  
+<strong>Última atualização:</strong> 7 de junho de 2025  
+<strong>Versão:</strong> 1.1  
 <strong>URL:</strong> https://wegig.com.br/termos.html
 
 <p>
@@ -57,16 +57,31 @@ Ao criar uma conta e utilizar o aplicativo WeGig ("App", "Plataforma", "Serviço
 <h2>2. Descrição do Serviço</h2>
 
 <p>
-O WeGig é uma plataforma social que conecta músicos e bandas através de:
+O WeGig é uma plataforma social que conecta músicos, bandas e espaços musicais através de:
 </p>
 
 <ul>
 <li><strong>Busca geolocalizada</strong>: Encontre oportunidades musicais próximas a você</li>
-<li><strong>Sistema de múltiplos perfis</strong>: Crie até 5 perfis independentes (músico ou banda)</li>
+<li><strong>Sistema de múltiplos perfis</strong>: Crie até 5 perfis independentes (músico, banda ou espaço)</li>
+<li><strong>Três tipos de perfis</strong>:
+  <ul>
+    <li><strong>Músico</strong>: Perfil individual para artistas que buscam bandas ou projetos</li>
+    <li><strong>Banda</strong>: Perfil para grupos que buscam músicos</li>
+    <li><strong>Espaço</strong>: Perfil para estúdios, lojas de instrumentos, bares/casas de show, escolas de música, produtoras, luthiers, selos e outros estabelecimentos musicais</li>
+  </ul>
+</li>
+<li><strong>Três tipos de posts</strong>:
+  <ul>
+    <li><strong>Músico</strong>: Posts de músicos buscando bandas/colaborações</li>
+    <li><strong>Banda</strong>: Posts de bandas buscando músicos</li>
+    <li><strong>Anúncio (Sales)</strong>: Posts comerciais de espaços com preços, descontos, promoções e contato via WhatsApp</li>
+  </ul>
+</li>
 <li><strong>Posts efêmeros</strong>: Oportunidades expiram automaticamente após 30 dias</li>
 <li><strong>Chat em tempo real</strong>: Comunicação direta entre perfis</li>
 <li><strong>Notificações de proximidade</strong>: Alertas sobre posts próximos à sua localização</li>
 <li><strong>Sistema de interesses</strong>: Demonstre interesse em posts de outros usuários</li>
+<li><strong>Sistema de denúncias</strong>: Reporte conteúdos ou perfis inadequados</li>
 </ul>
 
 <p>
@@ -158,8 +173,32 @@ O WeGig implementa um sistema de <strong>perfis isolados</strong> onde:
 
 <ul>
 <li>Cada usuário (identificado por Firebase UID) pode ter até <strong>5 perfis</strong></li>
-<li>Cada perfil funciona como uma <strong>identidade independente</strong> (músico ou banda)</li>
+<li>Cada perfil funciona como uma <strong>identidade independente</strong> de um dos três tipos:
+  <ul>
+    <li><strong>Músico</strong>: Perfil pessoal com instrumentos, gêneros e disponibilidade</li>
+    <li><strong>Banda</strong>: Perfil de grupo com gêneros e instrumentos buscados</li>
+    <li><strong>Espaço</strong>: Perfil comercial com tipo de estabelecimento, telefone, horários, site e facilidades (Wi-Fi, estacionamento, acessibilidade)</li>
+  </ul>
+</li>
 <li>Todos os dados (posts, conversas, notificações, interesses) são <strong>isolados por perfil</strong></li>
+</ul>
+
+<h3>4.1.1. Tipos de Espaço</h3>
+
+<p>
+Perfis do tipo <strong>Espaço</strong> podem ser categorizados em:
+</p>
+
+<ul>
+<li><strong>Estúdio de Gravação/Ensaios</strong>: Salas de gravação e ensaio</li>
+<li><strong>Loja de Instrumentos</strong>: Lojas especializadas em equipamentos musicais</li>
+<li><strong>Bar/Casa de Show</strong>: Estabelecimentos com música ao vivo</li>
+<li><strong>Escola de Música</strong>: Instituições de ensino musical</li>
+<li><strong>Produtora de Eventos</strong>: Empresas de produção de eventos musicais</li>
+<li><strong>Aluguel de Equipamento</strong>: Locação de instrumentos e equipamentos</li>
+<li><strong>Luthieria</strong>: Serviços de construção e reparo de instrumentos</li>
+<li><strong>Selo/Distribuidora</strong>: Gravadoras e distribuidoras musicais</li>
+<li><strong>Outro</strong>: Outros tipos de estabelecimentos musicais</li>
 </ul>
 
 <h3>4.2. Como Funciona</h3>
@@ -176,12 +215,17 @@ O WeGig implementa um sistema de <strong>perfis isolados</strong> onde:
 <p>
 profiles/{profileId}:
   - uid: Firebase UID do dono
-  - name: "João Silva"
-  - isBand: false
+  - name: "João Silva" | "The Rock Band" | "Studio XYZ"
+  - profileType: "musician" | "band" | "space"
+  - spaceType: "recording_studio" (apenas para espaços)
   - location: GeoPoint(-23.5505, -46.6333)
   - city: "São Paulo"
-  - instruments: ["Guitarra", "Baixo"]
-  - genres: ["Rock", "Blues"]
+  - instruments: ["Guitarra", "Baixo"] (músicos/bandas)
+  - genres: ["Rock", "Blues"] (músicos/bandas)
+  - phone: "+5511999999999" (espaços)
+  - operatingHours: "Seg-Sex 9h-18h" (espaços)
+  - website: "https://..." (espaços)
+  - amenities: ["Wi-Fi", "Estacionamento"] (espaços)
   - photoUrl, bio, youtubeLink...</code></pre>
 </p>
 
@@ -203,6 +247,7 @@ profiles/{profileId}:
 <li>Ao trocar de perfil, <strong>não verá</strong> posts/mensagens/notificações de outros perfis seus</li>
 <li>Outros usuários <strong>não podem</strong> descobrir que dois perfis pertencem ao mesmo usuário (a menos que você revele)</li>
 <li>Cada perfil tem sua própria <strong>foto, nome, localização, bio</strong> e histórico independente</li>
+<li>Perfis do tipo <strong>Espaço</strong> podem publicar <strong>anúncios comerciais</strong> (sales) com preços e promoções</li>
 </ul>
 
 <span class="emoji">✅</span> <strong>Regras de Segurança (Firestore Rules):</strong>
@@ -225,10 +270,51 @@ match /profiles/{profileId} {
 <h3>4.4. Limites e Restrições</h3>
 
 <ul>
-<li><strong>Máximo 5 perfis</strong> por usuário (limite técnico para performance)</li>
+<li><strong>Máximo 5 perfis</strong> por usuário (combinação de músicos, bandas e espaços)</li>
 <li><strong>Impossível recuperar perfil deletado</strong> (deleção permanente após confirmação)</li>
 <li><strong>Troca de perfil ativo</strong>: Atualiza <code>activeProfileId</code> no documento <code>users/{uid}</code></li>
 <li><strong>Posts órfãos</strong>: Se deletar perfil com posts ativos, posts permanecem mas sem vínculo editável</li>
+</ul>
+
+<p>
+---
+</p>
+
+<h2>4.5. Posts do Tipo Anúncio (Sales)</h2>
+
+<p>
+Perfis do tipo <strong>Espaço</strong> podem criar anúncios comerciais com funcionalidades específicas:
+</p>
+
+<h3>4.5.1. Campos de Anúncio</h3>
+
+<ul>
+<li><strong>Título</strong>: Título do anúncio (obrigatório)</li>
+<li><strong>Tipo de Serviço</strong>: Gravação, Ensaio, Aula, Venda, etc.</li>
+<li><strong>Preço Base</strong>: Valor em reais do serviço/produto</li>
+<li><strong>Desconto</strong>: Percentual ou valor fixo de desconto</li>
+<li><strong>Período Promocional</strong>: Datas de início e fim da promoção</li>
+<li><strong>WhatsApp</strong>: Número para contato direto</li>
+<li><strong>Fotos</strong>: Até 9 imagens do serviço/produto</li>
+</ul>
+
+<h3>4.5.2. Regras para Anúncios</h3>
+
+<span class="emoji">✅</span> <strong>Permitido:</strong>
+
+<ul>
+<li>Anunciar serviços musicais legítimos (gravação, ensaio, aulas, venda de instrumentos)</li>
+<li>Oferecer descontos e promoções com datas definidas</li>
+<li>Incluir contato via WhatsApp para negociação</li>
+</ul>
+
+<span class="emoji">❌</span> <strong>Proibido:</strong>
+
+<ul>
+<li>Anúncios de produtos/serviços não relacionados à música</li>
+<li>Preços enganosos ou informações falsas sobre promoções</li>
+<li>Spam ou anúncios repetitivos</li>
+<li>Conteúdo que viole direitos de terceiros</li>
 </ul>
 
 <p>
@@ -243,7 +329,8 @@ match /profiles/{profileId} {
 
 <ul>
 <li>Fornecer dados verdadeiros sobre habilidades musicais, experiência e localização</li>
-<li>Não criar perfis falsos ou se passar por outras pessoas/bandas</li>
+<li>Não criar perfis falsos ou se passar por outras pessoas/bandas/estabelecimentos</li>
+<li>Para perfis de Espaço: fornecer informações verídicas sobre serviços, preços e disponibilidade</li>
 </ul>
 
 <span class="emoji">✅</span> <strong>Localização Precisa:</strong>
@@ -281,6 +368,81 @@ match /profiles/{profileId} {
 <li>Tentar burlar sistema de geolocalização</li>
 <li>Usar o serviço para fins comerciais sem autorização (ex: recrutamento em massa)</li>
 <li>Fazer engenharia reversa do aplicativo</li>
+<li>Publicar anúncios com preços ou informações falsas</li>
+<li>Criar denúncias falsas ou abusivas contra outros usuários</li>
+</ul>
+
+<p>
+---
+</p>
+
+<h2>5.3. Sistema de Denúncias</h2>
+
+<p>
+O WeGig disponibiliza um sistema de denúncias para garantir a segurança da comunidade:
+</p>
+
+<h3>5.3.1. O Que Pode Ser Denunciado</h3>
+
+<ul>
+<li><strong>Posts</strong>: Conteúdo publicado por outros usuários</li>
+<li><strong>Perfis</strong>: Perfis de músicos, bandas ou espaços</li>
+</ul>
+
+<h3>5.3.2. Categorias de Denúncia</h3>
+
+<strong>Para Posts:</strong>
+<ul>
+<li>Spam ou propaganda enganosa</li>
+<li>Conteúdo inapropriado</li>
+<li>Assédio ou bullying</li>
+<li>Informações falsas</li>
+<li>Golpe ou fraude</li>
+<li>Violência ou ameaças</li>
+<li>Discurso de ódio</li>
+<li>Violação de direitos autorais</li>
+</ul>
+
+<strong>Para Perfis:</strong>
+<ul>
+<li>Perfil falso ou impostor</li>
+<li>Spam ou propaganda</li>
+<li>Assédio ou bullying</li>
+<li>Conteúdo inapropriado</li>
+<li>Golpe ou fraude</li>
+<li>Discurso de ódio</li>
+<li>Menor de idade</li>
+</ul>
+
+<h3>5.3.3. Processo de Denúncia</h3>
+
+<ul>
+<li>Selecione o motivo da denúncia</li>
+<li>Adicione uma descrição detalhada (opcional)</li>
+<li>A denúncia é enviada para revisão da equipe</li>
+<li>Administradores analisam e tomam ações apropriadas</li>
+</ul>
+
+<h3>5.3.4. Limites de Denúncia</h3>
+
+<ul>
+<li><strong>Máximo 10 denúncias por dia</strong> por usuário</li>
+<li><strong>Uma denúncia por conteúdo</strong>: Você não pode denunciar o mesmo post/perfil duas vezes</li>
+<li>Denúncias abusivas ou falsas podem resultar em suspensão da conta</li>
+</ul>
+
+<h3>5.3.5. Ações Pós-Denúncia</h3>
+
+<p>
+Após análise, a equipe pode tomar as seguintes ações:
+</p>
+
+<ul>
+<li><strong>Dispensar</strong>: Denúncia improcedente</li>
+<li><strong>Advertência</strong>: Notificação ao usuário denunciado</li>
+<li><strong>Remoção de Conteúdo</strong>: Deleção do post denunciado</li>
+<li><strong>Suspensão Temporária</strong>: Bloqueio de 7 a 30 dias</li>
+<li><strong>Banimento Permanente</strong>: Exclusão definitiva da conta</li>
 </ul>
 
 <p>
@@ -565,11 +727,30 @@ Fica eleito o foro da Comarca de <strong>São Paulo/SP</strong> para dirimir qua
 <span class="emoji">✅</span> <strong>Sistema de Múltiplos Perfis:</strong>
 
 <ul>
-<li>Compreendo que posso criar até 5 perfis independentes (músico ou banda)</li>
+<li>Compreendo que posso criar até 5 perfis independentes (músico, banda ou espaço)</li>
 <li>Estou ciente que cada perfil tem dados isolados (posts, mensagens, notificações)</li>
 <li>Aceito que ao trocar de perfil, não visualizo dados de outros perfis meus</li>
 <li>Entendo que outros usuários não podem descobrir que múltiplos perfis são meus (exceto se eu revelar)</li>
 <li>Estou ciente que deletar perfil é permanente e irreversível</li>
+<li>Compreendo que perfis de Espaço podem criar anúncios comerciais (sales)</li>
+</ul>
+
+<span class="emoji">✅</span> <strong>Anúncios e Conteúdo Comercial:</strong>
+
+<ul>
+<li>Compreendo que anúncios (sales) são públicos e vistos por todos os usuários na região</li>
+<li>Autorizo a exibição de preços, descontos e número de WhatsApp publicamente</li>
+<li>Aceito que sou responsável pela veracidade das informações comerciais publicadas</li>
+<li>Entendo que anúncios também expiram em 30 dias</li>
+</ul>
+
+<span class="emoji">✅</span> <strong>Sistema de Denúncias:</strong>
+
+<ul>
+<li>Compreendo que posso denunciar conteúdos e perfis inadequados</li>
+<li>Aceito que denúncias falsas ou abusivas podem resultar em suspensão</li>
+<li>Entendo que a equipe WeGig analisa denúncias e toma ações apropriadas</li>
+<li>Estou ciente que minha conta pode ser suspensa ou banida em caso de violações</li>
 </ul>
 
 <span class="emoji">✅</span> <strong>Processamento de Dados:</strong>
@@ -587,8 +768,8 @@ Fica eleito o foro da Comarca de <strong>São Paulo/SP</strong> para dirimir qua
 
 <strong>Ao clicar em "Aceito os termos de uso e política de privacidade" durante o cadastro, você confirma que leu, compreendeu e concorda com todos os itens acima.</strong>
 
-<strong>Versão:</strong> 1.0  
-<strong>Data:</strong> 27 de novembro de 2025  
+<strong>Versão:</strong> 1.1  
+<strong>Data:</strong> 7 de junho de 2025  
 <strong>Documento gerado para conformidade LGPD/GDPR</strong>
 
     </main>
