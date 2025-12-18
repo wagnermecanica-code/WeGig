@@ -400,6 +400,7 @@ nav a:hover {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 4px 8px 4px 4px;
 }
 
 .posts-carousel::-webkit-scrollbar {

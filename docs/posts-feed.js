@@ -409,16 +409,16 @@ function addMarkersToMap() {
 function createMarkerContent(post, isActive) {
   const type = post.type || "musician";
   const color = CONFIG.COLORS[type];
-  
+
   // Cores de highlight (reflexo) baseadas na cor principal
   const highlightColor = lightenColor(color, 30);
-  
+
   // Tamanhos proporcionais ao pin_template.svg (viewBox 256x256, mas escalado para 90x90)
   // Proporção: width=46.9, height=62.7 (ratio 1.337) do WeGigPinDescriptorBuilder
   const baseSize = isActive ? 52 : 46;
   const width = baseSize;
   const height = baseSize * 1.28; // Mesmo ratio do app (1.28)
-  
+
   // Container wrapper com sombra
   const wrapper = document.createElement("div");
   wrapper.style.cssText = `
@@ -431,7 +431,10 @@ function createMarkerContent(post, isActive) {
 
   // Efeito de glow/blur para marcador ativo (como WeGigPinWidget.isHighlighted)
   if (isActive) {
-    const glowSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const glowSvg = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "svg"
+    );
     glowSvg.setAttribute("width", width * 1.15);
     glowSvg.setAttribute("height", height * 1.15);
     glowSvg.setAttribute("viewBox", "0 0 256 256");
@@ -458,7 +461,7 @@ function createMarkerContent(post, isActive) {
   svg.setAttribute("height", height);
   svg.setAttribute("viewBox", "0 0 256 256");
   svg.style.cssText = "position: relative; z-index: 1; cursor: pointer;";
-  
+
   // Estrutura idêntica ao pin_template.svg:
   // 1. Path da gota (cor primária)
   // 2. Círculo branco central
@@ -484,10 +487,21 @@ function createMarkerContent(post, isActive) {
 
 // Função auxiliar para clarear uma cor hex
 function lightenColor(hex, percent) {
-  const num = parseInt(hex.replace('#', ''), 16);
-  const r = Math.min(255, Math.floor((num >> 16) + (255 - (num >> 16)) * percent / 100));
-  const g = Math.min(255, Math.floor(((num >> 8) & 0x00FF) + (255 - ((num >> 8) & 0x00FF)) * percent / 100));
-  const b = Math.min(255, Math.floor((num & 0x0000FF) + (255 - (num & 0x0000FF)) * percent / 100));
+  const num = parseInt(hex.replace("#", ""), 16);
+  const r = Math.min(
+    255,
+    Math.floor((num >> 16) + ((255 - (num >> 16)) * percent) / 100)
+  );
+  const g = Math.min(
+    255,
+    Math.floor(
+      ((num >> 8) & 0x00ff) + ((255 - ((num >> 8) & 0x00ff)) * percent) / 100
+    )
+  );
+  const b = Math.min(
+    255,
+    Math.floor((num & 0x0000ff) + ((255 - (num & 0x0000ff)) * percent) / 100)
+  );
   return `rgb(${r},${g},${b})`;
 }
 
