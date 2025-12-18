@@ -360,9 +360,21 @@ function addMarkersToMap() {
       return;
     }
 
-    // GeoPoint do Firestore Web SDK usa _latitude/_longitude
-    const lat = post.location.latitude || post.location._latitude;
-    const lng = post.location.longitude || post.location._longitude;
+    // Firebase Web SDK GeoPoint: propriedades latitude/longitude são getters
+    // Admin SDK: _latitude/_longitude são propriedades internas
+    // Tentamos ambos para compatibilidade
+    let lat, lng;
+    
+    if (typeof post.location.latitude === 'number') {
+      lat = post.location.latitude;
+      lng = post.location.longitude;
+    } else if (typeof post.location._latitude === 'number') {
+      lat = post.location._latitude;
+      lng = post.location._longitude;
+    } else {
+      console.log(`⚠️ Post ${index} formato de localização desconhecido:`, post.location);
+      return;
+    }
 
     console.log(`📍 Post ${index}:`, post.id, "lat=", lat, "lng=", lng);
 
@@ -498,8 +510,14 @@ function highlightMarker(postId) {
       activeMarker.content = createMarkerContent(post, true);
 
       // Centralizar mapa no marker
-      const lat = post.location.latitude || post.location._latitude;
-      const lng = post.location.longitude || post.location._longitude;
+      let lat, lng;
+      if (typeof post.location.latitude === 'number') {
+        lat = post.location.latitude;
+        lng = post.location.longitude;
+      } else {
+        lat = post.location._latitude;
+        lng = post.location._longitude;
+      }
       map.panTo({ lat, lng });
     }
   }
