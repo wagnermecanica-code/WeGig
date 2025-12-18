@@ -41,42 +41,49 @@ let autoScrollInterval = null;
 // Aguardar Firebase e Google Maps estarem prontos
 function waitForDependencies() {
   return new Promise((resolve, reject) => {
-    let firebaseOk = window.firebaseReady || false;
-    let mapsOk = window.googleMapsReady || false;
+    console.log("🔍 Aguardando dependências...");
     
-    console.log("🔍 Estado inicial - Firebase:", firebaseOk, "| Maps:", mapsOk);
-
-    const check = () => {
-      console.log("🔍 Check - Firebase:", firebaseOk, "| Maps:", mapsOk);
+    // Polling approach - mais confiável que eventos
+    let attempts = 0;
+    const maxAttempts = 100; // 10 segundos (100 * 100ms)
+    
+    const checkDependencies = () => {
+      attempts++;
+      
+      const firebaseOk = window.firebaseReady === true && window.firebaseDb;
+      const mapsOk = window.googleMapsReady === true && window.google?.maps;
+      
+      console.log(`🔍 Tentativa ${attempts} - Firebase: ${firebaseOk}, Maps: ${mapsOk}`);
+      
       if (firebaseOk && mapsOk) {
         console.log("✅ Ambas dependências prontas!");
         resolve();
         return;
       }
+      
+      if (attempts >= maxAttempts) {
+        console.error("⏱️ Timeout esperando dependências");
+        console.error("Firebase:", { ready: window.firebaseReady, db: !!window.firebaseDb });
+        console.error("Maps:", { ready: window.googleMapsReady, google: !!window.google });
+        reject(new Error(`Timeout: Firebase=${firebaseOk}, Maps=${mapsOk}`));
+        return;
+      }
+      
+      // Verificar novamente em 100ms
+      setTimeout(checkDependencies, 100);
     };
-
+    
+    // Também ouvir eventos como backup
     window.addEventListener("firebase-ready", () => {
       console.log("📡 Evento firebase-ready recebido");
-      firebaseOk = true;
-      check();
     });
-
+    
     window.addEventListener("google-maps-ready", () => {
       console.log("🗺️ Evento google-maps-ready recebido");
-      mapsOk = true;
-      check();
     });
-
-    // Verificar estado inicial
-    check();
     
-    // Timeout de segurança - 10 segundos
-    setTimeout(() => {
-      if (!firebaseOk || !mapsOk) {
-        console.error("⏱️ Timeout esperando dependências - Firebase:", firebaseOk, "| Maps:", mapsOk);
-        reject(new Error("Timeout: Firebase=" + firebaseOk + ", Maps=" + mapsOk));
-      }
-    }, 10000);
+    // Iniciar verificação
+    checkDependencies();
   });
 }
 
