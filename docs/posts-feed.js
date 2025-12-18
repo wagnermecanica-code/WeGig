@@ -404,162 +404,91 @@ function addMarkersToMap() {
   }
 }
 
-// Criar conteúdo do marker em formato de PIN (gota invertida) - idêntico ao App Flutter
+// Criar conteúdo do marker - SVG idêntico ao pin_template.svg do App Flutter
+// NOTA: O app NÃO usa fotos nos markers, apenas cores sólidas com círculo branco
 function createMarkerContent(post, isActive) {
   const type = post.type || "musician";
   const color = CONFIG.COLORS[type];
-  const authorPhoto = post.authorPhotoUrl || post.activeProfilePhotoUrl;
-
-  // Tamanhos do pin (proporção 1:1.5 como no Flutter)
-  const pinWidth = isActive ? 52 : 44;
-  const pinHeight = pinWidth * 1.5;
-  const circleSize = pinWidth * 0.55;
-  const borderWidth = isActive ? 3 : 2;
-
-  // Container wrapper
+  
+  // Cores de highlight (reflexo) baseadas na cor principal
+  const highlightColor = lightenColor(color, 30);
+  
+  // Tamanhos proporcionais ao pin_template.svg (viewBox 256x256, mas escalado para 90x90)
+  // Proporção: width=46.9, height=62.7 (ratio 1.337) do WeGigPinDescriptorBuilder
+  const baseSize = isActive ? 52 : 46;
+  const width = baseSize;
+  const height = baseSize * 1.28; // Mesmo ratio do app (1.28)
+  
+  // Container wrapper com sombra
   const wrapper = document.createElement("div");
   wrapper.style.cssText = `
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.35));
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4));
   `;
 
-  // Glow effect para marcador ativo (como no app)
+  // Efeito de glow/blur para marcador ativo (como WeGigPinWidget.isHighlighted)
   if (isActive) {
-    const glow = document.createElement("div");
-    glow.style.cssText = `
+    const glowSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    glowSvg.setAttribute("width", width * 1.15);
+    glowSvg.setAttribute("height", height * 1.15);
+    glowSvg.setAttribute("viewBox", "0 0 256 256");
+    glowSvg.style.cssText = `
       position: absolute;
-      top: 8px;
-      width: ${pinWidth * 1.3}px;
-      height: ${pinWidth * 1.3}px;
-      border-radius: 50%;
-      background: ${color}40;
-      filter: blur(12px);
-      animation: markerGlow 1.5s ease-in-out infinite alternate;
+      top: -${height * 0.075}px;
+      left: -${width * 0.075}px;
+      opacity: 0.45;
+      filter: blur(${baseSize * 0.12}px);
     `;
-    wrapper.appendChild(glow);
+    // SVG path da gota (mesmo do pin_template.svg)
+    glowSvg.innerHTML = `
+      <g transform="translate(1.4 1.4) scale(2.81)">
+        <path d="M 45 90 C 30.086 71.757 15.174 46.299 15.174 29.826 S 28.527 0 45 0 s 29.826 13.353 29.826 29.826 S 59.914 71.757 45 90 z" 
+              fill="${color}" fill-opacity="0.9"/>
+      </g>
+    `;
+    wrapper.appendChild(glowSvg);
   }
 
-  // SVG do Pin em formato de gota invertida (exatamente como PinMarkerWidget do Flutter)
+  // SVG principal - Exatamente como pin_template.svg do app
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", pinWidth);
-  svg.setAttribute("height", pinHeight);
-  svg.setAttribute("viewBox", `0 0 ${pinWidth} ${pinHeight}`);
+  svg.setAttribute("width", width);
+  svg.setAttribute("height", height);
+  svg.setAttribute("viewBox", "0 0 256 256");
   svg.style.cssText = "position: relative; z-index: 1; cursor: pointer;";
-
-  // Gradiente para o pin (como no Flutter)
-  const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-  const gradient = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
-  gradient.setAttribute("id", `pinGradient-${post.id}`);
-  gradient.setAttribute("x1", "0%");
-  gradient.setAttribute("y1", "0%");
-  gradient.setAttribute("x2", "0%");
-  gradient.setAttribute("y2", "100%");
-
-  const stop1 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
-  stop1.setAttribute("offset", "0%");
-  stop1.setAttribute("stop-color", color);
-  stop1.setAttribute("stop-opacity", "0.9");
-
-  const stop2 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
-  stop2.setAttribute("offset", "50%");
-  stop2.setAttribute("stop-color", color);
-
-  const stop3 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
-  stop3.setAttribute("offset", "100%");
-  stop3.setAttribute("stop-color", color);
-  stop3.setAttribute("stop-opacity", "0.95");
-
-  gradient.appendChild(stop1);
-  gradient.appendChild(stop2);
-  gradient.appendChild(stop3);
-  defs.appendChild(gradient);
-  svg.appendChild(defs);
-
-  // Path da gota invertida (curva bezier idêntica ao Flutter)
-  // Pontos baseados no _PinPainter do Flutter:
-  // moveTo(width/2, height) - ponta inferior
-  // cubicTo(0.05, 0.72), (0.05, 0.35), (0.5, 0.2) - lado esquerdo
-  // cubicTo(0.95, 0.35), (0.95, 0.72), (0.5, 1.0) - lado direito
-  const w = pinWidth;
-  const h = pinHeight;
-  const pathD = `
-    M ${w / 2} ${h}
-    C ${w * 0.05} ${h * 0.72}, ${w * 0.05} ${h * 0.35}, ${w / 2} ${h * 0.2}
-    C ${w * 0.95} ${h * 0.35}, ${w * 0.95} ${h * 0.72}, ${w / 2} ${h}
-    Z
+  
+  // Estrutura idêntica ao pin_template.svg:
+  // 1. Path da gota (cor primária)
+  // 2. Círculo branco central
+  // 3. Highlight/reflexo para volume 3D
+  svg.innerHTML = `
+    <g transform="translate(1.4 1.4) scale(2.81)">
+      <!-- Corpo da gota (cor primária) -->
+      <path d="M 45 90 C 30.086 71.757 15.174 46.299 15.174 29.826 S 28.527 0 45 0 s 29.826 13.353 29.826 29.826 S 59.914 71.757 45 90 z" 
+            fill="${color}"/>
+      
+      <!-- Círculo branco central -->
+      <circle cx="45" cy="29.38" r="13.5" fill="white"/>
+      
+      <!-- Highlight/reflexo (dá volume 3D) -->
+      <path d="M 48.596 5.375 C 33.355 5.375 21 17.73 21 32.97 c 0 1.584 0.141 3.135 0.397 4.646 C 20.496 35.035 20 32.264 20 29.375 c 0 -13.807 11.193 -25 25 -25 c 2.889 0 5.661 0.496 8.242 1.397 C 51.731 5.516 50.18 5.375 48.596 5.375 z" 
+            fill="${highlightColor}"/>
+    </g>
   `;
-
-  const pinPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  pinPath.setAttribute("d", pathD);
-  pinPath.setAttribute("fill", `url(#pinGradient-${post.id})`);
-  pinPath.setAttribute("stroke", "white");
-  pinPath.setAttribute("stroke-width", borderWidth);
-  svg.appendChild(pinPath);
-
-  // Círculo branco central (marca registrada dos pins do Google, como no Flutter)
-  const circleY = h * 0.32; // Posicionado no "topo" da gota
-  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  circle.setAttribute("cx", w / 2);
-  circle.setAttribute("cy", circleY);
-  circle.setAttribute("r", circleSize / 2);
-  circle.setAttribute("fill", "white");
-  svg.appendChild(circle);
-
-  // Conteúdo dentro do círculo branco (foto ou ícone)
-  if (authorPhoto) {
-    // ClipPath para foto circular
-    const clipId = `photoClip-${post.id}`;
-    const clipPath = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
-    clipPath.setAttribute("id", clipId);
-    const clipCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    clipCircle.setAttribute("cx", w / 2);
-    clipCircle.setAttribute("cy", circleY);
-    clipCircle.setAttribute("r", (circleSize / 2) - 2);
-    clipPath.appendChild(clipCircle);
-    defs.appendChild(clipPath);
-
-    const image = document.createElementNS("http://www.w3.org/2000/svg", "image");
-    image.setAttribute("href", authorPhoto);
-    image.setAttribute("x", (w - circleSize + 4) / 2);
-    image.setAttribute("y", circleY - (circleSize / 2) + 2);
-    image.setAttribute("width", circleSize - 4);
-    image.setAttribute("height", circleSize - 4);
-    image.setAttribute("clip-path", `url(#${clipId})`);
-    image.setAttribute("preserveAspectRatio", "xMidYMid slice");
-    svg.appendChild(image);
-  } else {
-    // Ícone SVG dentro do círculo (como no Flutter)
-    const iconSize = circleSize * 0.5;
-    const iconGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    iconGroup.setAttribute("transform", `translate(${(w - iconSize) / 2}, ${circleY - iconSize / 2})`);
-    iconGroup.setAttribute("fill", color);
-
-    const iconPaths = {
-      musician: `<path transform="scale(${iconSize / 24})" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>`,
-      band: `<path transform="scale(${iconSize / 24})" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>`,
-      sales: `<path transform="scale(${iconSize / 24})" d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>`,
-    };
-    iconGroup.innerHTML = iconPaths[type] || iconPaths.musician;
-    svg.appendChild(iconGroup);
-  }
 
   wrapper.appendChild(svg);
   return wrapper;
 }
 
-// Ícone padrão do marker (mantido para compatibilidade)
-function getMarkerIcon(type) {
-  const icons = {
-    musician:
-      '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>',
-    band: '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>',
-    sales:
-      '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>',
-  };
-  return icons[type] || icons.musician;
+// Função auxiliar para clarear uma cor hex
+function lightenColor(hex, percent) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.min(255, Math.floor((num >> 16) + (255 - (num >> 16)) * percent / 100));
+  const g = Math.min(255, Math.floor(((num >> 8) & 0x00FF) + (255 - ((num >> 8) & 0x00FF)) * percent / 100));
+  const b = Math.min(255, Math.floor((num & 0x0000FF) + (255 - (num & 0x0000FF)) * percent / 100));
+  return `rgb(${r},${g},${b})`;
 }
 
 // Destacar marker no mapa
