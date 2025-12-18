@@ -259,7 +259,8 @@ function createPostCard(post) {
 
   // Mensagem do post (truncada)
   const content = post.content || "";
-  const truncatedContent = content.length > 120 ? content.substring(0, 120) + "..." : content;
+  const truncatedContent =
+    content.length > 120 ? content.substring(0, 120) + "..." : content;
 
   // Conteúdo específico por tipo
   let subtitle = typeLabel;
@@ -277,34 +278,50 @@ function createPostCard(post) {
       : price;
 
     subtitle = title;
-    extraInfo = `<span class="pc-price">R$ ${finalPrice.toFixed(0)}${hasDiscount ? ` <small class="pc-discount">-${discountValue}${post.discountMode === "percentage" ? "%" : ""}</small>` : ""}</span>`;
+    extraInfo = `<span class="pc-price">R$ ${finalPrice.toFixed(0)}${
+      hasDiscount
+        ? ` <small class="pc-discount">-${discountValue}${
+            post.discountMode === "percentage" ? "%" : ""
+          }</small>`
+        : ""
+    }</span>`;
   } else {
-    const items = type === "musician"
-      ? (post.instruments || []).slice(0, 3).join(" · ")
-      : (post.seekingMusicians || []).slice(0, 3).join(" · ");
+    const items =
+      type === "musician"
+        ? (post.instruments || []).slice(0, 3).join(" · ")
+        : (post.seekingMusicians || []).slice(0, 3).join(" · ");
     if (items) extraInfo = `<span class="pc-tags">${escapeHtml(items)}</span>`;
   }
 
   return `
     <article class="pc" data-post-id="${post.id}">
       <div class="pc-thumb" style="--pc-color: ${color}">
-        ${postPhoto
-          ? `<img src="${postPhoto}" alt="" loading="lazy" />`
-          : `<span class="pc-icon">${typeIcon}</span>`
+        ${
+          postPhoto
+            ? `<img src="${postPhoto}" alt="" loading="lazy" />`
+            : `<span class="pc-icon">${typeIcon}</span>`
         }
       </div>
       <div class="pc-content">
         <div class="pc-header">
-          ${authorPhoto
-            ? `<img src="${authorPhoto}" alt="" class="pc-avatar" />`
-            : `<span class="pc-avatar pc-avatar--placeholder" style="background:${color}">${authorName.charAt(0)}</span>`
-          }
           <span class="pc-name">${escapeHtml(authorName)}</span>
-          <span class="pc-badge" style="background:${color}">${typeIcon}</span>
+          ${
+            authorPhoto
+              ? `<img src="${authorPhoto}" alt="" class="pc-avatar" />`
+              : `<span class="pc-avatar pc-avatar--placeholder" style="background:${color}">${authorName.charAt(
+                  0
+                )}</span>`
+          }
         </div>
-        <div class="pc-subtitle" style="color:${color}">${escapeHtml(subtitle)}</div>
+        <div class="pc-subtitle" style="color:${color}">${escapeHtml(
+    subtitle
+  )}</div>
         ${extraInfo}
-        ${truncatedContent ? `<p class="pc-message">${escapeHtml(truncatedContent)}</p>` : ""}
+        ${
+          truncatedContent
+            ? `<p class="pc-message">${escapeHtml(truncatedContent)}</p>`
+            : ""
+        }
         <div class="pc-meta">
           <span>📍 ${escapeHtml(city)}</span>
           <span>· ${timeAgo}</span>
