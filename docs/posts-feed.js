@@ -238,7 +238,7 @@ function renderPosts() {
   });
 }
 
-// Criar HTML do card de post - Design moderno vertical
+// Criar HTML do card de post - Design compacto
 function createPostCard(post) {
   const type = post.type || "musician";
   const color = CONFIG.COLORS[type];
@@ -252,16 +252,14 @@ function createPostCard(post) {
 
   // Localização
   const city = post.city || "";
-  const state = post.state || "";
-  const location = [city, state].filter(Boolean).join(", ") || "Brasil";
+  const location = city || "Brasil";
 
   // Data
   const createdAt = post.createdAt?.toDate?.() || new Date();
   const timeAgo = formatTimeAgo(createdAt);
 
   // Conteúdo específico por tipo
-  let tagContent = "";
-  let priceContent = "";
+  let infoLine = "";
 
   if (type === "sales") {
     const title = post.title || "Anúncio";
@@ -274,27 +272,27 @@ function createPostCard(post) {
         : price - discountValue
       : price;
 
-    tagContent = `<span class="card-tag">${escapeHtml(title)}</span>`;
-    priceContent = `
-      <div class="card-price-row">
-        ${hasDiscount ? `<span class="card-price-old">R$ ${price.toFixed(0)}</span>` : ""}
+    infoLine = `
+      <div class="card-info-line">
+        <span class="card-title">${escapeHtml(title)}</span>
+      </div>
+      <div class="card-price-line">
         <span class="card-price">R$ ${finalPrice.toFixed(0)}</span>
         ${hasDiscount ? `<span class="card-discount">-${discountValue}${post.discountMode === "percentage" ? "%" : ""}</span>` : ""}
       </div>
     `;
   } else {
     const items = type === "musician"
-      ? (post.instruments || []).slice(0, 2)
-      : (post.seekingMusicians || []).slice(0, 2);
+      ? (post.instruments || []).slice(0, 2).join(", ")
+      : (post.seekingMusicians || []).slice(0, 2).join(", ");
     
-    tagContent = items.length > 0
-      ? items.map(i => `<span class="card-tag">${escapeHtml(i)}</span>`).join("")
-      : `<span class="card-tag">${typeLabel}</span>`;
+    infoLine = `
+      <div class="card-info-line">
+        <span class="card-label" style="color: ${color}">${typeLabel}</span>
+      </div>
+      ${items ? `<div class="card-detail">${escapeHtml(items)}</div>` : ""}
+    `;
   }
-
-  // Mensagem/conteúdo
-  const content = post.content || "";
-  const truncatedContent = content.length > 80 ? content.substring(0, 80) + "..." : content;
 
   return `
     <div class="post-card" data-post-id="${post.id}" style="--card-color: ${color}">
@@ -314,17 +312,13 @@ function createPostCard(post) {
             ? `<img src="${authorPhoto}" alt="" class="card-avatar" />`
             : `<div class="card-avatar-placeholder" style="background: ${color}">${authorName.charAt(0).toUpperCase()}</div>`
           }
-          <div class="card-author-info">
-            <span class="card-author-name">${escapeHtml(authorName)}</span>
-            <span class="card-meta">${escapeHtml(location)} · ${timeAgo}</span>
-          </div>
+          <span class="card-author-name">${escapeHtml(authorName)}</span>
         </div>
-        
-        <div class="card-tags">${tagContent}</div>
-        
-        ${priceContent}
-        
-        ${truncatedContent ? `<p class="card-description">${escapeHtml(truncatedContent)}</p>` : ""}
+        ${infoLine}
+        <div class="card-footer">
+          <span>📍 ${escapeHtml(location)}</span>
+          <span>${timeAgo}</span>
+        </div>
       </div>
     </div>
   `;
