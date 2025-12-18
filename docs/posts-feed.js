@@ -346,17 +346,30 @@ function createPostCard(post) {
 
 // Adicionar markers ao mapa
 function addMarkersToMap() {
-  if (!map || posts.length === 0) return;
+  if (!map || posts.length === 0) {
+    console.log("⚠️ addMarkersToMap: map=", !!map, "posts=", posts.length);
+    return;
+  }
 
+  console.log("🗺️ Adicionando", posts.length, "markers ao mapa...");
   const bounds = new google.maps.LatLngBounds();
 
-  posts.forEach((post) => {
-    if (!post.location) return;
+  posts.forEach((post, index) => {
+    if (!post.location) {
+      console.log(`⚠️ Post ${index} sem localização:`, post.id);
+      return;
+    }
 
-    const lat = post.location.latitude || post.location._lat;
-    const lng = post.location.longitude || post.location._long;
+    // GeoPoint do Firestore Web SDK usa _latitude/_longitude
+    const lat = post.location.latitude || post.location._latitude;
+    const lng = post.location.longitude || post.location._longitude;
 
-    if (!lat || !lng) return;
+    console.log(`📍 Post ${index}:`, post.id, "lat=", lat, "lng=", lng);
+
+    if (!lat || !lng) {
+      console.log(`⚠️ Post ${index} com lat/lng inválidos`);
+      return;
+    }
 
     const position = { lat, lng };
     const type = post.type || "musician";
@@ -485,8 +498,8 @@ function highlightMarker(postId) {
       activeMarker.content = createMarkerContent(post, true);
 
       // Centralizar mapa no marker
-      const lat = post.location.latitude || post.location._lat;
-      const lng = post.location.longitude || post.location._long;
+      const lat = post.location.latitude || post.location._latitude;
+      const lng = post.location.longitude || post.location._longitude;
       map.panTo({ lat, lng });
     }
   }
