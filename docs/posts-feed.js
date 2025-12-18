@@ -238,7 +238,7 @@ function renderPosts() {
   });
 }
 
-// Criar HTML do card de post - Design compacto
+// Criar HTML do card de post - Layout horizontal (estilo lista)
 function createPostCard(post) {
   const type = post.type || "musician";
   const color = CONFIG.COLORS[type];
@@ -251,15 +251,15 @@ function createPostCard(post) {
   const postPhoto = post.photoUrls?.[0] || null;
 
   // Localização
-  const city = post.city || "";
-  const location = city || "Brasil";
+  const city = post.city || "Brasil";
 
   // Data
   const createdAt = post.createdAt?.toDate?.() || new Date();
   const timeAgo = formatTimeAgo(createdAt);
 
   // Conteúdo específico por tipo
-  let infoLine = "";
+  let subtitle = typeLabel;
+  let extraInfo = "";
 
   if (type === "sales") {
     const title = post.title || "Anúncio";
@@ -272,55 +272,40 @@ function createPostCard(post) {
         : price - discountValue
       : price;
 
-    infoLine = `
-      <div class="card-info-line">
-        <span class="card-title">${escapeHtml(title)}</span>
-      </div>
-      <div class="card-price-line">
-        <span class="card-price">R$ ${finalPrice.toFixed(0)}</span>
-        ${hasDiscount ? `<span class="card-discount">-${discountValue}${post.discountMode === "percentage" ? "%" : ""}</span>` : ""}
-      </div>
-    `;
+    subtitle = title;
+    extraInfo = `<span class="pc-price">R$ ${finalPrice.toFixed(0)}${hasDiscount ? ` <small class="pc-discount">-${discountValue}${post.discountMode === "percentage" ? "%" : ""}</small>` : ""}</span>`;
   } else {
     const items = type === "musician"
-      ? (post.instruments || []).slice(0, 2).join(", ")
-      : (post.seekingMusicians || []).slice(0, 2).join(", ");
-    
-    infoLine = `
-      <div class="card-info-line">
-        <span class="card-label" style="color: ${color}">${typeLabel}</span>
-      </div>
-      ${items ? `<div class="card-detail">${escapeHtml(items)}</div>` : ""}
-    `;
+      ? (post.instruments || []).slice(0, 3).join(" · ")
+      : (post.seekingMusicians || []).slice(0, 3).join(" · ");
+    if (items) extraInfo = `<span class="pc-tags">${escapeHtml(items)}</span>`;
   }
 
   return `
-    <div class="post-card" data-post-id="${post.id}" style="--card-color: ${color}">
-      <div class="card-image">
+    <article class="pc" data-post-id="${post.id}">
+      <div class="pc-thumb" style="--pc-color: ${color}">
         ${postPhoto
           ? `<img src="${postPhoto}" alt="" loading="lazy" />`
-          : `<div class="card-image-placeholder">
-              <span class="card-type-icon">${typeIcon}</span>
-            </div>`
+          : `<span class="pc-icon">${typeIcon}</span>`
         }
-        <div class="card-type-badge" style="background: ${color}">${typeIcon}</div>
       </div>
-      
-      <div class="card-body">
-        <div class="card-header">
+      <div class="pc-content">
+        <div class="pc-header">
           ${authorPhoto
-            ? `<img src="${authorPhoto}" alt="" class="card-avatar" />`
-            : `<div class="card-avatar-placeholder" style="background: ${color}">${authorName.charAt(0).toUpperCase()}</div>`
+            ? `<img src="${authorPhoto}" alt="" class="pc-avatar" />`
+            : `<span class="pc-avatar pc-avatar--placeholder" style="background:${color}">${authorName.charAt(0)}</span>`
           }
-          <span class="card-author-name">${escapeHtml(authorName)}</span>
+          <span class="pc-name">${escapeHtml(authorName)}</span>
+          <span class="pc-badge" style="background:${color}">${typeIcon}</span>
         </div>
-        ${infoLine}
-        <div class="card-footer">
-          <span>📍 ${escapeHtml(location)}</span>
-          <span>${timeAgo}</span>
+        <div class="pc-subtitle" style="color:${color}">${escapeHtml(subtitle)}</div>
+        ${extraInfo}
+        <div class="pc-meta">
+          <span>📍 ${escapeHtml(city)}</span>
+          <span>· ${timeAgo}</span>
         </div>
       </div>
-    </div>
+    </article>
   `;
 }
 
@@ -523,14 +508,14 @@ function highlightMarker(postId) {
   }
 
   // Destacar card no carrossel
-  document.querySelectorAll(".post-card").forEach((card) => {
-    card.classList.toggle("highlighted", card.dataset.postId === postId);
+  document.querySelectorAll(".pc").forEach((card) => {
+    card.classList.toggle("pc--active", card.dataset.postId === postId);
   });
 }
 
 // Scroll para o post no carrossel
 function scrollToPost(postId) {
-  const card = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+  const card = document.querySelector(`.pc[data-post-id="${postId}"]`);
   if (card) {
     card.scrollIntoView({ behavior: "smooth", block: "center" });
   }

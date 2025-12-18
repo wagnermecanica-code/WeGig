@@ -386,11 +386,9 @@ nav a:hover {
   flex: 1;
   overflow-y: auto;
   max-height: 550px;
-  padding-right: 0.5rem;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .posts-carousel::-webkit-scrollbar {
@@ -412,172 +410,149 @@ nav a:hover {
 }
 
 /* ========================================
-   POST CARD - Design Compacto
+   POST CARD - Layout Horizontal (Lista)
+   Design definitivo - altura fixa, nunca corta
    ======================================== */
 
-.post-card {
+.pc {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
   background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.pc:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+.pc--active {
+  box-shadow: 0 0 0 2px var(--primary-color), 0 4px 12px rgba(0,0,0,0.1);
+  transform: scale(1.01);
+}
+
+/* Thumbnail - tamanho fixo */
+.pc-thumb {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  cursor: pointer;
-  transition: box-shadow 0.2s ease;
+  background: linear-gradient(135deg, var(--pc-color, #37475A), color-mix(in srgb, var(--pc-color, #37475A) 70%, black));
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.post-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-
-.post-card.highlighted {
-  box-shadow: 0 0 0 2px var(--card-color), 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-
-/* Card Image */
-.card-image {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16/10;
-  background: #f0f0f0;
-}
-
-.card-image img {
+.pc-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.card-image-placeholder {
-  width: 100%;
-  height: 100%;
+.pc-icon {
+  font-size: 1.8rem;
+}
+
+/* Content - flex grow */
+.pc-content {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: center;
-  background: linear-gradient(135deg, var(--card-color), color-mix(in srgb, var(--card-color) 70%, black));
+  gap: 2px;
 }
 
-.card-type-icon {
-  font-size: 2rem;
-}
-
-.card-type-badge {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-}
-
-/* Card Body */
-.card-body {
-  padding: 8px 10px 10px;
-}
-
-/* Card Header */
-.card-header {
+/* Header: avatar + nome + badge */
+.pc-header {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 4px;
 }
 
-.card-avatar {
-  width: 22px;
-  height: 22px;
+.pc-avatar {
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
 }
 
-.card-avatar-placeholder {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+.pc-avatar--placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
+  font-size: 10px;
   font-weight: 600;
-  font-size: 0.6rem;
-  flex-shrink: 0;
 }
 
-.card-author-name {
+.pc-name {
+  font-size: 13px;
   font-weight: 600;
-  font-size: 0.7rem;
-  color: var(--text-primary);
+  color: #1a1a1a;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
 }
 
-/* Card Info */
-.card-info-line {
-  margin-bottom: 2px;
-}
-
-.card-label {
-  font-weight: 600;
-  font-size: 0.65rem;
-}
-
-.card-title {
-  font-weight: 600;
-  font-size: 0.7rem;
-  color: var(--text-primary);
-  display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.card-detail {
-  font-size: 0.6rem;
-  color: var(--text-secondary);
-  margin-bottom: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Card Price */
-.card-price-line {
+.pc-badge {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 2px;
+  justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
 }
 
-.card-price {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--card-color);
-}
-
-.card-discount {
-  font-size: 0.55rem;
+/* Subtitle: tipo ou título */
+.pc-subtitle {
+  font-size: 12px;
   font-weight: 600;
-  color: white;
-  background: #e53935;
-  padding: 1px 4px;
-  border-radius: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Card Footer */
-.card-footer {
+/* Tags: instrumentos */
+.pc-tags {
+  font-size: 11px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+/* Price */
+.pc-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: #007EB9;
+  display: block;
+}
+
+.pc-discount {
+  font-size: 10px;
+  color: #e53935;
+  font-weight: 600;
+}
+
+/* Meta: location + time */
+.pc-meta {
+  font-size: 11px;
+  color: #888;
   display: flex;
-  justify-content: space-between;
-  font-size: 0.6rem;
-  color: var(--text-secondary);
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px solid #f0f0f0;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 /* ========================================
@@ -673,7 +648,6 @@ nav a:hover {
 
   .posts-carousel {
     max-height: 400px;
-    grid-template-columns: repeat(3, 1fr);
   }
 
   .posts-map {
@@ -682,21 +656,42 @@ nav a:hover {
 }
 
 @media (max-width: 768px) {
-  .posts-carousel {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
-
   .map-legend {
     flex-wrap: wrap;
     gap: 1rem;
+  }
+
+  .pc {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .pc-thumb {
+    width: 64px;
+    height: 64px;
   }
 }
 
 @media (max-width: 480px) {
   .posts-carousel {
-    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
+  }
+
+  .pc {
+    padding: 8px;
+  }
+
+  .pc-thumb {
+    width: 56px;
+    height: 56px;
+  }
+
+  .pc-name {
+    font-size: 12px;
+  }
+
+  .pc-subtitle {
+    font-size: 11px;
   }
 }
 
