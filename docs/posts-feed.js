@@ -97,15 +97,19 @@ async function init() {
 
     // Inicializar mapa
     initMap();
+    console.log("✅ Mapa inicializado");
 
     // Carregar posts do Firebase
     await loadPosts();
+    console.log("✅ Posts carregados:", posts.length);
 
     // Renderizar posts
     renderPosts();
+    console.log("✅ Posts renderizados");
 
     // Adicionar markers ao mapa
     addMarkersToMap();
+    console.log("✅ Markers adicionados");
 
     // Iniciar auto-scroll
     startAutoScroll();
@@ -113,7 +117,8 @@ async function init() {
     console.log("✅ Posts Feed inicializado com sucesso");
   } catch (error) {
     console.error("❌ Erro ao inicializar Posts Feed:", error);
-    showError();
+    console.error("❌ Stack:", error.stack);
+    showError(error.message);
   }
 }
 
@@ -564,7 +569,7 @@ function startAutoScroll() {
 }
 
 // Mostrar erro
-function showError() {
+function showError(errorMessage) {
   const carousel = document.getElementById("posts-carousel");
   if (carousel) {
     carousel.innerHTML = `
@@ -572,6 +577,7 @@ function showError() {
         <div class="icon">⚠️</div>
         <h3>Não foi possível carregar os posts</h3>
         <p>Tente novamente mais tarde ou baixe o app para a experiência completa.</p>
+        ${errorMessage ? `<p class="error-detail" style="font-size: 12px; color: #999; margin-top: 8px;">Erro: ${errorMessage}</p>` : ''}
         <a href="#download" class="btn btn-primary">Baixar App</a>
       </div>
     `;
