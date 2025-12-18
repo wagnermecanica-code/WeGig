@@ -257,6 +257,10 @@ function createPostCard(post) {
   const createdAt = post.createdAt?.toDate?.() || new Date();
   const timeAgo = formatTimeAgo(createdAt);
 
+  // Mensagem do post (truncada)
+  const content = post.content || "";
+  const truncatedContent = content.length > 120 ? content.substring(0, 120) + "..." : content;
+
   // Conteúdo específico por tipo
   let subtitle = typeLabel;
   let extraInfo = "";
@@ -300,6 +304,7 @@ function createPostCard(post) {
         </div>
         <div class="pc-subtitle" style="color:${color}">${escapeHtml(subtitle)}</div>
         ${extraInfo}
+        ${truncatedContent ? `<p class="pc-message">${escapeHtml(truncatedContent)}</p>` : ""}
         <div class="pc-meta">
           <span>📍 ${escapeHtml(city)}</span>
           <span>· ${timeAgo}</span>
