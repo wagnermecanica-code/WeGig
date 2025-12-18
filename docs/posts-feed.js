@@ -238,7 +238,7 @@ function renderPosts() {
   });
 }
 
-// Criar HTML do card de post
+// Criar HTML do card de post - Design moderno vertical
 function createPostCard(post) {
   const type = post.type || "musician";
   const color = CONFIG.COLORS[type];
@@ -253,17 +253,17 @@ function createPostCard(post) {
   // Localização
   const city = post.city || "";
   const state = post.state || "";
-  const location = [city, state].filter(Boolean).join(", ");
+  const location = [city, state].filter(Boolean).join(", ") || "Brasil";
 
   // Data
   const createdAt = post.createdAt?.toDate?.() || new Date();
   const timeAgo = formatTimeAgo(createdAt);
 
   // Conteúdo específico por tipo
-  let specificContent = "";
+  let tagContent = "";
+  let priceContent = "";
 
   if (type === "sales") {
-    // Anúncio de espaço
     const title = post.title || "Anúncio";
     const price = post.price || 0;
     const discountValue = post.discountValue || 0;
@@ -274,91 +274,57 @@ function createPostCard(post) {
         : price - discountValue
       : price;
 
-    specificContent = `
-      <div class="post-title">${escapeHtml(title)}</div>
-      ${
-        hasDiscount
-          ? `
-        <div class="post-price-original">
-          <span class="price-strikethrough">R$ ${price.toFixed(2)}</span>
-          <span class="discount-badge">-${discountValue}${
-              post.discountMode === "percentage" ? "%" : ""
-            }</span>
-        </div>
-      `
-          : ""
-      }
-      <div class="post-price">R$ ${finalPrice.toFixed(2)}</div>
+    tagContent = `<span class="card-tag">${escapeHtml(title)}</span>`;
+    priceContent = `
+      <div class="card-price-row">
+        ${hasDiscount ? `<span class="card-price-old">R$ ${price.toFixed(0)}</span>` : ""}
+        <span class="card-price">R$ ${finalPrice.toFixed(0)}</span>
+        ${hasDiscount ? `<span class="card-discount">-${discountValue}${post.discountMode === "percentage" ? "%" : ""}</span>` : ""}
+      </div>
     `;
   } else {
-    // Músico ou Banda
-    const instruments =
-      type === "musician"
-        ? (post.instruments || []).slice(0, 3).join(", ")
-        : (post.seekingMusicians || []).slice(0, 3).join(", ");
-    const level = post.level || "";
-
-    specificContent = `
-      <div class="post-type-label">${typeLabel}</div>
-      ${
-        instruments
-          ? `<div class="post-instruments">🎵 ${escapeHtml(instruments)}</div>`
-          : ""
-      }
-      ${level ? `<div class="post-level">⭐ ${escapeHtml(level)}</div>` : ""}
-    `;
+    const items = type === "musician"
+      ? (post.instruments || []).slice(0, 2)
+      : (post.seekingMusicians || []).slice(0, 2);
+    
+    tagContent = items.length > 0
+      ? items.map(i => `<span class="card-tag">${escapeHtml(i)}</span>`).join("")
+      : `<span class="card-tag">${typeLabel}</span>`;
   }
 
   // Mensagem/conteúdo
   const content = post.content || "";
-  const truncatedContent =
-    content.length > 100 ? content.substring(0, 100) + "..." : content;
+  const truncatedContent = content.length > 80 ? content.substring(0, 80) + "..." : content;
 
   return `
-    <div class="post-card" data-post-id="${
-      post.id
-    }" style="--card-color: ${color}">
-      <div class="post-card-image">
-        ${
-          postPhoto
-            ? `<img src="${postPhoto}" alt="Foto do post" loading="lazy" />`
-            : `<div class="post-card-placeholder" style="background-color: ${color}20">
-              <span>${typeIcon}</span>
+    <div class="post-card" data-post-id="${post.id}" style="--card-color: ${color}">
+      <div class="card-image">
+        ${postPhoto
+          ? `<img src="${postPhoto}" alt="" loading="lazy" />`
+          : `<div class="card-image-placeholder">
+              <span class="card-type-icon">${typeIcon}</span>
             </div>`
         }
+        <div class="card-type-badge" style="background: ${color}">${typeIcon}</div>
       </div>
-      <div class="post-card-content">
-        <div class="post-card-header">
-          <div class="post-author">
-            ${
-              authorPhoto
-                ? `<img src="${authorPhoto}" alt="${escapeHtml(
-                    authorName
-                  )}" class="author-avatar" />`
-                : `<div class="author-avatar-placeholder" style="background-color: ${color}">${authorName
-                    .charAt(0)
-                    .toUpperCase()}</div>`
-            }
-            <span class="author-name">${escapeHtml(authorName)}</span>
-          </div>
-          <span class="post-type-badge" style="background-color: ${color}">${typeIcon}</span>
-        </div>
-        
-        <div class="post-card-body">
-          ${specificContent}
-          ${
-            truncatedContent
-              ? `<p class="post-content">${escapeHtml(truncatedContent)}</p>`
-              : ""
+      
+      <div class="card-body">
+        <div class="card-header">
+          ${authorPhoto
+            ? `<img src="${authorPhoto}" alt="" class="card-avatar" />`
+            : `<div class="card-avatar-placeholder" style="background: ${color}">${authorName.charAt(0).toUpperCase()}</div>`
           }
+          <div class="card-author-info">
+            <span class="card-author-name">${escapeHtml(authorName)}</span>
+            <span class="card-meta">${escapeHtml(location)} · ${timeAgo}</span>
+          </div>
         </div>
         
-        <div class="post-card-footer">
-          <span class="post-location">📍 ${
-            escapeHtml(location) || "Brasil"
-          }</span>
-          <span class="post-time">🕐 ${timeAgo}</span>
-        </div>
+        <div class="card-tags">${tagContent}</div>
+        
+        ${priceContent}
+        
+        ${truncatedContent ? `<p class="card-description">${escapeHtml(truncatedContent)}</p>` : ""}
       </div>
     </div>
   `;
