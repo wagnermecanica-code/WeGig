@@ -362,7 +362,8 @@
 
     <!-- Google Maps API with Advanced Markers -->
     <script>
-      function initMap() {
+      function onGoogleMapsLoaded() {
+        console.log("🗺️ Google Maps API carregada com sucesso");
         window.googleMapsReady = true;
         window.dispatchEvent(new Event("google-maps-ready"));
       }
@@ -370,10 +371,10 @@
     <script
       async
       defer
-      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA3Rq-Fmlsrwn-fywriTBp7xZsOo7i5fyQ&map_ids=b7134f9dc59c2ad97d5b292e&libraries=marker&callback=initMap"
+      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA3Rq-Fmlsrwn-fywriTBp7xZsOo7i5fyQ&map_ids=b7134f9dc59c2ad97d5b292e&libraries=marker&callback=onGoogleMapsLoaded"
     ></script>
 
     <!-- Posts Feed Script -->
-    <script src="posts-feed.js?v=14"></script>
+    <script src="posts-feed.js?v=15"></script>
   </body>
 </html>
