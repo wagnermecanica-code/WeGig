@@ -36,52 +36,59 @@ let map = null;
 let markers = [];
 let posts = [];
 let activePostId = null;
-let autoScrollInterval = null;
 
 // Aguardar Firebase e Google Maps estarem prontos
 function waitForDependencies() {
   return new Promise((resolve, reject) => {
     console.log("🔍 Aguardando dependências...");
-    
+
     // Polling approach - mais confiável que eventos
     let attempts = 0;
     const maxAttempts = 100; // 10 segundos (100 * 100ms)
-    
+
     const checkDependencies = () => {
       attempts++;
-      
+
       const firebaseOk = window.firebaseReady === true && window.firebaseDb;
       const mapsOk = window.googleMapsReady === true && window.google?.maps;
-      
-      console.log(`🔍 Tentativa ${attempts} - Firebase: ${firebaseOk}, Maps: ${mapsOk}`);
-      
+
+      console.log(
+        `🔍 Tentativa ${attempts} - Firebase: ${firebaseOk}, Maps: ${mapsOk}`
+      );
+
       if (firebaseOk && mapsOk) {
         console.log("✅ Ambas dependências prontas!");
         resolve();
         return;
       }
-      
+
       if (attempts >= maxAttempts) {
         console.error("⏱️ Timeout esperando dependências");
-        console.error("Firebase:", { ready: window.firebaseReady, db: !!window.firebaseDb });
-        console.error("Maps:", { ready: window.googleMapsReady, google: !!window.google });
+        console.error("Firebase:", {
+          ready: window.firebaseReady,
+          db: !!window.firebaseDb,
+        });
+        console.error("Maps:", {
+          ready: window.googleMapsReady,
+          google: !!window.google,
+        });
         reject(new Error(`Timeout: Firebase=${firebaseOk}, Maps=${mapsOk}`));
         return;
       }
-      
+
       // Verificar novamente em 100ms
       setTimeout(checkDependencies, 100);
     };
-    
+
     // Também ouvir eventos como backup
     window.addEventListener("firebase-ready", () => {
       console.log("📡 Evento firebase-ready recebido");
     });
-    
+
     window.addEventListener("google-maps-ready", () => {
       console.log("🗺️ Evento google-maps-ready recebido");
     });
-    
+
     // Iniciar verificação
     checkDependencies();
   });
@@ -110,9 +117,6 @@ async function init() {
     // Adicionar markers ao mapa
     addMarkersToMap();
     console.log("✅ Markers adicionados");
-
-    // Iniciar auto-scroll
-    startAutoScroll();
 
     console.log("✅ Posts Feed inicializado com sucesso");
   } catch (error) {
@@ -147,7 +151,7 @@ function initMap() {
 // Carregar posts do Firebase
 async function loadPosts() {
   console.log("📥 Iniciando carregamento de posts...");
-  
+
   const db = window.firebaseDb;
   const q = window.firebaseQuery;
   const coll = window.firebaseCollection;
@@ -157,7 +161,13 @@ async function loadPosts() {
   const getDocs = window.firebaseGetDocs;
   const Timestamp = window.firebaseTimestamp;
 
-  console.log("📥 Firebase refs:", { db: !!db, q: !!q, coll: !!coll, getDocs: !!getDocs, Timestamp: !!Timestamp });
+  console.log("📥 Firebase refs:", {
+    db: !!db,
+    q: !!q,
+    coll: !!coll,
+    getDocs: !!getDocs,
+    Timestamp: !!Timestamp,
+  });
 
   if (!db || !q || !coll || !getDocs || !Timestamp) {
     throw new Error("Firebase não inicializado corretamente");
@@ -186,7 +196,12 @@ async function loadPosts() {
 
   console.log(`📋 ${posts.length} posts carregados`);
   if (posts.length > 0) {
-    console.log("📋 Primeiro post:", posts[0].id, posts[0].authorName, posts[0].type);
+    console.log(
+      "📋 Primeiro post:",
+      posts[0].id,
+      posts[0].authorName,
+      posts[0].type
+    );
   }
 }
 
@@ -369,15 +384,18 @@ function addMarkersToMap() {
     // Admin SDK: _latitude/_longitude são propriedades internas
     // Tentamos ambos para compatibilidade
     let lat, lng;
-    
-    if (typeof post.location.latitude === 'number') {
+
+    if (typeof post.location.latitude === "number") {
       lat = post.location.latitude;
       lng = post.location.longitude;
-    } else if (typeof post.location._latitude === 'number') {
+    } else if (typeof post.location._latitude === "number") {
       lat = post.location._latitude;
       lng = post.location._longitude;
     } else {
-      console.log(`⚠️ Post ${index} formato de localização desconhecido:`, post.location);
+      console.log(
+        `⚠️ Post ${index} formato de localização desconhecido:`,
+        post.location
+      );
       return;
     }
 
@@ -426,38 +444,54 @@ function addMarkersToMap() {
   }
 }
 
-// Criar conteúdo do marker (estilo do app)
+// Criar conteúdo do marker (estilo do app Flutter - CustomMarkerWidget)
 function createMarkerContent(post, isActive) {
   const type = post.type || "musician";
   const color = CONFIG.COLORS[type];
   const authorPhoto = post.authorPhotoUrl || post.activeProfilePhotoUrl;
 
-  const size = isActive ? 60 : 48;
+  const size = isActive ? 56 : 46;
   const borderWidth = isActive ? 4 : 3;
 
+  // Container wrapper para efeitos
+  const wrapper = document.createElement("div");
+  wrapper.style.cssText = `
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `;
+
+  // Efeito de pulso para marcador ativo (como no app)
+  if (isActive) {
+    const pulse = document.createElement("div");
+    pulse.style.cssText = `
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: ${color}30;
+      animation: markerPulse 1.5s ease-out infinite;
+    `;
+    wrapper.appendChild(pulse);
+  }
+
+  // Container principal do marcador (replica CustomMarkerWidget)
   const container = document.createElement("div");
   container.className = `map-marker ${isActive ? "active" : ""} ${type}`;
   container.style.cssText = `
+    position: relative;
     width: ${size}px;
     height: ${size}px;
     border-radius: 50%;
     border: ${borderWidth}px solid white;
     background: linear-gradient(135deg, ${color}, ${color}cc);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.3s ease;
     overflow: hidden;
-    ${
-      isActive
-        ? `
-      transform: scale(1.1);
-      box-shadow: 0 0 0 8px ${color}40, 0 6px 20px rgba(0,0,0,0.4);
-    `
-        : ""
-    }
   `;
 
   if (authorPhoto) {
@@ -476,7 +510,8 @@ function createMarkerContent(post, isActive) {
     container.innerHTML = getMarkerIcon(type);
   }
 
-  return container;
+  wrapper.appendChild(container);
+  return wrapper;
 }
 
 // Ícone padrão do marker
@@ -516,7 +551,7 @@ function highlightMarker(postId) {
 
       // Centralizar mapa no marker
       let lat, lng;
-      if (typeof post.location.latitude === 'number') {
+      if (typeof post.location.latitude === "number") {
         lat = post.location.latitude;
         lng = post.location.longitude;
       } else {
@@ -541,33 +576,6 @@ function scrollToPost(postId) {
   }
 }
 
-// Auto-scroll do carrossel
-function startAutoScroll() {
-  if (posts.length <= 1) return;
-
-  let currentIndex = 0;
-
-  autoScrollInterval = setInterval(() => {
-    currentIndex = (currentIndex + 1) % posts.length;
-    const post = posts[currentIndex];
-
-    scrollToPost(post.id);
-    highlightMarker(post.id);
-  }, 5000); // 5 segundos
-
-  // Pausar auto-scroll ao interagir
-  const carousel = document.getElementById("posts-carousel");
-  if (carousel) {
-    carousel.addEventListener("mouseenter", () => {
-      clearInterval(autoScrollInterval);
-    });
-
-    carousel.addEventListener("mouseleave", () => {
-      startAutoScroll();
-    });
-  }
-}
-
 // Mostrar erro
 function showError(errorMessage) {
   const carousel = document.getElementById("posts-carousel");
@@ -577,7 +585,11 @@ function showError(errorMessage) {
         <div class="icon">⚠️</div>
         <h3>Não foi possível carregar os posts</h3>
         <p>Tente novamente mais tarde ou baixe o app para a experiência completa.</p>
-        ${errorMessage ? `<p class="error-detail" style="font-size: 12px; color: #999; margin-top: 8px;">Erro: ${errorMessage}</p>` : ''}
+        ${
+          errorMessage
+            ? `<p class="error-detail" style="font-size: 12px; color: #999; margin-top: 8px;">Erro: ${errorMessage}</p>`
+            : ""
+        }
         <a href="#download" class="btn btn-primary">Baixar App</a>
       </div>
     `;
