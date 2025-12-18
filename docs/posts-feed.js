@@ -295,13 +295,6 @@ function createPostCard(post) {
 
   return `
     <article class="pc" data-post-id="${post.id}">
-      <div class="pc-thumb" style="--pc-color: ${color}">
-        ${
-          postPhoto
-            ? `<img src="${postPhoto}" alt="" loading="lazy" />`
-            : `<span class="pc-icon">${typeIcon}</span>`
-        }
-      </div>
       <div class="pc-content">
         <div class="pc-header">
           <span class="pc-name">${escapeHtml(authorName)}</span>
