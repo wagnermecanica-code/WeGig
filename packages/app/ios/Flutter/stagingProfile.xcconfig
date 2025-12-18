@@ -1,6 +1,8 @@
 #include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.profile-staging.xcconfig"
 #include "Generated.xcconfig"
 
+FLUTTER_TARGET=lib/main_staging.dart
 ASSET_PREFIX=staging
 BUNDLE_NAME=WeGig STAGING
 BUNDLE_DISPLAY_NAME=WeGig STAGING
+PRODUCT_BUNDLE_IDENTIFIER=com.wegig.wegig.staging

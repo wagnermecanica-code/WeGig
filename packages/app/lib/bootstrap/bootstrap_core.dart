@@ -59,8 +59,11 @@ Future<void> bootstrapCoreServices({
 
   FirebaseMessaging.onBackgroundMessage(backgroundHandler);
 
+  debugPrint('🔔 Bootstrap: enablePushNotifications = $enablePushNotifications');
   if (enablePushNotifications) {
     await _initializePushNotifications(flavorLabel);
+  } else {
+    debugPrint('⚠️ Bootstrap: Push notifications DESABILITADAS');
   }
 
   _configureErrorHandling(
@@ -132,7 +135,9 @@ Future<void> _initializeFirebase(FirebaseOptions options) async {
 }
 
 Future<void> _initializePushNotifications(String flavorLabel) async {
+  debugPrint('🔔 _initializePushNotifications: INICIANDO para $flavorLabel');
   try {
+    debugPrint('🔔 _initializePushNotifications: Chamando PushNotificationService().initialize()...');
     await PushNotificationService().initialize();
     debugPrint('✅ PushNotificationService initialized for $flavorLabel');
   } catch (error, stackTrace) {

@@ -150,9 +150,12 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
       // CRITICAL: Analytics - Track active profile para segmentação
       if (activeProfile != null) {
         _setAnalyticsProfile(activeProfile.profileId);
-        
-        // CRITICAL: Salvar token FCM para receber push notifications
-        _saveFcmToken(activeProfile.profileId);
+      }
+      
+      // CRITICAL: Salvar token FCM em TODOS os perfis do usuário
+      // Isso garante que push notifications cheguem independente do perfil ativo
+      if (profiles.isNotEmpty) {
+        _saveFcmTokenForAllProfiles(profiles.map((p) => p.profileId).toList());
       }
 
       return ProfileState(
@@ -220,18 +223,39 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
     }
   }
 
-  /// CRITICAL: Salva token FCM para receber push notifications
+  /// CRITICAL: Salva token FCM em TODOS os perfis do usuário
   /// 
-  /// Chamado quando perfil é carregado (login) para garantir que
-  /// o token FCM está associado ao perfil ativo.
-  void _saveFcmToken(String profileId) {
+  /// Chamado quando perfis são carregados (login) para garantir que
+  /// push notifications cheguem independente do perfil ativo.
+  /// Também solicita permissão de notificação se ainda não concedida.
+  void _saveFcmTokenForAllProfiles(List<String> profileIds) {
+    debugPrint('🔔 FCM: Iniciando salvamento de token para ${profileIds.length} perfis');
     // Usar Future para não bloquear o carregamento de perfis
     Future.microtask(() async {
       try {
-        await PushNotificationService().saveTokenForProfile(profileId);
-        debugPrint('🔔 FCM: Token salvo para perfil $profileId');
-      } catch (e) {
-        debugPrint('⚠️ FCM: Erro ao salvar token - $e');
+        final service = PushNotificationService();
+        
+        debugPrint('🔔 FCM: Solicitando permissão de notificação...');
+        // Solicitar permissão de notificação (iOS requer, Android 13+ também)
+        // Se já foi concedida, retorna imediatamente
+        final settings = await service.requestPermission();
+        debugPrint('🔔 FCM: Permissão: ${settings.authorizationStatus}');
+        
+        // IMPORTANTE: Forçar refresh do token para garantir que está válido
+        // Necessário após adicionar SHA-1 no Firebase Console
+        debugPrint('🔔 FCM: Forçando refresh do token...');
+        final token = await service.forceTokenRefresh();
+        debugPrint('🔔 FCM: Token obtido: ${token != null ? "SIM (${token.length} chars)" : "NULL"}');
+        if (token != null) {
+          debugPrint('🔔 FCM: FULL TOKEN: $token');
+        }
+        
+        // Salvar token para TODOS os perfis do usuário
+        await service.saveTokenForProfiles(profileIds);
+        debugPrint('🔔 FCM: Token salvo para ${profileIds.length} perfis');
+      } catch (e, stackTrace) {
+        debugPrint('⚠️ FCM: Erro ao salvar tokens - $e');
+        debugPrint('⚠️ FCM: StackTrace - $stackTrace');
         // Não faz rethrow - falha em FCM não deve bloquear login
       }
     });

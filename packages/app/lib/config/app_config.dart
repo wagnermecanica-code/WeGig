@@ -142,4 +142,32 @@ class AppConfig {
   static bool get isDevelopment => _flavor == 'dev';
   static bool get isStaging => _flavor == 'staging';
   static bool get isProduction => _flavor == 'prod';
+
+  // ========== Google Maps Configuration ==========
+
+  /// Google Maps Cloud Map ID para Android
+  static String get googleMapIdAndroid {
+    switch (_flavor) {
+      case 'prod':
+        return ProdConfig.googleMapIdAndroid;
+      case 'staging':
+        return StagingConfig.googleMapIdAndroid;
+      case 'dev':
+      default:
+        return DevConfig.googleMapIdAndroid;
+    }
+  }
+
+  /// Google Maps Cloud Map ID para iOS
+  static String get googleMapIdIOS {
+    switch (_flavor) {
+      case 'prod':
+        return ProdConfig.googleMapIdIOS;
+      case 'staging':
+        return StagingConfig.googleMapIdIOS;
+      case 'dev':
+      default:
+        return DevConfig.googleMapIdIOS;
+    }
+  }
 }

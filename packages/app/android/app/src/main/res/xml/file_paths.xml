@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider paths configuration for WeGig app
+    Used by: image_picker, image_cropper, share_plus
+    
+    This file defines which directories the FileProvider can share with other apps.
+    Required for Android 7.0+ (API 24+) file sharing via content:// URIs.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- External storage root (for images from gallery) -->
+    <external-path name="external_files" path="." />
+    
+    <!-- App's external files directory -->
+    <external-files-path name="external_app_files" path="." />
+    
+    <!-- App's external cache directory -->
+    <external-cache-path name="external_cache" path="." />
+    
+    <!-- App's internal cache directory (for cropped images) -->
+    <cache-path name="cache" path="." />
+    
+    <!-- App's internal files directory -->
+    <files-path name="files" path="." />
+    
+    <!-- Root of external storage (for legacy support) -->
+    <root-path name="root" path="." />
+</paths>

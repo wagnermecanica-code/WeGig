@@ -157,8 +157,28 @@ class PostNotifier extends _$PostNotifier {
       debugPrint('✅ PostNotifier: ${posts.length} posts carregados e cached');
       
       return posts;
+    } on TimeoutException catch (e) {
+      debugPrint('⏱️ PostNotifier: Timeout ao carregar posts - ${e.message}');
+      
+      // Em caso de timeout, retorna cache mesmo que expirado
+      final cache = ref.read(postCacheNotifierProvider);
+      if (cache.isNotEmpty) {
+        debugPrint('💾 PostNotifier: Usando cache expirado (${cache.length} posts) devido a timeout');
+        return cache;
+      }
+      
+      debugPrint('📭 PostNotifier: Cache vazio e timeout - retornando lista vazia');
+      return [];
     } catch (e) {
       debugPrint('❌ PostNotifier: Erro ao carregar posts - $e');
+      
+      // Em caso de erro, também tenta usar cache expirado
+      final cache = ref.read(postCacheNotifierProvider);
+      if (cache.isNotEmpty) {
+        debugPrint('💾 PostNotifier: Usando cache expirado (${cache.length} posts) devido a erro');
+        return cache;
+      }
+      
       return [];
     }
   }

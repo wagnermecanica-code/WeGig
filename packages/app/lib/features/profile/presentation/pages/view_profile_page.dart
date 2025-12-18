@@ -6,7 +6,6 @@ import 'dart:ui' as ui;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/core_ui.dart';
-import 'package:core_ui/utils/deep_link_generator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -19,13 +18,13 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
 import 'package:wegig_app/features/mensagens_new/presentation/providers/mensagens_new_providers.dart';
 import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
+import 'package:wegig_app/features/post/presentation/widgets/interest_options_dialog.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/profile/presentation/widgets/profile_switcher_bottom_sheet.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
@@ -92,6 +91,22 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     
     // Retorna o telefone original se não conseguir formatar
     return phone;
+  }
+
+  /// Retorna o título apropriado para o tipo de post
+  String _getPostTitle(String type, Map<String, dynamic> data) {
+    switch (type) {
+      case 'band':
+        return 'Banda procura músico';
+      case 'musician':
+        return 'Músico procura banda';
+      case 'sales':
+        // Para posts de vendas, usa o título do anúncio ou fallback
+        final title = data['title'] as String?;
+        return title?.isNotEmpty == true ? title! : 'Anúncio';
+      default:
+        return 'Post';
+    }
   }
 
   /// Carrega conversationId em background para acelerar botão de mensagem
@@ -297,7 +312,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     return _profile!.profileId == activeProfile.profileId;
   }
 
-  /// Constrói botão de ação (Mensagem / Compartilhar) estilo Instagram
+  /// Constrói botão de ação (Mensagem / Ligar / WhatsApp) estilo Instagram
   Widget _buildActionButton({
     required String label,
     required IconData icon,
@@ -307,48 +322,51 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   }) {
     final isDisabled = onPressed == null || isLoading;
     
-    return SizedBox(
-      height: 32,
-      child: ElevatedButton.icon(
-        onPressed: isDisabled ? null : onPressed,
-        icon: isLoading
-            ? SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    isPrimary ? Colors.white : Colors.black54,
+    return Expanded(
+      child: SizedBox(
+        height: 36,
+        child: ElevatedButton.icon(
+          onPressed: isDisabled ? null : onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isPrimary
+                ? (isDisabled ? AppColors.primary.withOpacity(0.7) : AppColors.primary)
+                : (isDisabled ? Colors.grey[300] : Colors.grey[200]),
+            foregroundColor: isPrimary ? Colors.white : Colors.black,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+          ),
+          icon: isLoading
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      isPrimary ? Colors.white : Colors.black54,
+                    ),
                   ),
+                )
+              : Icon(
+                  icon,
+                  size: 18,
+                  color: isDisabled
+                      ? (isPrimary ? Colors.white70 : Colors.black38)
+                      : (isPrimary ? Colors.white : Colors.black),
                 ),
-              )
-            : Icon(
-                icon,
-                size: 16,
-                color: isDisabled
-                    ? (isPrimary ? Colors.white70 : Colors.black38)
-                    : (isPrimary ? Colors.white : Colors.black),
-              ),
-        label: Text(
-          isLoading ? 'Abrindo...' : label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isDisabled
-                ? (isPrimary ? Colors.white70 : Colors.black38)
-                : (isPrimary ? Colors.white : Colors.black),
+          label: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDisabled
+                  ? (isPrimary ? Colors.white70 : Colors.black38)
+                  : (isPrimary ? Colors.white : Colors.black),
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary
-              ? (isDisabled ? AppColors.primary.withOpacity(0.7) : AppColors.primary)
-              : (isDisabled ? Colors.grey[300] : Colors.grey[200]),
-          foregroundColor: isPrimary ? Colors.white : Colors.black,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
         ),
       ),
     );
@@ -447,44 +465,22 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     }
   }
 
-  /// Compartilha o perfil via Share Plus
-  Future<void> _shareProfile() async {
+  /// Exibe opções do perfil para visitantes (Compartilhar e Reportar)
+  void _showProfileOptions() {
     if (_profile == null) return;
 
-    try {
-      final city = _profile!.city;
-
-      // Gerar deep link para o perfil
-      final profileUrl = 'https://wegig.app/profile/${_loadedProfileId ?? _profile!.profileId}';
-      
-      final message = DeepLinkGenerator.generateProfileShareMessage(
-        name: _profile!.name,
-        isBand: _profile!.isBand,
-        city: city,
-        neighborhood: _profile!.neighborhood,
-        state: _profile!.state,
-        userId: _loadedUserId ?? _profile!.uid,
-        profileId: _loadedProfileId ?? _profile!.profileId,
-        instruments: _profile!.instruments ?? <String>[],
-        genres: _profile!.genres ?? <String>[],
-      );
-
-      // Compartilhar com deep link incluído
-      await SharePlus.instance.share(
-        ShareParams(
-          text: '$message\n\nVeja o perfil completo: $profileUrl',
-          subject: 'Perfil no WeGig',
-        ),
-      );
-    } catch (e) {
-      debugPrint('Erro ao compartilhar perfil: $e');
-      if (mounted) {
-        AppSnackBar.showError(
-          context,
-          'Erro ao compartilhar: $e',
-        );
-      }
-    }
+    showProfileOptionsDialog(
+      context: context,
+      profileId: _loadedProfileId ?? _profile!.profileId,
+      userId: _loadedUserId ?? _profile!.uid,
+      profileName: _profile!.name,
+      isBand: _profile!.isBand,
+      city: _profile!.city,
+      neighborhood: _profile!.neighborhood,
+      state: _profile!.state,
+      instruments: _profile!.instruments ?? <String>[],
+      genres: _profile!.genres ?? <String>[],
+    );
   }
 
   void _openSettings() {
@@ -958,7 +954,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   onPressed: _openSettings,
                 ),
               ]
-            : null,
+            : [
+                // Botão de opções para visitantes (Compartilhar e Reportar)
+                IconButton(
+                  icon: const Icon(Iconsax.more, color: Colors.black),
+                  tooltip: 'Opções',
+                  onPressed: () => _showProfileOptions(),
+                ),
+              ],
       ),
       body: _loadingProfile
           ? const Center(
@@ -1127,33 +1130,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                     ),
                                   ),
 
-                                // Site/Linktree
-                                if (_profile!.website != null && _profile!.website!.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: InkWell(
-                                      onTap: () => _launchUrl(_profile!.website!),
-                                      child: Row(
-                                        children: [
-                                          const Icon(Iconsax.global_search, size: 18, color: AppColors.primary),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              _profile!.website!,
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                color: AppColors.primary,
-                                                decoration: TextDecoration.underline,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-
                                 // Comodidades
                                 if (_profile!.amenities != null && _profile!.amenities!.isNotEmpty)
                                   Padding(
@@ -1175,67 +1151,79 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                       ],
                                     ),
                                   ),
+
+                                // Site/Linktree (shortlink)
+                                if (_profile!.website != null && _profile!.website!.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: InkWell(
+                                      onTap: () => _launchUrl(_profile!.website!),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Iconsax.link, size: 18, color: AppColors.primary),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Text(
+                                              _profile!.website!
+                                                  .replaceFirst(RegExp(r'^https?://'), '')
+                                                  .replaceFirst(RegExp(r'^www\.'), '')
+                                                  .split('/').first,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: AppColors.primary,
+                                                decoration: TextDecoration.underline,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                               ],
 
                               // Social Links Block (YouTube, TikTok, Instagram)
                               if (_hasSocialLinks()) _buildSocialLinksBlock(),
 
-                              // Telefone/WhatsApp (posicionado APÓS os links sociais)
-                              if (_profile!.isSpace && _profile!.phone != null && _profile!.phone!.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8, bottom: 8),
-                                  child: Row(
-                                    children: [
-                                      // Botão de ligar
-                                      Expanded(
-                                        child: _buildActionButton(
-                                          label: 'Ligar',
-                                          icon: Iconsax.call,
-                                          onPressed: () => _launchUrl('tel:${_profile!.phone}'),
-                                          isPrimary: true,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      // Botão WhatsApp
-                                      Expanded(
-                                        child: _buildActionButton(
-                                          label: 'WhatsApp',
-                                          icon: Icons.chat,
-                                          onPressed: () {
-                                            final phone = _profile!.phone!.replaceAll(RegExp(r'[^\d]'), '');
-                                            final phoneWithCountry = phone.startsWith('55') ? phone : '55$phone';
-                                            _launchUrl('https://wa.me/$phoneWithCountry');
-                                          },
-                                          isPrimary: false,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                              // Botões de ação (Mensagem e Compartilhar) - estilo Instagram
-                              if (!isOwnProfile) ...[
+                              // Botões de ação alinhados: Mensagem, Ligar, WhatsApp
+                              if (!isOwnProfile || (_profile!.isSpace && _profile!.phone != null && _profile!.phone!.isNotEmpty)) ...[
                                 const SizedBox(height: 16),
                                 Row(
+                                  mainAxisAlignment: MainAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                      child: _buildActionButton(
+                                    // Botão Mensagem (sempre visível para não-donos)
+                                    if (!isOwnProfile)
+                                      _buildActionButton(
                                         label: 'Mensagem',
                                         icon: Iconsax.message,
                                         onPressed: _openOrCreateConversation,
                                         isPrimary: true,
                                         isLoading: _isOpeningConversation,
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: _buildActionButton(
-                                        label: 'Compartilhar',
-                                        icon: Iconsax.share,
-                                        onPressed: _shareProfile,
+                                    // Botões de telefone (apenas para spaces com telefone)
+                                    if (_profile!.isSpace && _profile!.phone != null && _profile!.phone!.isNotEmpty) ...[
+                                      if (!isOwnProfile) const SizedBox(width: 8),
+                                      // Botão de ligar
+                                      _buildActionButton(
+                                        label: 'Ligar',
+                                        icon: Iconsax.call,
+                                        onPressed: () => _launchUrl('tel:${_profile!.phone}'),
+                                        isPrimary: isOwnProfile,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // Botão WhatsApp
+                                      _buildActionButton(
+                                        label: 'WhatsApp',
+                                        icon: Icons.chat,
+                                        onPressed: () {
+                                          final phone = _profile!.phone!.replaceAll(RegExp(r'[^\d]'), '');
+                                          final phoneWithCountry = phone.startsWith('55') ? phone : '55$phone';
+                                          _launchUrl('https://wa.me/$phoneWithCountry');
+                                        },
                                         isPrimary: false,
                                       ),
-                                    ),
+                                    ],
                                   ],
                                 ),
                               ],
@@ -1655,35 +1643,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 ),
               ),
 
-            // Website (clicável)
-            if (_profile!.website != null && _profile!.website!.trim().isNotEmpty)
-              Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: InkWell(
-                onTap: () => _launchUrl(_profile!.website!),
-                child: Row(
-                children: [
-                  Icon(Iconsax.global, size: 20, color: AppColors.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                  child: Text(
-                    _profile!.website!.trim()
-                      .replaceFirst(RegExp(r'^https?://'), '')
-                      .replaceFirst(RegExp(r'^www\.'), '')
-                      .split('/')[0], // Shows only domain
-                    style: valueStyle.copyWith(
-                    color: AppColors.primary,
-                    decoration: TextDecoration.underline,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  ),
-                ],
-                ),
-              ),
-              ),
-
             // Comodidades/Amenidades
             if (_profile!.amenities?.isNotEmpty ?? false)
               Padding(
@@ -1731,6 +1690,35 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                       }).toList(),
                     ),
                   ],
+                ),
+              ),
+
+            // Website (shortlink - última posição)
+            if (_profile!.website != null && _profile!.website!.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InkWell(
+                  onTap: () => _launchUrl(_profile!.website!),
+                  child: Row(
+                    children: [
+                      const Icon(Iconsax.link, size: 20, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          _profile!.website!.trim()
+                              .replaceFirst(RegExp(r'^https?://'), '')
+                              .replaceFirst(RegExp(r'^www\.'), '')
+                              .split('/').first,
+                          style: valueStyle.copyWith(
+                            color: AppColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
           ],
@@ -2431,190 +2419,150 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       bool isInterestSent, bool isOwner) {
     final type = (data['type'] as String?) ?? '';
     final authorProfileId = (data['authorProfileId'] as String?) ?? '';
-    final isSalesPost = type == 'sales';
+    final authorUid = (data['authorUid'] as String?) ?? '';
+    
+    // Converter GeoPoint para formato válido
+    final locationData = data['location'];
+    final GeoPoint location;
+    if (locationData is GeoPoint) {
+      location = locationData;
+    } else if (locationData is Map) {
+      location = GeoPoint(
+        (locationData['latitude'] as num?)?.toDouble() ?? 0.0,
+        (locationData['longitude'] as num?)?.toDouble() ?? 0.0,
+      );
+    } else {
+      location = const GeoPoint(0, 0);
+    }
+    
+    // Criar PostEntity manualmente para evitar problemas de serialização
+    final post = PostEntity(
+      id: postId,
+      authorProfileId: authorProfileId,
+      authorUid: authorUid,
+      content: (data['content'] ?? data['message']) as String? ?? '',
+      location: location,
+      city: (data['city'] as String?) ?? '',
+      neighborhood: data['neighborhood'] as String?,
+      state: data['state'] as String?,
+      photoUrl: data['photoUrl'] as String?,
+      photoUrls: (data['photoUrls'] as List<dynamic>?)?.cast<String>() ?? [],
+      youtubeLink: data['youtubeLink'] as String?,
+      type: type,
+      level: (data['level'] as String?) ?? '',
+      instruments: (data['instruments'] as List<dynamic>?)?.cast<String>() ?? [],
+      genres: (data['genres'] as List<dynamic>?)?.cast<String>() ?? [],
+      seekingMusicians: (data['seekingMusicians'] as List<dynamic>?)?.cast<String>() ?? [],
+      availableFor: (data['availableFor'] as List<dynamic>?)?.cast<String>() ?? [],
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      expiresAt: (data['expiresAt'] as Timestamp?)?.toDate() ?? DateTime.now().add(const Duration(days: 30)),
+      authorName: data['authorName'] as String?,
+      authorPhotoUrl: data['authorPhotoUrl'] as String?,
+      activeProfileName: data['activeProfileName'] as String?,
+      activeProfilePhotoUrl: data['activeProfilePhotoUrl'] as String?,
+      // Sales fields
+      title: data['title'] as String?,
+      salesType: data['salesType'] as String?,
+      price: (data['price'] as num?)?.toDouble(),
+      discountMode: data['discountMode'] as String?,
+      discountValue: (data['discountValue'] as num?)?.toDouble(),
+      promoStartDate: (data['promoStartDate'] as Timestamp?)?.toDate(),
+      promoEndDate: (data['promoEndDate'] as Timestamp?)?.toDate(),
+      whatsappNumber: data['whatsappNumber'] as String?,
+    );
 
-    showModalBottomSheet<void>(
+    showInterestOptionsDialog(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Opções para o dono do post
-            if (isOwner) ...[
-              ListTile(
-                leading: const Icon(Iconsax.edit, color: AppColors.primary),
-                title: const Text('Editar Post'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  // Navegar para PostPage com dados do post para edição
-                  await Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => PostPage(
-                        postType: type,
-                        existingPostData: {
-                          'postId': postId,
-                          'content': data['content'],
-                          // Common fields
-                          'city': data['city'],
-                          'neighborhood': data['neighborhood'],
-                          'state': data['state'],
-                          'photoUrls': data['photoUrls'],
-                          'photoUrl': data['photoUrl'], // fallback
-                          'youtubeLink': data['youtubeLink'],
-                          'location': data['location'],
-                          'createdAt': data['createdAt'],
-                          'expiresAt': data['expiresAt'],
-                          // Musician/Band fields
-                          'instruments': data['instruments'],
-                          'genres': data['genres'],
-                          'seekingMusicians': data['seekingMusicians'],
-                          'level': data['level'],
-                          'availableFor': data['availableFor'],
-                          // Sales fields
-                          'title': data['title'],
-                          'salesType': data['salesType'],
-                          'price': data['price'],
-                          'discountMode': data['discountMode'],
-                          'discountValue': data['discountValue'],
-                          'promoStartDate': data['promoStartDate'],
-                          'promoEndDate': data['promoEndDate'],
-                          'whatsappNumber': data['whatsappNumber'],
-                        },
-                      ),
-                    ),
-                  );
-                  // Recarregar posts após edição
-                  if (mounted) {
-                    setState(() {
-                      _postsKey++; // Força rebuild do FutureBuilder
-                    });
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Iconsax.trash, color: Colors.red),
-                title: const Text('Deletar Post'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  // Confirmar exclusão
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (dialogCtx) => AlertDialog(
-                      title: const Text('Deletar Post'),
-                      content: const Text(
-                          'Tem certeza que deseja deletar este post? Esta ação não pode ser desfeita.'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogCtx, false),
-                          child: const Text('Cancelar'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogCtx, true),
-                          style:
-                              TextButton.styleFrom(foregroundColor: Colors.red),
-                          child: const Text('Deletar'),
-                        ),
-                      ],
-                    ),
-                  );
+      post: post,
+      isInterestSent: isInterestSent,
+      isOwner: isOwner,
+      onSendInterest: () => _sendInterestOptimistically(postId, authorProfileId, type),
+      onRemoveInterest: () => _removeInterestOptimistically(postId, authorProfileId),
+      onDeletePost: () => _confirmDeletePost(post),
+      onViewProfile: () => context.pushProfile(authorProfileId),
+      onPostEdited: () {
+        if (mounted) {
+          setState(() {
+            _postsKey++; // Força rebuild do FutureBuilder
+          });
+        }
+      },
+    );
+  }
 
-                  if ((confirmed ?? false) && mounted) {
-                    try {
-                      // Deletar foto do Storage se existir
-                      final photoUrl = data['photoUrl'] as String?;
-                      if (photoUrl != null && photoUrl.isNotEmpty) {
-                        try {
-                          await FirebaseStorage.instance
-                              .refFromURL(photoUrl)
-                              .delete();
-                        } catch (e) {
-                          debugPrint('Erro ao deletar foto: $e');
-                        }
-                      }
-
-                      // Deletar post do Firestore
-                      await FirebaseFirestore.instance
-                          .collection('posts')
-                          .doc(postId)
-                          .delete();
-
-                      // Mostrar confirmação
-                      if (mounted) {
-                        AppSnackBar.showSuccess(
-                          context,
-                          'Post deletado com sucesso!',
-                        );
-
-                        // Recarregar posts
-                        setState(() {
-                          _postsKey++; // Força rebuild do FutureBuilder
-                        });
-                      }
-                    } catch (e) {
-                      debugPrint('Erro ao deletar post: $e');
-                      if (mounted) {
-                        AppSnackBar.showError(
-                          context,
-                          'Erro ao deletar post: $e',
-                        );
-                      }
-                    }
-                  }
-                },
-              ),
-            ]
-            // Opções para outros usuários
-            else ...[
-              if (isInterestSent)
-                ListTile(
-                  leading: Icon(
-                    isSalesPost ? Iconsax.tag5 : Iconsax.heart,
-                    color: isSalesPost ? AppColors.primary : Colors.red,
-                  ),
-                  title: Text(isSalesPost ? 'Remover dos Salvos' : 'Remover Interesse'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _removeInterestOptimistically(postId, authorProfileId);
-                  },
-                )
-              else
-                ListTile(
-                  leading: Icon(
-                    isSalesPost ? Iconsax.tag : Iconsax.heart5,
-                    color: isSalesPost ? AppColors.primary : Colors.pink,
-                  ),
-                  title: Text(isSalesPost ? 'Salvar Anúncio' : 'Demonstrar Interesse'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _sendInterestOptimistically(postId, authorProfileId, type);
-                  },
-                ),
-              ListTile(
-                leading: const Icon(Iconsax.user, color: AppColors.primary),
-                title: const Text('Ver Perfil'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  context.pushProfile(authorProfileId);
-                },
-              ),
-            ],
-          ],
-        ),
+  void _confirmDeletePost(PostEntity post) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Deletar Post'),
+        content: const Text(
+            'Tem certeza que deseja deletar este post? Esta ação não pode ser desfeita.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _deletePost(post);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Deletar'),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _deletePost(PostEntity post) async {
+    try {
+      // Mostrar loading
+      AppSnackBar.showInfo(context, 'Deletando post...');
+
+      // Deletar TODAS as fotos do Storage se existirem (carrossel)
+      for (final photoUrl in post.photoUrls) {
+        if (photoUrl.isNotEmpty) {
+          try {
+            final ref = FirebaseStorage.instance.refFromURL(photoUrl);
+            await ref.delete();
+            debugPrint('✅ Foto deletada: $photoUrl');
+          } catch (e) {
+            debugPrint('⚠️ Erro ao deletar foto: $e');
+          }
+        }
+      }
+      // Fallback: deletar photoUrl antigo se existir e não estiver em photoUrls
+      if (post.photoUrl != null &&
+          post.photoUrl!.isNotEmpty &&
+          !post.photoUrls.contains(post.photoUrl)) {
+        try {
+          final ref = FirebaseStorage.instance.refFromURL(post.photoUrl!);
+          await ref.delete();
+        } catch (e) {
+          debugPrint('⚠️ Erro ao deletar foto legada: $e');
+        }
+      }
+
+      // Deletar post do Firestore
+      await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(post.id)
+          .delete();
+
+      // Recarregar posts
+      if (mounted) {
+        AppSnackBar.showSuccess(context, 'Post deletado com sucesso');
+        setState(() {
+          _postsKey++; // Força rebuild do FutureBuilder
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao deletar post: $e');
+      if (mounted) {
+        AppSnackBar.showError(context, 'Erro ao deletar post: $e');
+      }
+    }
   }
 
   Widget _buildPostCard(String postId, Map<String, dynamic> data, bool isOwner,
@@ -2743,9 +2691,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                       children: [
                         Expanded(
                           child: Text(
-                            type == 'band'
-                                ? 'Banda procura músico'
-                                : 'Músico procura banda',
+                            _getPostTitle(type, data),
                             style: const TextStyle(
                                 fontWeight: FontWeight.w600, fontSize: 14),
                             maxLines: 1,
@@ -2763,9 +2709,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                       ],
                     )
                   : Text(
-                      type == 'band'
-                          ? 'Banda procura músico'
-                          : 'Músico procura banda',
+                      _getPostTitle(type, data),
                       style: const TextStyle(
                           fontWeight: FontWeight.w600, fontSize: 14),
                       maxLines: 1,

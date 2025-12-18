@@ -35,6 +35,10 @@ class DevConfig {
   static const String androidApplicationId = 'com.wegig.wegig.dev';
   static const String iosBundleId = 'com.wegig.wegig.dev';
 
+  // Google Maps Cloud Map IDs (wegig-dev)
+  static const String googleMapIdAndroid = 'f4c603fd45b2747ceac6e4b5';
+  static const String googleMapIdIOS = 'f4c603fd45b2747cac0905b3';
+
   /// Verifica se está em ambiente de desenvolvimento
   static bool get isDevelopment => true;
   static bool get isStaging => false;

@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "27906769066",
+    "project_id": "wegig-staging",
+    "storage_bucket": "wegig-staging.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:27906769066:android:a125c8ac271ea8c4bcd0d3",
+        "android_client_info": {
+          "package_name": "com.wegig.wegig.staging"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "27906769066-gaqr9df4hlij6sg2ejdo4d63ccdd8lbc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSdKys9izCKHrkGlxlNCnuTqcU7Xjcoaw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "27906769066-gaqr9df4hlij6sg2ejdo4d63ccdd8lbc.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "27906769066-5cglghj0fieot8tnqko4snjkf6i4htiq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.tosembanda.wegig.staging"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

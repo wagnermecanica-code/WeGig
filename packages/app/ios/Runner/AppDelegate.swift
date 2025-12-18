@@ -9,8 +9,13 @@ import SDWebImage
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    // Provide Google Maps API key for iOS
-    GMSServices.provideAPIKey("AIzaSyCx9HCECrISrL-auox1RUMBU0IYGec4_PQ")
+    // Provide Google Maps API key based on Bundle ID (flavor)
+    let googleMapsApiKey = getGoogleMapsApiKey()
+    GMSServices.provideAPIKey(googleMapsApiKey)
+    
+    #if DEBUG
+    print("🗺️ Google Maps API Key loaded for bundle: \(Bundle.main.bundleIdentifier ?? "unknown")")
+    #endif
     
     // ✅ Configurar cache de imagens SDWebImage
     // Limite de 200MB em disco e 50MB em memória
@@ -44,5 +49,29 @@ import SDWebImage
     print("   - Disco: 200MB")
     print("   - TTL: 7 dias")
     #endif
+  }
+  
+  /// Returns the Google Maps API key based on the current Bundle ID (flavor)
+  /// Keys from Google Cloud Console - ensure Maps SDK for iOS is enabled in each project
+  private func getGoogleMapsApiKey() -> String {
+    let bundleId = Bundle.main.bundleIdentifier ?? ""
+    
+    switch bundleId {
+    case "com.wegig.wegig.dev":
+      // Dev environment - wegig-dev project
+      return "AIzaSyADjXo-1miAGtoCVRR1702AjtiyoeSdsMA"
+    case "com.wegig.wegig.staging":
+      // Staging environment - wegig-staging project
+      return "AIzaSyBcR84Clf81XicGgxCM77mO7qqt1Np87cg"
+    case "com.wegig.wegig":
+      // Production environment - to-sem-banda-83e19 project
+      return "AIzaSyAe_WwvD3nN-VJlMZf2L_BRpIx-ne3P_-0"
+    default:
+      // Fallback to production key
+      #if DEBUG
+      print("⚠️ Unknown bundle ID: \(bundleId), using production API key")
+      #endif
+      return "AIzaSyAe_WwvD3nN-VJlMZf2L_BRpIx-ne3P_-0"
+    }
   }
 }

@@ -30,6 +30,21 @@ class FeedPostCard extends StatelessWidget {
   final VoidCallback onOpenOptions;
   final VoidCallback? onClose;
 
+  /// Retorna o título apropriado para o tipo de post
+  String _getPostTitle() {
+    switch (post.type) {
+      case 'band':
+        return 'Busca músico';
+      case 'musician':
+        return 'Busca banda';
+      case 'sales':
+        // Para posts de vendas, usa o título do anúncio ou fallback
+        return post.title?.isNotEmpty == true ? post.title! : 'Anúncio';
+      default:
+        return 'Post';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final primaryColor =
@@ -249,9 +264,7 @@ class FeedPostCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            post.type == 'band'
-                                ? 'Busca músico'
-                                : 'Busca banda',
+                            _getPostTitle(),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -259,6 +272,7 @@ class FeedPostCard extends StatelessWidget {
                               decoration: TextDecoration.underline,
                             ),
                             maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],

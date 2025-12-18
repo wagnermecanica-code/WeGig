@@ -16,8 +16,11 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
-import 'package:wegig_app/features/post/data/models/interest_document.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/providers/mensagens_new_providers.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
+import 'package:wegig_app/features/post/presentation/widgets/interest_options_dialog.dart';
+import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
@@ -49,13 +52,13 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   PostEntity? _post;
   String _authorName = '';
   String _authorPhotoUrl = '';
+  String _authorUid = ''; // UID do autor para criar conversa
   bool _isLoading = true;
-  bool _hasInterest = false;
-  String? _interestId;
   YoutubePlayerController? _youtubeController;
   List<Map<String, dynamic>> _interestedUsers = [];
   bool _isLoadingInterests = false;
   int _currentPhotoIndex = 0;
+  bool _isOpeningConversation = false; // Loading ao abrir chat
 
   void _handleBackNavigation() {
     if (!mounted) return;
@@ -119,9 +122,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           _isLoading = false;
         });
       }
-
-      // Verificar se já tem interesse (APÓS definir _post)
-      await _checkInterest(post);
 
       // Carregar interessados (visível para todos) (APÓS definir _post)
       await _loadInterestedUsers();
@@ -229,35 +229,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
-  /// Verifica se o usuário já demonstrou interesse
-  Future<void> _checkInterest(PostEntity post) async {
-    try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return;
 
-      final profileState = ref.read(profileProvider);
-      final activeProfile = profileState.value?.activeProfile;
-      if (activeProfile == null) return;
-
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('interests')
-          .where('postId', isEqualTo: post.id)
-          .where('interestedUid', isEqualTo: currentUser.uid)
-          .where('interestedProfileId', isEqualTo: activeProfile.profileId)
-          .where('profileUid', isEqualTo: activeProfile.uid)
-          .limit(1)
-          .get();
-
-      if (querySnapshot.docs.isNotEmpty) {
-        setState(() {
-          _hasInterest = true;
-          _interestId = querySnapshot.docs.first.id;
-        });
-      }
-    } catch (e) {
-      debugPrint(r'Erro ao verificar interesse: $e');
-    }
-  }
 
   /// Verifica se o post pertence ao perfil ativo
   bool _isOwnPost() {
@@ -281,6 +253,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         setState(() {
           _authorName = (profileData['name'] as String?) ?? 'Perfil';
           _authorPhotoUrl = (profileData['photoUrl'] as String?) ?? '';
+          _authorUid = (profileData['uid'] as String?) ?? '';
         });
       }
     } catch (e) {
@@ -288,7 +261,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
-  /// Demonstra interesse no post (Abordagem Otimista)
+  /// Demonstra interesse no post (usando provider global)
   Future<void> _showInterest() async {
     if (_post == null) return;
 
@@ -299,67 +272,16 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     final activeProfile = profileState.value?.activeProfile;
     if (activeProfile == null) return;
 
-    // ✅ VERIFICAR SE JÁ EXISTE INTERESSE ANTES DE CRIAR
-    // Evita criação de duplicatas
-    if (_hasInterest || _interestId != null) {
-      debugPrint('⚠️ Interesse já existe, pulando criação...');
-      return;
-    }
-
-    // 1. Estado Otimista: Atualiza UI imediatamente
-    setState(() {
-      _hasInterest = true;
-    });
-
+    // Usar provider global para optimistic update
+    final interestNotifier = ref.read(interestNotifierProvider.notifier);
+    
     try {
-      // ✅ Verificar novamente no Firestore para evitar race conditions
-      final existingInterest = await FirebaseFirestore.instance
-          .collection('interests')
-          .where('postId', isEqualTo: _post!.id)
-          .where('interestedProfileId', isEqualTo: activeProfile.profileId)
-          .limit(1)
-          .get();
-
-      if (existingInterest.docs.isNotEmpty) {
-        debugPrint('⚠️ Interesse já existe no Firestore, atualizando estado...');
-        if (mounted) {
-          setState(() {
-            _interestId = existingInterest.docs.first.id;
-          });
-        }
-        return;
-      }
-
-      // ✅ Usar factory padronizada
-      final interestData = InterestDocumentFactory.create(
+      await interestNotifier.addInterest(
         postId: _post!.id,
         postAuthorUid: _post!.authorUid,
         postAuthorProfileId: _post!.authorProfileId,
-        currentUserUid: currentUser.uid,
-        activeProfileUid: activeProfile.uid,
-        activeProfileId: activeProfile.profileId,
-        activeProfileName: activeProfile.name,
-        activeProfileUsername: activeProfile.username,
-        activeProfilePhotoUrl: activeProfile.photoUrl,
       );
 
-      // 2. Chamada ao Firebase
-      final docRef = await FirebaseFirestore.instance
-          .collection('interests')
-          .add(interestData);
-
-      // Atualiza o ID do interesse confirmado
-      if (mounted) {
-        setState(() {
-          _interestId = docRef.id;
-        });
-      }
-
-      // ⚠️ REMOVIDO: Notificação duplicada - a Cloud Function `sendInterestNotification`
-      // já cria a notificação automaticamente via trigger onCreate em interests/{interestId}
-      // Aguardar confirmação do Firestore para garantir consistência antes de recarregar lista
-      await docRef.get();
-      
       if (mounted) {
         // Recarregar lista silenciosamente
         _loadInterestedUsers();
@@ -369,40 +291,26 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           _post!.type == 'sales' ? 'Anúncio salvo!' : 'Interesse demonstrado!',
         );
       }
-
     } catch (e) {
       debugPrint('❌ Erro ao demonstrar interesse: $e');
       
-      // 4. Rollback em caso de erro
       if (mounted) {
-        setState(() {
-          _hasInterest = false;
-          _interestId = null;
-        });
         AppSnackBar.showError(context, 'Erro ao salvar interesse. Verifique sua conexão.');
       }
     }
   }
 
-  /// Remove interesse (Abordagem Otimista)
+  /// Remove interesse do post (usando provider global)
   Future<void> _removeInterest() async {
-    if (_interestId == null) return;
+    if (_post == null) return;
 
-    // Guardar ID para caso de rollback
-    final idToRemove = _interestId!;
-
-    // 1. Estado Otimista: Remove da UI imediatamente
-    setState(() {
-      _hasInterest = false;
-      _interestId = null;
-    });
-
+    // Usar provider global para optimistic update
+    final interestNotifier = ref.read(interestNotifierProvider.notifier);
+    
     try {
-      // 2. Chamada ao Firebase
-      await FirebaseFirestore.instance
-          .collection('interests')
-          .doc(idToRemove)
-          .delete();
+      await interestNotifier.removeInterest(
+        postId: _post!.id,
+      );
 
       if (mounted) {
         AppSnackBar.showInfo(context, 'Interesse removido');
@@ -412,12 +320,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     } catch (e) {
       debugPrint('❌ Erro ao remover interesse: $e');
       
-      // 3. Rollback em caso de erro
       if (mounted) {
-        setState(() {
-          _hasInterest = true;
-          _interestId = idToRemove;
-        });
         AppSnackBar.showError(context, 'Erro ao remover interesse.');
       }
     }
@@ -444,55 +347,74 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     SharePlus.instance.share(ShareParams(text: text));
   }
 
-  /// Deleta o post
-  Future<void> _deletePost() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Deletar post'),
-        content: const Text(
-            'Tem certeza que deseja deletar este post? Esta ação não pode ser desfeita.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Deletar'),
-          ),
-        ],
-      ),
-    );
+  /// Abre conversa direta com o autor do post
+  Future<void> _openConversation() async {
+    if (_post == null || _authorUid.isEmpty) return;
 
-    if (confirmed != true) return;
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      AppSnackBar.showError(context, 'Faça login para enviar mensagem');
+      return;
+    }
+
+    final profileState = ref.read(profileProvider);
+    final activeProfile = profileState.value?.activeProfile;
+    if (activeProfile == null) {
+      AppSnackBar.showError(context, 'Selecione um perfil primeiro');
+      return;
+    }
+
+    // Impedir conversa consigo mesmo
+    if (activeProfile.profileId == _post!.authorProfileId) {
+      AppSnackBar.showInfo(context, 'Este é seu próprio post');
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _isOpeningConversation = true);
+    }
 
     try {
-      // Deletar interesses relacionados
-      final interestsSnapshot = await FirebaseFirestore.instance
-          .collection('interests')
-          .where('postId', isEqualTo: _post!.id)
-          .get();
+      // Busca/cria a conversa
+      final conversation = await ref.read(mensagensNewRepositoryProvider).getOrCreateConversation(
+        currentProfileId: activeProfile.profileId,
+        currentUid: currentUser.uid,
+        otherProfileId: _post!.authorProfileId,
+        otherUid: _authorUid,
+        currentProfileData: {
+          'name': activeProfile.name,
+          'photoUrl': activeProfile.photoUrl,
+        },
+        otherProfileData: {
+          'name': _authorName,
+          'photoUrl': _authorPhotoUrl,
+        },
+      );
 
-      for (final doc in interestsSnapshot.docs) {
-        await doc.reference.delete();
-      }
-
-      // Deletar o post
-      await FirebaseFirestore.instance
-          .collection('posts')
-          .doc(_post!.id)
-          .delete();
-
+      // Navegar para a tela de chat
       if (mounted) {
-        Navigator.pop(context);
-        AppSnackBar.showSuccess(context, 'Post deletado com sucesso');
+        setState(() => _isOpeningConversation = false);
+        
+        Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ChatNewPage(
+              conversationId: conversation.id,
+              otherUid: _authorUid,
+              otherProfileId: _post!.authorProfileId,
+              otherName: _authorName,
+              otherPhotoUrl: _authorPhotoUrl,
+            ),
+          ),
+        );
       }
     } catch (e) {
-      debugPrint(r'Erro ao deletar post: $e');
+      debugPrint('Erro ao abrir conversa: $e');
       if (mounted) {
-        AppSnackBar.showError(context, 'Erro ao deletar post');
+        AppSnackBar.showError(context, 'Erro ao abrir conversa. Tente novamente.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isOpeningConversation = false);
       }
     }
   }
@@ -851,46 +773,77 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     );
   }
 
-  /// Mostra opções de interesse
+  /// Mostra modal completo de opções de interesse
   void _showInterestOptions() {
-    final isSalesPost = _post?.type == 'sales';
+    if (_post == null) return;
     
-    showModalBottomSheet<void>(
+    final activeProfile = ref.read(profileProvider).value?.activeProfile;
+    final isOwner = _post!.authorProfileId == activeProfile?.profileId;
+    final isInterestSent = ref.read(interestNotifierProvider).contains(_post!.id);
+    
+    showInterestOptionsDialog(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            ListTile(
-              leading: Icon(
-                isSalesPost ? Iconsax.tag : Iconsax.heart,
-                color: isSalesPost ? AppColors.primary : Colors.red,
-                size: 24,
-              ),
-              title: Text(isSalesPost ? 'Remover dos Salvos' : 'Remover interesse'),
-              onTap: () {
-                Navigator.pop(context);
-                _removeInterest();
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
+      post: _post!,
+      isInterestSent: isInterestSent,
+      isOwner: isOwner,
+      onSendInterest: _showInterest,
+      onRemoveInterest: _removeInterest,
+      onDeletePost: _confirmDeletePost,
+      onViewProfile: () => context.pushProfile(_post!.authorProfileId),
+      onPostEdited: () {
+        // Recarregar dados do post após edição
+        _loadPost();
+      },
+    );
+  }
+  
+  /// Confirma deleção do post
+  void _confirmDeletePost() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Deletar Post'),
+        content: const Text(
+            'Tem certeza que deseja deletar este post? Esta ação não pode ser desfeita.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _deletePost();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Deletar'),
+          ),
+        ],
       ),
     );
+  }
+  
+  /// Deleta o post
+  Future<void> _deletePost() async {
+    if (_post == null) return;
+    
+    try {
+      AppSnackBar.showInfo(context, 'Deletando post...');
+      
+      await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(_post!.id)
+          .delete();
+      
+      if (mounted) {
+        AppSnackBar.showSuccess(context, 'Post deletado com sucesso!');
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.showError(context, 'Erro ao deletar post');
+      }
+    }
   }
 
   /// Constrói o carrossel de fotos do post
@@ -920,30 +873,33 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
     // Se só tem uma foto, não precisa de carrossel
     if (photos.length == 1) {
-      return Hero(
-        tag: 'post-photo-${_post!.id}',
-        child: Container(
-          width: screenWidth,
-          height: photoHeight,
-          color: Colors.grey[200],
-          child: CachedNetworkImage(
-            cacheManager: WeGigImageCacheManager.instance,
-            imageUrl: photos.first,
-            fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+      return GestureDetector(
+        onTap: () => _openPhotoViewer(photos, 0),
+        child: Hero(
+          tag: 'post-photo-${_post!.id}',
+          child: Container(
+            width: screenWidth,
+            height: photoHeight,
+            color: Colors.grey[200],
+            child: CachedNetworkImage(
+              cacheManager: WeGigImageCacheManager.instance,
+              imageUrl: photos.first,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => Container(
+                color: Colors.grey[200],
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+                  ),
                 ),
               ),
-            ),
-            errorWidget: (context, url, error) => Container(
-              color: Colors.grey[300],
-              child: Icon(
-                _post!.type == 'band' ? Iconsax.people : Iconsax.user,
-                size: 80,
-                color: Colors.grey[600],
+              errorWidget: (context, url, error) => Container(
+                color: Colors.grey[300],
+                child: Icon(
+                  _post!.type == 'band' ? Iconsax.people : Iconsax.user,
+                  size: 80,
+                  color: Colors.grey[600],
+                ),
               ),
             ),
           ),
@@ -962,26 +918,29 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
             itemCount: photos.length,
             onPageChanged: (index) => setState(() => _currentPhotoIndex = index),
             itemBuilder: (context, index) {
-              return Hero(
-                tag: 'post-photo-${_post!.id}-$index',
-                child: CachedNetworkImage(
-                  cacheManager: WeGigImageCacheManager.instance,
-                  imageUrl: photos[index],
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: Colors.grey[200],
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+              return GestureDetector(
+                onTap: () => _openPhotoViewer(photos, index),
+                child: Hero(
+                  tag: 'post-photo-${_post!.id}-$index',
+                  child: CachedNetworkImage(
+                    cacheManager: WeGigImageCacheManager.instance,
+                    imageUrl: photos[index],
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      color: Colors.grey[200],
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+                        ),
                       ),
                     ),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    color: Colors.grey[300],
-                    child: Icon(
-                      _post!.type == 'band' ? Iconsax.people : Iconsax.user,
-                      size: 80,
-                      color: Colors.grey[600],
+                    errorWidget: (context, url, error) => Container(
+                      color: Colors.grey[300],
+                      child: Icon(
+                        _post!.type == 'band' ? Iconsax.people : Iconsax.user,
+                        size: 80,
+                        color: Colors.grey[600],
+                      ),
                     ),
                   ),
                 ),
@@ -1143,6 +1102,37 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                   ],
                                 ),
                               ),
+                              // Botão de mensagem direta (aviãozinho de papel)
+                              // Só aparece se não for o próprio post
+                              if (!_isOwnPost())
+                                _isOpeningConversation
+                                    ? const SizedBox(
+                                        width: 44,
+                                        height: 44,
+                                        child: Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : IconButton(
+                                        onPressed: _openConversation,
+                                        icon: const Icon(
+                                          Iconsax.send_2, // Aviãozinho de papel
+                                          color: AppColors.textSecondary,
+                                          size: 24,
+                                        ),
+                                        tooltip: 'Enviar mensagem',
+                                        style: IconButton.styleFrom(
+                                          backgroundColor: AppColors.textSecondary.withValues(alpha: 0.1),
+                                          shape: const CircleBorder(),
+                                        ),
+                                      ),
                             ],
                           ),
                         ),
@@ -1237,21 +1227,24 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                   constraints: const BoxConstraints(),
                                   onPressed: _showOwnPostOptions,
                                 )
-                              : IconButton(
-                                  icon: Icon(
-                                    _hasInterest
-                                        ? (_post!.type == 'sales' ? Iconsax.tag5 : Iconsax.heart5)
-                                        : (_post!.type == 'sales' ? Iconsax.tag : Iconsax.heart),
-                                    color: _hasInterest
-                                        ? Colors.pink
-                                        : Colors.white,
-                                    size: 20,
-                                  ),
-                                  padding: const EdgeInsets.all(8),
-                                  constraints: const BoxConstraints(),
-                                  onPressed: _hasInterest
-                                      ? _showInterestOptions
-                                      : _showInterest,
+                              : Builder(
+                                  builder: (context) {
+                                    final hasInterest = ref.watch(interestNotifierProvider).contains(_post!.id);
+                                    return IconButton(
+                                      icon: Icon(
+                                        hasInterest
+                                            ? (_post!.type == 'sales' ? Iconsax.tag5 : Iconsax.heart5)
+                                            : (_post!.type == 'sales' ? Iconsax.tag : Iconsax.heart),
+                                        color: hasInterest
+                                            ? Colors.pink
+                                            : Colors.white,
+                                        size: 20,
+                                      ),
+                                      padding: const EdgeInsets.all(8),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: _showInterestOptions,
+                                    );
+                                  },
                                 ),
                         ),
                       ],
@@ -1506,37 +1499,38 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       children: [
         // Espaçamento adicional no topo
         const SizedBox(height: 16),
+
+        // 1. Categoria (texto simples)
+        _buildSalesCategoryText(),
+        const SizedBox(height: 16),
         
-        // 1. Badge de status da promoção
+        // 2. Badge de status da promoção
         _buildPromotionStatusBadge(),
         const SizedBox(height: 16),
 
-        // 2. Título do anúncio
+        // 3. Título do anúncio
         _buildSalesTitle(),
         const SizedBox(height: 16),
 
-        // 3. Bloco de preços Amazon-style
+        // 4. Bloco de preços Amazon-style
         _buildPriceBlock(),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
-        // 4. Descrição (reaproveita message card)
+        // 5. Descrição (reaproveita message card)
         _buildSalesDescriptionCard(),
         const SizedBox(height: 16),
 
-        // 5. Localização + distância
+        // 6. Localização + distância
         _buildSalesLocation(),
         const SizedBox(height: 16),
 
-        // 6. Validade da promoção
+        // 7. Validade da promoção
         _buildPromoValidity(),
         const SizedBox(height: 24),
 
-        // 7. Botões de ação rápida
+        // 8. Botões de ação rápida
         _buildSalesActionButtons(),
         const SizedBox(height: 24),
-
-        // 8. Tipo do anúncio
-        _buildSalesTypeSection(),
       ],
     );
   }
@@ -1836,53 +1830,33 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     final whatsapp = _post!.whatsappNumber;
     final hasWhatsApp = whatsapp != null && whatsapp.isNotEmpty;
 
+    if (!hasWhatsApp) {
+      return const SizedBox.shrink();
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          // WhatsApp
-          if (hasWhatsApp)
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () => _launchWhatsApp(whatsapp),
-                icon: const Icon(Iconsax.message, size: 20),
-                label: const Text('WhatsApp'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF25D366),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-
-          if (hasWhatsApp) const SizedBox(width: 12),
-
-          // Compartilhar
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _sharePost,
-              icon: const Icon(Iconsax.share, size: 20),
-              label: const Text('Compartilhar'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                side: const BorderSide(color: AppColors.primary),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => _launchWhatsApp(whatsapp),
+          icon: const Icon(Iconsax.message, size: 20),
+          label: const Text('WhatsApp'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF25D366),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  /// Tipo do anúncio
-  Widget _buildSalesTypeSection() {
+  /// Categoria do anúncio (texto simples)
+  Widget _buildSalesCategoryText() {
     final salesType = _post!.salesType;
 
     if (salesType == null || salesType.isEmpty) {
@@ -1891,18 +1865,50 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey[50],
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: _buildInfoRow(
-          Iconsax.tag,
-          'Categoria',
-          salesType,
-        ),
+      child: Row(
+        children: [
+          Icon(
+            Iconsax.tag,
+            size: 18,
+            color: Colors.grey[600],
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Categoria: ',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+          Text(
+            salesType,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Abre o visualizador de fotos em tela cheia
+  void _openPhotoViewer(List<String> photos, int initialIndex) {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: false,
+        barrierColor: Colors.black87,
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return _FullScreenPhotoViewer(
+            photos: photos,
+            initialIndex: initialIndex,
+            postId: _post!.id,
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
       ),
     );
   }
@@ -1933,4 +1939,171 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
+}
+
+/// Widget para visualização de fotos em tela cheia com zoom e swipe
+class _FullScreenPhotoViewer extends StatefulWidget {
+  const _FullScreenPhotoViewer({
+    required this.photos,
+    required this.initialIndex,
+    required this.postId,
+  });
+
+  final List<String> photos;
+  final int initialIndex;
+  final String postId;
+
+  @override
+  State<_FullScreenPhotoViewer> createState() => _FullScreenPhotoViewerState();
+}
+
+class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
+  late PageController _pageController;
+  late int _currentIndex;
+  final TransformationController _transformationController = TransformationController();
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  void _resetZoom() {
+    _transformationController.value = Matrix4.identity();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Área de toque para fechar (fundo)
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(color: Colors.transparent),
+            ),
+            
+            // PageView com fotos
+            PageView.builder(
+              controller: _pageController,
+              itemCount: widget.photos.length,
+              onPageChanged: (index) {
+                _resetZoom();
+                setState(() => _currentIndex = index);
+              },
+              itemBuilder: (context, index) {
+                final heroTag = widget.photos.length == 1
+                    ? 'post-photo-${widget.postId}'
+                    : 'post-photo-${widget.postId}-$index';
+                    
+                return Center(
+                  child: Hero(
+                    tag: heroTag,
+                    child: InteractiveViewer(
+                      transformationController: _transformationController,
+                      minScale: 1.0,
+                      maxScale: 4.0,
+                      child: CachedNetworkImage(
+                        cacheManager: WeGigImageCacheManager.instance,
+                        imageUrl: widget.photos[index],
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => const Icon(
+                          Iconsax.image,
+                          size: 80,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            
+            // Botão fechar
+            Positioned(
+              top: 16,
+              left: 16,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+            
+            // Contador de fotos (se mais de uma)
+            if (widget.photos.length > 1)
+              Positioned(
+                top: 16,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    '${_currentIndex + 1}/${widget.photos.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            
+            // Indicadores de página (dots)
+            if (widget.photos.length > 1)
+              Positioned(
+                bottom: 32,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    widget.photos.length,
+                    (index) => Container(
+                      width: 8,
+                      height: 8,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _currentIndex == index
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }

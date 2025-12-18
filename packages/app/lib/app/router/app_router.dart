@@ -170,13 +170,14 @@ GoRouter goRouter(Ref ref) {
       }
 
       // Usuário logado com perfis - verificar se está em rota permitida
-      // Se está indo para auth/splash/createProfile, redireciona para home
-      if (isGoingToAuth || isGoingToSplash || isGoingToCreateProfile) {
+      // Se está indo para auth/splash, redireciona para home
+      // NOTA: createProfile é permitido para usuários que querem criar perfis adicionais
+      if (isGoingToAuth || isGoingToSplash) {
         debugPrint('Router: logged in with profiles, redirecting to home');
         return AppRoutes.home;
       }
 
-      // Rota atual é válida (home, profile, post, conversation, etc) - não redirecionar
+      // Rota atual é válida (home, profile, post, conversation, createProfile, etc) - não redirecionar
       debugPrint('Router: logged in with profiles, allowing current route: ${state.matchedLocation}');
       return null;
     },

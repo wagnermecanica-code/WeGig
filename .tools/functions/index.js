@@ -11,8 +11,8 @@
  * Região: southamerica-east1 (São Paulo)
  */
 
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -26,7 +26,7 @@ const messaging = admin.messaging();
 async function checkRateLimit(userId, action, limit, windowMs) {
   const now = Date.now();
   const windowStart = new Date(now - windowMs);
-  const counterRef = db.collection('rateLimits').doc(`${userId}_${action}`);
+  const counterRef = db.collection("rateLimits").doc(`${userId}_${action}`);
 
   try {
     const counterDoc = await counterRef.get();
@@ -98,11 +98,11 @@ async function checkRateLimit(userId, action, limit, windowMs) {
  */
 exports.notifyNearbyPosts = functions
   .runWith({
-    memory: '256MB',
+    memory: "256MB",
     timeoutSeconds: 60,
   })
-  .region('southamerica-east1') // São Paulo region para menor latência
-  .firestore.document('posts/{postId}')
+  .region("southamerica-east1") // São Paulo region para menor latência
+  .firestore.document("posts/{postId}")
   .onCreate(async (snap) => {
     const post = snap.data();
     const postId = snap.id;
@@ -124,7 +124,7 @@ exports.notifyNearbyPosts = functions
     if (authorUid) {
       const rateLimitCheck = await checkRateLimit(
         authorUid,
-        'posts',
+        "posts",
         20,
         24 * 60 * 60 * 1000 // 24 horas
       );
@@ -142,10 +142,18 @@ exports.notifyNearbyPosts = functions
     // Firebase Admin SDK v12+ usa .latitude/.longitude (sem underscore)
     const postLat = post.location.latitude ?? post.location._latitude;
     const postLng = post.location.longitude ?? post.location._longitude;
-    const postCity = post.city || 'cidade desconhecida';
-    const postType = post.type === 'band' ? 'banda' : 'músico';
-    const authorName = post.authorName || 'Alguém';
-    const authorUsername = post.authorUsername || '';
+    const postCity = post.city || "cidade desconhecida";
+
+    // Mapear tipo do post para texto amigável
+    const postTypeMap = {
+      musician: "banda",
+      band: "músico",
+      sales: "serviço/produto",
+    };
+    const postType = postTypeMap[post.type] || "músico";
+
+    const authorName = post.authorName || "Alguém";
+    const authorUsername = post.authorUsername || "";
     const authorProfileId = post.authorProfileId;
 
     // Usa username se disponível, senão usa nome (para exibição no body)
@@ -160,8 +168,8 @@ exports.notifyNearbyPosts = functions
 
     // Query: Busca perfis com notificações de posts próximos habilitadas
     const profilesSnap = await db
-      .collection('profiles')
-      .where('notificationRadiusEnabled', '==', true)
+      .collection("profiles")
+      .where("notificationRadiusEnabled", "==", true)
       .get();
 
     console.log(
@@ -217,9 +225,26 @@ exports.notifyNearbyPosts = functions
           )}...): ${distanceStr} km (raio: ${radius} km)`
         );
 
+        // Verificar se já existe notificação não lida para este post próximo
+        const existingNearbyNotification = await db
+          .collection("notifications")
+          .where("recipientProfileId", "==", profileId)
+          .where("type", "==", "nearbyPost")
+          .where("actionData.postId", "==", postId)
+          .where("read", "==", false)
+          .limit(1)
+          .get();
+
+        if (!existingNearbyNotification.empty) {
+          console.log(
+            `   📭 ${profile.name} já foi notificado sobre este post próximo, pulando...`
+          );
+          continue; // Pular este perfil, já foi notificado
+        }
+
         // Mensagem personalizada baseada no tipo de post
         const nearbyBody =
-          post.type === 'sales'
+          post.type === "sales"
             ? `@${displayAuthor} • anunciou perto de você`
             : `@${displayAuthor} • postou perto de você`;
 
@@ -227,11 +252,11 @@ exports.notifyNearbyPosts = functions
           recipientProfileId: profileId,
           recipientUid: profileUid, // 🔒 SECURITY: UID do dono do perfil para push
           profileUid: profileId, // CRITICAL: Isolamento de perfil
-          type: 'nearbyPost',
-          priority: 'medium',
-          title: 'Novo post próximo!',
+          type: "nearbyPost",
+          priority: "medium",
+          title: "Novo post próximo!",
           body: nearbyBody,
-          actionType: 'viewPost',
+          actionType: "viewPost",
           actionData: {
             postId: postId,
             distance: distanceStr,
@@ -265,7 +290,7 @@ exports.notifyNearbyPosts = functions
     if (notifications.length > 0) {
       const batch = db.batch();
       notifications.forEach((notification) => {
-        const notificationRef = db.collection('notifications').doc();
+        const notificationRef = db.collection("notifications").doc();
         batch.set(notificationRef, notification);
       });
 
@@ -280,10 +305,11 @@ exports.notifyNearbyPosts = functions
         postId,
         authorName,
         postType,
-        postCity
+        postCity,
+        post.type // tipo original do post
       );
     } else {
-      console.log('📭 Nenhum perfil próximo encontrado para notificar');
+      console.log("📭 Nenhum perfil próximo encontrado para notificar");
     }
 
     return null;
@@ -300,15 +326,27 @@ async function sendPushNotificationsForNearbyPost(
   postId,
   authorName,
   postType,
-  city
+  city,
+  originalPostType // tipo original do post ('musician', 'band', 'sales')
 ) {
   const tokens = [];
   const tokenToProfile = {}; // Map token -> profileId para debug
+  const processedUids = new Set(); // 🔧 FIX: Evitar duplicação por UID
 
   // 🔒 SECURITY FIX: Coletar apenas tokens válidos com ownership verificado
+  // 🔧 DEDUP FIX: Processar apenas um perfil por UID para evitar duplicação
   for (const notification of notifications) {
     const profileId = notification.recipientProfileId;
     const recipientUid = notification.recipientUid;
+
+    // Pular se já processamos este UID (usuário pode ter múltiplos perfis)
+    if (processedUids.has(recipientUid)) {
+      console.log(
+        `   ⏭️ UID ${recipientUid} já processado, pulando perfil ${profileId}...`
+      );
+      continue;
+    }
+    processedUids.add(recipientUid);
 
     const profileTokens = await getValidTokensForProfile(
       profileId,
@@ -316,30 +354,39 @@ async function sendPushNotificationsForNearbyPost(
     );
 
     profileTokens.forEach((token) => {
-      tokens.push(token);
-      tokenToProfile[token] = profileId;
+      // Verificar se token já foi adicionado (mesmo token em múltiplos perfis)
+      if (!tokens.includes(token)) {
+        tokens.push(token);
+        tokenToProfile[token] = profileId;
+      }
     });
   }
 
   if (tokens.length === 0) {
-    console.log('📭 Nenhum token FCM encontrado para enviar push');
+    console.log("📭 Nenhum token FCM encontrado para enviar push");
     return;
   }
 
   console.log(`📤 Enviando push para ${tokens.length} dispositivos`);
 
+  // Texto personalizado baseado no tipo de post
+  const notificationBody =
+    originalPostType === "sales"
+      ? `${authorName} está oferecendo ${postType} em ${city}`
+      : `${authorName} está procurando ${postType} em ${city}`;
+
   // Payload da notificação
   const payload = {
     notification: {
-      title: 'Novo post próximo!',
-      body: `${authorName} está procurando ${postType} em ${city}`,
+      title: "Novo post próximo!",
+      body: notificationBody,
     },
     data: {
-      type: 'nearbyPost',
+      type: "nearbyPost",
       postId: postId,
       authorName: authorName,
       city: city,
-      click_action: 'FLUTTER_NOTIFICATION_CLICK',
+      click_action: "FLUTTER_NOTIFICATION_CLICK",
     },
   };
 
@@ -354,12 +401,12 @@ async function sendPushNotificationsForNearbyPost(
         notification: payload.notification,
         data: payload.data,
         android: {
-          priority: 'high',
+          priority: "high",
           notification: {
-            channelId: 'high_importance_channel',
-            priority: 'high',
-            color: '#E47911',
-            sound: 'default',
+            channelId: "high_importance_channel",
+            priority: "high",
+            color: "#E47911",
+            sound: "default",
           },
         },
         apns: {
@@ -369,7 +416,7 @@ async function sendPushNotificationsForNearbyPost(
                 title: payload.notification.title,
                 body: payload.notification.body,
               },
-              sound: 'default',
+              sound: "default",
               badge: 1,
             },
           },
@@ -395,8 +442,8 @@ async function sendPushNotificationsForNearbyPost(
 
             // Tokens inválidos ou desinstalados
             if (
-              errorCode === 'messaging/registration-token-not-registered' ||
-              errorCode === 'messaging/invalid-registration-token'
+              errorCode === "messaging/registration-token-not-registered" ||
+              errorCode === "messaging/invalid-registration-token"
             ) {
               tokensToRemove.push(batchTokens[idx]);
             }
@@ -422,7 +469,7 @@ async function sendPushNotificationsForNearbyPost(
 async function getValidTokensForProfile(profileId, expectedUid) {
   try {
     // Validar que o profileId pertence ao expectedUid
-    const profileDoc = await db.collection('profiles').doc(profileId).get();
+    const profileDoc = await db.collection("profiles").doc(profileId).get();
     if (!profileDoc.exists) {
       console.log(`⚠️ Perfil ${profileId} não encontrado`);
       return [];
@@ -438,9 +485,9 @@ async function getValidTokensForProfile(profileId, expectedUid) {
 
     // Buscar tokens FCM
     const tokensSnap = await db
-      .collection('profiles')
+      .collection("profiles")
       .doc(profileId)
-      .collection('fcmTokens')
+      .collection("fcmTokens")
       .get();
 
     if (tokensSnap.empty) {
@@ -448,7 +495,7 @@ async function getValidTokensForProfile(profileId, expectedUid) {
       return [];
     }
 
-    // Filtrar tokens válidos (não expirados)
+    // Filtrar tokens válidos (não expirados) e ordenar por updatedAt (mais recente primeiro)
     const now = Date.now();
     const SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000; // 60 dias
     const validTokens = [];
@@ -466,13 +513,18 @@ async function getValidTokensForProfile(profileId, expectedUid) {
         return; // Skip
       }
 
-      validTokens.push(token);
+      validTokens.push({ token, updatedAt });
     });
 
+    // Ordenar por updatedAt (mais recente primeiro) e pegar apenas o mais recente
+    // para evitar notificações duplicadas em múltiplos dispositivos
+    validTokens.sort((a, b) => b.updatedAt - a.updatedAt);
+    const tokensToUse = validTokens.slice(0, 1).map((t) => t.token); // Apenas o token mais recente
+
     console.log(
-      `✅ ${validTokens.length} tokens válidos encontrados para perfil ${profileId}`
+      `✅ ${tokensToUse.length} token mais recente encontrado para perfil ${profileId} (${validTokens.length} tokens válidos no total)`
     );
-    return validTokens;
+    return tokensToUse;
   } catch (error) {
     console.log(`❌ Erro ao buscar tokens do perfil ${profileId}: ${error}`);
     return [];
@@ -492,9 +544,9 @@ async function removeInvalidTokens(tokens, tokenToProfile) {
     const profileId = tokenToProfile[token];
     if (profileId) {
       const tokenRef = db
-        .collection('profiles')
+        .collection("profiles")
         .doc(profileId)
-        .collection('fcmTokens')
+        .collection("fcmTokens")
         .doc(token);
       batch.delete(tokenRef);
     }
@@ -512,27 +564,27 @@ async function removeInvalidTokens(tokens, tokenToProfile) {
  */
 exports.sendInterestNotification = functions
   .runWith({
-    memory: '128MB',
+    memory: "128MB",
     timeoutSeconds: 30,
   })
-  .region('southamerica-east1')
-  .firestore.document('interests/{interestId}')
+  .region("southamerica-east1")
+  .firestore.document("interests/{interestId}")
   .onCreate(async (snap) => {
     const interest = snap.data();
     const postAuthorProfileId = interest.postAuthorProfileId;
-    const interestedProfileName = interest.interestedProfileName || 'Alguém';
-    const interestedProfileUsername = interest.interestedProfileUsername || '';
+    const interestedProfileName = interest.interestedProfileName || "Alguém";
+    const interestedProfileUsername = interest.interestedProfileUsername || "";
     const postId = interest.postId;
 
     // Buscar dados do post para personalizar mensagem
-    let postType = 'unknown';
-    let postCity = '';
+    let postType = "unknown";
+    let postCity = "";
     try {
-      const postDoc = await db.collection('posts').doc(postId).get();
+      const postDoc = await db.collection("posts").doc(postId).get();
       if (postDoc.exists) {
         const postData = postDoc.data();
-        postType = postData.type || 'unknown';
-        postCity = postData.city || '';
+        postType = postData.type || "unknown";
+        postCity = postData.city || "";
       }
     } catch (err) {
       console.log(`⚠️ Erro ao buscar post ${postId}:`, err.message);
@@ -543,7 +595,7 @@ exports.sendInterestNotification = functions
 
     // Mensagem personalizada baseada no tipo de post
     const interestBody =
-      postType === 'sales'
+      postType === "sales"
         ? `@${displayName} • salvou seu anúncio`
         : `@${displayName} • demonstrou interesse no seu post`;
 
@@ -552,7 +604,7 @@ exports.sendInterestNotification = functions
     if (interestedProfileId) {
       const rateLimitCheck = await checkRateLimit(
         interestedProfileId,
-        'interests',
+        "interests",
         50,
         24 * 60 * 60 * 1000
       );
@@ -570,7 +622,7 @@ exports.sendInterestNotification = functions
 
     // 🔒 SECURITY: Buscar UID do perfil autor para validação
     const postAuthorProfile = await db
-      .collection('profiles')
+      .collection("profiles")
       .doc(postAuthorProfileId)
       .get();
     if (!postAuthorProfile.exists) {
@@ -589,16 +641,36 @@ exports.sendInterestNotification = functions
       return null;
     }
 
+    // Verificar se já existe notificação de interesse não lida para este post/interessado
+    const existingInterestNotification = await db
+      .collection("notifications")
+      .where("recipientProfileId", "==", postAuthorProfileId)
+      .where("type", "==", "interest")
+      .where("actionData.postId", "==", postId)
+      .where(
+        "actionData.interestedProfileId",
+        "==",
+        interest.interestedProfileId
+      )
+      .where("read", "==", false)
+      .limit(1)
+      .get();
+
+    if (!existingInterestNotification.empty) {
+      console.log(`📭 Interesse já notificado anteriormente, pulando...`);
+      return null; // Já existe notificação para este interesse específico
+    }
+
     // Criar notificação in-app
-    await db.collection('notifications').add({
+    await db.collection("notifications").add({
       recipientProfileId: postAuthorProfileId,
       recipientUid: recipientUid, // 🔒 SECURITY: UID do dono do perfil
       profileUid: postAuthorProfileId, // LEGACY: manter para compatibilidade
-      type: 'interest',
-      priority: 'high',
-      title: 'Novo interesse!',
+      type: "interest",
+      priority: "high",
+      title: "Novo interesse!",
       body: interestBody,
-      actionType: 'viewPost',
+      actionType: "viewPost",
       actionData: {
         postId: postId,
         interestedProfileId: interest.interestedProfileId,
@@ -621,11 +693,11 @@ exports.sendInterestNotification = functions
       postAuthorProfileId,
       recipientUid, // 🔒 SECURITY: passar UID para validação
       {
-        title: 'Novo interesse!',
+        title: "Novo interesse!",
         body: interestBody,
       },
       {
-        type: 'interest',
+        type: "interest",
         postId: postId,
         interestedProfileId: interest.interestedProfileId,
         postType: postType,
@@ -645,17 +717,17 @@ exports.sendInterestNotification = functions
  */
 exports.sendMessageNotification = functions
   .runWith({
-    memory: '128MB',
+    memory: "128MB",
     timeoutSeconds: 30,
   })
-  .region('southamerica-east1')
-  .firestore.document('conversations/{conversationId}/messages/{messageId}')
+  .region("southamerica-east1")
+  .firestore.document("conversations/{conversationId}/messages/{messageId}")
   .onCreate(async (snap, context) => {
     const message = snap.data();
     const conversationId = context.params.conversationId;
     const senderProfileId = message.senderProfileId;
-    const senderName = message.senderName || 'Alguém';
-    const messageText = message.text || 'Enviou uma mensagem';
+    const senderName = message.senderName || "Alguém";
+    const messageText = message.text || "Enviou uma mensagem";
 
     console.log(
       `💬 Nova mensagem de ${senderName} na conversa ${conversationId}`
@@ -665,7 +737,7 @@ exports.sendMessageNotification = functions
     if (senderProfileId) {
       const rateLimitCheck = await checkRateLimit(
         senderProfileId,
-        'messages',
+        "messages",
         500,
         24 * 60 * 60 * 1000
       );
@@ -681,12 +753,12 @@ exports.sendMessageNotification = functions
 
     // Buscar conversa para obter destinatário
     const conversationDoc = await db
-      .collection('conversations')
+      .collection("conversations")
       .doc(conversationId)
       .get();
 
     if (!conversationDoc.exists) {
-      console.log('⚠️ Conversa não encontrada');
+      console.log("⚠️ Conversa não encontrada");
       return null;
     }
 
@@ -699,13 +771,13 @@ exports.sendMessageNotification = functions
     );
 
     if (!recipientProfileId) {
-      console.log('⚠️ Destinatário não encontrado');
+      console.log("⚠️ Destinatário não encontrado");
       return null;
     }
 
     // ✅ FIX: Buscar UID do destinatário para permissões (Security Rules)
     const recipientProfileDoc = await db
-      .collection('profiles')
+      .collection("profiles")
       .doc(recipientProfileId)
       .get();
 
@@ -736,11 +808,11 @@ exports.sendMessageNotification = functions
 
     // Verificar se já existe notificação não lida desta conversa (agregação)
     const existingNotifications = await db
-      .collection('notifications')
-      .where('recipientProfileId', '==', recipientProfileId)
-      .where('type', '==', 'newMessage')
-      .where('data.conversationId', '==', conversationId)
-      .where('read', '==', false)
+      .collection("notifications")
+      .where("recipientProfileId", "==", recipientProfileId)
+      .where("type", "==", "newMessage")
+      .where("data.conversationId", "==", conversationId)
+      .where("read", "==", false)
       .limit(1)
       .get();
 
@@ -749,20 +821,20 @@ exports.sendMessageNotification = functions
       const notificationDoc = existingNotifications.docs[0];
       await notificationDoc.ref.update({
         body: `${senderName}: ${messageText}`,
-        'data.messagePreview': messageText,
-        'data.messageCount': admin.firestore.FieldValue.increment(1),
+        "data.messagePreview": messageText,
+        "data.messageCount": admin.firestore.FieldValue.increment(1),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      console.log('📝 Notificação de mensagem atualizada (agregação)');
+      console.log("📝 Notificação de mensagem atualizada (agregação)");
     } else {
       // Criar nova notificação
-      await db.collection('notifications').add({
+      await db.collection("notifications").add({
         recipientProfileId: recipientProfileId,
         recipientUid: recipientUid, // ✅ FIX: Auth UID para Security Rules
-        type: 'newMessage',
-        priority: 'high',
-        title: 'Nova mensagem',
+        type: "newMessage",
+        priority: "high",
+        title: "Nova mensagem",
         body: `${senderName}: ${messageText}`,
         data: {
           conversationId: conversationId,
@@ -778,10 +850,10 @@ exports.sendMessageNotification = functions
         ), // 7 dias
       });
 
-      console.log('📨 Notificação de mensagem criada');
+      console.log("📨 Notificação de mensagem criada");
     }
 
-    // Enviar push notification
+    // ✅ Sempre enviar push notification para cada mensagem recebida
     await sendPushToProfile(
       recipientProfileId,
       recipientUid, // 🔒 SECURITY: passar UID para validação
@@ -790,7 +862,7 @@ exports.sendMessageNotification = functions
         body: messageText,
       },
       {
-        type: 'newMessage',
+        type: "newMessage",
         conversationId: conversationId,
         senderProfileId: senderProfileId,
       }
@@ -821,19 +893,19 @@ async function sendPushToProfile(profileId, recipientUid, notification, data) {
     );
 
     // Adicionar click_action para navegação no app
-    data.click_action = 'FLUTTER_NOTIFICATION_CLICK';
+    data.click_action = "FLUTTER_NOTIFICATION_CLICK";
 
     const response = await messaging.sendEachForMulticast({
       tokens: tokens,
       notification: notification,
       data: data,
       android: {
-        priority: 'high',
+        priority: "high",
         notification: {
-          channelId: 'high_importance_channel',
-          priority: 'high',
-          color: '#E47911',
-          sound: 'default',
+          channelId: "high_importance_channel",
+          priority: "high",
+          color: "#E47911",
+          sound: "default",
         },
       },
       apns: {
@@ -843,7 +915,7 @@ async function sendPushToProfile(profileId, recipientUid, notification, data) {
               title: notification.title,
               body: notification.body,
             },
-            sound: 'default',
+            sound: "default",
             badge: 1,
           },
         },
@@ -868,8 +940,8 @@ async function sendPushToProfile(profileId, recipientUid, notification, data) {
           );
 
           if (
-            errorCode === 'messaging/registration-token-not-registered' ||
-            errorCode === 'messaging/invalid-registration-token'
+            errorCode === "messaging/registration-token-not-registered" ||
+            errorCode === "messaging/invalid-registration-token"
           ) {
             tokensToRemove.push(tokens[idx]);
           }
@@ -898,23 +970,23 @@ async function sendPushToProfile(profileId, recipientUid, notification, data) {
  */
 exports.cleanupExpiredNotifications = functions
   .runWith({
-    memory: '256MB',
+    memory: "256MB",
     timeoutSeconds: 120,
   })
-  .region('southamerica-east1')
-  .pubsub.schedule('0 3 * * *') // 3h da manhã todos os dias
-  .timeZone('America/Sao_Paulo')
+  .region("southamerica-east1")
+  .pubsub.schedule("0 3 * * *") // 3h da manhã todos os dias
+  .timeZone("America/Sao_Paulo")
   .onRun(async () => {
     const now = admin.firestore.Timestamp.now();
 
     const expiredSnap = await db
-      .collection('notifications')
-      .where('expiresAt', '<', now)
+      .collection("notifications")
+      .where("expiresAt", "<", now)
       .limit(500) // Limite de segurança
       .get();
 
     if (expiredSnap.empty) {
-      console.log('🧹 Nenhuma notificação expirada encontrada');
+      console.log("🧹 Nenhuma notificação expirada encontrada");
       return null;
     }
 
@@ -945,11 +1017,11 @@ exports.cleanupExpiredNotifications = functions
  */
 exports.onProfileDelete = functions
   .runWith({
-    memory: '512MB',
+    memory: "512MB",
     timeoutSeconds: 540, // 9 minutos (máximo permitido)
   })
-  .region('southamerica-east1')
-  .firestore.document('profiles/{profileId}')
+  .region("southamerica-east1")
+  .firestore.document("profiles/{profileId}")
   .onDelete(async (snap, context) => {
     const profileId = context.params.profileId;
     const profileData = snap.data();
@@ -969,8 +1041,8 @@ exports.onProfileDelete = functions
       console.log(`📝 Cleaning up posts for profile ${profileId}...`);
 
       const postsQuery = db
-        .collection('posts')
-        .where('authorProfileId', '==', profileId)
+        .collection("posts")
+        .where("authorProfileId", "==", profileId)
         .limit(500);
 
       let postsSnapshot = await postsQuery.get();
@@ -1004,7 +1076,7 @@ exports.onProfileDelete = functions
             const pathMatch = decodedUrl.match(/\/o\/(.+?)\?/);
 
             if (pathMatch && pathMatch[1]) {
-              const filePath = pathMatch[1].replace(/%2F/g, '/');
+              const filePath = pathMatch[1].replace(/%2F/g, "/");
               const fileRef = admin.storage().bucket().file(filePath);
 
               await fileRef.delete();
@@ -1034,8 +1106,8 @@ exports.onProfileDelete = functions
 
       // Notificações onde o perfil é destinatário
       const recipientNotificationsQuery = db
-        .collection('notifications')
-        .where('recipientProfileId', '==', profileId)
+        .collection("notifications")
+        .where("recipientProfileId", "==", profileId)
         .limit(500);
 
       let notifSnapshot = await recipientNotificationsQuery.get();
@@ -1053,8 +1125,8 @@ exports.onProfileDelete = functions
 
       // Notificações onde o perfil é remetente (postAuthorProfileId)
       const senderNotificationsQuery = db
-        .collection('notifications')
-        .where('postAuthorProfileId', '==', profileId)
+        .collection("notifications")
+        .where("postAuthorProfileId", "==", profileId)
         .limit(500);
 
       notifSnapshot = await senderNotificationsQuery.get();
@@ -1080,8 +1152,8 @@ exports.onProfileDelete = functions
       console.log(`💚 Cleaning up interests for profile ${profileId}...`);
 
       const interestsQuery = db
-        .collection('interests')
-        .where('profileId', '==', profileId)
+        .collection("interests")
+        .where("profileId", "==", profileId)
         .limit(500);
 
       let interestsSnapshot = await interestsQuery.get();
@@ -1107,9 +1179,9 @@ exports.onProfileDelete = functions
       console.log(`🔔 Cleaning up FCM tokens for profile ${profileId}...`);
 
       const tokensSnapshot = await db
-        .collection('profiles')
+        .collection("profiles")
         .doc(profileId)
-        .collection('fcmTokens')
+        .collection("fcmTokens")
         .get();
 
       if (!tokensSnapshot.empty) {
@@ -1139,6 +1211,178 @@ exports.onProfileDelete = functions
       console.error(error.stack);
 
       // Não lançar exceção - cleanup parcial é melhor que nada
+      return null;
+    }
+  });
+
+/**
+ * Notifica administradores quando um novo report é criado.
+ *
+ * Lógica:
+ * 1. Obtém dados do report (reason, targetId, etc.)
+ * 2. Busca dados adicionais do conteúdo reportado (post ou perfil)
+ * 3. Cria notificação no Firestore para admins
+ * 4. Envia email via SendGrid (se configurado) ou log para monitoramento
+ *
+ * Campos do report esperados:
+ * - reportedPostId ou reportedProfileId (string)
+ * - reporterUid (string)
+ * - reason (string)
+ * - description (string, opcional)
+ * - timestamp (Timestamp)
+ * - status (string: "pending")
+ * - reportedBy (array de UIDs)
+ */
+exports.onReportCreated = functions
+  .runWith({
+    memory: "256MB",
+    timeoutSeconds: 30,
+  })
+  .region("southamerica-east1")
+  .firestore.document("reports/{reportId}")
+  .onCreate(async (snap, context) => {
+    const report = snap.data();
+    const reportId = context.params.reportId;
+
+    console.log(`📢 Novo report recebido: ${reportId}`);
+    console.log(`   Motivo: ${report.reason}`);
+    console.log(`   Reporter: ${report.reporterUid}`);
+
+    try {
+      // Determinar tipo de conteúdo reportado
+      const isPostReport = !!report.reportedPostId;
+      const targetId = report.reportedPostId || report.reportedProfileId;
+      const targetType = isPostReport ? "post" : "perfil";
+
+      // Buscar informações adicionais sobre o conteúdo reportado
+      let targetInfo = {};
+      if (isPostReport) {
+        const postDoc = await db.collection("posts").doc(targetId).get();
+        if (postDoc.exists) {
+          const postData = postDoc.data();
+          targetInfo = {
+            authorName: postData.authorName || "Desconhecido",
+            authorProfileId: postData.authorProfileId,
+            content: postData.content?.substring(0, 100) || "",
+            city: postData.city || "",
+          };
+        }
+      } else {
+        const profileDoc = await db.collection("profiles").doc(targetId).get();
+        if (profileDoc.exists) {
+          const profileData = profileDoc.data();
+          targetInfo = {
+            name: profileData.name || "Desconhecido",
+            username: profileData.username || "",
+            city: profileData.city || "",
+          };
+        }
+      }
+
+      // Contar reports anteriores para este conteúdo (para priorização)
+      const reportCountField = isPostReport
+        ? "reportedPostId"
+        : "reportedProfileId";
+      const previousReports = await db
+        .collection("reports")
+        .where(reportCountField, "==", targetId)
+        .where("status", "==", "pending")
+        .count()
+        .get();
+
+      const totalReports = previousReports.data().count || 1;
+
+      // Criar notificação para dashboard admin
+      await db.collection("adminNotifications").add({
+        type: "new_report",
+        reportId: reportId,
+        targetType: targetType,
+        targetId: targetId,
+        targetInfo: targetInfo,
+        reason: report.reason,
+        description: report.description || null,
+        totalReports: totalReports,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        read: false,
+        priority: totalReports >= 3 ? "high" : "normal", // Prioridade alta se 3+ reports
+      });
+
+      console.log(`✅ Admin notification criada para report ${reportId}`);
+      console.log(`   Tipo: ${targetType}`);
+      console.log(`   Target: ${targetId}`);
+      console.log(`   Total reports para este ${targetType}: ${totalReports}`);
+
+      // Log para monitoramento (pode ser substituído por SendGrid ou outro serviço de email)
+      if (totalReports >= 3) {
+        console.log(
+          `⚠️ ATENÇÃO: ${targetType} ${targetId} tem ${totalReports} denúncias pendentes!`
+        );
+
+        // Integrar SendGrid para enviar email aos admins
+        try {
+          const sgMail = require("@sendgrid/mail");
+          const sendgridKey = functions.config().sendgrid?.key;
+
+          if (sendgridKey) {
+            sgMail.setApiKey(sendgridKey);
+
+            const emailData = {
+              to: "admin@wegig.app", // Email do admin
+              from: "noreply@wegig.app", // Email verificado no SendGrid
+              subject: `[${
+                totalReports >= 5 ? "URGENTE" : "ALERTA"
+              }] ${totalReports} denúncias para ${targetType}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #E47911;">🚨 Nova Denúncia no WeGig</h2>
+                  
+                  <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h3>Detalhes da Denúncia:</h3>
+                    <ul>
+                      <li><strong>Tipo:</strong> ${
+                        targetType === "post" ? "Post" : "Perfil"
+                      }</li>
+                      <li><strong>ID:</strong> ${targetId}</li>
+                      <li><strong>Total de denúncias:</strong> ${totalReports}</li>
+                      <li><strong>Motivo:</strong> ${report.reason}</li>
+                      ${
+                        report.description
+                          ? `<li><strong>Descrição:</strong> ${report.description}</li>`
+                          : ""
+                      }
+                    </ul>
+                  </div>
+                  
+                  <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <strong>Ação necessária:</strong> Verifique o ${targetType} e tome as medidas apropriadas.
+                  </div>
+                  
+                  <p style="color: #666; font-size: 12px;">
+                    Esta é uma notificação automática do sistema WeGig.
+                  </p>
+                </div>
+              `,
+            };
+
+            await sgMail.send(emailData);
+            console.log(
+              `📧 Email enviado para admin sobre ${totalReports} denúncias`
+            );
+          } else {
+            console.warn(
+              "⚠️ SendGrid key não configurada - pulando envio de email"
+            );
+          }
+        } catch (emailError) {
+          console.error("❌ Erro ao enviar email via SendGrid:", emailError);
+          // Não falhar a função por erro de email
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error(`❌ Erro ao processar report: ${error}`);
+      console.error(error.stack);
       return null;
     }
   });

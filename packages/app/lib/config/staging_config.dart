@@ -35,6 +35,10 @@ class StagingConfig {
   static const String androidApplicationId = 'com.wegig.wegig.staging';
   static const String iosBundleId = 'com.wegig.wegig.staging';
 
+  // Google Maps Cloud Map IDs
+  static const String googleMapIdAndroid = 'ba595eb57ab991decf855d69';
+  static const String googleMapIdIOS = 'ba595eb57ab991dedf093b89';
+
   /// Verifica se está em ambiente de staging
   static bool get isDevelopment => false;
   static bool get isStaging => true;

@@ -1,5 +1,5 @@
 #include? "Pods/Target Support Files/Pods-WeGig/Pods-WeGig.debug-staging.xcconfig"
 #include "Generated.xcconfig"
 
-PRODUCT_BUNDLE_IDENTIFIER = com.wegig.staging
+PRODUCT_BUNDLE_IDENTIFIER = com.wegig.wegig.staging
 DISPLAY_NAME = WeGig STAGING

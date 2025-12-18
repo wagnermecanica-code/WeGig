@@ -45,8 +45,20 @@ class PostService {
       throw ArgumentError('Autor inválido');
     }
 
-    if (post.city.isEmpty) {
-      throw ArgumentError('Cidade obrigatória');
+    if (post.content.trim().isEmpty) {
+      throw ArgumentError('Conteúdo é obrigatório');
+    }
+
+    if (post.content.length > 600) {
+      throw ArgumentError('Conteúdo deve ter no máximo 600 caracteres');
+    }
+
+    if (post.city.trim().isEmpty) {
+      throw ArgumentError('Cidade é obrigatória');
+    }
+
+    if (post.location.latitude == 0 && post.location.longitude == 0) {
+      throw ArgumentError('Localização é obrigatória');
     }
 
     if (!['musician', 'band', 'sales'].contains(post.type)) {
@@ -63,6 +75,16 @@ class PostService {
 
     if (post.type == 'band' && post.seekingMusicians.isEmpty) {
       throw ArgumentError('Informe os músicos buscados');
+    }
+
+    // Validações comuns para musician e band
+    if (post.type != 'sales') {
+      if (post.genres.isEmpty) {
+        throw ArgumentError('Selecione pelo menos um gênero musical');
+      }
+      if (post.level.trim().isEmpty) {
+        throw ArgumentError('Selecione o nível de experiência');
+      }
     }
 
     // Validações específicas para sales

@@ -7,12 +7,20 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:963929089370:android:1a6d15efd0ca5ecfec7f63",
+        "mobilesdk_app_id": "1:963929089370:android:9982e7cff7a65685ec7f63",
         "android_client_info": {
-          "package_name": "com.tosembanda.wegig.dev"
+          "package_name": "com.wegig.wegig.dev"
         }
       },
       "oauth_client": [
+        {
+          "client_id": "963929089370-efv2rq5ukhlna3ch7hvn4uu1o9mmadl2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.wegig.wegig.dev",
+            "certificate_hash": "d162ea7be2ae14eba14a1ea6b9e244b3bf69b618"
+          }
+        },
         {
           "client_id": "963929089370-3davl5ktr3nuvispagbd1rlnk51vproh.apps.googleusercontent.com",
           "client_type": 3

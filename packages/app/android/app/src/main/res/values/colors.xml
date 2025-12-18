@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#37475A</color>
+    <!-- Cor accent para notificações push (laranja WeGig) -->
+    <color name="notification_color">#E47911</color>
 </resources>

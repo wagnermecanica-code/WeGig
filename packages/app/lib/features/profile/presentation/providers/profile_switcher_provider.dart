@@ -1,7 +1,6 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_cache_provider.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
@@ -31,11 +30,13 @@ class ProfileSwitcherNotifier extends _$ProfileSwitcherNotifier {
   /// Troca para o perfil especificado e invalida todos os caches
   /// 
   /// Sequence:
-  /// 1. Captura perfil antigo (para FCM)
-  /// 2. Executa troca via ProfileNotifier
-  /// 3. Invalida cache de posts (feed limpo para novo perfil)
-  /// 4. Atualiza token FCM (remove do antigo, adiciona no novo)
-  /// 5. Atualiza Analytics
+  /// 1. Executa troca via ProfileNotifier
+  /// 2. Invalida cache de posts (feed limpo para novo perfil)
+  /// 3. Atualiza Analytics
+  /// 
+  /// NOTA: Token FCM NÃO é removido do perfil antigo.
+  /// O token é mantido em TODOS os perfis do usuário para que
+  /// push notifications cheguem independente do perfil ativo.
   /// 
   /// [profileId] ID do perfil de destino (não o uid do usuário)
   Future<void> switchToProfile(String profileId) async {
@@ -43,9 +44,6 @@ class ProfileSwitcherNotifier extends _$ProfileSwitcherNotifier {
     
     try {
       debugPrint('🔄 ProfileSwitcher: Iniciando troca para perfil $profileId');
-      
-      // 0. ✅ Capturar perfil antigo para FCM
-      final oldProfileId = ref.read(profileProvider).value?.activeProfile?.profileId;
       
       // 1. ✅ Trocar perfil (atualiza Firestore + estado local)
       await ref.read(profileProvider.notifier).switchProfile(profileId);
@@ -61,8 +59,10 @@ class ProfileSwitcherNotifier extends _$ProfileSwitcherNotifier {
       // recarregados quando profileProvider mudar
       debugPrint('   ✅ Notificações e mensagens serão recarregadas automaticamente');
       
-      // 4. ✅ Atualizar token FCM (CRÍTICO para notificações corretas)
-      await _updateFcmToken(oldProfileId: oldProfileId, newProfileId: profileId);
+      // 4. ✅ Token FCM: NÃO remover do perfil antigo!
+      // O token é mantido em TODOS os perfis para que push notifications
+      // cheguem independente do perfil ativo.
+      debugPrint('   ✅ Token FCM mantido em todos os perfis');
       
       // 5. ✅ Atualizar Analytics
       await _updateAnalytics(profileId);
@@ -112,26 +112,6 @@ class ProfileSwitcherNotifier extends _$ProfileSwitcherNotifier {
     } catch (e) {
       debugPrint('   ⚠️ Erro ao atualizar Analytics: $e');
       // Não faz rethrow - falha em analytics não deve bloquear troca
-    }
-  }
-  
-  /// Atualiza token FCM para o novo perfil
-  /// 
-  /// Remove token do perfil antigo e adiciona no novo.
-  /// Isso garante que notificações push sejam enviadas para o perfil correto.
-  Future<void> _updateFcmToken({
-    required String? oldProfileId,
-    required String newProfileId,
-  }) async {
-    try {
-      await PushNotificationService().switchProfile(
-        oldProfileId: oldProfileId,
-        newProfileId: newProfileId,
-      );
-      debugPrint('   ✅ Token FCM atualizado: $oldProfileId → $newProfileId');
-    } catch (e) {
-      debugPrint('   ⚠️ Erro ao atualizar FCM token: $e');
-      // Não faz rethrow - falha em FCM não deve bloquear troca
     }
   }
   

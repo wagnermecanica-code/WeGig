@@ -1553,7 +1553,9 @@ PODS:
     - GTMSessionFetcher/Core
   - image_cropper (0.0.4):
     - Flutter
-    - TOCropViewController (~> 2.7.4)
+    - TOCropViewController (~> 2.8.0)
+  - image_gallery_saver_plus (0.0.1):
+    - Flutter
   - image_picker_ios (0.0.1):
     - Flutter
   - integration_test (0.0.1):
@@ -1583,6 +1585,8 @@ PODS:
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
+  - permission_handler_apple (9.3.0):
+    - Flutter
   - pointer_interceptor_ios (0.0.1):
     - Flutter
   - PromisesObjC (2.4.0)
@@ -1605,7 +1609,7 @@ PODS:
   - sqflite_darwin (0.0.4):
     - Flutter
     - FlutterMacOS
-  - TOCropViewController (2.7.4)
+  - TOCropViewController (2.8.0)
   - url_launcher_ios (0.0.1):
     - Flutter
 
@@ -1630,9 +1634,11 @@ DEPENDENCIES:
   - google_maps_flutter_ios (from `.symlinks/plugins/google_maps_flutter_ios/ios`)
   - google_sign_in_ios (from `.symlinks/plugins/google_sign_in_ios/darwin`)
   - image_cropper (from `.symlinks/plugins/image_cropper/ios`)
+  - image_gallery_saver_plus (from `.symlinks/plugins/image_gallery_saver_plus/ios`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
+  - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - pointer_interceptor_ios (from `.symlinks/plugins/pointer_interceptor_ios/ios`)
   - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
@@ -1727,12 +1733,16 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/google_sign_in_ios/darwin"
   image_cropper:
     :path: ".symlinks/plugins/image_cropper/ios"
+  image_gallery_saver_plus:
+    :path: ".symlinks/plugins/image_gallery_saver_plus/ios"
   image_picker_ios:
     :path: ".symlinks/plugins/image_picker_ios/ios"
   integration_test:
     :path: ".symlinks/plugins/integration_test/ios"
   path_provider_foundation:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
+  permission_handler_apple:
+    :path: ".symlinks/plugins/permission_handler_apple/ios"
   pointer_interceptor_ios:
     :path: ".symlinks/plugins/pointer_interceptor_ios/ios"
   share_plus:
@@ -1798,7 +1808,8 @@ SPEC CHECKSUMS:
   gRPC-Core: 860978b7db482de8b4f5e10677216309b5ff6330
   GTMAppAuth: f69bd07d68cd3b766125f7e072c45d7340dea0de
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
-  image_cropper: 37d40f62177c101ff4c164906d259ea2c3aa70cf
+  image_cropper: b8ef14d3fcff4040b0f9da2ca28d98219a5cba0e
+  image_gallery_saver_plus: 782ade975fe6a4600b53e7c1983e3a2979d1e9e5
   image_picker_ios: c560581cceedb403a6ff17f2f816d7fea1421fc1
   integration_test: 252f60fa39af5e17c3aa9899d35d908a0721b573
   leveldb-library: cc8b8f8e013647a295ad3f8cd2ddf49a6f19be19
@@ -1807,6 +1818,7 @@ SPEC CHECKSUMS:
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   OrderedSet: e539b66b644ff081c73a262d24ad552a69be3a94
   path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
+  permission_handler_apple: 9878588469a2b0d0fc1e048d9f43605f92e6cec2
   pointer_interceptor_ios: 508241697ff0947f853c061945a8b822463947c1
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   PromisesSwift: 9d77319bbe72ebf6d872900551f7eeba9bce2851
@@ -1817,7 +1829,7 @@ SPEC CHECKSUMS:
   shared_preferences_foundation: fcdcbc04712aee1108ac7fda236f363274528f78
   sign_in_with_apple: f3bf75217ea4c2c8b91823f225d70230119b8440
   sqflite_darwin: 5a7236e3b501866c1c9befc6771dfd73ffb8702d
-  TOCropViewController: 80b8985ad794298fb69d3341de183f33d1853654
+  TOCropViewController: 797deaf39c90e6e9ddd848d88817f6b9a8a09888
   url_launcher_ios: 5334b05cef931de560670eeae103fd3e431ac3fe
 
 PODFILE CHECKSUM: e08653686ec90f8976e2f7a677c9047f52af52a5

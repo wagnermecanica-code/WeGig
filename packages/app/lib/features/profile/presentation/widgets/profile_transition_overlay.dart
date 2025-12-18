@@ -80,13 +80,22 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
     _controller.forward().then((_) {
       Future<void>.delayed(const Duration(milliseconds: 500), () {
         // ✅ FIX: Verificar mounted ANTES de acessar Navigator.of(context)
-        if (!mounted) return;
+        if (!mounted) {
+          // Ainda assim executar onComplete para finalizar o fluxo
+          widget.onComplete();
+          return;
+        }
         // Usando try-catch para evitar exceção se o widget já foi descartado
         try {
-          Navigator.of(context).pop();
+          final navigator = Navigator.of(context, rootNavigator: true);
+          if (navigator.canPop()) {
+            navigator.pop();
+          }
           widget.onComplete();
         } catch (e) {
-          debugPrint('ProfileTransitionOverlay: Navegação já foi descartada: $e');
+          // Falha silenciosa - widget já foi descartado
+          debugPrint('ProfileTransitionOverlay: Overlay descartado antes do pop');
+          widget.onComplete();
         }
       });
     });

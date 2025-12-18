@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 require 'xcodeproj'
 
-project_path = 'Runner.xcodeproj'
+project_path = 'WeGig.xcodeproj'
 project = Xcodeproj::Project.open(project_path)
 
 # Get existing configurations
@@ -30,10 +30,10 @@ if malformed_configs.any?
 end
 
 # Create flavor configurations
-flavors = ['dev', 'staging']
+flavors = ['dev', 'staging', 'prod']
 
 # Get Runner target
-runner_target = project.targets.find { |t| t.name == 'Runner' }
+runner_target = project.targets.find { |t| t.name == 'WeGig' }
 runner_debug = runner_target.build_configurations.find { |c| c.name == 'Debug' }
 runner_release = runner_target.build_configurations.find { |c| c.name == 'Release' }
 runner_profile = runner_target.build_configurations.find { |c| c.name == 'Profile' }
@@ -51,6 +51,7 @@ flavors.each do |flavor|
   unless project.build_configurations.find { |c| c.name == debug_flavor_name }
     debug_flavor = project.add_build_configuration(debug_flavor_name, :debug)
     debug_flavor.build_settings.merge!(debug_config.build_settings)
+    debug_flavor.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.6'
     puts "  ✅ Created project #{debug_flavor_name}"
   else
     puts "  ⚠️  Project #{debug_flavor_name} already exists"
@@ -60,6 +61,7 @@ flavors.each do |flavor|
   unless runner_target.build_configurations.find { |c| c.name == debug_flavor_name }
     runner_debug_flavor = runner_target.add_build_configuration(debug_flavor_name, :debug)
     runner_debug_flavor.build_settings.merge!(runner_debug.build_settings)
+    runner_debug_flavor.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.6'
     puts "  ✅ Created Runner target #{debug_flavor_name}"
   else
     puts "  ⚠️  Runner target #{debug_flavor_name} already exists"
@@ -70,6 +72,7 @@ flavors.each do |flavor|
   unless project.build_configurations.find { |c| c.name == release_flavor_name }
     release_flavor = project.add_build_configuration(release_flavor_name, :release)
     release_flavor.build_settings.merge!(release_config.build_settings)
+    release_flavor.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.6'
     puts "  ✅ Created project #{release_flavor_name}"
   else
     puts "  ⚠️  Project #{release_flavor_name} already exists"
@@ -79,6 +82,7 @@ flavors.each do |flavor|
   unless runner_target.build_configurations.find { |c| c.name == release_flavor_name }
     runner_release_flavor = runner_target.add_build_configuration(release_flavor_name, :release)
     runner_release_flavor.build_settings.merge!(runner_release.build_settings)
+    runner_release_flavor.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.6'
     puts "  ✅ Created Runner target #{release_flavor_name}"
   else
     puts "  ⚠️  Runner target #{release_flavor_name} already exists"
@@ -89,6 +93,7 @@ flavors.each do |flavor|
   unless project.build_configurations.find { |c| c.name == profile_flavor_name }
     profile_flavor = project.add_build_configuration(profile_flavor_name, :release)
     profile_flavor.build_settings.merge!(profile_config.build_settings)
+    profile_flavor.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.6'
     puts "  ✅ Created project #{profile_flavor_name}"
   else
     puts "  ⚠️  Project #{profile_flavor_name} already exists"
@@ -98,6 +103,7 @@ flavors.each do |flavor|
   unless runner_target.build_configurations.find { |c| c.name == profile_flavor_name }
     runner_profile_flavor = runner_target.add_build_configuration(profile_flavor_name, :release)
     runner_profile_flavor.build_settings.merge!(runner_profile.build_settings)
+    runner_profile_flavor.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.6'
     puts "  ✅ Created Runner target #{profile_flavor_name}"
   else
     puts "  ⚠️  Runner target #{profile_flavor_name} already exists"

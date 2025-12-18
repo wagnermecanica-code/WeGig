@@ -1,0 +1,15 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Dev Flavor Configuration -->
+    <application
+        android:label="WeGig DEV"
+        android:icon="@mipmap/ic_launcher"
+        tools:replace="android:label">
+        
+        <!-- Google Maps API Key for Dev -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyBJeEwkaBn1B80GOsrOjRMYpny_GPKABvc"
+            tools:replace="android:value" />
+    </application>
+</manifest>

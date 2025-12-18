@@ -3,6 +3,7 @@ import 'package:core_ui/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:wegig_app/widgets/full_screen_photo_viewer.dart';
 
 import '../../domain/entities/entities.dart';
 
@@ -180,7 +181,7 @@ class MessageNewBubble extends StatelessWidget {
           if (message.isReply) _buildReplyPreview(),
 
           // Imagem
-          if (message.hasImage) _buildImage(),
+          if (message.hasImage) _buildImage(context),
 
           // Texto
           if (message.hasText || message.isEdited) _buildTextContent(),
@@ -250,42 +251,117 @@ class MessageNewBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildImage() {
-    return ClipRRect(
-      borderRadius: BorderRadius.only(
-        topLeft: const Radius.circular(18),
-        topRight: const Radius.circular(18),
-        bottomLeft:
-            message.hasText ? Radius.zero : Radius.circular(isMine ? 18 : 4),
-        bottomRight:
-            message.hasText ? Radius.zero : Radius.circular(isMine ? 4 : 18),
-      ),
-      child: CachedNetworkImage(
-        imageUrl: message.imageUrl!,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => Container(
-          height: 200,
+  Widget _buildImage(BuildContext context) {
+    final imageUrl = message.imageUrl;
+    
+    // Validar URL antes de tentar carregar
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return Container(
+        height: 200,
+        width: double.infinity,
+        decoration: BoxDecoration(
           color: AppColors.surfaceVariant,
-          child: const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(18),
+            topRight: const Radius.circular(18),
+            bottomLeft: Radius.circular(isMine ? 18 : 4),
+            bottomRight: Radius.circular(isMine ? 4 : 18),
           ),
         ),
-        errorWidget: (context, url, error) => Container(
-          height: 200,
-          color: AppColors.surfaceVariant,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Iconsax.image, color: AppColors.textHint),
-              const SizedBox(height: 4),
-              Text(
-                'Erro ao carregar',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textHint,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Iconsax.image, color: AppColors.textHint),
+            const SizedBox(height: 4),
+            Text(
+              'Imagem não disponível',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textHint,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () {
+        // Abrir visualizador de fotos em tela cheia
+        FullScreenPhotoViewer.open(
+          context,
+          photos: [imageUrl],
+          heroTagPrefix: 'chat-image-${message.id}',
+        );
+      },
+      child: Hero(
+        tag: 'chat-image-${message.id}',
+        child: ClipRRect(
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(18),
+            topRight: const Radius.circular(18),
+            bottomLeft:
+                message.hasText ? Radius.zero : Radius.circular(isMine ? 18 : 4),
+            bottomRight:
+                message.hasText ? Radius.zero : Radius.circular(isMine ? 4 : 18),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: 100,
+              maxHeight: 300,
+              minWidth: 150,
+              maxWidth: 280,
+            ),
+            child: CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.contain,
+              memCacheWidth: 800,
+              placeholder: (context, url) => Container(
+                height: 200,
+                width: 200,
+                color: AppColors.surfaceVariant,
+                child: const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
-            ],
+              errorWidget: (context, url, error) {
+                debugPrint('❌ CachedNetworkImage error: $error for URL: $url');
+                return Container(
+                  height: 200,
+                  width: 200,
+                  color: AppColors.surfaceVariant,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Iconsax.image, color: AppColors.textHint),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Erro ao carregar',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textHint,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () {
+                          // Forçar recarregamento limpando cache
+                          CachedNetworkImage.evictFromCache(url);
+                        },
+                        child: Text(
+                          'Toque para tentar novamente',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.accent,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),

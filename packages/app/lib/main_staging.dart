@@ -23,14 +23,26 @@ Future<void> main() async {
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // CRITICAL: Firebase must be initialized in background isolate
   if (Firebase.apps.isEmpty) {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
   }
 
-  debugPrint('📩 [staging] Background Message: ${message.messageId}');
-  debugPrint('   Title: ${message.notification?.title}');
-  debugPrint('   Body: ${message.notification?.body}');
+  // Log detalhado para debug
+  debugPrint('');
+  debugPrint('══════════════════════════════════════════════════════════════');
+  debugPrint('📩 [STAGING BACKGROUND] PUSH RECEBIDO!');
+  debugPrint('══════════════════════════════════════════════════════════════');
+  debugPrint('   MessageId: ${message.messageId}');
+  debugPrint('   Notification Title: ${message.notification?.title}');
+  debugPrint('   Notification Body: ${message.notification?.body}');
   debugPrint('   Data: ${message.data}');
+  debugPrint('   From: ${message.from}');
+  debugPrint('   SentTime: ${message.sentTime}');
+  debugPrint('   ContentAvailable: ${message.contentAvailable}');
+  debugPrint('   Category: ${message.category}');
+  debugPrint('══════════════════════════════════════════════════════════════');
+  debugPrint('');
 }

@@ -783,15 +783,23 @@ extension on _BottomNavScaffoldState {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      builder: (context) {
+        // Padding dinâmico para respeitar safe area (Android/iOS)
+        final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: EdgeInsets.only(
+            top: 24,
+            left: 20,
+            right: 20,
+            bottom: 20 + bottomPadding,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             // Handle visual
             Container(
               width: 40,
@@ -884,10 +892,10 @@ extension on _BottomNavScaffoldState {
                 }
               },
             ),
-            const SizedBox(height: 20),
           ],
         ),
-      ),
+      );
+      },
     );
   }
 

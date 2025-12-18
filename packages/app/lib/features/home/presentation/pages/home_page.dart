@@ -4,6 +4,7 @@
 // Refactored: Extracted sub-features (Map, Search, Feed) for better maintainability
 
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -23,6 +24,7 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/config/app_config.dart';
 import 'package:wegig_app/features/home/data/datasources/gps_cache_service.dart';
 import 'package:wegig_app/features/home/presentation/providers/map_center_provider.dart';
 import 'package:wegig_app/features/home/presentation/widgets/feed/interest_service.dart';
@@ -30,11 +32,10 @@ import 'package:wegig_app/features/home/presentation/widgets/map/map_controller.
 import 'package:wegig_app/features/home/presentation/widgets/map/marker_builder.dart';
 import 'package:wegig_app/features/home/presentation/widgets/search/search_service.dart';
 import 'package:wegig_app/features/post/data/models/interest_document.dart';
-import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
+import 'package:wegig_app/features/post/presentation/widgets/interest_options_dialog.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
-import 'package:wegig_app/utils/migrate_post_prices.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({
@@ -77,13 +78,11 @@ class _HomePageState extends ConsumerState<HomePage>
   Completer<GoogleMapController>? _mapControllerCompleter;
   List<PostEntity> _cachedPosts = <PostEntity>[];
   bool _isDisposed = false;
+  bool _isRequestingLocationPermission = false; // ✅ FIX: Evita race condition de GPS
   
   // PageView Controller para carrossel horizontal
   late final PageController _pageController;
   bool _isProgrammaticScroll = false; // Evita loops de sync
-  
-  // Flag para executar migração apenas uma vez
-  static bool _migrationExecuted = false;
   
     ProfileEntity? get _activeProfile =>
       ref.read(profileProvider).value?.activeProfile;
@@ -232,19 +231,15 @@ class _HomePageState extends ConsumerState<HomePage>
   Future<void> _initializePage() async {
     // Pré-carrega cache de marcadores customizados (alta qualidade)
     await _markerBuilder.initialize();
-    await _mapControllerWrapper.loadMapStyle();
+    // Cloud-based Map Styling é usado via cloudMapId - não precisa carregar estilo local
     await _initializeMap();
     widget.searchNotifier?.addListener(_onSearchChanged);
     
-    // Executar migração de preços apenas uma vez por sessão do app
-    if (!_migrationExecuted) {
-      _migrationExecuted = true;
-      try {
-        await migratePostPrices();
-      } catch (e) {
-        debugPrint('❌ Erro na migração de preços: $e');
-      }
-    }
+    // ⚠️ MIGRAÇÃO REMOVIDA - causava loop de aumento de preços
+    // A migração foi removida porque a lógica estava invertida:
+    // o código já salva o preço ORIGINAL no Firestore, mas a migração
+    // assumia que era o preço FINAL e tentava "recuperar" o original,
+    // causando inflação progressiva a cada visualização/edição.
   }
 
   // ========================= MÉTODOS DE LÓGICA =========================
@@ -668,128 +663,17 @@ class _HomePageState extends ConsumerState<HomePage>
     final isInterestSent = ref.read(interestNotifierProvider).contains(post.id);
     final isOwner = post.authorProfileId.isNotEmpty &&
         post.authorProfileId == _activeProfile?.profileId;
-    final isSalesPost = post.type == 'sales';
 
-    showModalBottomSheet<void>(
+    showInterestOptionsDialog(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Opções para o dono do post
-            if (isOwner) ...[
-              ListTile(
-                leading: const Icon(Icons.edit, color: AppColors.primary),
-                title: const Text('Editar Post'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final result = await Navigator.of(context).push<bool?>(
-                    MaterialPageRoute<bool?>(
-                      builder: (_) => PostPage(
-                        postType: post.type,
-                        existingPostData: {
-                          // ✅ CAMPOS COMUNS A TODOS OS TIPOS
-                          'postId': post.id,
-                          'content': post.content,
-                          'photoUrls': post.photoUrls,
-                          'youtubeLink': post.youtubeLink,
-                          'location': GeoPoint(
-                              post.location.latitude, post.location.longitude),
-                          'city': post.city,
-                          'neighborhood': post.neighborhood,
-                          'state': post.state,
-                          'createdAt': post.createdAt,
-                          'expiresAt': post.expiresAt,
-                          
-                          // ✅ CAMPOS ESPECÍFICOS DE MUSICIAN/BAND
-                          'instruments': post.instruments,
-                          'genres': post.genres,
-                          'seekingMusicians': post.seekingMusicians,
-                          'level': post.level,
-                          'availableFor': post.availableFor,
-                          
-                          // ✅ CAMPOS ESPECÍFICOS DE SALES
-                          'title': post.title,
-                          'salesType': post.salesType,
-                          'price': post.price,
-                          'discountMode': post.discountMode,
-                          'discountValue': post.discountValue,
-                          'promoStartDate': post.promoStartDate,
-                          'promoEndDate': post.promoEndDate,
-                          'whatsappNumber': post.whatsappNumber,
-                        },
-                      ),
-                    ),
-                  );
-                  if (result == true) {
-                    // Recarregar posts
-                    ref.invalidate(postNotifierProvider);
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Iconsax.trash, color: Colors.red),
-                title: const Text('Deletar Post'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _confirmDeletePost(post);
-                },
-              ),
-            ]
-            // Opções para outros usuários
-            else ...[
-              if (isInterestSent)
-                ListTile(
-                    leading: Icon(
-                    isSalesPost ? Iconsax.tag5 : Iconsax.heart5,
-                    color: isSalesPost ? AppColors.primary : Colors.pink,
-                    size: 24,
-                    ),
-                  title: Text(isSalesPost ? 'Remover dos Salvos' : 'Remover Interesse'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _removeInterestOptimistically(post);
-                  },
-                )
-              else
-                ListTile(
-                  leading: Icon(
-                    isSalesPost ? Iconsax.tag : Iconsax.heart5,
-                    color: isSalesPost ? AppColors.primary : Colors.pink,
-                    size: 24,
-                  ),
-                  title: Text(isSalesPost ? 'Salvar Anúncio' : 'Demonstrar Interesse'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _sendInterestOptimistically(post);
-                  },
-                ),
-              ListTile(
-                leading: const Icon(Iconsax.user, color: AppColors.primary),
-                title: const Text('Ver Perfil'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  context.pushProfile(post.authorProfileId);
-                },
-              ),
-            ],
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+      post: post,
+      isInterestSent: isInterestSent,
+      isOwner: isOwner,
+      onSendInterest: () => _sendInterestOptimistically(post),
+      onRemoveInterest: () => _removeInterestOptimistically(post),
+      onDeletePost: () => _confirmDeletePost(post),
+      onViewProfile: () => context.pushProfile(post.authorProfileId),
+      onPostEdited: () => ref.invalidate(postNotifierProvider),
     );
   }
 
@@ -1092,54 +976,6 @@ class _HomePageState extends ConsumerState<HomePage>
                     ),
                   ),
                 ),
-                // Botão "Buscar nessa área" (aparece quando usuário move o mapa)
-                if (_mapControllerWrapper.showSearchAreaButton)
-                  Positioned(
-                    top: 110,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Material(
-                        elevation: 8,
-                        borderRadius: BorderRadius.circular(24),
-                        child: InkWell(
-                          onTap: () async {
-                            setState(() => _mapControllerWrapper.setShowSearchAreaButton(false));
-                            if (_mapControllerWrapper.controller != null) {
-                              _mapControllerWrapper.setLastSearchBounds(
-                                  await _mapControllerWrapper.controller!.getVisibleRegion());
-                              await _onMapIdle();
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(24),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE47911), // Brand Orange
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Iconsax.search_normal,
-                                    color: Colors.white, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Buscar nessa área',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
             // ✅ Carrossel horizontal de cards (sempre visível quando há posts)
             if (_visiblePosts.isNotEmpty) _buildFloatingCard(),
           ],
@@ -1159,8 +995,9 @@ class _HomePageState extends ConsumerState<HomePage>
           target: initial,
           zoom: _mapControllerWrapper.currentZoom,
         ),
-        style:
-            _mapControllerWrapper.mapStyle, // Usando GoogleMap.style ao invés de setMapStyle deprecated
+        cloudMapId: Platform.isAndroid
+            ? AppConfig.googleMapIdAndroid
+            : AppConfig.googleMapIdIOS, // Cloud-based Map Styling
         myLocationEnabled: true,
         myLocationButtonEnabled: false,
         zoomControlsEnabled: false,
@@ -1232,15 +1069,6 @@ class _HomePageState extends ConsumerState<HomePage>
       debugPrint(
           '🗺️ Bounds do mapa: NE=${bounds.northeast}, SW=${bounds.southwest}');
 
-      if (!_boundsEqual(bounds, _mapControllerWrapper.lastSearchBounds)) {
-        if (_isDisposed || !mounted) {
-          return;
-        }
-        if (mounted) {
-          setState(() => _mapControllerWrapper.setShowSearchAreaButton(true));
-        }
-      }
-
       final visible = allPosts.where(
         (post) {
           final postLocation = post.location;
@@ -1309,15 +1137,6 @@ class _HomePageState extends ConsumerState<HomePage>
     }
   }
 
-  bool _boundsEqual(LatLngBounds a, LatLngBounds? b) {
-    if (b == null) return false;
-    const threshold = 0.01;
-    return (a.northeast.latitude - b.northeast.latitude).abs() < threshold &&
-        (a.northeast.longitude - b.northeast.longitude).abs() < threshold &&
-        (a.southwest.latitude - b.southwest.latitude).abs() < threshold &&
-        (a.southwest.longitude - b.southwest.longitude).abs() < threshold;
-  }
-
   bool _latLngInBounds(LatLng p, LatLngBounds b) {
     return (p.latitude >= b.southwest.latitude &&
             p.latitude <= b.northeast.latitude) &&
@@ -1365,8 +1184,15 @@ class _HomePageState extends ConsumerState<HomePage>
 
   /// Inicializa posição do mapa na ordem: GPS atual → Perfil → Cache GPS
   Future<void> _initializeMap() async {
+    // ✅ FIX: Evita chamadas concorrentes que causam "A request for location permissions is already running"
+    if (_isRequestingLocationPermission) {
+      debugPrint('⚠️ _initializeMap: Permissão de GPS já em andamento, aguardando...');
+      return;
+    }
+    
     try {
       debugPrint('📍 _initializeMap: Iniciando...');
+      _isRequestingLocationPermission = true;
 
       // Estratégia 1: Tentar GPS atual (instantâneo, sem timeout)
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -1427,6 +1253,8 @@ class _HomePageState extends ConsumerState<HomePage>
           geoPointToLatLng(profileLocation)
         ));
       }
+    } finally {
+      _isRequestingLocationPermission = false;
     }
   }
 

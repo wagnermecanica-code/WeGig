@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:flutter/foundation.dart';
@@ -80,11 +82,19 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
 
       // ✅ Buscar TODOS os posts ativos, não apenas do próprio usuário
       // Removido o filtro .where('profileUid', isEqualTo: uid)
+      // ⚡ Timeout de 10s para evitar travamento em rede fraca
       final snapshot = await _firestore
           .collection('posts')
           .where('expiresAt', isGreaterThan: Timestamp.now())
           .orderBy('expiresAt')
-          .get();
+          .get()
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              debugPrint('⏱️ PostDataSource: Query timeout após 10s - usando cache local');
+              throw TimeoutException('Firestore query timeout - verifique conexão');
+            },
+          );
 
       final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
 

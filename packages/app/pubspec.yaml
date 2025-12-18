@@ -36,7 +36,7 @@ dependencies:
 
   # Mídia & Imagens
   image_picker: ">=1.2.0 <2.0.0"
-  image_cropper: ^8.0.2
+  image_cropper: ^11.0.0
   flutter_image_compress: ">=2.4.0 <3.0.0"
 
   cached_network_image: ^3.4.1 # Cache de imagens para performance
@@ -77,6 +77,10 @@ dependencies:
   image: ^4.2.0
   connectivity_plus: ^7.0.0
   emoji_picker_flutter: ^4.4.0
+
+  # Download e permissões
+  image_gallery_saver_plus: ^4.0.1 # Salvar imagens na galeria
+  permission_handler: ^11.3.1 # Gerenciamento de permissões
 dev_dependencies:
   flutter_test:
     sdk: flutter

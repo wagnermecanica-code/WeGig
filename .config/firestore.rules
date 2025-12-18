@@ -64,9 +64,10 @@ service cloud.firestore {
     // POSTS - Publicações (expiram após 30 dias)
     // ============================================
     // Fields: authorUid (auth UID), authorProfileId (profile ID)
+    // Leitura pública permitida para o site (wegig.com.br)
 
     match /posts/{postId} {
-      allow read: if isSignedIn();
+      allow read: if true;  // Leitura pública para site
       allow create: if isSignedIn()
         && request.resource.data.authorUid == request.auth.uid;
       allow update, delete: if isSignedIn()
@@ -170,11 +171,46 @@ service cloud.firestore {
     }
 
     // ============================================
-    // REPORTS - Denúncias
+    // REPORTS - Denúncias de conteúdo/perfis
     // ============================================
+    // Usuários podem criar reports e visualizar/consultar seus próprios (para verificar duplicatas e rate limit)
+    // O campo 'reportedBy' é um array que contém o UID do usuário que reportou
+    // O campo 'reporterUid' é o UID do usuário que criou o report
+    // Admins acessam via Admin SDK (bypassa regras)
     match /reports/{reportId} {
-      allow create: if isSignedIn() && request.resource.data.reporterUid == request.auth.uid;
-      allow read, update, delete: if isSignedIn() && resource.data.reporterUid == request.auth.uid;
+      // Create: usuário autenticado pode criar report com seu próprio UID
+      allow create: if isSignedIn() 
+        && request.resource.data.reporterUid == request.auth.uid
+        && (request.resource.data.reportedPostId != null || request.resource.data.reportedProfileId != null)
+        && request.resource.data.reason != null
+        && request.resource.data.status == 'pending';
+      
+      // Read (get/list): permite leitura/queries onde o usuário é o reporter
+      // Queries DEVEM incluir .where('reporterUid', '==', auth.uid) OU
+      // .where('reportedBy', 'array-contains', auth.uid)
+      allow read: if isSignedIn() 
+        && (resource.data.reporterUid == request.auth.uid 
+            || request.auth.uid in resource.data.reportedBy);
+      
+      // Update/Delete: negado para usuários (apenas admins via Admin SDK)
+      allow update, delete: if false;
+    }
+
+    // ============================================
+    // ADMIN NOTIFICATIONS - Notificações para painel admin
+    // ============================================
+    // Apenas Cloud Functions podem criar (via Admin SDK)
+    // Admins acessam via Admin SDK
+    match /adminNotifications/{notificationId} {
+      allow read, write: if false; // Apenas Admin SDK
+    }
+
+    // ============================================
+    // RATE LIMITS - Contadores de rate limiting
+    // ============================================
+    // Apenas Cloud Functions podem acessar (via Admin SDK)
+    match /rateLimits/{limitId} {
+      allow read, write: if false; // Apenas Admin SDK
     }
   }
 }

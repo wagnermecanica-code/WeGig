@@ -2,8 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:core_ui/widgets/location_autocomplete_field.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'dart:convert';
 
 void main() {

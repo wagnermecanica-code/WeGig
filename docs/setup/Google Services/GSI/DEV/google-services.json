@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "963929089370",
+    "project_id": "wegig-dev",
+    "storage_bucket": "wegig-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:963929089370:android:9982e7cff7a65685ec7f63",
+        "android_client_info": {
+          "package_name": "com.wegig.wegig.dev"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "963929089370-3davl5ktr3nuvispagbd1rlnk51vproh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBPov3Sy9P2M3u5ckWW4fqWdMuo7OBHNA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "963929089370-3davl5ktr3nuvispagbd1rlnk51vproh.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "963929089370-9vpki42g0itfkegtst8b149jtafm37cs.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.tosembanda.wegig.dev"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

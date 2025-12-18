@@ -1348,6 +1348,29 @@ class _PostPageState extends ConsumerState<PostPage> {
           child: Text('Nenhum endereço encontrado'),
         ),
       ),
+      const SizedBox(height: 8),
+      // Aviso de segurança sobre localização
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Iconsax.shield_tick,
+            size: 16,
+            color: Colors.orange.shade700,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Dica de segurança: Use um ponto de referência próximo ao invés do seu endereço exato.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
       const Divider(height: 48, thickness: 0.5),
 
       // 10. WhatsApp
@@ -1523,6 +1546,29 @@ class _PostPageState extends ConsumerState<PostPage> {
                       padding: EdgeInsets.all(16.0),
                       child: Text('Nenhum endereço encontrado'),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Aviso de segurança sobre localização
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Iconsax.shield_tick,
+                        size: 16,
+                        color: Colors.orange.shade700,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Dica de segurança: Use um ponto de referência próximo ao invés do seu endereço exato.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const Divider(thickness: 0.5, height: 48),
 

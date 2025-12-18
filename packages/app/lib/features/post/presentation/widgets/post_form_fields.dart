@@ -70,7 +70,7 @@ class PostFormFields extends StatelessWidget {
             alignLabelWithHint: true,
           ),
           maxLines: 5,
-          maxLength: 500,
+          maxLength: 600,
           textInputAction: TextInputAction.newline,
         ),
         if (videoUrlController != null) ...[

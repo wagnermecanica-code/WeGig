@@ -76,6 +76,28 @@
                 <action android:name="com.google.android.c2dm.intent.RECEIVE" />
             </intent-filter>
         </receiver>
+        
+        <!-- FCM: Canal padrão de notificações (CRÍTICO para background messages) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="high_importance_channel" />
+        
+        <!-- FCM: Ícone padrão para notificações -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+        
+        <!-- FCM: Cor padrão para notificações -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
+        
+        <!-- UCrop Activity for image_cropper plugin -->
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
+        
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

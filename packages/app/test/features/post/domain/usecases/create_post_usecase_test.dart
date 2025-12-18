@@ -100,13 +100,13 @@ void main() {
       );
     });
 
-    test('should throw when content is too long (> 500 chars)', () async {
+    test('should throw when content is too long (> 600 chars)', () async {
       // given
       final invalidPost = PostEntity(
         id: 'post-1',
         authorProfileId: 'profile-1',
         authorUid: 'user-123',
-        content: 'A' * 501,
+        content: 'A' * 601,
         location: const GeoPoint(-23.5505, -46.6333),
         city: 'São Paulo',
         type: 'band',
@@ -122,18 +122,18 @@ void main() {
       expect(
         () => useCase(invalidPost),
         throwsA(
-          predicate((e) => e.toString().contains('no máximo 500 caracteres')),
+          predicate((e) => e.toString().contains('no máximo 600 caracteres')),
         ),
       );
     });
 
-    test('should accept content with exactly 500 chars', () async {
+    test('should accept content with exactly 600 chars', () async {
       // given
       final validPost = PostEntity(
         id: 'post-1',
         authorProfileId: 'profile-1',
         authorUid: 'user-123',
-        content: 'A' * 500,
+        content: 'A' * 600,
         location: const GeoPoint(-23.5505, -46.6333),
         city: 'São Paulo',
         type: 'musician',
@@ -150,7 +150,7 @@ void main() {
       final result = await useCase(validPost);
 
       // then
-      expect(result.content.length, 500);
+      expect(result.content.length, 600);
     });
   });
 

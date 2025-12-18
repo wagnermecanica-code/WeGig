@@ -36,6 +36,10 @@ class ProdConfig {
   static const String androidApplicationId = 'com.wegig.wegig';
   static const String iosBundleId = 'com.wegig.wegig';
 
+  // Google Maps Cloud Map IDs
+  static const String googleMapIdAndroid = 'b7134f9dc59c2ad987ffb1bf';
+  static const String googleMapIdIOS = 'b7134f9dc59c2ad91b13772c';
+
   /// Verifica se está em ambiente de produção
   static bool get isDevelopment => false;
   static bool get isStaging => false;

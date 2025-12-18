@@ -53,7 +53,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCBPov3Sy9P2M3u5ckWW4fqWdMuo7OBHNA',
-    appId: '1:963929089370:android:1a6d15efd0ca5ecfec7f63',
+    appId: '1:963929089370:android:9982e7cff7a65685ec7f63',
     messagingSenderId: '963929089370',
     projectId: 'wegig-dev',
     storageBucket: 'wegig-dev.firebasestorage.app',
@@ -63,10 +63,10 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAf6EMmKIke4UX_PH9L78dIhQjCZyPiO1s',
-    appId: '1:963929089370:ios:09b43a150f6d7ec1ec7f63',
+    appId: '1:963929089370:ios:c9a1e302fc589b5fec7f63',
     messagingSenderId: '963929089370',
     projectId: 'wegig-dev',
     storageBucket: 'wegig-dev.firebasestorage.app',
-    iosBundleId: 'com.wegig.wegig',
+    iosBundleId: 'com.wegig.wegig.dev',
   );
 }

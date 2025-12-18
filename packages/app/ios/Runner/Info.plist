@@ -29,7 +29,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.963929089370-ptr6oho7i5e222st1g9a3boec7g20tol</string>
+				<string>com.googleusercontent.apps.278498777601-db30frfmi8dd44khpstus6kgog0nttg1</string>
 				<string>wegig</string>
 			</array>
 		</dict>
@@ -41,7 +41,7 @@
 	<key>FlutterDeepLinkingEnabled</key>
 	<true/>
 	<key>GIDClientID</key>
-	<string>963929089370-ptr6oho7i5e222st1g9a3boec7g20tol.apps.googleusercontent.com</string>
+	<string>278498777601-db30frfmi8dd44khpstus6kgog0nttg1.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>

@@ -20,7 +20,7 @@ part 'cache_config_provider.g.dart';
 @immutable
 class CacheConfig {
   const CacheConfig({
-    this.postCacheTTL = const Duration(minutes: 2),
+    this.postCacheTTL = const Duration(minutes: 10),
     this.profileCacheTTL = const Duration(minutes: 5),
     this.notificationCacheTTL = const Duration(minutes: 1),
     this.messageCacheTTL = const Duration(seconds: 30),
@@ -37,7 +37,7 @@ class CacheConfig {
   // TTLs por tipo de dado
   // ============================================
   
-  /// TTL para cache de posts/feed
+  /// TTL para cache de posts/feed (aumentado para 10 min para reduzir queries em rede fraca)
   final Duration postCacheTTL;
   
   /// TTL para cache de perfis

@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 /// Representa os tipos de perfis suportados no app.
 enum UserType { band, musician, sales }
 

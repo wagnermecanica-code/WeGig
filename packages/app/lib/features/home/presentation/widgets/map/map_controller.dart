@@ -1,18 +1,16 @@
 // Map Controller - Manages GoogleMap state and interactions
-import 'package:flutter/services.dart';
+// Cloud-based Map Styling é usado via cloudMapId no GoogleMap widget
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class MapControllerWrapper {
   GoogleMapController? _controller;
-  String? _mapStyle;
   LatLng? _currentPosition;
   double _currentZoom = 12;
   LatLngBounds? _lastSearchBounds;
   bool _showSearchAreaButton = false;
 
   GoogleMapController? get controller => _controller;
-  String? get mapStyle => _mapStyle;
   LatLng? get currentPosition => _currentPosition;
   double get currentZoom => _currentZoom;
   LatLngBounds? get lastSearchBounds => _lastSearchBounds;
@@ -36,14 +34,6 @@ class MapControllerWrapper {
 
   void setShowSearchAreaButton(bool show) {
     _showSearchAreaButton = show;
-  }
-
-  Future<void> loadMapStyle() async {
-    try {
-      _mapStyle = await rootBundle.loadString('assets/maps_style.json');
-    } catch (e) {
-      // Ignore errors - map will use default style
-    }
   }
 
   Future<void> animateToPosition(LatLng position, double zoom) async {

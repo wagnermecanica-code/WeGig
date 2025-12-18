@@ -1026,10 +1026,21 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   ),
                   onPressed: () async {
                     if (widget.isNewProfile) {
-                      // Novo perfil após autenticação: fazer logout e voltar para auth
-                      await ref.read(authServiceProvider).signOut();
-                      if (mounted) {
-                        context.go(AppRoutes.auth);
+                      // Verificar se usuário já tem outros perfis
+                      final profileState = ref.read(profileProvider).valueOrNull;
+                      final hasExistingProfiles = profileState?.profiles.isNotEmpty ?? false;
+                      
+                      if (hasExistingProfiles) {
+                        // Usuário já tem perfis, apenas voltar para a tela anterior
+                        if (mounted) {
+                          Navigator.of(context).maybePop();
+                        }
+                      } else {
+                        // Primeiro perfil (após autenticação): fazer logout e voltar para auth
+                        await ref.read(authServiceProvider).signOut();
+                        if (mounted) {
+                          context.go(AppRoutes.auth);
+                        }
                       }
                     } else {
                       Navigator.of(context).maybePop();

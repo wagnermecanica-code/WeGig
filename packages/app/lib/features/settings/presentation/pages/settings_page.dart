@@ -1,15 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
-import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
-import 'package:wegig_app/features/notifications_new/domain/services/notification_service.dart';
-import 'package:wegig_app/features/notifications_new/presentation/providers/push_notification_new_provider.dart';
+import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
@@ -155,16 +153,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const Divider(),
           const SizedBox(height: 24),
 
-          // Seção: Push Notifications (FCM)
-          const SettingsSection(
-              title: 'Push Notifications', icon: Iconsax.notification_bing),
-          const SizedBox(height: 12),
-          _buildPushNotificationsCard(activeProfile),
-
-          const SizedBox(height: 32),
-          const Divider(),
-          const SizedBox(height: 24),
-
           // Seção: Conta
           const SettingsSection(
               title: 'Conta', icon: Iconsax.profile_circle),
@@ -176,6 +164,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             iconColor: AppColors.error,
             textColor: AppColors.error,
             onTap: _showLogoutDialog,
+          ),
+          const SizedBox(height: 8),
+          SettingsTile(
+            icon: Iconsax.trash,
+            title: 'Excluir Conta',
+            subtitle: 'Remover permanentemente todos os dados',
+            iconColor: AppColors.error,
+            textColor: AppColors.error,
+            onTap: _showDeleteAccountDialog,
           ),
 
           const SizedBox(height: 40),
@@ -474,220 +471,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  /// Card de Push Notifications (FCM) - status de permissão e botão de teste
-  Widget _buildPushNotificationsCard(ProfileEntity? activeProfile) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Status de Permissão FCM
-            FutureBuilder<NotificationSettings>(
-              future: FirebaseMessaging.instance.getNotificationSettings(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                      ),
-                    ),
-                  );
-                }
-                
-                final status = snapshot.data!.authorizationStatus;
-                final isAuthorized = status == AuthorizationStatus.authorized;
-                final statusText = _getPermissionStatusText(status);
-                
-                return Column(
-                  children: [
-                    // Status atual
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: (isAuthorized ? AppColors.success : AppColors.error)
-                              .withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          isAuthorized ? Iconsax.tick_circle : Iconsax.danger,
-                          color: isAuthorized ? AppColors.success : AppColors.error,
-                          size: 24,
-                        ),
-                      ),
-                      title: Text(
-                        'Status das Notificações',
-                        style: AppTypography.titleMedium.copyWith(
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      subtitle: Text(
-                        statusText,
-                        style: AppTypography.caption.copyWith(
-                          color: isAuthorized ? AppColors.success : AppColors.error,
-                        ),
-                      ),
-                    ),
-                    
-                    // Botão solicitar permissão (se não autorizado)
-                    if (!isAuthorized) ...[
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _requestPushPermission(activeProfile),
-                          icon: const Icon(Iconsax.notification),
-                          label: const Text('Solicitar Permissão'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.accent,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                    
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    
-                    // Botão de Teste
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Iconsax.send_2,
-                          color: AppColors.primary,
-                          size: 24,
-                        ),
-                      ),
-                      title: Text(
-                        'Testar Notificações',
-                        style: AppTypography.titleMedium.copyWith(
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      subtitle: Text(
-                        'Envie uma notificação de teste',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      trailing: TextButton(
-                        onPressed: isAuthorized
-                            ? () => _sendTestNotification(activeProfile)
-                            : null,
-                        child: Text(
-                          'Enviar',
-                          style: TextStyle(
-                            color: isAuthorized
-                                ? AppColors.primary
-                                : AppColors.textHint,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Retorna texto legível do status de permissão FCM
-  String _getPermissionStatusText(AuthorizationStatus status) {
-    switch (status) {
-      case AuthorizationStatus.authorized:
-        return 'Notificações habilitadas ✅';
-      case AuthorizationStatus.denied:
-        return 'Permissão negada ❌';
-      case AuthorizationStatus.notDetermined:
-        return 'Aguardando permissão ⏳';
-      case AuthorizationStatus.provisional:
-        return 'Permissão provisória 📱';
-    }
-  }
-
-  /// Solicita permissão de push notifications (FCM)
-  Future<void> _requestPushPermission(ProfileEntity? activeProfile) async {
-    if (!mounted) return;
-
-    try {
-      final pushService = ref.read(pushNotificationNewServiceProvider);
-      final settings = await pushService.requestPermission();
-
-      if (!mounted) return;
-
-      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        // Salvar token para perfil ativo
-        if (activeProfile != null) {
-          await pushService.saveTokenForProfile(activeProfile.profileId);
-        }
-
-        AppSnackBar.showSuccess(context, '✅ Permissão concedida!');
-        
-        // Rebuild UI para atualizar status
-        setState(() {});
-      } else {
-        AppSnackBar.showError(context, '❌ Permissão negada');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      AppSnackBar.showError(context, 'Erro: $e');
-    }
-  }
-
-  /// Envia notificação de teste
-  Future<void> _sendTestNotification(ProfileEntity? activeProfile) async {
-    if (!mounted || activeProfile == null) return;
-
-    try {
-      // Criar notificação in-app de teste usando NotificationService
-      final notificationService = ref.read(notificationServiceProvider);
-      await notificationService.create(
-        recipientProfileId: activeProfile.profileId,
-        recipientUid: activeProfile.uid, // ✅ FIX: Obrigatório para Security Rules
-        type: 'system',
-        title: '🧪 Notificação de Teste',
-        body: 'Push notifications estão funcionando perfeitamente!',
-        data: {
-          'test': true,
-          'timestamp': DateTime.now().toIso8601String(),
-        },
-      );
-
-      if (!mounted) return;
-
-      AppSnackBar.showSuccess(
-        context,
-        '✅ Notificação de teste enviada! Verifique a aba de notificações.',
-      );
-    } catch (e) {
-      if (!mounted) return;
-      AppSnackBar.showError(context, 'Erro ao enviar teste: $e');
-    }
-  }
-
   /// Compartilha o deep link do perfil via WhatsApp, Instagram, etc
   void _shareProfile(ProfileEntity? profile) {
     if (profile == null) {
@@ -757,13 +540,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!mounted) return;
 
     // Capturar TUDO ANTES de operações async (crítico!)
-    final authService = ref.read(authServiceProvider);  // ✅ Capturar ANTES!
+    final authService = ref.read(authServiceProvider);
+    final profiles = ref.read(profileProvider).value?.profiles ?? [];
+    final profileIds = profiles.map((p) => p.profileId).toList();
 
     try {
       debugPrint('🔓 SettingsPage: Iniciando processo de logout...');
 
-      // ✅ FIX: Executar logout PRIMEIRO, antes de qualquer invalidação
-      // Isso garante que o router redirecione para AuthPage antes de invalidar providers
+      // 1. Remover tokens FCM de TODOS os perfis (antes do signOut)
+      if (profileIds.isNotEmpty) {
+        debugPrint('🔓 SettingsPage: Removendo tokens FCM de ${profileIds.length} perfis...');
+        await PushNotificationService().removeTokenFromAllProfiles(profileIds);
+      }
+
+      // 2. Executar logout (Firebase + Google)
       debugPrint('🔓 SettingsPage: Executando signOut...');
       await authService.signOut();
 
@@ -795,6 +585,181 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         );
       }
+    }
+  }
+
+  void _showDeleteAccountDialog() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Row(
+          children: [
+            Icon(Iconsax.warning_2, color: AppColors.error),
+            SizedBox(width: 12),
+            Text('Excluir Conta'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tem certeza que deseja excluir sua conta? Esta ação é irreversível.',
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.error.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Serão excluídos permanentemente:',
+                    style: AppTypography.captionLight.copyWith(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '• Todos os seus perfis\n• Todos os seus posts\n• Todas as suas fotos\n• Todas as suas conversas\n• Todas as suas notificações',
+                    style: AppTypography.captionLight.copyWith(
+                      color: AppColors.error,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _performDeleteAccount();
+            },
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _performDeleteAccount() async {
+    if (!mounted) return;
+
+    // Capturar referências ANTES de operações async
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final profileNotifier = ref.read(profileProvider.notifier);
+    final profiles = ref.read(profileProvider).value?.profiles ?? [];
+    final profileIds = profiles.map((p) => p.profileId).toList();
+    final user = ref.read(currentUserProvider);
+
+    if (user == null) {
+      debugPrint('❌ SettingsPage: Usuário não encontrado para deletar conta');
+      return;
+    }
+
+    try {
+      debugPrint('🗑️ SettingsPage: Iniciando processo de exclusão de conta...');
+      
+      // Mostrar loading
+      if (mounted) {
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const PopScope(
+            canPop: false,
+            child: Center(
+              child: Card(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Excluindo conta...'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      // 1. Remover tokens FCM de todos os perfis
+      if (profileIds.isNotEmpty) {
+        debugPrint('🗑️ SettingsPage: Removendo tokens FCM de ${profileIds.length} perfis...');
+        await PushNotificationService().removeTokenFromAllProfiles(profileIds);
+      }
+
+      // 2. Deletar todos os perfis (Cloud Function limpará posts e storage)
+      for (final profileId in profileIds) {
+        debugPrint('🗑️ SettingsPage: Deletando perfil $profileId...');
+        await profileNotifier.deleteProfile(profileId);
+      }
+
+      // 3. Deletar documento users/{uid} no Firestore
+      debugPrint('🗑️ SettingsPage: Deletando documento do usuário...');
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).delete();
+
+      // 4. Deletar usuário do Firebase Auth
+      debugPrint('🗑️ SettingsPage: Deletando usuário do Firebase Auth...');
+      await user.delete();
+
+      debugPrint('✅ SettingsPage: Conta excluída com sucesso');
+
+      // ✅ O router detectará authState == null e redirecionará para /auth
+    } catch (e) {
+      debugPrint('❌ SettingsPage: Erro ao excluir conta: $e');
+
+      // Fechar loading dialog se ainda estiver aberto
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Iconsax.danger, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  e.toString().contains('requires-recent-login')
+                      ? 'Para excluir sua conta, faça login novamente e tente de novo.'
+                      : 'Erro ao excluir conta: $e',
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
     }
   }
 

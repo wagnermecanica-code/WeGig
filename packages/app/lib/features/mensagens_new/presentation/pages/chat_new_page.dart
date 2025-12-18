@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -141,18 +142,32 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
 
   Future<void> _pickAndSendImage() async {
     try {
+      debugPrint('📷 ChatNewPage: Iniciando seleção de imagem...');
+      
       final pickedFile = await _imagePicker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 1920,
         maxHeight: 1920,
         imageQuality: 85,
+        requestFullMetadata: false, // Evita problemas de permissão no iOS 18
       );
 
-      if (pickedFile == null) return;
+      if (pickedFile == null) {
+        debugPrint('📷 ChatNewPage: Nenhuma imagem selecionada');
+        return;
+      }
 
+      debugPrint('📷 ChatNewPage: Imagem selecionada: ${pickedFile.path}');
       setState(() => _isUploading = true);
 
+      // Verificar se o arquivo existe
+      final file = File(pickedFile.path);
+      if (!await file.exists()) {
+        throw Exception('Arquivo de imagem não encontrado');
+      }
+
       // Comprimir imagem
+      debugPrint('📷 ChatNewPage: Comprimindo imagem...');
       final tempDir = await getTemporaryDirectory();
       final targetPath = path.join(
         tempDir.path,
@@ -165,27 +180,54 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
         quality: 85,
         minWidth: 800,
         minHeight: 800,
+        format: CompressFormat.jpeg, // Força JPEG sem alpha channel
+        keepExif: false, // Remove metadados desnecessários
       );
 
       if (compressedFile == null) {
         throw Exception('Erro ao comprimir imagem');
       }
 
+      debugPrint('📷 ChatNewPage: Imagem comprimida: ${compressedFile.path}');
+
       // Upload para Firebase Storage
       final activeProfile = ref.read(activeProfileProvider);
-      if (activeProfile == null) return;
+      if (activeProfile == null) {
+        throw Exception('Perfil ativo não encontrado');
+      }
 
+      // Verificar autenticação
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('Usuário não autenticado');
+      }
+      debugPrint('📷 ChatNewPage: Usuário autenticado: ${currentUser.uid}');
+
+      debugPrint('📷 ChatNewPage: Fazendo upload para Firebase Storage...');
       final fileName =
           '${DateTime.now().millisecondsSinceEpoch}_${path.basename(compressedFile.path)}';
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('chat_images')
-          .child(widget.conversationId)
-          .child(fileName);
+      final storagePath = 'chat_images/${widget.conversationId}/$fileName';
+      debugPrint('📷 ChatNewPage: Storage path: $storagePath');
+      
+      final storageRef = FirebaseStorage.instance.ref().child(storagePath);
 
-      final uploadTask = storageRef.putFile(File(compressedFile.path));
+      // Adicionar metadata com content-type
+      final metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        customMetadata: {
+          'uploadedBy': currentUser.uid,
+          'conversationId': widget.conversationId,
+        },
+      );
+
+      final uploadTask = storageRef.putFile(
+        File(compressedFile.path),
+        metadata,
+      );
       final snapshot = await uploadTask;
       final imageUrl = await snapshot.ref.getDownloadURL();
+
+      debugPrint('📷 ChatNewPage: Upload concluído: $imageUrl');
 
       // Enviar mensagem com imagem
       await ref
@@ -198,10 +240,13 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
             senderPhotoUrl: activeProfile.photoUrl,
           );
 
+      debugPrint('✅ ChatNewPage: Imagem enviada com sucesso!');
       _scrollToBottom();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ ChatNewPage: Erro ao enviar imagem - $e');
+      debugPrint('$stackTrace');
       if (mounted) {
-        AppSnackBar.showError(context, 'Erro ao enviar imagem');
+        AppSnackBar.showError(context, 'Erro ao enviar imagem: ${e.toString().split(':').last.trim()}');
       }
     } finally {
       if (mounted) {

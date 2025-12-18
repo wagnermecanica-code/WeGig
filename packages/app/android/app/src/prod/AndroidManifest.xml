@@ -1,7 +1,15 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Production Flavor Configuration -->
     <application
         android:label="WeGig"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        tools:replace="android:label">
+        
+        <!-- Google Maps API Key for Prod -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyC_QxHROqFRoIzCHBK_NFxu-GG6uMNS0uk"
+            tools:replace="android:value" />
     </application>
 </manifest>

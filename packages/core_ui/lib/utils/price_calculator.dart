@@ -1,21 +1,28 @@
+import 'dart:math';
+
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 
 /// Utilitário para cálculos de preços de posts
 class PriceCalculator {
   /// Calcula o preço final aplicando desconto sobre o preço original
+  /// Garante que o preço final nunca seja negativo
   static double calculateFinalPrice(PostEntity post) {
     final originalPrice = post.price ?? 0.0;
     final discountMode = post.discountMode ?? 'none';
     final discountValue = post.discountValue ?? 0.0;
 
+    double finalPrice = originalPrice;
+
     if (discountMode == 'percentage' && discountValue > 0) {
       // Desconto percentual: final = original * (1 - desconto%/100)
-      return originalPrice * (1 - discountValue / 100);
+      finalPrice = originalPrice * (1 - discountValue / 100);
     } else if (discountMode == 'fixed' && discountValue > 0) {
       // Desconto fixo: final = original - valor fixo
-      return originalPrice - discountValue;
+      finalPrice = originalPrice - discountValue;
     }
-    return originalPrice;
+    
+    // Garantir que o preço final nunca seja negativo
+    return max(0.0, finalPrice);
   }
 
   /// Verifica se o post tem desconto válido

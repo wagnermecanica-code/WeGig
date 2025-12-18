@@ -14,13 +14,21 @@
       },
       "oauth_client": [
         {
+          "client_id": "278498777601-k84006ghva4ndk43q5j87rst94drb7kv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.wegig.wegig",
+            "certificate_hash": "d162ea7be2ae14eba14a1ea6b9e244b3bf69b618"
+          }
+        },
+        {
           "client_id": "278498777601-t9pqcb80j1uui7pm7aakaej3p2cusdfp.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyC_QxHROqFRoIzCHBK_NFxu-GG6uMNS0uk"
+          "current_key": "AIzaSyDSf3JS9jg2LInpQma25FgIm1qWeToFXSQ"
         }
       ],
       "services": {

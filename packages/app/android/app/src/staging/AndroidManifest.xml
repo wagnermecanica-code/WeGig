@@ -5,5 +5,11 @@
         android:label="WeGig STAGING"
         android:icon="@mipmap/ic_launcher"
         tools:replace="android:label">
+        
+        <!-- Google Maps API Key for Staging -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyDVHjivVvjyB6-XGQQ4ckH4UXYafN14miU"
+            tools:replace="android:value" />
     </application>
 </manifest>

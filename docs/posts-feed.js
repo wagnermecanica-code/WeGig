@@ -40,29 +40,43 @@ let autoScrollInterval = null;
 
 // Aguardar Firebase e Google Maps estarem prontos
 function waitForDependencies() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let firebaseOk = window.firebaseReady || false;
     let mapsOk = window.googleMapsReady || false;
+    
+    console.log("🔍 Estado inicial - Firebase:", firebaseOk, "| Maps:", mapsOk);
 
     const check = () => {
+      console.log("🔍 Check - Firebase:", firebaseOk, "| Maps:", mapsOk);
       if (firebaseOk && mapsOk) {
+        console.log("✅ Ambas dependências prontas!");
         resolve();
         return;
       }
     };
 
     window.addEventListener("firebase-ready", () => {
+      console.log("📡 Evento firebase-ready recebido");
       firebaseOk = true;
       check();
     });
 
     window.addEventListener("google-maps-ready", () => {
+      console.log("🗺️ Evento google-maps-ready recebido");
       mapsOk = true;
       check();
     });
 
     // Verificar estado inicial
     check();
+    
+    // Timeout de segurança - 10 segundos
+    setTimeout(() => {
+      if (!firebaseOk || !mapsOk) {
+        console.error("⏱️ Timeout esperando dependências - Firebase:", firebaseOk, "| Maps:", mapsOk);
+        reject(new Error("Timeout: Firebase=" + firebaseOk + ", Maps=" + mapsOk));
+      }
+    }, 10000);
   });
 }
 
@@ -120,6 +134,8 @@ function initMap() {
 
 // Carregar posts do Firebase
 async function loadPosts() {
+  console.log("📥 Iniciando carregamento de posts...");
+  
   const db = window.firebaseDb;
   const q = window.firebaseQuery;
   const coll = window.firebaseCollection;
@@ -129,18 +145,27 @@ async function loadPosts() {
   const getDocs = window.firebaseGetDocs;
   const Timestamp = window.firebaseTimestamp;
 
+  console.log("📥 Firebase refs:", { db: !!db, q: !!q, coll: !!coll, getDocs: !!getDocs, Timestamp: !!Timestamp });
+
+  if (!db || !q || !coll || !getDocs || !Timestamp) {
+    throw new Error("Firebase não inicializado corretamente");
+  }
+
   const now = Timestamp.now();
+  console.log("📥 Timestamp now:", now.toDate());
 
   const postsRef = coll(db, "posts");
   const postsQuery = q(
     postsRef,
     whereClause("expiresAt", ">", now),
-    orderByClause("expiresAt", "asc"),  // REQUIRED: must orderBy the inequality field first
+    orderByClause("expiresAt", "asc"), // REQUIRED: must orderBy the inequality field first
     orderByClause("createdAt", "desc"),
     limitClause(CONFIG.MAX_POSTS)
   );
 
+  console.log("📥 Executando query...");
   const snapshot = await getDocs(postsQuery);
+  console.log("📥 Query retornou:", snapshot.size, "documentos");
 
   posts = snapshot.docs.map((doc) => ({
     id: doc.id,
@@ -148,6 +173,9 @@ async function loadPosts() {
   }));
 
   console.log(`📋 ${posts.length} posts carregados`);
+  if (posts.length > 0) {
+    console.log("📋 Primeiro post:", posts[0].id, posts[0].authorName, posts[0].type);
+  }
 }
 
 // Renderizar posts no carrossel
