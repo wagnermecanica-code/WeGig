@@ -32,6 +32,15 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("wegig-release.keystore")
+            storePassword = "wegig2025"
+            keyAlias = "wegig-key"
+            keyPassword = "wegig2025"
+        }
+    }
+
     // ===== FLAVORS CONFIGURATION =====
     flavorDimensions.add("environment")
     
@@ -67,9 +76,7 @@ android {
                 "proguard-rules.pro"
             )
             
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

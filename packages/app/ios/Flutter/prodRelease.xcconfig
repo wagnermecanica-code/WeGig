@@ -2,6 +2,7 @@
 #include "Generated.xcconfig"
 
 FLUTTER_TARGET=lib/main_prod.dart
+FLUTTER_BUILD_MODE=release
 ASSET_PREFIX=prod
 BUNDLE_NAME=WeGig
 BUNDLE_DISPLAY_NAME=WeGig

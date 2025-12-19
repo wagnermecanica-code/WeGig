@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "1500"
+   LastUpgradeVersion = "2610"
    version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -41,16 +41,17 @@
       </BuildActionEntries>
    </BuildAction>
    <TestAction
-      buildConfiguration = "Debug-prod"
+      buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
    </TestAction>
    <LaunchAction
-      buildConfiguration = "Release"
+      buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      customLLDBInitFile = "$(SRCROOT)/Flutter/ephemeral/flutter_lldbinit"
       launchStyle = "0"
       useCustomWorkingDirectory = "NO"
       ignoresPersistentStateOnLaunch = "NO"
@@ -69,7 +70,7 @@
       </BuildableProductRunnable>
    </LaunchAction>
    <ProfileAction
-      buildConfiguration = "Profile-prod"
+      buildConfiguration = "Profile"
       shouldUseLaunchSchemeArgsEnv = "YES"
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
@@ -86,10 +87,10 @@
       </BuildableProductRunnable>
    </ProfileAction>
    <AnalyzeAction
-      buildConfiguration = "Debug-prod">
+      buildConfiguration = "Debug">
    </AnalyzeAction>
    <ArchiveAction
-      buildConfiguration = "Release-prod"
+      buildConfiguration = "Release"
       revealArchiveInOrganizer = "YES">
    </ArchiveAction>
 </Scheme>

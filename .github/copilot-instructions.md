@@ -197,6 +197,7 @@ _debouncer.run(() => _performSearch(query));
 | **mensagens_new/**     | Real-time chat; unread counter per profile; lazy stream loading                                                                |
 | **notifications_new/** | In-app + FCM push; proximity alerts; interest notifications; auto-cleanup                                                      |
 | **settings/**          | Notification radius (5-100km); profile management; legal links                                                                 |
+| **report/**            | Report posts/profiles with predefined reasons; rate limiting (10/day); duplicate prevention                                    |
 
 ## Firestore Security Rules
 
