@@ -28,6 +28,7 @@ import 'package:path/path.dart' as p;
 import 'package:go_router/go_router.dart';
 import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
+import 'package:wegig_app/features/auth/presentation/widgets/age_verification_dialog.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 class EditProfilePage extends ConsumerStatefulWidget {
@@ -291,9 +292,17 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         }
       }
 
-      // Se é novo perfil, deixa tudo vazio
+      // Se é novo perfil, deixa tudo vazio (exceto ano de nascimento verificado)
       if (widget.isNewProfile) {
         debugPrint('EditProfile: Modo novo perfil - campos vazios');
+        
+        // ✅ Pré-preenche ano de nascimento da verificação de idade no cadastro
+        final verifiedBirthYear = ref.read(verifiedBirthYearProvider);
+        if (verifiedBirthYear != null) {
+          _birthYearController.text = verifiedBirthYear.toString();
+          debugPrint('EditProfile: Ano de nascimento pré-preenchido: $verifiedBirthYear');
+        }
+        
         setState(() => _isLoadingProfile = false);
         return;
       }

@@ -6,7 +6,7 @@
 
 ## 📋 Sumário Executivo
 
-**WeGig** é uma plataforma social móvel que conecta músicos, bandas e espaços musicais através de busca geoespacial, posts efêmeros (30 dias de validade), mensagens em tempo real e notificações de proximidade. O sistema de múltiplos perfis (estilo Instagram) permite que um único usuário gerencie perfis de músico, banda e espaço (estúdios, escolas, luthierias, etc.) separadamente.
+**WeGig (18+)** é uma plataforma social móvel **exclusiva para maiores de 18 anos** que conecta músicos, bandas e espaços musicais através de busca geoespacial, posts efêmeros (30 dias de validade), mensagens em tempo real e notificações de proximidade. O sistema de múltiplos perfis (estilo Instagram) permite que um único usuário gerencie perfis de músico, banda e espaço (estúdios, escolas, luthierias, etc.) separadamente.
 
 ### Métricas do MVP
 

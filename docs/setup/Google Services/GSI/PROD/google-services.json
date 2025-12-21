@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "278498777601-1pbl191m1rcovkgbiiftcndelbphmofl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.wegig.wegig",
+            "certificate_hash": "48202107d9ec82be46f61e2c537c2b8265e1dc31"
+          }
+        },
+        {
+          "client_id": "278498777601-k84006ghva4ndk43q5j87rst94drb7kv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.wegig.wegig",
+            "certificate_hash": "d162ea7be2ae14eba14a1ea6b9e244b3bf69b618"
+          }
+        },
+        {
           "client_id": "278498777601-t9pqcb80j1uui7pm7aakaej3p2cusdfp.apps.googleusercontent.com",
           "client_type": 3
         }

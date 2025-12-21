@@ -31,7 +31,9 @@
     <key>NSFaceIDUsageDescription</key>
     <string></string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Este app usa a sua localização para mostrar anúncios próximos a você no mapa.</string>
+    <string>O WeGig usa sua localização para mostrar músicos, bandas e espaços musicais próximos a você, permitindo buscas geoespaciais precisas e notificações de oportunidades na sua região.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>O WeGig usa sua localização para mostrar músicos, bandas e espaços musicais próximos a você, permitindo buscas geoespaciais precisas e notificações de oportunidades na sua região.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Este app pode salvar fotos editadas na sua galeria.</string>
     <key>NSPhotoLibraryUsageDescription</key>
