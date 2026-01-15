@@ -1,0 +1,39 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": [
+          "6PP9UL45V7.com.wegig.wegig",
+          "6PP9UL45V7.com.wegig.wegig.dev",
+          "6PP9UL45V7.com.wegig.wegig.staging"
+        ],
+        "components": [
+          {
+            "/": "/profile/*",
+            "comment": "Matches any profile page"
+          },
+          {
+            "/": "/post/*",
+            "comment": "Matches any post page"
+          },
+          {
+            "/": "/conversation/*",
+            "comment": "Matches any conversation page"
+          },
+          {
+            "/": "/chat/*",
+            "comment": "Matches any chat page"
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "6PP9UL45V7.com.wegig.wegig",
+      "6PP9UL45V7.com.wegig.wegig.dev",
+      "6PP9UL45V7.com.wegig.wegig.staging"
+    ]
+  }
+}

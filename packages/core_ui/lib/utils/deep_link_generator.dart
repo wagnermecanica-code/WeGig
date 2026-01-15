@@ -2,8 +2,8 @@ import 'location_utils.dart';
 
 /// Gerador de deep links para compartilhamento
 class DeepLinkGenerator {
-  // Base URL do app (ajustar quando tiver domínio registrado)
-  static const String baseUrl = 'https://wegig.app';
+  // Base URL do app (domínio registrado)
+  static const String baseUrl = 'https://wegig.com.br';
   
   /// Gera link para perfil
   static String generateProfileLink({
@@ -100,6 +100,25 @@ class DeepLinkGenerator {
         message += '\n🔍 Procurando: ${instruments.join(", ")}';
       }
       
+      if (genres.isNotEmpty) {
+        message += '\n🎼 Gêneros: ${genres.join(", ")}';
+      }
+    } else if (postType == 'hiring') {
+      // Contratação/divulgação de oportunidade
+      message = '📣 Oportunidade de contratação no WeGig!\n\n';
+      message += '🏢 $authorName\n';
+      if (locationText.isNotEmpty) {
+        message += '📍 $locationText\n';
+      }
+
+      if (content != null && content.isNotEmpty) {
+        message += '\n💬 "$content"\n';
+      }
+
+      if (instruments.isNotEmpty) {
+        message += '\n🎯 Perfil desejado: ${instruments.join(", ")}';
+      }
+
       if (genres.isNotEmpty) {
         message += '\n🎼 Gêneros: ${genres.join(", ")}';
       }

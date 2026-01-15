@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,12 +15,16 @@ import 'package:iconsax/iconsax.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:wegig_app/core/firebase/blocked_profiles.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
+import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 
 import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../domain/entities/entities.dart';
 import '../providers/chat_new_controller.dart';
 import '../providers/mensagens_new_providers.dart';
 import '../widgets/widgets.dart';
+import 'edit_group_page.dart';
 import 'package:wegig_app/app/router/app_router.dart';
 
 /// Página de chat individual
@@ -39,6 +45,8 @@ class ChatNewPage extends ConsumerStatefulWidget {
     required this.otherUid,
     required this.otherName,
     this.otherPhotoUrl,
+    this.isGroup = false,
+    this.groupPhotoUrl,
     super.key,
   });
 
@@ -57,6 +65,9 @@ class ChatNewPage extends ConsumerStatefulWidget {
   /// Foto do outro participante
   final String? otherPhotoUrl;
 
+  final bool isGroup;
+  final String? groupPhotoUrl;
+
   @override
   ConsumerState<ChatNewPage> createState() => _ChatNewPageState();
 }
@@ -67,23 +78,289 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
   
   bool _isUploading = false;
 
+  StreamSubscription<List<String>>? _excludedSubscription;
+  String? _resolvedOtherProfileId;
+  ProviderSubscription<ChatNewState>? _chatStateSubscription;
+
   // Mensagem selecionada para ações
   MessageNewEntity? _selectedMessage;
   Offset? _selectedMessagePosition;
+
+  // ✅ Cache de dados dos participantes para grupos
+  Map<String, ParticipantData> _participantsCache = {};
+  bool _isLoadingParticipants = false;
+
+  // ✅ Set de profileIds bloqueados (para filtrar mensagens em grupos)
+  Set<String> _blockedProfileIds = {};
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
 
+    // 🔒 Bloqueios: impede abrir conversa com usuário bloqueado (apenas 1:1)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!widget.isGroup) {
+        _exitIfBlocked();
+      } else {
+        // Para grupos: carregar lista de bloqueados para filtrar mensagens
+        _loadBlockedProfiles();
+      }
+    });
+
     // Marcar como lida ao abrir
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       _markAsRead();
+
+      // ✅ Marcar como lida sempre que chegar nova mensagem do outro participante enquanto o chat está aberto (somente 1:1)
+      if (!widget.isGroup) {
+        _chatStateSubscription = ref.listenManual(
+          chatNewControllerProvider(widget.conversationId),
+          (prev, next) {
+            if (!mounted) return;
+
+            final activeProfile = ref.read(activeProfileProvider);
+            if (activeProfile == null) return;
+
+            final hasUnreadIncoming = next.messages.any(
+              (msg) =>
+                  msg.senderProfileId != activeProfile.profileId &&
+                  msg.status != MessageDeliveryStatus.read,
+            );
+
+            if (hasUnreadIncoming) {
+              _markAsRead();
+            }
+          },
+        );
+      }
     });
+
+    // ✅ Carregar participantes se for grupo
+    if (widget.isGroup) {
+      _loadGroupParticipants();
+    }
+  }
+
+  /// ✅ Carrega lista de perfis bloqueados (para filtrar mensagens em grupos)
+  Future<void> _loadBlockedProfiles() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final activeProfile = ref.read(activeProfileProvider);
+    if (activeProfile == null) return;
+
+    try {
+      final excluded = await BlockedRelations.getExcludedProfileIds(
+        firestore: FirebaseFirestore.instance,
+        profileId: activeProfile.profileId,
+        uid: currentUser.uid,
+      );
+
+      if (mounted) {
+        setState(() {
+          _blockedProfileIds = excluded.toSet();
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Erro ao carregar perfis bloqueados: $e');
+    }
+  }
+
+  /// ✅ Verifica se um perfil está bloqueado
+  bool _isProfileBlocked(String profileId) {
+    return _blockedProfileIds.contains(profileId);
+  }
+
+  /// ✅ Carrega dados de todos os participantes do grupo
+  Future<void> _loadGroupParticipants() async {
+    if (_isLoadingParticipants) return;
+    setState(() => _isLoadingParticipants = true);
+    try {
+      final conversationSnap = await FirebaseFirestore.instance
+          .collection('conversations')
+          .doc(widget.conversationId)
+          .get();
+
+      final data = conversationSnap.data();
+      if (data == null) return;
+
+      final participantProfiles =
+          (data['participantProfiles'] as List<dynamic>?)?.cast<String>() ?? [];
+
+      // Buscar dados de todos os participantes
+      final activeProfile = ref.read(activeProfileProvider);
+      final currentProfileId = activeProfile?.profileId ?? '';
+
+      final otherIds = participantProfiles
+          .where((id) => id != currentProfileId)
+          .toList();
+
+      if (otherIds.isEmpty) return;
+
+      // Buscar em batches de 10 (limite do Firestore)
+      final cache = <String, ParticipantData>{};
+      for (var i = 0; i < otherIds.length; i += 10) {
+        final chunk = otherIds.sublist(
+          i,
+          i + 10 > otherIds.length ? otherIds.length : i + 10,
+        );
+
+        final profilesSnap = await FirebaseFirestore.instance
+            .collection('profiles')
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+
+        for (final doc in profilesSnap.docs) {
+          final profileData = doc.data();
+          cache[doc.id] = ParticipantData(
+            profileId: doc.id,
+            uid: profileData['uid'] as String? ?? '',
+            name: profileData['name'] as String? ?? 'Usuário',
+            photoUrl: profileData['photoUrl'] as String?,
+            profileType: profileData['type'] as String?,
+          );
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _participantsCache = cache;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Erro ao carregar participantes do grupo: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingParticipants = false);
+      }
+    }
+  }
+
+  /// ✅ Obtém dados de um participante pelo profileId
+  ParticipantData? _getParticipantData(String profileId) {
+    return _participantsCache[profileId];
+  }
+
+  Future<String> _resolveOtherProfileId() async {
+    if (_resolvedOtherProfileId != null) return _resolvedOtherProfileId!;
+
+    final activeProfile = ref.read(activeProfileProvider);
+    if (activeProfile == null) {
+      _resolvedOtherProfileId = widget.otherProfileId.trim();
+      return _resolvedOtherProfileId!;
+    }
+
+    var otherProfileId = widget.otherProfileId.trim();
+    if (otherProfileId.isEmpty) {
+      try {
+        final conversationSnap = await FirebaseFirestore.instance
+            .collection('conversations')
+            .doc(widget.conversationId)
+            .get();
+        final data = conversationSnap.data();
+        final participantProfiles =
+            (data?['participantProfiles'] as List<dynamic>?)?.cast<String>() ??
+                <String>[];
+        otherProfileId = participantProfiles.firstWhere(
+          (p) => p != activeProfile.profileId,
+          orElse: () => '',
+        );
+      } catch (_) {
+        // Best-effort only.
+      }
+    }
+
+    _resolvedOtherProfileId = otherProfileId.trim();
+    return _resolvedOtherProfileId!;
+  }
+
+  Future<void> _startBlockedWatcher() async {
+    if (_excludedSubscription != null) return;
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final activeProfile = ref.read(activeProfileProvider);
+    if (activeProfile == null) return;
+
+    final otherProfileId = await _resolveOtherProfileId();
+    if (otherProfileId.isEmpty) return;
+
+    _excludedSubscription = BlockedRelations.watchExcludedProfileIds(
+      firestore: FirebaseFirestore.instance,
+      profileId: activeProfile.profileId,
+      uid: currentUser.uid,
+    ).listen(
+      (excluded) {
+        if (!mounted) return;
+        if (excluded.contains(otherProfileId)) {
+          AppSnackBar.showError(context, 'Conversa indisponível');
+          if (Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      onError: (_) {
+        // Não derrubar a UI por falha de stream.
+      },
+    );
+  }
+
+  Future<void> _exitIfBlocked() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+    
+    final activeProfile = ref.read(activeProfileProvider);
+    if (activeProfile == null) return;
+
+    try {
+      final otherProfileId = await _resolveOtherProfileId();
+      if (otherProfileId.isEmpty) return;
+
+      final excluded = await BlockedRelations.getExcludedProfileIds(
+        firestore: FirebaseFirestore.instance,
+        profileId: activeProfile.profileId,
+        uid: currentUser.uid,
+      );
+
+      if (excluded.contains(otherProfileId)) {
+        if (!mounted) return;
+        AppSnackBar.showError(context, 'Conversa indisponível');
+        if (Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+        }
+        return;
+      }
+
+      await _startBlockedWatcher();
+    } catch (_) {
+      // Se falhar, não bloqueia a UI; guard adicional existe no envio.
+    }
+  }
+
+  Future<bool> _isOtherUserBlocked() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return false;
+    
+    final activeProfile = ref.read(activeProfileProvider);
+    if (activeProfile == null) return false;
+
+    final otherProfileId = await _resolveOtherProfileId();
+    if (otherProfileId.isEmpty) return false;
+
+    final excluded = await BlockedRelations.getExcludedProfileIds(
+      firestore: FirebaseFirestore.instance,
+      profileId: activeProfile.profileId,
+      uid: currentUser.uid,
+    );
+    return excluded.contains(otherProfileId);
   }
 
   @override
   void dispose() {
+    _excludedSubscription?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -103,21 +380,41 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
     final activeProfile = ref.read(activeProfileProvider);
     if (activeProfile == null) return;
 
-    ref.read(markAsReadNewUseCaseProvider).call(
-      conversationId: widget.conversationId,
-      profileId: activeProfile.profileId,
+    // Marcar como lida e só então recalcular o badge.
+    // Se atualizarmos o badge antes do write no Firestore, ele pode manter o valor antigo.
+    unawaited(
+      ref
+          .read(markAsReadNewUseCaseProvider)
+          .call(
+            conversationId: widget.conversationId,
+            profileId: activeProfile.profileId,
+          )
+          .then((_) => PushNotificationService().updateAppBadge(
+                activeProfile.profileId,
+                activeProfile.uid,
+              ))
+          .catchError((e, _) {
+        debugPrint('Erro ao marcar conversa como lida (chat): $e');
+      }),
     );
   }
 
   Future<void> _sendMessage(String text) async {
+    if (await _isOtherUserBlocked()) {
+      if (!mounted) return;
+      AppSnackBar.showError(context, 'Conversa indisponível');
+      return;
+    }
+
     final activeProfile = ref.read(activeProfileProvider);
     if (activeProfile == null) return;
 
+    final chatState = ref.read(chatNewControllerProvider(widget.conversationId));
     final chatNotifier =
         ref.read(chatNewControllerProvider(widget.conversationId).notifier);
 
     // Se estiver editando, atualiza a mensagem
-    final editing = chatNotifier.state.editingMessage;
+    final editing = chatState.editingMessage;
     if (editing != null) {
       await chatNotifier.editMessage(
         messageId: editing.id,
@@ -142,6 +439,12 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
 
   Future<void> _pickAndSendImage() async {
     try {
+      if (await _isOtherUserBlocked()) {
+        if (!mounted) return;
+        AppSnackBar.showError(context, 'Conversa indisponível');
+        return;
+      }
+
       debugPrint('📷 ChatNewPage: Iniciando seleção de imagem...');
       
       final pickedFile = await _imagePicker.pickImage(
@@ -263,6 +566,25 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
         curve: Curves.easeOut,
       );
     }
+  }
+
+  String _typingDisplayName(ChatNewState chatState) {
+    final typingId = chatState.typingProfileId;
+
+    if (widget.isGroup) {
+      final participantName = typingId != null
+          ? _getParticipantData(typingId)?.name
+          : null;
+      if (participantName != null && participantName.isNotEmpty) {
+        return participantName;
+      }
+      return 'Alguém';
+    }
+
+    if (widget.otherName.isNotEmpty) {
+      return widget.otherName;
+    }
+    return 'Contato';
   }
 
   void _onTyping() {
@@ -429,7 +751,7 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Digitando...',
+                      '${_typingDisplayName(chatState)} digitando...',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -497,40 +819,23 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
       titleSpacing: 0,
       title: GestureDetector(
         onTap: () {
+          if (widget.isGroup) {
+            // ✅ Abrir página de edição do grupo
+            _openEditGroup();
+            return;
+          }
           // ✅ Navegar para ViewProfile do outro usuário
-          context.pushProfile(widget.otherProfileId);
+          final otherProfileId = _resolvedOtherProfileId ?? widget.otherProfileId;
+          if (otherProfileId.isEmpty) return;
+          context.pushProfile(otherProfileId);
         },
         child: Row(
           children: [
-            // Avatar
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.surfaceVariant,
-              ),
-              child: widget.otherPhotoUrl != null &&
-                      widget.otherPhotoUrl!.isNotEmpty
-                  ? ClipOval(
-                      child: CachedNetworkImage(
-                        imageUrl: widget.otherPhotoUrl!,
-                        fit: BoxFit.cover,
-                      ),
-                    )
-                  : Center(
-                      child: Text(
-                        widget.otherName.isNotEmpty
-                            ? widget.otherName[0].toUpperCase()
-                            : '?',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-            ),
+            // Avatar (empilhado para grupos)
+            if (widget.isGroup)
+              _buildGroupAvatarAppBar()
+            else
+              _buildSingleAvatarAppBar(),
 
             const SizedBox(width: 12),
 
@@ -539,23 +844,45 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.otherName,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      if (widget.isGroup) ...[
+                        Icon(
+                          Iconsax.people,
+                          size: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      Flexible(
+                        child: Text(
+                          widget.otherName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // ✅ Indicador de que é clicável para grupos
+                      if (widget.isGroup) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Iconsax.arrow_right_3,
+                          size: 14,
+                          color: AppColors.textHint,
+                        ),
+                      ],
+                    ],
                   ),
-                  if (chatState.isOtherTyping)
+                  if (widget.isGroup && _participantsCache.isNotEmpty)
                     Text(
-                      'digitando...',
+                      '${_participantsCache.length + 1} participantes',
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.accent,
-                        fontStyle: FontStyle.italic,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                 ],
@@ -564,7 +891,262 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
           ],
         ),
       ),
-      actions: const [],
+      actions: widget.isGroup
+          ? [
+              // ✅ Menu de opções do grupo
+              PopupMenuButton<String>(
+                icon: Icon(Iconsax.more, color: AppColors.textPrimary),
+                onSelected: _onGroupMenuSelected,
+                itemBuilder: (context) => [
+                  const PopupMenuItem<String>(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Iconsax.edit, size: 20),
+                        SizedBox(width: 12),
+                        Text('Editar grupo'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ]
+          : const [],
+    );
+  }
+
+  /// ✅ Abre a página de edição do grupo
+  void _openEditGroup() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EditGroupPage(
+          conversationId: widget.conversationId,
+          groupName: widget.otherName,
+          groupPhotoUrl: _groupPhotoUrl ?? widget.groupPhotoUrl,
+        ),
+      ),
+    );
+  }
+
+  /// ✅ Handler do menu do grupo
+  void _onGroupMenuSelected(String value) {
+    if (value == 'edit') {
+      _openEditGroup();
+    }
+  }
+
+  /// ✅ Foto do grupo (atualizada se mudou)
+  String? get _groupPhotoUrl => widget.groupPhotoUrl;
+
+  /// ✅ Avatar único para chat 1:1
+  Widget _buildSingleAvatarAppBar() {
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: (widget.otherPhotoUrl != null && widget.otherPhotoUrl!.isNotEmpty)
+          ? ClipOval(
+              child: CachedNetworkImage(
+                imageUrl: widget.otherPhotoUrl!,
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+                memCacheWidth: 80,
+                memCacheHeight: 80,
+                placeholder: (_, __) => Container(
+                  color: AppColors.surfaceVariant,
+                  child: Icon(
+                    Iconsax.user,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
+                ),
+                errorWidget: (_, __, ___) => Container(
+                  color: AppColors.surfaceVariant,
+                  child: Icon(
+                    Iconsax.user,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
+                ),
+              ),
+            )
+          : Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.surfaceVariant,
+              ),
+              child: Icon(
+                Iconsax.user,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
+            ),
+    );
+  }
+
+  /// ✅ Avatares empilhados para grupos (estilo Instagram/WhatsApp)
+  Widget _buildGroupAvatarAppBar() {
+    // Se tem foto do grupo, usa ela
+    if (widget.groupPhotoUrl != null && widget.groupPhotoUrl!.isNotEmpty) {
+      return SizedBox(
+        width: 40,
+        height: 40,
+        child: ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: widget.groupPhotoUrl!,
+            width: 40,
+            height: 40,
+            fit: BoxFit.cover,
+            memCacheWidth: 80,
+            memCacheHeight: 80,
+            placeholder: (_, __) => Container(
+              color: AppColors.surfaceVariant,
+              child: Icon(
+                Iconsax.people,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
+            ),
+            errorWidget: (_, __, ___) => Container(
+              color: AppColors.surfaceVariant,
+              child: Icon(
+                Iconsax.people,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Sem foto do grupo: avatares empilhados
+    final participants = _participantsCache.values.take(2).toList();
+    
+    if (participants.isEmpty) {
+      // Loading ou sem participantes: mostrar ícone de grupo
+      return Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.surfaceVariant,
+        ),
+        child: Center(
+          child: Icon(
+            Iconsax.people,
+            color: AppColors.textSecondary,
+            size: 20,
+          ),
+        ),
+      );
+    }
+
+    if (participants.length == 1) {
+      // Apenas 1 participante visível
+      return _buildMiniAvatar(participants.first, 40);
+    }
+
+    // 2+ participantes: avatares empilhados
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Avatar de trás
+          Positioned(
+            top: 0,
+            right: 0,
+            child: _buildMiniAvatar(participants[1], 26),
+          ),
+          // Avatar da frente
+          Positioned(
+            bottom: 0,
+            left: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.surface, width: 1.5),
+              ),
+              child: _buildMiniAvatar(participants[0], 26),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ✅ Mini avatar para composição de grupo
+  Widget _buildMiniAvatar(ParticipantData participant, double size) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: (participant.photoUrl != null && participant.photoUrl!.isNotEmpty)
+          ? ClipOval(
+              child: CachedNetworkImage(
+                imageUrl: participant.photoUrl!,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                memCacheWidth: (size * 2).toInt(),
+                memCacheHeight: (size * 2).toInt(),
+                placeholder: (_, __) => Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.surfaceVariant,
+                  ),
+                  child: Center(
+                    child: Text(
+                      participant.name.isNotEmpty
+                          ? participant.name[0].toUpperCase()
+                          : '?',
+                      style: TextStyle(
+                        fontSize: size * 0.4,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+                errorWidget: (_, __, ___) => Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.surfaceVariant,
+                  ),
+                  child: Center(
+                    child: Text(
+                      participant.name.isNotEmpty
+                          ? participant.name[0].toUpperCase()
+                          : '?',
+                      style: TextStyle(
+                        fontSize: size * 0.4,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.surfaceVariant,
+              ),
+              child: Center(
+                child: Text(
+                  participant.name.isNotEmpty
+                      ? participant.name[0].toUpperCase()
+                      : '?',
+                  style: TextStyle(
+                    fontSize: size * 0.4,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
     );
   }
 
@@ -588,15 +1170,31 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
       );
     }
 
+    // ✅ Filtrar mensagens de perfis bloqueados (apenas em grupos)
+    final messages = widget.isGroup && _blockedProfileIds.isNotEmpty
+        ? chatState.messages.where((m) {
+            // Sempre mostrar mensagens próprias e do sistema
+            if (m.senderProfileId == currentProfileId) return true;
+            if (m.isSystemMessage) return true;
+            // Ocultar mensagens de perfis bloqueados
+            return !_isProfileBlocked(m.senderProfileId);
+          }).toList()
+        : chatState.messages;
+
+    // ✅ Verificar se ficou vazio após filtro
+    if (messages.isEmpty && chatState.error == null) {
+      return const EmptyChatState();
+    }
+
     return ListView.builder(
       controller: _scrollController,
       reverse: true,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: chatState.messages.length + (chatState.isLoadingMore ? 1 : 0),
+      itemCount: messages.length + (chatState.isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
         // Loading indicator no topo
-        if (index == chatState.messages.length) {
+        if (index == messages.length) {
           return const Padding(
             padding: EdgeInsets.all(16),
             child: Center(
@@ -605,14 +1203,50 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
           );
         }
 
-        final message = chatState.messages[index];
+        final message = messages[index];
         final isMine = message.senderProfileId == currentProfileId;
 
+        // Para agrupamento visual (avatar/nome), ignorar mensagens de sistema e mensagens ocultas
+        // (ex.: a primeira mensagem "normal" após uma mensagem de sistema do mesmo remetente)
+        String? nextComparableSenderProfileId;
+        if (index < messages.length - 1) {
+          for (var i = index + 1; i < messages.length; i++) {
+          final next = messages[i];
+          if (next.isSystemMessage) continue;
+          if (next.isDeletedForProfile(currentProfileId)) continue;
+          nextComparableSenderProfileId = next.senderProfileId;
+          break;
+          }
+        }
+
         // Verificar se deve mostrar avatar
-        final showAvatar = !isMine &&
-            (index == chatState.messages.length - 1 ||
-                chatState.messages[index + 1].senderProfileId !=
-                    message.senderProfileId);
+        final showAvatar =
+          !isMine &&
+          !message.isSystemMessage &&
+          (nextComparableSenderProfileId == null ||
+            nextComparableSenderProfileId != message.senderProfileId);
+
+        // ✅ Para grupos: verificar se deve mostrar nome do remetente
+        // Mostra nome quando é primeira mensagem do remetente em sequência
+        final showSenderName =
+          false;
+
+        // ✅ Obter nome e foto do remetente correto
+        String? senderName;
+        String? senderPhotoUrl;
+
+        if (!isMine) {
+          if (widget.isGroup) {
+            // Para grupos: buscar do cache de participantes
+            final participant = _getParticipantData(message.senderProfileId);
+            senderName = participant?.name ?? message.senderName ?? 'Usuário';
+            senderPhotoUrl = participant?.photoUrl ?? message.senderPhotoUrl;
+          } else {
+            // Para 1:1: usar dados do widget
+            senderName = widget.otherName;
+            senderPhotoUrl = widget.otherPhotoUrl;
+          }
+        }
 
         return GestureDetector(
           onLongPressStart: (details) {
@@ -622,9 +1256,11 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
             message: message,
             isMine: isMine,
             currentProfileId: currentProfileId,
+            isGroup: widget.isGroup,
             showAvatar: showAvatar,
-            senderName: isMine ? null : widget.otherName,
-            senderPhotoUrl: isMine ? null : widget.otherPhotoUrl,
+            showSenderName: showSenderName,
+            senderName: senderName,
+            senderPhotoUrl: senderPhotoUrl,
             onReactionTap: (emoji) async {
               final activeProfile = ref.read(activeProfileProvider);
               if (activeProfile == null) return;
@@ -654,6 +1290,8 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
               }
             },
             onReactorsPressed: () => _showReactors(message),
+            onProfileTap: (profileId) => context.pushProfile(profileId),
+            onPostTap: (postId) => context.pushPostDetail(postId),
             onReplyTap: (messageId) {
               // TODO: Scroll para mensagem original
             },
@@ -667,7 +1305,7 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
   void _showReactors(MessageNewEntity message) {
     if (message.reactions.isEmpty) return;
     
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

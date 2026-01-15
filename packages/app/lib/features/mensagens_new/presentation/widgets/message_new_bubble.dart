@@ -6,6 +6,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:wegig_app/widgets/full_screen_photo_viewer.dart';
 
 import '../../domain/entities/entities.dart';
+import 'linkified_text.dart';
 
 /// Bubble de mensagem no chat
 ///
@@ -21,11 +22,15 @@ class MessageNewBubble extends StatelessWidget {
     required this.message,
     required this.isMine,
     required this.currentProfileId,
+    this.isGroup = false,
     this.onReactionTap,
     this.onLongPress,
     this.onReplyTap,
     this.onReactorsPressed,
+    this.onProfileTap,
+    this.onPostTap,
     this.showAvatar = false,
+    this.showSenderName = false,
     this.senderName,
     this.senderPhotoUrl,
     super.key,
@@ -40,6 +45,9 @@ class MessageNewBubble extends StatelessWidget {
   /// ProfileId do usuário atual
   final String currentProfileId;
 
+  /// Se a conversa é em grupo (esconde ícone de lido)
+  final bool isGroup;
+
   /// Callback ao tocar em uma reação
   final void Function(String emoji)? onReactionTap;
 
@@ -52,8 +60,17 @@ class MessageNewBubble extends StatelessWidget {
   /// ✅ Callback ao pressionar longamente nas reações (mostrar quem reagiu)
   final VoidCallback? onReactorsPressed;
 
+  /// Callback ao tocar em um link de perfil WeGig
+  final void Function(String profileId)? onProfileTap;
+
+  /// Callback ao tocar em um link de post WeGig
+  final void Function(String postId)? onPostTap;
+
   /// Se deve mostrar avatar (para mensagens recebidas)
   final bool showAvatar;
+
+  /// ✅ Se deve mostrar nome do remetente (para grupos)
+  final bool showSenderName;
 
   /// Nome do remetente (para mensagens recebidas)
   final String? senderName;
@@ -126,24 +143,22 @@ class MessageNewBubble extends StatelessWidget {
     final photoUrl = senderPhotoUrl ?? message.senderPhotoUrl;
     final name = senderName ?? message.senderName ?? '?';
 
-    return Container(
+    return SizedBox(
       width: 28,
       height: 28,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppColors.surfaceVariant,
-      ),
-      child: photoUrl != null && photoUrl.isNotEmpty
-          ? ClipOval(
-              child: CachedNetworkImage(
+      child: ClipOval(
+        child: photoUrl != null && photoUrl.isNotEmpty
+            ? CachedNetworkImage(
                 imageUrl: photoUrl,
+                memCacheWidth: 56,
+                memCacheHeight: 56,
                 fit: BoxFit.cover,
                 placeholder: (context, url) => _buildAvatarPlaceholder(name),
                 errorWidget: (context, url, error) =>
                     _buildAvatarPlaceholder(name),
-              ),
-            )
-          : _buildAvatarPlaceholder(name),
+              )
+            : _buildAvatarPlaceholder(name),
+      ),
     );
   }
 
@@ -177,6 +192,20 @@ class MessageNewBubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ✅ Nome do remetente (para grupos)
+          if (showSenderName && senderName != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Text(
+                senderName!,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.accent,
+                ),
+              ),
+            ),
+
           // Reply preview
           if (message.isReply) _buildReplyPreview(),
 
@@ -379,15 +408,24 @@ class MessageNewBubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Texto
+          // Texto com links clicáveis
           if (message.hasText)
-            Text(
-              message.text,
+            LinkifiedText(
+              text: message.text,
               style: TextStyle(
                 fontSize: 15,
                 color: isMine ? Colors.white : AppColors.textPrimary,
                 height: 1.3,
               ),
+              linkStyle: TextStyle(
+                fontSize: 15,
+                color: isMine ? Colors.white : AppColors.accent,
+                height: 1.3,
+                decoration: TextDecoration.underline,
+                decorationColor: isMine ? Colors.white70 : AppColors.accent,
+              ),
+              onProfileTap: onProfileTap,
+              onPostTap: onPostTap,
             ),
 
           const SizedBox(height: 4),
@@ -414,7 +452,7 @@ class MessageNewBubble extends StatelessWidget {
                   color: isMine ? Colors.white54 : AppColors.textHint,
                 ),
               ),
-              if (isMine) ...[
+              if (isMine && !isGroup) ...[
                 const SizedBox(width: 4),
                 _buildStatusIcon(),
               ],
@@ -426,6 +464,8 @@ class MessageNewBubble extends StatelessWidget {
   }
 
   Widget _buildStatusIcon() {
+    if (isGroup) return const SizedBox.shrink();
+
     IconData icon;
     Color color = Colors.white54;
 
@@ -441,8 +481,8 @@ class MessageNewBubble extends StatelessWidget {
         color = Colors.white70;
         break;
       case MessageDeliveryStatus.read:
-        icon = Iconsax.tick_circle5;
-        color = Colors.white;
+        icon = Iconsax.tick_circle;
+        color = AppColors.success;
         break;
       case MessageDeliveryStatus.failed:
         icon = Iconsax.warning_2;

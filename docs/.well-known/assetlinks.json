@@ -1,0 +1,32 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.wegig.wegig",
+      "sha256_cert_fingerprints": [
+        "E9:C7:35:BD:0C:05:9B:3D:53:3D:8C:D3:13:C5:12:06:DE:BA:8A:52:9A:3E:56:4E:5F:B0:5A:2F:C2:A7:7A:8D"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.wegig.wegig.dev",
+      "sha256_cert_fingerprints": [
+        "E9:C7:35:BD:0C:05:9B:3D:53:3D:8C:D3:13:C5:12:06:DE:BA:8A:52:9A:3E:56:4E:5F:B0:5A:2F:C2:A7:7A:8D"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.wegig.wegig.staging",
+      "sha256_cert_fingerprints": [
+        "E9:C7:35:BD:0C:05:9B:3D:53:3D:8C:D3:13:C5:12:06:DE:BA:8A:52:9A:3E:56:4E:5F:B0:5A:2F:C2:A7:7A:8D"
+      ]
+    }
+  }
+]

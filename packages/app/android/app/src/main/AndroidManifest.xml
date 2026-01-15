@@ -58,12 +58,12 @@
                 <data android:scheme="wegig" android:host="app" />
             </intent-filter>
             
-            <!-- Universal Links: https://wegig.app/* -->
+            <!-- Universal Links: https://wegig.com.br/* -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="wegig.app" />
+                <data android:scheme="https" android:host="wegig.com.br" />
             </intent-filter>
         </activity>
         
