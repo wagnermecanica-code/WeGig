@@ -1,0 +1,12 @@
+# Jekyll configuration for GitHub Pages
+# Required to serve .well-known directory for deep linking
+
+# Include hidden directories
+include:
+  - .well-known
+
+# Disable Jekyll processing for JSON files
+exclude:
+  - "*.md"
+  - "!README.md"
+  - "!index.md"
