@@ -73,6 +73,11 @@ class DeepLinkGenerator {
     String? content,
     List<String> instruments = const [],
     List<String> genres = const [],
+    String? title,
+    String? salesType,
+    double? price,
+    String? discountMode,
+    double? discountValue,
   }) {
     final link = generatePostLink(postId: postId);
     final locationText = formatCleanLocation(
@@ -122,6 +127,35 @@ class DeepLinkGenerator {
       if (genres.isNotEmpty) {
         message += '\n🎼 Gêneros: ${genres.join(", ")}';
       }
+    } else if (postType == 'sales') {
+      // Anúncio/venda
+      final fallbackTitle = (content != null && content.isNotEmpty)
+          ? content.split('\n').first
+          : 'Anúncio';
+      final titleText = (title != null && title.isNotEmpty) ? title : fallbackTitle;
+      message = '🏷️ Anúncio no WeGig!\n\n';
+      message += '📦 $titleText\n';
+      message += '👤 $authorName\n';
+      if (locationText.isNotEmpty) {
+        message += '📍 $locationText\n';
+      }
+
+      if (content != null && content.isNotEmpty) {
+        message += '\n💬 "$content"\n';
+      }
+
+      if (salesType != null && salesType.isNotEmpty) {
+        message += '\n🗂️ Categoria: $salesType';
+      }
+
+      if (price != null && price > 0) {
+        message += '\n💰 Preço: ${_formatPrice(price)}';
+      }
+
+      final discountLabel = _formatDiscountLabel(discountMode, discountValue);
+      if (discountLabel.isNotEmpty) {
+        message += '\n🏷️ Desconto: $discountLabel';
+      }
     } else {
       // Músico procurando banda
       message = '🎵 Músico procurando banda no WeGig!\n\n';
@@ -147,5 +181,22 @@ class DeepLinkGenerator {
     message += 'Baixe o app e conecte-se com músicos na sua região!';
     
     return message;
+  }
+
+  static String _formatPrice(double value) {
+    final normalized = value.toStringAsFixed(2).replaceAll('.', ',');
+    return 'R\$ $normalized';
+  }
+
+  static String _formatDiscountLabel(String? mode, double? value) {
+    if (value == null || value <= 0) return '';
+    if (mode == 'percentage') {
+      final percent = value.toStringAsFixed(0);
+      return '$percent%';
+    }
+    if (mode == 'fixed') {
+      return _formatPrice(value);
+    }
+    return '';
   }
 }
