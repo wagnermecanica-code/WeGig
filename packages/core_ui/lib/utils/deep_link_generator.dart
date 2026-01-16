@@ -129,10 +129,7 @@ class DeepLinkGenerator {
       }
     } else if (postType == 'sales') {
       // Anúncio/venda
-      final fallbackTitle = (content != null && content.isNotEmpty)
-          ? content.split('\n').first
-          : 'Anúncio';
-      final titleText = (title != null && title.isNotEmpty) ? title : fallbackTitle;
+      final titleText = (title != null && title.isNotEmpty) ? title : 'Anúncio';
       message = '🏷️ Anúncio no WeGig!\n\n';
       message += '📦 $titleText\n';
       message += '👤 $authorName\n';
