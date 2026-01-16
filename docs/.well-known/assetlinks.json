@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "com.wegig.wegig",
       "sha256_cert_fingerprints": [
-        "E9:C7:35:BD:0C:05:9B:3D:53:3D:8C:D3:13:C5:12:06:DE:BA:8A:52:9A:3E:56:4E:5F:B0:5A:2F:C2:A7:7A:8D"
+        "E9:C7:35:BD:0C:05:9B:3D:53:3D:8C:D3:13:C5:12:06:DE:BA:8A:52:9A:3E:56:4E:5F:B0:5A:2F:C2:A7:7A:8D",
+        "1D:E5:7E:FE:34:4E:28:96:CE:2A:5F:15:6F:16:85:CB:29:87:3C:75:58:77:F1:27:9E:52:66:4B:1F:B9:A0:87"
       ]
     }
   },
