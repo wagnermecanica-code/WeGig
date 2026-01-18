@@ -152,39 +152,27 @@ nav a:hover {
 
 .about-grid {
   display: grid;
-  grid-template-columns: 1fr 1.2fr;
-  gap: 0;
-  align-items: stretch;
-  position: relative;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
 }
 
 .about-image {
   display: flex;
-  justify-content: flex-end;
-  align-items: stretch;
-  position: relative;
-  z-index: 1;
+  justify-content: center;
+  align-items: center;
 }
 
 .about-image img {
-  width: 90%;
-  height: 100%;
-  object-fit: cover;
+  width: 100%;
+  max-width: 400px;
+  height: auto;
   border-radius: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
 .about-content {
-  position: relative;
-  z-index: 2;
-  margin-left: -60px;
-  background: linear-gradient(
-    135deg,
-    rgba(52, 21, 57, 0.95),
-    rgba(0, 8, 17, 0.95)
-  );
-  padding: 2.5rem;
-  border-radius: 16px;
+  padding: 1rem 0;
 }
 
 .about-content h2 {
