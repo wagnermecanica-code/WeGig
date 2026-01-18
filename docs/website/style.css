@@ -151,22 +151,34 @@ nav a:hover {
 
 .about-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4rem;
+  grid-template-columns: 0.4fr 1fr;
+  gap: 0;
   align-items: center;
+  position: relative;
 }
 
 .about-image {
   display: flex;
   justify-content: center;
   align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
 .about-image img {
-  max-width: 100%;
+  max-width: 75%;
   height: auto;
   border-radius: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.about-content {
+  position: relative;
+  z-index: 2;
+  margin-left: -80px;
+  background: linear-gradient(135deg, rgba(52, 21, 57, 0.95), rgba(0, 8, 17, 0.95));
+  padding: 2.5rem;
+  border-radius: 16px;
 }
 
 .about-content h2 {
@@ -865,7 +877,13 @@ footer {
   }
 
   .about-image img {
-    max-width: 80%;
+    max-width: 60%;
+  }
+
+  .about-content {
+    margin-left: 0;
+    background: transparent;
+    padding: 1rem;
   }
 
   .about-content h2 {
