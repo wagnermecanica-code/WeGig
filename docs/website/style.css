@@ -151,7 +151,7 @@ nav a:hover {
 
 .about-grid {
   display: grid;
-  grid-template-columns: 0.4fr 1fr;
+  grid-template-columns: 1fr 1.2fr;
   gap: 0;
   align-items: center;
   position: relative;
@@ -166,7 +166,7 @@ nav a:hover {
 }
 
 .about-image img {
-  max-width: 56%;
+  max-width: 85%;
   height: auto;
   border-radius: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
@@ -175,7 +175,7 @@ nav a:hover {
 .about-content {
   position: relative;
   z-index: 2;
-  margin-left: -120px;
+  margin-left: -60px;
   background: linear-gradient(
     135deg,
     rgba(52, 21, 57, 0.95),
