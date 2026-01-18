@@ -18,16 +18,19 @@ const CONFIG = {
     musician: "#37475A",
     band: "#E47911",
     sales: "#007EB9",
+    hiring: "#514771",
   },
   TYPE_LABELS: {
     musician: "Busca banda",
     band: "Busca músico",
     sales: "Anúncio",
+    hiring: "Oportunidade",
   },
   TYPE_ICONS: {
-    musician: "🎸",
-    band: "👥",
-    sales: "🏪",
+    musician: "music",
+    band: "people",
+    sales: "shop",
+    hiring: "briefcase",
   },
 };
 
@@ -40,7 +43,7 @@ let activePostId = null;
 // Aguardar Firebase e Google Maps estarem prontos
 function waitForDependencies() {
   return new Promise((resolve, reject) => {
-    console.log("🔍 Aguardando dependências...");
+    console.log("Aguardando dependências...");
 
     // Polling approach - mais confiável que eventos
     let attempts = 0;
@@ -53,17 +56,17 @@ function waitForDependencies() {
       const mapsOk = window.googleMapsReady === true && window.google?.maps;
 
       console.log(
-        `🔍 Tentativa ${attempts} - Firebase: ${firebaseOk}, Maps: ${mapsOk}`
+        `Tentativa ${attempts} - Firebase: ${firebaseOk}, Maps: ${mapsOk}`,
       );
 
       if (firebaseOk && mapsOk) {
-        console.log("✅ Ambas dependências prontas!");
+        console.log("Ambas dependências prontas!");
         resolve();
         return;
       }
 
       if (attempts >= maxAttempts) {
-        console.error("⏱️ Timeout esperando dependências");
+        console.error("Timeout esperando dependências");
         console.error("Firebase:", {
           ready: window.firebaseReady,
           db: !!window.firebaseDb,
@@ -82,11 +85,11 @@ function waitForDependencies() {
 
     // Também ouvir eventos como backup
     window.addEventListener("firebase-ready", () => {
-      console.log("📡 Evento firebase-ready recebido");
+      console.log("Evento firebase-ready recebido");
     });
 
     window.addEventListener("google-maps-ready", () => {
-      console.log("🗺️ Evento google-maps-ready recebido");
+      console.log("Evento google-maps-ready recebido");
     });
 
     // Iniciar verificação
@@ -96,32 +99,32 @@ function waitForDependencies() {
 
 // Inicialização
 async function init() {
-  console.log("🚀 WeGig Posts Feed: Iniciando...");
+  console.log("WeGig Posts Feed: Iniciando...");
 
   try {
     await waitForDependencies();
-    console.log("✅ Dependências carregadas");
+    console.log("Dependências carregadas");
 
     // Inicializar mapa
     initMap();
-    console.log("✅ Mapa inicializado");
+    console.log("Mapa inicializado");
 
     // Carregar posts do Firebase
     await loadPosts();
-    console.log("✅ Posts carregados:", posts.length);
+    console.log("Posts carregados:", posts.length);
 
     // Renderizar posts
     renderPosts();
-    console.log("✅ Posts renderizados");
+    console.log("Posts renderizados");
 
     // Adicionar markers ao mapa
     addMarkersToMap();
-    console.log("✅ Markers adicionados");
+    console.log("Markers adicionados");
 
-    console.log("✅ Posts Feed inicializado com sucesso");
+    console.log("Posts Feed inicializado com sucesso");
   } catch (error) {
-    console.error("❌ Erro ao inicializar Posts Feed:", error);
-    console.error("❌ Stack:", error.stack);
+    console.error("Erro ao inicializar Posts Feed:", error);
+    console.error("Stack:", error.stack);
     showError(error.message);
   }
 }
@@ -150,7 +153,7 @@ function initMap() {
 
 // Carregar posts do Firebase
 async function loadPosts() {
-  console.log("📥 Iniciando carregamento de posts...");
+  console.log("Iniciando carregamento de posts...");
 
   const db = window.firebaseDb;
   const q = window.firebaseQuery;
@@ -161,7 +164,7 @@ async function loadPosts() {
   const getDocs = window.firebaseGetDocs;
   const Timestamp = window.firebaseTimestamp;
 
-  console.log("📥 Firebase refs:", {
+  console.log("Firebase refs:", {
     db: !!db,
     q: !!q,
     coll: !!coll,
@@ -174,7 +177,7 @@ async function loadPosts() {
   }
 
   const now = Timestamp.now();
-  console.log("📥 Timestamp now:", now.toDate());
+  console.log("Timestamp now:", now.toDate());
 
   const postsRef = coll(db, "posts");
   const postsQuery = q(
@@ -182,25 +185,25 @@ async function loadPosts() {
     whereClause("expiresAt", ">", now),
     orderByClause("expiresAt", "asc"), // REQUIRED: must orderBy the inequality field first
     orderByClause("createdAt", "desc"),
-    limitClause(CONFIG.MAX_POSTS)
+    limitClause(CONFIG.MAX_POSTS),
   );
 
-  console.log("📥 Executando query...");
+  console.log("Executando query...");
   const snapshot = await getDocs(postsQuery);
-  console.log("📥 Query retornou:", snapshot.size, "documentos");
+  console.log("Query retornou:", snapshot.size, "documentos");
 
   posts = snapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
   }));
 
-  console.log(`📋 ${posts.length} posts carregados`);
+  console.log(`${posts.length} posts carregados`);
   if (posts.length > 0) {
     console.log(
-      "📋 Primeiro post:",
+      "Primeiro post:",
       posts[0].id,
       posts[0].authorName,
-      posts[0].type
+      posts[0].type,
     );
   }
 }
@@ -213,7 +216,7 @@ function renderPosts() {
   if (posts.length === 0) {
     carousel.innerHTML = `
       <div class="no-posts-message">
-        <div class="icon">📭</div>
+        <div class="icon"><i class="iconsax" data-icon="box"></i></div>
         <h3>Nenhum post disponível</h3>
         <p>Seja o primeiro a publicar! Baixe o app e comece a conectar-se com músicos.</p>
         <a href="#download" class="btn btn-primary">Baixar App</a>
@@ -285,6 +288,22 @@ function createPostCard(post) {
           }</small>`
         : ""
     }</span>`;
+  } else if (type === "hiring") {
+    const eventType = post.eventType || "Evento";
+    const budget = post.budgetRange || "";
+    const guestCount =
+      typeof post.guestCount === "number"
+        ? `${post.guestCount} convidados`
+        : "";
+
+    subtitle = eventType;
+
+    const metaParts = [budget, guestCount].filter(Boolean);
+    if (metaParts.length) {
+      extraInfo = `<span class="pc-tags">${escapeHtml(
+        metaParts.join(" · "),
+      )}</span>`;
+    }
   } else {
     const items =
       type === "musician"
@@ -302,13 +321,13 @@ function createPostCard(post) {
             authorPhoto
               ? `<img src="${authorPhoto}" alt="" class="pc-avatar" />`
               : `<span class="pc-avatar pc-avatar--placeholder" style="background:${color}">${authorName.charAt(
-                  0
+                  0,
                 )}</span>`
           }
         </div>
         <div class="pc-subtitle" style="color:${color}">${escapeHtml(
-    subtitle
-  )}</div>
+          subtitle,
+        )}</div>
         ${extraInfo}
         ${
           truncatedContent
@@ -316,7 +335,9 @@ function createPostCard(post) {
             : ""
         }
         <div class="pc-meta">
-          <span>📍 ${escapeHtml(city)}</span>
+          <span><i class="iconsax" data-icon="location"></i> ${escapeHtml(
+            city,
+          )}</span>
           <span>· ${timeAgo}</span>
         </div>
       </div>
@@ -331,7 +352,7 @@ function addMarkersToMap() {
     return;
   }
 
-  console.log("🗺️ Adicionando", posts.length, "markers ao mapa...");
+  console.log("Adicionando", posts.length, "markers ao mapa...");
   const bounds = new google.maps.LatLngBounds();
 
   posts.forEach((post, index) => {
@@ -354,12 +375,12 @@ function addMarkersToMap() {
     } else {
       console.log(
         `⚠️ Post ${index} formato de localização desconhecido:`,
-        post.location
+        post.location,
       );
       return;
     }
 
-    console.log(`📍 Post ${index}:`, post.id, "lat=", lat, "lng=", lng);
+    console.log(`Post ${index}:`, post.id, "lat=", lat, "lng=", lng);
 
     if (!lat || !lng) {
       console.log(`⚠️ Post ${index} com lat/lng inválidos`);
@@ -433,7 +454,7 @@ function createMarkerContent(post, isActive) {
   if (isActive) {
     const glowSvg = document.createElementNS(
       "http://www.w3.org/2000/svg",
-      "svg"
+      "svg",
     );
     glowSvg.setAttribute("width", width * 1.15);
     glowSvg.setAttribute("height", height * 1.15);
@@ -490,17 +511,17 @@ function lightenColor(hex, percent) {
   const num = parseInt(hex.replace("#", ""), 16);
   const r = Math.min(
     255,
-    Math.floor((num >> 16) + ((255 - (num >> 16)) * percent) / 100)
+    Math.floor((num >> 16) + ((255 - (num >> 16)) * percent) / 100),
   );
   const g = Math.min(
     255,
     Math.floor(
-      ((num >> 8) & 0x00ff) + ((255 - ((num >> 8) & 0x00ff)) * percent) / 100
-    )
+      ((num >> 8) & 0x00ff) + ((255 - ((num >> 8) & 0x00ff)) * percent) / 100,
+    ),
   );
   const b = Math.min(
     255,
-    Math.floor((num & 0x0000ff) + ((255 - (num & 0x0000ff)) * percent) / 100)
+    Math.floor((num & 0x0000ff) + ((255 - (num & 0x0000ff)) * percent) / 100),
   );
   return `rgb(${r},${g},${b})`;
 }
@@ -561,7 +582,7 @@ function showError(errorMessage) {
   if (carousel) {
     carousel.innerHTML = `
       <div class="error-message">
-        <div class="icon">⚠️</div>
+        <div class="icon"><i class="iconsax" data-icon="warning-2"></i></div>
         <h3>Não foi possível carregar os posts</h3>
         <p>Tente novamente mais tarde ou baixe o app para a experiência completa.</p>
         ${

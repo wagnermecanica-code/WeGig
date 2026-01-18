@@ -6,6 +6,10 @@
     <meta name="description" content="Política de Privacidade - WeGig">
     <title>Política de Privacidade - WeGig</title>
     <link rel="stylesheet" href="style.css">
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/iconsax@1.0.0/dist/css/iconsax.css"
+        >
     <link rel="icon" type="image/png" href="favicon.png">
 </head>
 <body>
@@ -190,14 +194,14 @@ Cada usuário pode criar até <strong>5 perfis</strong> diferentes. Para cada pe
 <p>
 | Dado                                  | Precisão                 | Visibilidade              | Retenção                  |
 | ------------------------------------- | ------------------------ | ------------------------- | ------------------------- |
-| <strong>GeoPoint (lat/lng)</strong>                | ~11cm (6 casas decimais) | <span class="emoji">🔒</span> Privado (backend only) | Enquanto perfil existir   |
-| <strong>Cidade</strong>                            | Municipal                | 🌐 Público                | Enquanto perfil existir   |
-| <strong>Bairro</strong>                            | ~1km                     | 🌐 Público                | Enquanto perfil existir   |
-| <strong>Distância calculada</strong>               | ~100m                    | 🌐 Público (ex: "2.5km")  | Calculado em tempo real   |
-| <strong>Histórico de localização de posts</strong> | Por post                 | 🌐 Público                | 30 dias (expira com post) |
+| <strong>GeoPoint (lat/lng)</strong>                | ~11cm (6 casas decimais) | <span class="emoji"><i class="iconsax" data-icon="lock-1"></i></span> Privado (backend only) | Enquanto perfil existir   |
+| <strong>Cidade</strong>                            | Municipal                | <i class="iconsax" data-icon="global"></i> Público                | Enquanto perfil existir   |
+| <strong>Bairro</strong>                            | ~1km                     | <i class="iconsax" data-icon="global"></i> Público                | Enquanto perfil existir   |
+| <strong>Distância calculada</strong>               | ~100m                    | <i class="iconsax" data-icon="global"></i> Público (ex: "2.5km")  | Calculado em tempo real   |
+| <strong>Histórico de localização de posts</strong> | Por post                 | <i class="iconsax" data-icon="global"></i> Público                | 30 dias (expira com post) |
 </p>
 
-<strong><span class="emoji">⚠️</span> IMPORTANTE:</strong>
+<strong><span class="emoji"><i class="iconsax" data-icon="warning-2"></i></span> IMPORTANTE:</strong>
 
 <ul>
 <li>Suas coordenadas <strong>exatas</strong> não são exibidas na interface do app</li>
@@ -521,9 +525,9 @@ O WeGig implementa <strong>isolamento de dados por perfil</strong>, semelhante a
 <strong>Criptografia:</strong>
 
 <ul>
-<li><span class="emoji">🔒</span> <strong>Em trânsito</strong>: TLS 1.3 (HTTPS) para todas as comunicações</li>
-<li><span class="emoji">🔒</span> <strong>Em repouso</strong>: AES-256 (Firebase Firestore padrão)</li>
-<li><span class="emoji">🔒</span> <strong>Senhas</strong>: Bcrypt hash com salt (Firebase Auth)</li>
+<li><span class="emoji"><i class="iconsax" data-icon="lock-1"></i></span> <strong>Em trânsito</strong>: TLS 1.3 (HTTPS) para todas as comunicações</li>
+<li><span class="emoji"><i class="iconsax" data-icon="lock-1"></i></span> <strong>Em repouso</strong>: AES-256 (Firebase Firestore padrão)</li>
+<li><span class="emoji"><i class="iconsax" data-icon="lock-1"></i></span> <strong>Senhas</strong>: Bcrypt hash com salt (Firebase Auth)</li>
 </ul>
 
 <strong>Controles de Acesso:</strong>
@@ -1012,8 +1016,8 @@ Versões anteriores disponíveis em: <code>https://wegig.com.br/privacidade/hist
 </p>
 
 <strong>Para dúvidas ou exercício de direitos, entre em contato:</strong>  
-<span class="emoji">📧</span> <strong>contato@wegig.com.br</strong>  
-<span class="emoji">🕒</span> <strong>Prazo de resposta: 72 horas úteis</strong>
+<span class="emoji"><i class="iconsax" data-icon="sms"></i></span> <strong>contato@wegig.com.br</strong>  
+<span class="emoji"><i class="iconsax" data-icon="clock"></i></span> <strong>Prazo de resposta: 72 horas úteis</strong>
 
     </main>
 

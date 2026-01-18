@@ -8,6 +8,7 @@
 :root {
   --primary-color: #37475a; /* Dark - Musicians */
   --secondary-color: #e47911; /* Orange - Bands */
+  --hiring-color: #514771; /* Purple - Hiring */
   --dark-color: #232f3e;
   --light-color: #f0f3f7;
   --text-primary: #1a1a1a;
@@ -18,8 +19,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, sans-serif;
   line-height: 1.6;
   color: var(--text-primary);
   background-color: var(--background);
@@ -87,11 +89,7 @@ nav a:hover {
 
 /* Hero Section */
 .hero {
-  background: linear-gradient(
-    135deg,
-    var(--primary-color),
-    var(--secondary-color)
-  );
+  background: linear-gradient(135deg, #341539, #0f3f70);
   color: white;
   padding: 6rem 0;
   text-align: center;
@@ -231,6 +229,23 @@ nav a:hover {
 .feature .icon {
   font-size: 3rem;
   margin-bottom: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.icon-inline .iconsax,
+.feature .icon .iconsax,
+.no-posts-message .icon .iconsax,
+.error-message .icon .iconsax {
+  font-size: inherit;
+  line-height: 1;
 }
 
 .feature h3 {
@@ -435,7 +450,10 @@ nav a:hover {
   border: 1px solid transparent;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   cursor: pointer;
-  transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+  transition:
+    box-shadow 0.15s,
+    transform 0.15s,
+    border-color 0.15s;
 }
 
 .pc:hover {

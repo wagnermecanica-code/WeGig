@@ -25,9 +25,9 @@ const CONFIG = {
     sales: "Anúncio",
   },
   TYPE_ICONS: {
-    musician: "🎸",
-    band: "👥",
-    sales: "🏪",
+    musician: '<i class="iconsax" data-icon="music"></i>',
+    band: '<i class="iconsax" data-icon="people"></i>',
+    sales: '<i class="iconsax" data-icon="shop"></i>',
   },
 };
 
@@ -68,11 +68,11 @@ function waitForDependencies() {
 
 // Inicialização
 async function init() {
-  console.log("🚀 WeGig Posts Feed: Iniciando...");
+  console.log("WeGig Posts Feed: Iniciando...");
 
   try {
     await waitForDependencies();
-    console.log("✅ Dependências carregadas");
+    console.log("Dependências carregadas");
 
     // Inicializar mapa
     initMap();
@@ -89,9 +89,9 @@ async function init() {
     // Iniciar auto-scroll
     startAutoScroll();
 
-    console.log("✅ Posts Feed inicializado com sucesso");
+    console.log("Posts Feed inicializado com sucesso");
   } catch (error) {
-    console.error("❌ Erro ao inicializar Posts Feed:", error);
+    console.error("Erro ao inicializar Posts Feed:", error);
     showError();
   }
 }
@@ -146,7 +146,7 @@ async function loadPosts() {
     ...doc.data(),
   }));
 
-  console.log(`📋 ${posts.length} posts carregados`);
+  console.log(`${posts.length} posts carregados`);
 }
 
 // Renderizar posts no carrossel
@@ -157,7 +157,7 @@ function renderPosts() {
   if (posts.length === 0) {
     carousel.innerHTML = `
       <div class="no-posts-message">
-        <div class="icon">📭</div>
+        <div class="icon"><i class="iconsax" data-icon="box"></i></div>
         <h3>Nenhum post disponível</h3>
         <p>Seja o primeiro a publicar! Baixe o app e comece a conectar-se com músicos.</p>
         <a href="#download" class="btn btn-primary">Baixar App</a>
@@ -246,10 +246,18 @@ function createPostCard(post) {
       <div class="post-type-label">${typeLabel}</div>
       ${
         instruments
-          ? `<div class="post-instruments">🎵 ${escapeHtml(instruments)}</div>`
+          ? `<div class="post-instruments"><i class="iconsax" data-icon="musicnote"></i> ${escapeHtml(
+              instruments
+            )}</div>`
           : ""
       }
-      ${level ? `<div class="post-level">⭐ ${escapeHtml(level)}</div>` : ""}
+      ${
+        level
+          ? `<div class="post-level"><i class="iconsax" data-icon="star"></i> ${escapeHtml(
+              level
+            )}</div>`
+          : ""
+      }
     `;
   }
 
@@ -266,7 +274,7 @@ function createPostCard(post) {
         ${
           postPhoto
             ? `<img src="${postPhoto}" alt="Foto do post" loading="lazy" />`
-            : `<div class="post-card-placeholder" style="background-color: ${color}20">
+            ? `<div class="post-card-placeholder" style="background-color: ${color}20">
               <span>${typeIcon}</span>
             </div>`
         }
@@ -298,10 +306,10 @@ function createPostCard(post) {
         </div>
         
         <div class="post-card-footer">
-          <span class="post-location">📍 ${
+          <span class="post-location"><i class="iconsax" data-icon="location"></i> ${
             escapeHtml(location) || "Brasil"
           }</span>
-          <span class="post-time">🕐 ${timeAgo}</span>
+          <span class="post-time"><i class="iconsax" data-icon="clock"></i> ${timeAgo}</span>
         </div>
       </div>
     </div>
@@ -502,7 +510,7 @@ function showError() {
   if (carousel) {
     carousel.innerHTML = `
       <div class="error-message">
-        <div class="icon">⚠️</div>
+        <div class="icon"><i class="iconsax" data-icon="warning-2"></i></div>
         <h3>Não foi possível carregar os posts</h3>
         <p>Tente novamente mais tarde ou baixe o app para a experiência completa.</p>
         <a href="#download" class="btn btn-primary">Baixar App</a>
