@@ -154,21 +154,22 @@ nav a:hover {
   display: grid;
   grid-template-columns: 1fr 1.2fr;
   gap: 0;
-  align-items: center;
+  align-items: stretch;
   position: relative;
 }
 
 .about-image {
   display: flex;
-  justify-content: center;
-  align-items: center;
+  justify-content: flex-end;
+  align-items: stretch;
   position: relative;
   z-index: 1;
 }
 
 .about-image img {
-  max-width: 85%;
-  height: auto;
+  width: 90%;
+  height: 100%;
+  object-fit: cover;
   border-radius: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
