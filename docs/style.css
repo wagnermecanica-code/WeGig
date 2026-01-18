@@ -757,7 +757,9 @@ footer {
   height: 40px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 50%;
-  transition: background 0.3s, transform 0.3s;
+  transition:
+    background 0.3s,
+    transform 0.3s;
 }
 
 .social-links a:hover {
@@ -765,9 +767,10 @@ footer {
   transform: scale(1.1);
 }
 
-.social-links .iconsax {
-  font-size: 1.25rem;
-  color: #fff;
+.social-links .social-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 .copyright {
