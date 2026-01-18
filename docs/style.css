@@ -147,14 +147,14 @@ nav a:hover {
 /* About Section */
 .about {
   padding: 4rem 0;
-  background-color: var(--surface);
+  background: linear-gradient(135deg, #341539, #000811);
 }
 
 .about h2 {
   text-align: center;
   font-size: 2rem;
   margin-bottom: 2rem;
-  color: var(--dark-color);
+  color: #fff;
 }
 
 .about > .container > p {
@@ -162,7 +162,7 @@ nav a:hover {
   max-width: 800px;
   margin: 0 auto 3rem;
   font-size: 1.1rem;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .stats {
