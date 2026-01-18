@@ -58,7 +58,7 @@ header .container {
 }
 
 .logo img {
-  height: 90px;
+  height: 108px;
   width: auto;
   display: block;
   image-rendering: auto;
@@ -67,7 +67,7 @@ header .container {
 
 @media (max-width: 768px) {
   .logo img {
-    height: 75px;
+    height: 90px;
   }
 }
 
@@ -764,7 +764,7 @@ footer {
 }
 
 .footer-section .footer-logo {
-  height: 75px;
+  height: 90px;
   width: auto;
   margin-bottom: 1rem;
   image-rendering: auto;
