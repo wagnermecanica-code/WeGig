@@ -176,7 +176,11 @@ nav a:hover {
   position: relative;
   z-index: 2;
   margin-left: -80px;
-  background: linear-gradient(135deg, rgba(52, 21, 57, 0.95), rgba(0, 8, 17, 0.95));
+  background: linear-gradient(
+    135deg,
+    rgba(52, 21, 57, 0.95),
+    rgba(0, 8, 17, 0.95)
+  );
   padding: 2.5rem;
   border-radius: 16px;
 }
