@@ -154,19 +154,17 @@ nav a:hover {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 3rem;
-  align-items: center;
+  align-items: stretch;
 }
 
 .about-image {
   display: flex;
-  justify-content: center;
-  align-items: center;
 }
 
 .about-image img {
   width: 100%;
-  max-width: 400px;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
   border-radius: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
