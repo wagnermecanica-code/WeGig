@@ -747,6 +747,33 @@ footer {
   color: var(--primary-color);
 }
 
+.social-links {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.social-links a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  transition: background 0.3s, transform 0.3s;
+}
+
+.social-links a:hover {
+  background: var(--accent-color);
+  transform: scale(1.1);
+}
+
+.social-links .iconsax {
+  font-size: 1.25rem;
+  color: #fff;
+}
+
 .copyright {
   margin-top: 1rem;
   opacity: 0.7;
