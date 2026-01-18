@@ -424,6 +424,10 @@ nav a:hover {
   background-color: #007eb9;
 }
 
+.legend-dot.hiring {
+  background-color: #514771;
+}
+
 /* Map Marker Animations */
 @keyframes markerPulse {
   0% {
