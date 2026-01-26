@@ -235,8 +235,11 @@ nav a:hover {
 .stat-counter h3 {
   color: white !important;
   font-size: 1.3rem !important;
-  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   justify-content: center;
+  margin-bottom: 0.5rem;
 }
 
 .stat-counter p {
