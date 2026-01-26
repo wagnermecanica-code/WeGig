@@ -227,6 +227,23 @@ nav a:hover {
   transform: translateY(-5px);
 }
 
+.stat-counter {
+  background: linear-gradient(135deg, #341539, #0f3f70);
+  color: white;
+}
+
+.stat-counter h3 {
+  color: white !important;
+  font-size: 2.5rem !important;
+  font-weight: 700;
+  justify-content: center;
+}
+
+.stat-counter p {
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-weight: 500;
+}
+
 .stat h3 {
   color: var(--primary-color);
   font-size: 1.3rem;

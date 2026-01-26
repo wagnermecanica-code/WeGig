@@ -34,6 +34,7 @@
         orderBy,
         limit,
         getDocs,
+        getCountFromServer,
         Timestamp,
       } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
@@ -59,6 +60,7 @@
       window.firebaseOrderBy = orderBy;
       window.firebaseLimit = limit;
       window.firebaseGetDocs = getDocs;
+      window.firebaseGetCountFromServer = getCountFromServer;
       window.firebaseTimestamp = Timestamp;
       window.firebaseReady = true;
 
@@ -129,6 +131,10 @@
               </p>
 
               <div class="stats">
+                <div class="stat stat-counter">
+                  <h3 id="profile-count">--</h3>
+                  <p>Perfis cadastrados</p>
+                </div>
                 <div class="stat">
                   <h3>📍 Geolocalizado</h3>
                   <p>Busca por proximidade (5-100km)</p>
@@ -432,6 +438,28 @@
       defer
       src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA3Rq-Fmlsrwn-fywriTBp7xZsOo7i5fyQ&map_ids=b7134f9dc59c2ad97d5b292e&libraries=marker&callback=onGoogleMapsLoaded"
     ></script>
+
+    <!-- Profile Counter Script -->
+    <script>
+      async function loadProfileCount() {
+        if (!window.firebaseReady) {
+          window.addEventListener("firebase-ready", loadProfileCount);
+          return;
+        }
+        try {
+          const coll = window.firebaseCollection(window.firebaseDb, "profiles");
+          const snapshot = await window.firebaseGetCountFromServer(coll);
+          const count = snapshot.data().count;
+          const el = document.getElementById("profile-count");
+          if (el) {
+            el.textContent = count.toLocaleString("pt-BR");
+          }
+        } catch (e) {
+          console.error("Erro ao contar perfis:", e);
+        }
+      }
+      loadProfileCount();
+    </script>
 
     <!-- Posts Feed Script -->
     <script src="posts-feed.js?v=24"></script>
