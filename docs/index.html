@@ -151,6 +151,10 @@
                   <h3>🎸 <span id="profile-count">--</span></h3>
                   <p>Músicos já conectados!</p>
                 </div>
+                <div class="stat stat-counter">
+                  <h3>📢 <span id="post-count">--</span></h3>
+                  <p>Oportunidades publicadas!</p>
+                </div>
               </div>
             </div>
           </div>
@@ -439,26 +443,36 @@
       src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA3Rq-Fmlsrwn-fywriTBp7xZsOo7i5fyQ&map_ids=b7134f9dc59c2ad97d5b292e&libraries=marker&callback=onGoogleMapsLoaded"
     ></script>
 
-    <!-- Profile Counter Script -->
+    <!-- Counters Script -->
     <script>
-      async function loadProfileCount() {
+      async function loadCounters() {
         if (!window.firebaseReady) {
-          window.addEventListener("firebase-ready", loadProfileCount);
+          window.addEventListener("firebase-ready", loadCounters);
           return;
         }
         try {
-          const coll = window.firebaseCollection(window.firebaseDb, "profiles");
-          const snapshot = await window.firebaseGetCountFromServer(coll);
-          const count = snapshot.data().count;
-          const el = document.getElementById("profile-count");
-          if (el) {
-            el.textContent = count.toLocaleString("pt-BR");
+          // Count profiles
+          const profilesColl = window.firebaseCollection(window.firebaseDb, "profiles");
+          const profilesSnapshot = await window.firebaseGetCountFromServer(profilesColl);
+          const profileCount = profilesSnapshot.data().count;
+          const profileEl = document.getElementById("profile-count");
+          if (profileEl) {
+            profileEl.textContent = profileCount.toLocaleString("pt-BR");
+          }
+
+          // Count posts
+          const postsColl = window.firebaseCollection(window.firebaseDb, "posts");
+          const postsSnapshot = await window.firebaseGetCountFromServer(postsColl);
+          const postCount = postsSnapshot.data().count;
+          const postEl = document.getElementById("post-count");
+          if (postEl) {
+            postEl.textContent = postCount.toLocaleString("pt-BR");
           }
         } catch (e) {
-          console.error("Erro ao contar perfis:", e);
+          console.error("Erro ao contar:", e);
         }
       }
-      loadProfileCount();
+      loadCounters();
     </script>
 
     <!-- Posts Feed Script -->
