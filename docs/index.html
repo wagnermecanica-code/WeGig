@@ -153,7 +153,7 @@
                 </div>
                 <div class="stat stat-counter">
                   <h3>📢 <span id="post-count">--</span></h3>
-                  <p>Oportunidades publicadas!</p>
+                  <p>Oportunidades já publicadas!</p>
                 </div>
               </div>
             </div>
@@ -452,8 +452,12 @@
         }
         try {
           // Count profiles
-          const profilesColl = window.firebaseCollection(window.firebaseDb, "profiles");
-          const profilesSnapshot = await window.firebaseGetCountFromServer(profilesColl);
+          const profilesColl = window.firebaseCollection(
+            window.firebaseDb,
+            "profiles",
+          );
+          const profilesSnapshot =
+            await window.firebaseGetCountFromServer(profilesColl);
           const profileCount = profilesSnapshot.data().count;
           const profileEl = document.getElementById("profile-count");
           if (profileEl) {
@@ -461,8 +465,12 @@
           }
 
           // Count posts
-          const postsColl = window.firebaseCollection(window.firebaseDb, "posts");
-          const postsSnapshot = await window.firebaseGetCountFromServer(postsColl);
+          const postsColl = window.firebaseCollection(
+            window.firebaseDb,
+            "posts",
+          );
+          const postsSnapshot =
+            await window.firebaseGetCountFromServer(postsColl);
           const postCount = postsSnapshot.data().count;
           const postEl = document.getElementById("post-count");
           if (postEl) {
