@@ -892,8 +892,10 @@ footer {
   }
 
   .about-image img {
-    max-width: 90%;
+    width: 100%;
+    max-width: 420px;
     height: auto;
+    margin: 0 auto;
   }
 
   .about-content {
