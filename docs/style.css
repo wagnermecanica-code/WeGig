@@ -888,10 +888,12 @@ footer {
 
   .about-image {
     order: -1;
+    justify-content: center;
   }
 
   .about-image img {
-    max-width: 60%;
+    max-width: 90%;
+    height: auto;
   }
 
   .about-content {
