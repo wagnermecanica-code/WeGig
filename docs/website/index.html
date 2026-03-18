@@ -412,5 +412,18 @@
 
     <!-- Posts Feed Script -->
     <script src="posts-feed.js?v=9"></script>
+
+    <!-- Meta Pixel: Download Tracking -->
+    <script>
+      document.querySelectorAll('.store-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var href = btn.getAttribute('href') || '';
+          var platform = href.includes('apple.com') ? 'iOS' : 'Android';
+          if (typeof fbq === 'function') {
+            fbq('track', 'Lead', { content_name: 'App Download', content_category: platform });
+          }
+        });
+      });
+    </script>
   </body>
 </html>
