@@ -206,7 +206,7 @@ GitHub Pages atualiza automaticamente em ~1 minuto!
 **No site (após deploy):**
 
 - Suporte: suporte@wegig.com.br
-- Privacidade: privacidade@wegig.com.br
+- Privacidade: contato@wegig.com.br
 - DPO: dpo@wegig.com.br
 
 **GitHub Pages:**

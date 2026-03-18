@@ -5,6 +5,36 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.0.2] - 2025-12-22 (Build 5)
+
+### 🗺️ Mapa - Normalização de Markers
+
+- **Problema:** Markers no Android apareciam muito maiores que no iOS
+- **Causa:** O `widget_to_marker` usa diferentes `pixelRatio` por plataforma
+- **Solução:** Tamanhos específicos por plataforma:
+  - Android: Size(32, 43), pixelRatio 2.5
+  - iOS: Size(46.9, 62.7), pixelRatio 3.0
+- **Arquivos:** `wegig_pin_descriptor_builder.dart`, `wegig_cluster_renderer.dart`
+
+### 🎨 UI/UX - PostDetailPage
+
+- **Problema:** Card do vídeo do YouTube colado na borda inferior (Android)
+- **Solução:** Adicionado `SizedBox(height: 24)` após o card do YouTube
+- **Arquivos:** `post_detail_page.dart`
+
+### 📝 Formulários - Campo YouTube
+
+- **Problema:** Texto de aviso do campo YouTube não quebrava linha
+- **Solução:** Adicionado `helperMaxLines: 2` no InputDecoration
+- **Arquivos:** `post_page.dart`, `edit_profile_page.dart`
+
+### 🔒 Segurança - Exclusão de Conta
+
+- **Melhoria:** Fluxo de reautenticação para exclusão de conta aprimorado
+- **Arquivos:** `account_settings_page.dart`
+
+---
+
 ## [Não Publicado]
 
 ### 🔒 Sprint 1: Correções Críticas de Segurança (09/12/2025)
