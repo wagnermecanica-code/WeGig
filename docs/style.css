@@ -77,14 +77,14 @@ nav {
 }
 
 nav a {
-  color: #fff;
+  color: #d1d1d1;
   text-decoration: none;
   font-weight: 500;
   transition: color 0.3s;
 }
 
 nav a:hover {
-  color: var(--accent-color);
+  color: #fff;
 }
 
 /* Hero Section */
