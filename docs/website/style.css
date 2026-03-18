@@ -219,7 +219,7 @@ nav a:hover {
 }
 
 .stat {
-  text-align: center;
+  text-align: left;
   padding: 2rem;
   background: #4a4a4a;
   border-radius: 16px;
@@ -492,7 +492,7 @@ nav a:hover {
 /* Post Card */
 .post-card {
   display: flex;
-  background: white;
+  background: #4a4a4a;
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);

@@ -220,7 +220,7 @@ nav a:hover {
 }
 
 .stat {
-  text-align: center;
+  text-align: left;
   padding: 2rem;
   background: #4a4a4a;
   border-radius: 16px;
@@ -540,7 +540,7 @@ nav a:hover {
   display: flex;
   gap: 12px;
   padding: 12px;
-  background: white;
+  background: #4a4a4a;
   border-radius: 12px;
   border: 1px solid transparent;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -600,7 +600,7 @@ nav a:hover {
 .pc-name {
   font-size: 17px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -620,7 +620,7 @@ nav a:hover {
 /* Tags: instrumentos */
 .pc-tags {
   font-size: 11px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.6);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -644,7 +644,7 @@ nav a:hover {
 /* Message: conteúdo do post */
 .pc-message {
   font-size: 12px;
-  color: #444;
+  color: rgba(255, 255, 255, 0.75);
   line-height: 1.4;
   margin: 4px 0;
   display: -webkit-box;
@@ -656,7 +656,7 @@ nav a:hover {
 /* Meta: location + time */
 .pc-meta {
   font-size: 11px;
-  color: #888;
+  color: rgba(255, 255, 255, 0.5);
   display: flex;
   gap: 4px;
   white-space: nowrap;
