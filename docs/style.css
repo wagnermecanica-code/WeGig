@@ -329,18 +329,18 @@ nav a:hover {
 /* Download Section */
 .download {
   padding: 4rem 0;
-  background-color: var(--surface);
+  background: linear-gradient(135deg, #4820d0, #673dfd);
   text-align: center;
 }
 
 .download h2 {
   font-size: 2rem;
   margin-bottom: 1rem;
-  color: var(--dark-color);
+  color: white;
 }
 
 .download > .container > p {
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.85);
   margin-bottom: 2rem;
 }
 
@@ -772,7 +772,7 @@ nav a:hover {
 
 /* Footer */
 footer {
-  background-color: var(--dark-color);
+  background: linear-gradient(135deg, #4820d0, #673dfd);
   color: white;
   padding: 3rem 0 1rem;
 }
