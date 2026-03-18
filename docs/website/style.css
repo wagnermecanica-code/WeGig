@@ -312,7 +312,7 @@ nav a:hover {
 /* Download Section */
 .download {
   padding: 4rem 0;
-  background: linear-gradient(135deg, #4820d0, #673dfd);
+  background: linear-gradient(135deg, #000000, #4a4a4a);
   text-align: center;
 }
 
