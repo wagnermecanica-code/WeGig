@@ -5,7 +5,7 @@
  * Cores do Design System:
  * - Primary (Músico): #37475A
  * - Accent (Banda): #E47911
- * - SalesBlue (Espaço): #007EB9
+ * - SalesBlue (Espaço): #683FFF
  */
 
 // Configurações
@@ -17,8 +17,8 @@ const CONFIG = {
   COLORS: {
     musician: "#37475A",
     band: "#E47911",
-    sales: "#007EB9",
-    hiring: "#514771",
+    sales: "#683FFF",
+    hiring: "#000000",
   },
   TYPE_LABELS: {
     musician: "Busca banda",

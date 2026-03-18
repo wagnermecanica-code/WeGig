@@ -8,7 +8,7 @@
 :root {
   --primary-color: #37475a; /* Dark - Musicians */
   --secondary-color: #e47911; /* Orange - Bands */
-  --hiring-color: #514771; /* Purple - Hiring */
+  --hiring-color: #000000; /* Black - Hiring */
   --dark-color: #232f3e;
   --light-color: #f0f3f7;
   --text-primary: #1a1a1a;
@@ -443,11 +443,11 @@ nav a:hover {
 }
 
 .legend-dot.sales {
-  background-color: #007eb9;
+  background-color: #683fff;
 }
 
 .legend-dot.hiring {
-  background-color: #514771;
+  background-color: #000000;
 }
 
 /* Map Marker Animations */
