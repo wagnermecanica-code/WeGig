@@ -159,6 +159,8 @@ nav a:hover {
 
 .about-image {
   display: flex;
+  background-color: #ffcb92;
+  border-radius: 16px;
 }
 
 .about-image img {
