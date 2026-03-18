@@ -77,7 +77,7 @@ nav {
 }
 
 nav a {
-  color: #d1d1d1;
+  color: rgba(255, 255, 255, 0.75);
   text-decoration: none;
   font-weight: 500;
   transition: color 0.3s;
@@ -867,9 +867,9 @@ footer {
   }
 
   nav {
-    flex-direction: column;
-    gap: 1rem;
-    text-align: center;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    justify-content: center;
   }
 
   .hero h2 {
