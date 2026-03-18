@@ -5,7 +5,7 @@
  * Cores do Design System:
  * - Primary (Músico): #37475A
  * - Accent (Banda): #E47911
- * - SalesBlue (Espaço): #007EB9
+ * - SalesBlue (Espaço): #683FFF
  */
 
 // Configurações
@@ -17,17 +17,20 @@ const CONFIG = {
   COLORS: {
     musician: "#37475A",
     band: "#E47911",
-    sales: "#007EB9",
+    sales: "#683FFF",
+    hiring: "#000000",
   },
   TYPE_LABELS: {
     musician: "Busca banda",
     band: "Busca músico",
     sales: "Anúncio",
+    hiring: "Oportunidade",
   },
   TYPE_ICONS: {
-    musician: '<i class="iconsax" data-icon="music"></i>',
-    band: '<i class="iconsax" data-icon="people"></i>',
-    sales: '<i class="iconsax" data-icon="shop"></i>',
+    musician: "music",
+    band: "people",
+    sales: "shop",
+    hiring: "briefcase",
   },
 };
 
@@ -36,33 +39,61 @@ let map = null;
 let markers = [];
 let posts = [];
 let activePostId = null;
-let autoScrollInterval = null;
 
 // Aguardar Firebase e Google Maps estarem prontos
 function waitForDependencies() {
-  return new Promise((resolve) => {
-    let firebaseOk = window.firebaseReady || false;
-    let mapsOk = window.googleMapsReady || false;
+  return new Promise((resolve, reject) => {
+    console.log("Aguardando dependências...");
 
-    const check = () => {
+    // Polling approach - mais confiável que eventos
+    let attempts = 0;
+    const maxAttempts = 100; // 10 segundos (100 * 100ms)
+
+    const checkDependencies = () => {
+      attempts++;
+
+      const firebaseOk = window.firebaseReady === true && window.firebaseDb;
+      const mapsOk = window.googleMapsReady === true && window.google?.maps;
+
+      console.log(
+        `Tentativa ${attempts} - Firebase: ${firebaseOk}, Maps: ${mapsOk}`,
+      );
+
       if (firebaseOk && mapsOk) {
+        console.log("Ambas dependências prontas!");
         resolve();
         return;
       }
+
+      if (attempts >= maxAttempts) {
+        console.error("Timeout esperando dependências");
+        console.error("Firebase:", {
+          ready: window.firebaseReady,
+          db: !!window.firebaseDb,
+        });
+        console.error("Maps:", {
+          ready: window.googleMapsReady,
+          google: !!window.google,
+        });
+        reject(new Error(`Timeout: Firebase=${firebaseOk}, Maps=${mapsOk}`));
+        return;
+      }
+
+      // Verificar novamente em 100ms
+      setTimeout(checkDependencies, 100);
     };
 
+    // Também ouvir eventos como backup
     window.addEventListener("firebase-ready", () => {
-      firebaseOk = true;
-      check();
+      console.log("Evento firebase-ready recebido");
     });
 
     window.addEventListener("google-maps-ready", () => {
-      mapsOk = true;
-      check();
+      console.log("Evento google-maps-ready recebido");
     });
 
-    // Verificar estado inicial
-    check();
+    // Iniciar verificação
+    checkDependencies();
   });
 }
 
@@ -76,23 +107,25 @@ async function init() {
 
     // Inicializar mapa
     initMap();
+    console.log("Mapa inicializado");
 
     // Carregar posts do Firebase
     await loadPosts();
+    console.log("Posts carregados:", posts.length);
 
     // Renderizar posts
     renderPosts();
+    console.log("Posts renderizados");
 
     // Adicionar markers ao mapa
     addMarkersToMap();
-
-    // Iniciar auto-scroll
-    startAutoScroll();
+    console.log("Markers adicionados");
 
     console.log("Posts Feed inicializado com sucesso");
   } catch (error) {
     console.error("Erro ao inicializar Posts Feed:", error);
-    showError();
+    console.error("Stack:", error.stack);
+    showError(error.message);
   }
 }
 
@@ -120,6 +153,8 @@ function initMap() {
 
 // Carregar posts do Firebase
 async function loadPosts() {
+  console.log("Iniciando carregamento de posts...");
+
   const db = window.firebaseDb;
   const q = window.firebaseQuery;
   const coll = window.firebaseCollection;
@@ -129,17 +164,33 @@ async function loadPosts() {
   const getDocs = window.firebaseGetDocs;
   const Timestamp = window.firebaseTimestamp;
 
+  console.log("Firebase refs:", {
+    db: !!db,
+    q: !!q,
+    coll: !!coll,
+    getDocs: !!getDocs,
+    Timestamp: !!Timestamp,
+  });
+
+  if (!db || !q || !coll || !getDocs || !Timestamp) {
+    throw new Error("Firebase não inicializado corretamente");
+  }
+
   const now = Timestamp.now();
+  console.log("Timestamp now:", now.toDate());
 
   const postsRef = coll(db, "posts");
   const postsQuery = q(
     postsRef,
     whereClause("expiresAt", ">", now),
+    orderByClause("expiresAt", "asc"), // REQUIRED: must orderBy the inequality field first
     orderByClause("createdAt", "desc"),
-    limitClause(CONFIG.MAX_POSTS)
+    limitClause(CONFIG.MAX_POSTS),
   );
 
+  console.log("Executando query...");
   const snapshot = await getDocs(postsQuery);
+  console.log("Query retornou:", snapshot.size, "documentos");
 
   posts = snapshot.docs.map((doc) => ({
     id: doc.id,
@@ -147,6 +198,14 @@ async function loadPosts() {
   }));
 
   console.log(`${posts.length} posts carregados`);
+  if (posts.length > 0) {
+    console.log(
+      "Primeiro post:",
+      posts[0].id,
+      posts[0].authorName,
+      posts[0].type,
+    );
+  }
 }
 
 // Renderizar posts no carrossel
@@ -182,7 +241,7 @@ function renderPosts() {
   });
 }
 
-// Criar HTML do card de post
+// Criar HTML do card de post - Layout horizontal (estilo lista)
 function createPostCard(post) {
   const type = post.type || "musician";
   const color = CONFIG.COLORS[type];
@@ -195,19 +254,22 @@ function createPostCard(post) {
   const postPhoto = post.photoUrls?.[0] || null;
 
   // Localização
-  const city = post.city || "";
-  const state = post.state || "";
-  const location = [city, state].filter(Boolean).join(", ");
+  const city = post.city || "Brasil";
 
   // Data
   const createdAt = post.createdAt?.toDate?.() || new Date();
   const timeAgo = formatTimeAgo(createdAt);
 
+  // Mensagem do post (truncada)
+  const content = post.content || "";
+  const truncatedContent =
+    content.length > 120 ? content.substring(0, 120) + "..." : content;
+
   // Conteúdo específico por tipo
-  let specificContent = "";
+  let subtitle = typeLabel;
+  let extraInfo = "";
 
   if (type === "sales") {
-    // Anúncio de espaço
     const title = post.title || "Anúncio";
     const price = post.price || 0;
     const discountValue = post.discountValue || 0;
@@ -218,117 +280,112 @@ function createPostCard(post) {
         : price - discountValue
       : price;
 
-    specificContent = `
-      <div class="post-title">${escapeHtml(title)}</div>
-      ${
-        hasDiscount
-          ? `
-        <div class="post-price-original">
-          <span class="price-strikethrough">R$ ${price.toFixed(2)}</span>
-          <span class="discount-badge">-${discountValue}${
-              post.discountMode === "percentage" ? "%" : ""
-            }</span>
-        </div>
-      `
-          : ""
-      }
-      <div class="post-price">R$ ${finalPrice.toFixed(2)}</div>
-    `;
-  } else {
-    // Músico ou Banda
-    const instruments =
-      type === "musician"
-        ? (post.instruments || []).slice(0, 3).join(", ")
-        : (post.seekingMusicians || []).slice(0, 3).join(", ");
-    const level = post.level || "";
+    subtitle = title;
+    extraInfo = `<span class="pc-price">R$ ${finalPrice.toFixed(0)}${
+      hasDiscount
+        ? ` <small class="pc-discount">-${discountValue}${
+            post.discountMode === "percentage" ? "%" : ""
+          }</small>`
+        : ""
+    }</span>`;
+  } else if (type === "hiring") {
+    const eventType = post.eventType || "Evento";
+    const budget = post.budgetRange || "";
+    const guestCount =
+      typeof post.guestCount === "number"
+        ? `${post.guestCount} convidados`
+        : "";
 
-    specificContent = `
-      <div class="post-type-label">${typeLabel}</div>
-      ${
-        instruments
-          ? `<div class="post-instruments"><i class="iconsax" data-icon="musicnote"></i> ${escapeHtml(
-              instruments
-            )}</div>`
-          : ""
-      }
-      ${
-        level
-          ? `<div class="post-level"><i class="iconsax" data-icon="star"></i> ${escapeHtml(
-              level
-            )}</div>`
-          : ""
-      }
-    `;
+    subtitle = eventType;
+
+    const metaParts = [budget, guestCount].filter(Boolean);
+    if (metaParts.length) {
+      extraInfo = `<span class="pc-tags">${escapeHtml(
+        metaParts.join(" · "),
+      )}</span>`;
+    }
+  } else {
+    const items =
+      type === "musician"
+        ? (post.instruments || []).slice(0, 3).join(" · ")
+        : (post.seekingMusicians || []).slice(0, 3).join(" · ");
+    if (items) extraInfo = `<span class="pc-tags">${escapeHtml(items)}</span>`;
   }
 
-  // Mensagem/conteúdo
-  const content = post.content || "";
-  const truncatedContent =
-    content.length > 100 ? content.substring(0, 100) + "..." : content;
-
   return `
-    <div class="post-card" data-post-id="${
-      post.id
-    }" style="--card-color: ${color}">
-      <div class="post-card-image">
-        ${
-          postPhoto
-            ? `<img src="${postPhoto}" alt="Foto do post" loading="lazy" />`
-            ? `<div class="post-card-placeholder" style="background-color: ${color}20">
-              <span>${typeIcon}</span>
-            </div>`
-        }
-      </div>
-      <div class="post-card-content">
-        <div class="post-card-header">
-          <div class="post-author">
-            ${
-              authorPhoto
-                ? `<img src="${authorPhoto}" alt="${escapeHtml(
-                    authorName
-                  )}" class="author-avatar" />`
-                : `<div class="author-avatar-placeholder" style="background-color: ${color}">${authorName
-                    .charAt(0)
-                    .toUpperCase()}</div>`
-            }
-            <span class="author-name">${escapeHtml(authorName)}</span>
-          </div>
-          <span class="post-type-badge" style="background-color: ${color}">${typeIcon}</span>
-        </div>
-        
-        <div class="post-card-body">
-          ${specificContent}
+    <article class="pc" data-post-id="${post.id}">
+      <div class="pc-content">
+        <div class="pc-header">
+          <span class="pc-name">${escapeHtml(authorName)}</span>
           ${
-            truncatedContent
-              ? `<p class="post-content">${escapeHtml(truncatedContent)}</p>`
-              : ""
+            authorPhoto
+              ? `<img src="${authorPhoto}" alt="" class="pc-avatar" />`
+              : `<span class="pc-avatar pc-avatar--placeholder" style="background:${color}">${authorName.charAt(
+                  0,
+                )}</span>`
           }
         </div>
-        
-        <div class="post-card-footer">
-          <span class="post-location"><i class="iconsax" data-icon="location"></i> ${
-            escapeHtml(location) || "Brasil"
-          }</span>
-          <span class="post-time"><i class="iconsax" data-icon="clock"></i> ${timeAgo}</span>
+        <div class="pc-subtitle">${escapeHtml(
+          subtitle,
+        )}</div>
+        ${extraInfo}
+        ${
+          truncatedContent
+            ? `<p class="pc-message">${escapeHtml(truncatedContent)}</p>`
+            : ""
+        }
+        <div class="pc-meta">
+          <span><i class="iconsax" data-icon="location"></i> ${escapeHtml(
+            city,
+          )}</span>
+          <span>· ${timeAgo}</span>
         </div>
       </div>
-    </div>
+    </article>
   `;
 }
 
 // Adicionar markers ao mapa
 function addMarkersToMap() {
-  if (!map || posts.length === 0) return;
+  if (!map || posts.length === 0) {
+    console.log("⚠️ addMarkersToMap: map=", !!map, "posts=", posts.length);
+    return;
+  }
 
+  console.log("Adicionando", posts.length, "markers ao mapa...");
   const bounds = new google.maps.LatLngBounds();
 
-  posts.forEach((post) => {
-    if (!post.location) return;
+  posts.forEach((post, index) => {
+    if (!post.location) {
+      console.log(`⚠️ Post ${index} sem localização:`, post.id);
+      return;
+    }
 
-    const lat = post.location.latitude || post.location._lat;
-    const lng = post.location.longitude || post.location._long;
+    // Firebase Web SDK GeoPoint: propriedades latitude/longitude são getters
+    // Admin SDK: _latitude/_longitude são propriedades internas
+    // Tentamos ambos para compatibilidade
+    let lat, lng;
 
-    if (!lat || !lng) return;
+    if (typeof post.location.latitude === "number") {
+      lat = post.location.latitude;
+      lng = post.location.longitude;
+    } else if (typeof post.location._latitude === "number") {
+      lat = post.location._latitude;
+      lng = post.location._longitude;
+    } else {
+      console.log(
+        `⚠️ Post ${index} formato de localização desconhecido:`,
+        post.location,
+      );
+      return;
+    }
+
+    console.log(`Post ${index}:`, post.id, "lat=", lat, "lng=", lng);
+
+    if (!lat || !lng) {
+      console.log(`⚠️ Post ${index} com lat/lng inválidos`);
+      return;
+    }
 
     const position = { lat, lng };
     const type = post.type || "musician";
@@ -368,69 +425,105 @@ function addMarkersToMap() {
   }
 }
 
-// Criar conteúdo do marker (estilo do app)
+// Criar conteúdo do marker - SVG idêntico ao pin_template.svg do App Flutter
+// NOTA: O app NÃO usa fotos nos markers, apenas cores sólidas com círculo branco
 function createMarkerContent(post, isActive) {
   const type = post.type || "musician";
   const color = CONFIG.COLORS[type];
-  const authorPhoto = post.authorPhotoUrl || post.activeProfilePhotoUrl;
 
-  const size = isActive ? 60 : 48;
-  const borderWidth = isActive ? 4 : 3;
+  // Cores de highlight (reflexo) baseadas na cor principal
+  const highlightColor = lightenColor(color, 30);
 
-  const container = document.createElement("div");
-  container.className = `map-marker ${isActive ? "active" : ""} ${type}`;
-  container.style.cssText = `
-    width: ${size}px;
-    height: ${size}px;
-    border-radius: 50%;
-    border: ${borderWidth}px solid white;
-    background: linear-gradient(135deg, ${color}, ${color}cc);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  // Tamanhos proporcionais ao pin_template.svg (viewBox 256x256, mas escalado para 90x90)
+  // Proporção: width=46.9, height=62.7 (ratio 1.337) do WeGigPinDescriptorBuilder
+  const baseSize = isActive ? 52 : 46;
+  const width = baseSize;
+  const height = baseSize * 1.28; // Mesmo ratio do app (1.28)
+
+  // Container wrapper com sombra
+  const wrapper = document.createElement("div");
+  wrapper.style.cssText = `
+    position: relative;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    overflow: hidden;
-    ${
-      isActive
-        ? `
-      transform: scale(1.1);
-      box-shadow: 0 0 0 8px ${color}40, 0 6px 20px rgba(0,0,0,0.4);
-    `
-        : ""
-    }
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4));
   `;
 
-  if (authorPhoto) {
-    const img = document.createElement("img");
-    img.src = authorPhoto;
-    img.style.cssText = `
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
+  // Efeito de glow/blur para marcador ativo (como WeGigPinWidget.isHighlighted)
+  if (isActive) {
+    const glowSvg = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "svg",
+    );
+    glowSvg.setAttribute("width", width * 1.15);
+    glowSvg.setAttribute("height", height * 1.15);
+    glowSvg.setAttribute("viewBox", "0 0 256 256");
+    glowSvg.style.cssText = `
+      position: absolute;
+      top: -${height * 0.075}px;
+      left: -${width * 0.075}px;
+      opacity: 0.45;
+      filter: blur(${baseSize * 0.12}px);
     `;
-    img.onerror = () => {
-      container.innerHTML = getMarkerIcon(type);
-    };
-    container.appendChild(img);
-  } else {
-    container.innerHTML = getMarkerIcon(type);
+    // SVG path da gota (mesmo do pin_template.svg)
+    glowSvg.innerHTML = `
+      <g transform="translate(1.4 1.4) scale(2.81)">
+        <path d="M 45 90 C 30.086 71.757 15.174 46.299 15.174 29.826 S 28.527 0 45 0 s 29.826 13.353 29.826 29.826 S 59.914 71.757 45 90 z" 
+              fill="${color}" fill-opacity="0.9"/>
+      </g>
+    `;
+    wrapper.appendChild(glowSvg);
   }
 
-  return container;
+  // SVG principal - Exatamente como pin_template.svg do app
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", width);
+  svg.setAttribute("height", height);
+  svg.setAttribute("viewBox", "0 0 256 256");
+  svg.style.cssText = "position: relative; z-index: 1; cursor: pointer;";
+
+  // Estrutura idêntica ao pin_template.svg:
+  // 1. Path da gota (cor primária)
+  // 2. Círculo branco central
+  // 3. Highlight/reflexo para volume 3D
+  svg.innerHTML = `
+    <g transform="translate(1.4 1.4) scale(2.81)">
+      <!-- Corpo da gota (cor primária) -->
+      <path d="M 45 90 C 30.086 71.757 15.174 46.299 15.174 29.826 S 28.527 0 45 0 s 29.826 13.353 29.826 29.826 S 59.914 71.757 45 90 z" 
+            fill="${color}"/>
+      
+      <!-- Círculo branco central -->
+      <circle cx="45" cy="29.38" r="13.5" fill="white"/>
+      
+      <!-- Highlight/reflexo (dá volume 3D) -->
+      <path d="M 48.596 5.375 C 33.355 5.375 21 17.73 21 32.97 c 0 1.584 0.141 3.135 0.397 4.646 C 20.496 35.035 20 32.264 20 29.375 c 0 -13.807 11.193 -25 25 -25 c 2.889 0 5.661 0.496 8.242 1.397 C 51.731 5.516 50.18 5.375 48.596 5.375 z" 
+            fill="${highlightColor}"/>
+    </g>
+  `;
+
+  wrapper.appendChild(svg);
+  return wrapper;
 }
 
-// Ícone padrão do marker
-function getMarkerIcon(type) {
-  const icons = {
-    musician:
-      '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>',
-    band: '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>',
-    sales:
-      '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>',
-  };
-  return icons[type] || icons.musician;
+// Função auxiliar para clarear uma cor hex
+function lightenColor(hex, percent) {
+  const num = parseInt(hex.replace("#", ""), 16);
+  const r = Math.min(
+    255,
+    Math.floor((num >> 16) + ((255 - (num >> 16)) * percent) / 100),
+  );
+  const g = Math.min(
+    255,
+    Math.floor(
+      ((num >> 8) & 0x00ff) + ((255 - ((num >> 8) & 0x00ff)) * percent) / 100,
+    ),
+  );
+  const b = Math.min(
+    255,
+    Math.floor((num & 0x0000ff) + ((255 - (num & 0x0000ff)) * percent) / 100),
+  );
+  return `rgb(${r},${g},${b})`;
 }
 
 // Destacar marker no mapa
@@ -457,55 +550,34 @@ function highlightMarker(postId) {
       activeMarker.content = createMarkerContent(post, true);
 
       // Centralizar mapa no marker
-      const lat = post.location.latitude || post.location._lat;
-      const lng = post.location.longitude || post.location._long;
+      let lat, lng;
+      if (typeof post.location.latitude === "number") {
+        lat = post.location.latitude;
+        lng = post.location.longitude;
+      } else {
+        lat = post.location._latitude;
+        lng = post.location._longitude;
+      }
       map.panTo({ lat, lng });
     }
   }
 
   // Destacar card no carrossel
-  document.querySelectorAll(".post-card").forEach((card) => {
-    card.classList.toggle("highlighted", card.dataset.postId === postId);
+  document.querySelectorAll(".pc").forEach((card) => {
+    card.classList.toggle("pc--active", card.dataset.postId === postId);
   });
 }
 
 // Scroll para o post no carrossel
 function scrollToPost(postId) {
-  const card = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+  const card = document.querySelector(`.pc[data-post-id="${postId}"]`);
   if (card) {
     card.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }
 
-// Auto-scroll do carrossel
-function startAutoScroll() {
-  if (posts.length <= 1) return;
-
-  let currentIndex = 0;
-
-  autoScrollInterval = setInterval(() => {
-    currentIndex = (currentIndex + 1) % posts.length;
-    const post = posts[currentIndex];
-
-    scrollToPost(post.id);
-    highlightMarker(post.id);
-  }, 5000); // 5 segundos
-
-  // Pausar auto-scroll ao interagir
-  const carousel = document.getElementById("posts-carousel");
-  if (carousel) {
-    carousel.addEventListener("mouseenter", () => {
-      clearInterval(autoScrollInterval);
-    });
-
-    carousel.addEventListener("mouseleave", () => {
-      startAutoScroll();
-    });
-  }
-}
-
 // Mostrar erro
-function showError() {
+function showError(errorMessage) {
   const carousel = document.getElementById("posts-carousel");
   if (carousel) {
     carousel.innerHTML = `
@@ -513,6 +585,11 @@ function showError() {
         <div class="icon"><i class="iconsax" data-icon="warning-2"></i></div>
         <h3>Não foi possível carregar os posts</h3>
         <p>Tente novamente mais tarde ou baixe o app para a experiência completa.</p>
+        ${
+          errorMessage
+            ? `<p class="error-detail" style="font-size: 12px; color: #999; margin-top: 8px;">Erro: ${errorMessage}</p>`
+            : ""
+        }
         <a href="#download" class="btn btn-primary">Baixar App</a>
       </div>
     `;

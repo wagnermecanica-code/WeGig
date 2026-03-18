@@ -325,7 +325,7 @@ function createPostCard(post) {
                 )}</span>`
           }
         </div>
-        <div class="pc-subtitle" style="color:${color}">${escapeHtml(
+        <div class="pc-subtitle">${escapeHtml(
           subtitle,
         )}</div>
         ${extraInfo}
