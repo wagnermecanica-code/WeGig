@@ -43,7 +43,7 @@ img {
 
 /* Header */
 header {
-  background: linear-gradient(135deg, #341539, #0f3f70);
+  background: linear-gradient(135deg, #4820d0, #673dfd);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
   position: sticky;
   top: 0;
@@ -231,7 +231,7 @@ nav a:hover {
 }
 
 .stat-counter {
-  background: linear-gradient(135deg, #341539, #0f3f70);
+  background: linear-gradient(135deg, #4820d0, #673dfd);
   color: white;
 }
 
@@ -362,7 +362,7 @@ nav a:hover {
 }
 
 .coming-soon {
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.7);
   font-style: italic;
   margin-top: 1rem;
 }
@@ -786,7 +786,7 @@ footer {
 
 .footer-section h4 {
   margin-bottom: 1rem;
-  color: var(--primary-color);
+  color: #ffcb92;
 }
 
 .footer-section .footer-logo {
@@ -812,7 +812,7 @@ footer {
 }
 
 .footer-section a:hover {
-  color: var(--primary-color);
+  color: #ffcb92;
 }
 
 .social-links {
