@@ -12,7 +12,7 @@
       content="músicos, bandas, música, networking, geolocalização"
     />
     <title>WeGig - Conectando Músicos</title>
-    <link rel="stylesheet" href="style.css?v=39" />
+    <link rel="stylesheet" href="style.css?v=40" />
     <link
       rel="stylesheet"
       href="https://unpkg.com/iconsax@1.0.0/dist/css/iconsax.css"
@@ -121,6 +121,7 @@
   <body>
     <header>
       <div class="container">
+        <img src="icons8-taxa-de-amostra-50.png" alt="" class="header-icon header-icon-left" />
         <div class="logo">
           <img src="Logo.png?v=10" alt="WeGig - Conectando Músicos" />
         </div>
@@ -131,6 +132,7 @@
           <a href="termos.html">Termos de Uso</a>
           <a href="privacidade.html">Privacidade</a>
         </nav>
+        <img src="icons8-conectado-50.png" alt="" class="header-icon header-icon-right" />
       </div>
     </header>
 
@@ -415,12 +417,15 @@
 
     <!-- Meta Pixel: Download Tracking -->
     <script>
-      document.querySelectorAll('.store-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var href = btn.getAttribute('href') || '';
-          var platform = href.includes('apple.com') ? 'iOS' : 'Android';
-          if (typeof fbq === 'function') {
-            fbq('track', 'Lead', { content_name: 'App Download', content_category: platform });
+      document.querySelectorAll(".store-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var href = btn.getAttribute("href") || "";
+          var platform = href.includes("apple.com") ? "iOS" : "Android";
+          if (typeof fbq === "function") {
+            fbq("track", "Lead", {
+              content_name: "App Download",
+              content_category: platform,
+            });
           }
         });
       });
