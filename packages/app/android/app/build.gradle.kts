@@ -66,6 +66,12 @@ android {
     }
     // ===== END FLAVORS CONFIGURATION =====
 
+    packaging {
+        jniLibs {
+            keepDebugSymbols += setOf("**/libflutter.so", "**/libapp.so")
+        }
+    }
+
     buildTypes {
         release {
             // Code obfuscation habilitado (temporariamente desabilitado para debug)
@@ -87,4 +93,10 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // TikTok Business SDK
+    implementation("com.github.tiktok:tiktok-business-android-sdk:1.5.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.3.1")
+    implementation("androidx.lifecycle:lifecycle-common-java8:2.3.1")
+    implementation("com.android.installreferrer:installreferrer:2.2")
 }
