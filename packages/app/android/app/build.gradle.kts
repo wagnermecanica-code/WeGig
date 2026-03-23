@@ -66,22 +66,17 @@ android {
     }
     // ===== END FLAVORS CONFIGURATION =====
 
-    packaging {
-        jniLibs {
-            keepDebugSymbols += setOf("**/libflutter.so", "**/libapp.so")
-        }
-    }
-
     buildTypes {
         release {
-            // Code obfuscation habilitado (temporariamente desabilitado para debug)
-            isMinifyEnabled = false  // TODO: Habilitar após corrigir ProGuard rules
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
             signingConfig = signingConfigs.getByName("release")
         }
     }

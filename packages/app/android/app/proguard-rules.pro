@@ -35,6 +35,10 @@
 -keep class androidx.lifecycle.** { *; }
 -keepattributes Signature
 -keepattributes SourceFile,LineNumberTable
+-dontwarn com.android.billingclient.api.**
+
+# Flutter Play Store deferred components (not used but referenced)
+-dontwarn com.google.android.play.core.**
 
 # Keep native methods
 -keepclassmembers class * {
@@ -48,6 +52,38 @@
 -keepattributes *Annotation*
 -keepattributes SourceFile,LineNumberTable
 -keep public class * extends java.lang.Exception
+
+# Facebook SDK
+-keep class com.facebook.** { *; }
+-dontwarn com.facebook.**
+
+# Image Cropper (uses reflection for layout)
+-keep class com.yalantis.ucrop.** { *; }
+-keep interface com.yalantis.ucrop.** { *; }
+
+# Geolocator / Location
+-keep class com.google.android.gms.location.** { *; }
+-keep class com.baseflow.geolocator.** { *; }
+
+# Local Notifications
+-keep class com.dexterous.** { *; }
+-dontwarn com.dexterous.**
+
+# Network / Caching (OkHttp, Glide)
+-keep class okhttp3.** { *; }
+-dontwarn okhttp3.**
+-keep class com.bumptech.glide.** { *; }
+-dontwarn com.bumptech.**
+
+# Permissions handler
+-keep class com.baseflow.permissionhandler.** { *; }
+-dontwarn com.baseflow.**
+
+# AndroidX
+-keep class androidx.appcompat.** { *; }
+-keep class androidx.exifinterface.** { *; }
+-keep class androidx.browser.customtabs.** { *; }
+-keep class androidx.core.app.NotificationCompat** { *; }
 
 # Suppress warnings
 -dontwarn org.bouncycastle.**
