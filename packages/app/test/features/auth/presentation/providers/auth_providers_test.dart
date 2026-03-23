@@ -350,7 +350,6 @@ class _MockAuthRemoteDataSource implements AuthRemoteDataSource {
   Future<User> signUpWithEmail(
     String email,
     String password,
-    String username,
   ) =>
       throw UnimplementedError();
 

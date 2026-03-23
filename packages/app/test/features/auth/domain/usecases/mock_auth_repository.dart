@@ -7,7 +7,6 @@ import 'package:wegig_app/features/auth/domain/repositories/auth_repository.dart
 class MockAuthRepository implements AuthRepository {
   String? lastEmail;
   String? lastPassword;
-    String? lastUsername;
   AuthResult? _mockedResponse;
 
   void setupSuccessResponse() {
@@ -61,11 +60,9 @@ class MockAuthRepository implements AuthRepository {
     Future<AuthResult> signUpWithEmail(
         String email,
         String password,
-        String username,
     ) async {
         lastEmail = email;
         lastPassword = password;
-        lastUsername = username;
         return _mockedResponse ??
                 const AuthFailure(message: 'Not implemented', code: 'test-error');
     }
