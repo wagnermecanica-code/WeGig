@@ -1024,16 +1024,20 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
                       ),
               ),
               if (widget.interestCount > 0)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    widget.interestCount > 999
-                        ? '${(widget.interestCount / 1000).toStringAsFixed(1)}k'
-                        : '${widget.interestCount}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                GestureDetector(
+                  onTap: _showAllInterestedUsers,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 4, left: 8, right: 8, bottom: 4),
+                    child: Text(
+                      widget.interestCount > 999
+                          ? '${(widget.interestCount / 1000).toStringAsFixed(1)}k'
+                          : '${widget.interestCount}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
