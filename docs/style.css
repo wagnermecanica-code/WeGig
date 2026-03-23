@@ -275,6 +275,10 @@ nav a:hover {
   gap: 0.5rem;
 }
 
+.stat h3 svg {
+  flex-shrink: 0;
+}
+
 .stat p {
   color: rgba(255, 255, 255, 0.85);
 }
@@ -337,6 +341,7 @@ nav a:hover {
   align-items: center;
   justify-content: center;
   line-height: 1;
+  color: #673dfd;
 }
 
 .icon-inline {
