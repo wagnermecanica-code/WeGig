@@ -1,7 +1,7 @@
 name: wegig_app
 description: WeGig - Conectando músicos e bandas
 publish_to: none
-version: 1.0.2+4
+version: 1.0.11+14
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
@@ -23,6 +23,7 @@ dependencies:
   firebase_messaging: ^16.0.4
   firebase_analytics: ^12.0.4
   flutter_local_notifications: ^19.5.0 # Notificações locais para foreground
+  flutter_app_badger: ^1.5.0 # Badge counter no ícone do app (iOS/Android)
 
   # Google Services
   google_sign_in: ^6.2.1 # Última versão estável com correções de login social
@@ -78,6 +79,10 @@ dependencies:
   connectivity_plus: ^7.0.0
   emoji_picker_flutter: ^4.4.0
 
+  # Facebook SDK & App Tracking Transparency
+  facebook_app_events: ^0.26.0 # Facebook App Events SDK (iOS + Android)
+  app_tracking_transparency: ^2.0.6 # ATT dialog para iOS 14+ (IDFA)
+
   # Download e permissões
   image_gallery_saver_plus: ^4.0.1 # Salvar imagens na galeria
   permission_handler: ^11.3.1 # Gerenciamento de permissões
@@ -126,6 +131,10 @@ flutter:
     - assets/icon/app_icon.png
     - assets/icon/app_icon_foreground.png
     - assets/pin_template.svg
+    - assets/wegig-location.svg
+    - assets/WeGigPin.svg
+    - assets/WeGigPin2.svg
+    - assets/WeGigPin3.svg
 
   fonts:
     - family: Cereal
