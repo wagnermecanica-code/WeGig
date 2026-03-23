@@ -60,7 +60,8 @@ header .container {
 .header-icon {
   width: 40px;
   height: 40px;
-  filter: brightness(0) saturate(100%) invert(62%) sepia(85%) saturate(2000%) hue-rotate(360deg) brightness(100%) contrast(95%);
+  filter: brightness(0) saturate(100%) invert(62%) sepia(85%) saturate(2000%)
+    hue-rotate(360deg) brightness(100%) contrast(95%);
   flex-shrink: 0;
 }
 

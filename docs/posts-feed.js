@@ -325,9 +325,7 @@ function createPostCard(post) {
                 )}</span>`
           }
         </div>
-        <div class="pc-subtitle">${escapeHtml(
-          subtitle,
-        )}</div>
+        <div class="pc-subtitle">${escapeHtml(subtitle)}</div>
         ${extraInfo}
         ${
           truncatedContent
