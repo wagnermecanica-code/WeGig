@@ -47,11 +47,18 @@ class PriceCalculator {
     return '';
   }
 
+  /// Verifica se o post é gratuito
+  static bool isFree(PostEntity post) {
+    final price = post.price ?? 0.0;
+    return price == 0.0;
+  }
+
   /// Retorna dados completos de preço para exibição
   static PriceDisplayData getPriceDisplayData(PostEntity post) {
     final originalPrice = post.price ?? 0.0;
-    final hasDiscount = PriceCalculator.hasDiscount(post);
-    final finalPrice = calculateFinalPrice(post);
+    final isFreeProduct = isFree(post);
+    final hasDiscount = !isFreeProduct && PriceCalculator.hasDiscount(post);
+    final finalPrice = isFreeProduct ? 0.0 : calculateFinalPrice(post);
     final discountLabel = hasDiscount ? getDiscountLabel(post) : null;
 
     return PriceDisplayData(
@@ -59,6 +66,7 @@ class PriceCalculator {
       finalPrice: finalPrice,
       hasDiscount: hasDiscount,
       discountLabel: discountLabel,
+      isFree: isFreeProduct,
     );
   }
 }
@@ -70,10 +78,12 @@ class PriceDisplayData {
     required this.finalPrice,
     required this.hasDiscount,
     this.discountLabel,
+    this.isFree = false,
   });
 
   final double originalPrice;
   final double finalPrice;
   final bool hasDiscount;
   final String? discountLabel;
+  final bool isFree;
 }

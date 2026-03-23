@@ -39,10 +39,25 @@ _$PostEntityImpl _$$PostEntityImplFromJson(Map<String, dynamic> json) =>
               .toList() ??
           const [],
       youtubeLink: json['youtubeLink'] as String?,
+      spotifyLink: json['spotifyLink'] as String?,
+      deezerLink: json['deezerLink'] as String?,
       availableFor: (json['availableFor'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],
+      eventDate: _$JsonConverterFromJson<Object, DateTime>(
+          json['eventDate'], const TimestampConverter().fromJson),
+      eventType: json['eventType'] as String?,
+      gigFormat: json['gigFormat'] as String?,
+      venueSetup: (json['venueSetup'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      budgetRange: json['budgetRange'] as String?,
+      eventStartTime: json['eventStartTime'] as String?,
+      eventEndTime: json['eventEndTime'] as String?,
+      eventDurationMinutes: (json['eventDurationMinutes'] as num?)?.toInt(),
+      guestCount: (json['guestCount'] as num?)?.toInt(),
       distanceKm: (json['distanceKm'] as num?)?.toDouble(),
       authorName: json['authorName'] as String?,
       authorPhotoUrl: json['authorPhotoUrl'] as String?,
@@ -58,6 +73,8 @@ _$PostEntityImpl _$$PostEntityImplFromJson(Map<String, dynamic> json) =>
       promoEndDate: _$JsonConverterFromJson<Object, DateTime>(
           json['promoEndDate'], const TimestampConverter().fromJson),
       whatsappNumber: json['whatsappNumber'] as String?,
+      commentCount: (json['commentCount'] as num?)?.toInt() ?? 0,
+      forwardCount: (json['forwardCount'] as num?)?.toInt() ?? 0,
     );
 
 Map<String, dynamic> _$$PostEntityImplToJson(_$PostEntityImpl instance) =>
@@ -80,7 +97,19 @@ Map<String, dynamic> _$$PostEntityImplToJson(_$PostEntityImpl instance) =>
       'photoUrl': instance.photoUrl,
       'photoUrls': instance.photoUrls,
       'youtubeLink': instance.youtubeLink,
+      'spotifyLink': instance.spotifyLink,
+      'deezerLink': instance.deezerLink,
       'availableFor': instance.availableFor,
+      'eventDate': _$JsonConverterToJson<Object, DateTime>(
+          instance.eventDate, const TimestampConverter().toJson),
+      'eventType': instance.eventType,
+      'gigFormat': instance.gigFormat,
+      'venueSetup': instance.venueSetup,
+      'budgetRange': instance.budgetRange,
+      'eventStartTime': instance.eventStartTime,
+      'eventEndTime': instance.eventEndTime,
+      'eventDurationMinutes': instance.eventDurationMinutes,
+      'guestCount': instance.guestCount,
       'distanceKm': instance.distanceKm,
       'authorName': instance.authorName,
       'authorPhotoUrl': instance.authorPhotoUrl,
@@ -96,6 +125,8 @@ Map<String, dynamic> _$$PostEntityImplToJson(_$PostEntityImpl instance) =>
       'promoEndDate': _$JsonConverterToJson<Object, DateTime>(
           instance.promoEndDate, const TimestampConverter().toJson),
       'whatsappNumber': instance.whatsappNumber,
+      'commentCount': instance.commentCount,
+      'forwardCount': instance.forwardCount,
     };
 
 Value? _$JsonConverterFromJson<Json, Value>(

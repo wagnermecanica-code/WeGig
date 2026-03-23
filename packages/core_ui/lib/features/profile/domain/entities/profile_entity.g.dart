@@ -39,6 +39,8 @@ _$ProfileEntityImpl _$$ProfileEntityImplFromJson(Map<String, dynamic> json) =>
       instagramLink: json['instagramLink'] as String?,
       tiktokLink: json['tiktokLink'] as String?,
       youtubeLink: json['youtubeLink'] as String?,
+      spotifyLink: json['spotifyLink'] as String?,
+      deezerLink: json['deezerLink'] as String?,
       neighborhood: json['neighborhood'] as String?,
       state: json['state'] as String?,
       bandMembers: (json['bandMembers'] as List<dynamic>?)
@@ -76,6 +78,8 @@ Map<String, dynamic> _$$ProfileEntityImplToJson(_$ProfileEntityImpl instance) =>
       'instagramLink': instance.instagramLink,
       'tiktokLink': instance.tiktokLink,
       'youtubeLink': instance.youtubeLink,
+      'spotifyLink': instance.spotifyLink,
+      'deezerLink': instance.deezerLink,
       'neighborhood': instance.neighborhood,
       'state': instance.state,
       'bandMembers': instance.bandMembers,

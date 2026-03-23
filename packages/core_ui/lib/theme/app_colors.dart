@@ -12,15 +12,20 @@ class AppColors {
   static const Color accent = Color(0xFFE47911);
   static const Color accentLight = Color(0xFFFCEEE3);
 
+  // Hiring – Roxo profundo para posts de contratação
+  static const Color hiringPurple = Color(0xFF514771);
+
   // Branding (novos tokens)
   static const Color brandPrimary = Color(0xFFE47911); // Laranja
   static const Color utilityLink = Color(0xFF007EB9); // Azul para links
-  static const Color salesBlue = Color(0xFF007EB9); // Azul para anúncios (sales)
+  static const Color salesBlue = Color(0xFF683FFF); // Roxo para anúncios (sales)
 
   // ✅ Cores por tipo de perfil
   static const Color bandColor = Color(0xFFE47911); // Banda - Laranja
   static const Color spaceColor = Color(0xFF007EB9); // Espaço - Azul
-  static const Color musicianColor = Color(0xFF37475A); // Músico - Cinza escuro
+  static const Color musicianColor = Color(0xFF37475A); // Músico
+  static const Color salesColor = Color(0xFF683FFF); // Anúncio - Roxo vibrante
+  static const Color hiringColor = Color(0xFF000000); // Contratação - Preto
 
   // ✅ Método helper para obter cor por tipo de perfil
   static Color getProfileTypeColor(String profileType) {
@@ -31,8 +36,12 @@ class AppColors {
         return spaceColor;
       case 'musician':
         return musicianColor;
+      case 'sales':
+        return salesColor;
+      case 'hiring':
+        return hiringColor;
       default:
-        return primary; // Fallback
+        return musicianColor; // Fallback
     }
   }
 

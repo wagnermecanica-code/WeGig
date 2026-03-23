@@ -30,7 +30,18 @@ class PostEntity with _$PostEntity {
     String? photoUrl, // Mantido para compatibilidade
     @Default([]) List<String> photoUrls, // NOVO: Lista de fotos (até 4)
     String? youtubeLink,
+    String? spotifyLink,
+    String? deezerLink,
     @Default([]) List<String> availableFor,
+    @TimestampConverter() DateTime? eventDate,
+    String? eventType,
+    String? gigFormat,
+    @Default([]) List<String> venueSetup,
+    String? budgetRange,
+    String? eventStartTime,
+    String? eventEndTime,
+    int? eventDurationMinutes,
+    int? guestCount,
     double? distanceKm,
     String? authorName,
     String? authorPhotoUrl,
@@ -45,6 +56,8 @@ class PostEntity with _$PostEntity {
     @TimestampConverter() DateTime? promoStartDate,
     @TimestampConverter() DateTime? promoEndDate,
     String? whatsappNumber,
+    @Default(0) int commentCount,
+    @Default(0) int forwardCount,
   }) = _PostEntity;
 
   /// From Firestore Document
@@ -69,6 +82,8 @@ class PostEntity with _$PostEntity {
       photoUrls: (data['photoUrls'] as List<dynamic>?)?.cast<String>() ?? 
           (data['photoUrl'] != null ? [data['photoUrl'] as String] : []), // Compatibilidade
       youtubeLink: data['youtubeLink'] as String?,
+        spotifyLink: data['spotifyLink'] as String?,
+        deezerLink: data['deezerLink'] as String?,
       type: data['type'] as String? ?? 'musician',
       level: data['level'] as String? ?? '',
       instruments:
@@ -78,6 +93,16 @@ class PostEntity with _$PostEntity {
           (data['seekingMusicians'] as List<dynamic>?)?.cast<String>() ?? [],
       availableFor:
           (data['availableFor'] as List<dynamic>?)?.cast<String>() ?? [],
+        eventDate: (data['eventDate'] as Timestamp?)?.toDate(),
+        eventType: data['eventType'] as String?,
+        gigFormat: data['gigFormat'] as String?,
+        venueSetup:
+          (data['venueSetup'] as List<dynamic>?)?.cast<String>() ?? [],
+        budgetRange: data['budgetRange'] as String?,
+        eventStartTime: data['eventStartTime'] as String?,
+        eventEndTime: data['eventEndTime'] as String?,
+        eventDurationMinutes: (data['eventDurationMinutes'] as num?)?.toInt(),
+        guestCount: (data['guestCount'] as num?)?.toInt(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       expiresAt: (data['expiresAt'] as Timestamp?)?.toDate() ??
           DateTime.now().add(const Duration(days: 30)),
@@ -95,6 +120,8 @@ class PostEntity with _$PostEntity {
       promoStartDate: (data['promoStartDate'] as Timestamp?)?.toDate(),
       promoEndDate: (data['promoEndDate'] as Timestamp?)?.toDate(),
       whatsappNumber: data['whatsappNumber'] as String?,
+      commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
+      forwardCount: (data['forwardCount'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -126,12 +153,23 @@ class PostEntity with _$PostEntity {
       if (photoUrl != null) 'photoUrl': photoUrl,
       if (photoUrls.isNotEmpty) 'photoUrls': photoUrls,
       if (youtubeLink != null) 'youtubeLink': youtubeLink,
+      if (spotifyLink != null) 'spotifyLink': spotifyLink,
+      if (deezerLink != null) 'deezerLink': deezerLink,
       'type': type,
       'level': level,
       'instruments': instruments,
       'genres': genres,
       'seekingMusicians': seekingMusicians,
       'availableFor': availableFor,
+      if (eventDate != null) 'eventDate': Timestamp.fromDate(eventDate!),
+      if (eventType != null) 'eventType': eventType,
+      if (gigFormat != null) 'gigFormat': gigFormat,
+      if (venueSetup.isNotEmpty) 'venueSetup': venueSetup,
+      if (budgetRange != null) 'budgetRange': budgetRange,
+      if (eventStartTime != null) 'eventStartTime': eventStartTime,
+      if (eventEndTime != null) 'eventEndTime': eventEndTime,
+      if (eventDurationMinutes != null) 'eventDurationMinutes': eventDurationMinutes,
+      if (guestCount != null) 'guestCount': guestCount,
       if (authorName != null) 'authorName': authorName,
       if (authorPhotoUrl != null) 'authorPhotoUrl': authorPhotoUrl,
       if (activeProfileName != null) 'activeProfileName': activeProfileName,
@@ -148,6 +186,8 @@ class PostEntity with _$PostEntity {
       if (promoStartDate != null) 'promoStartDate': Timestamp.fromDate(promoStartDate!),
       if (promoEndDate != null) 'promoEndDate': Timestamp.fromDate(promoEndDate!),
       if (whatsappNumber != null) 'whatsappNumber': whatsappNumber,
+      'commentCount': commentCount,
+      'forwardCount': forwardCount,
     };
   }
 

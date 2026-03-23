@@ -22,10 +22,17 @@ mixin _$SearchParams {
   Set<String> get instruments => throw _privateConstructorUsedError;
   Set<String> get genres => throw _privateConstructorUsedError;
   String? get postType =>
-      throw _privateConstructorUsedError; // 'musician', 'band', ou 'sales'
-  String? get availableFor =>
-      throw _privateConstructorUsedError; // 'gig', 'rehearsal', etc.
-  bool? get hasYoutube =>
+      throw _privateConstructorUsedError; // 'musician', 'band', 'sales' ou 'hiring'
+  Set<String> get availableFor =>
+      throw _privateConstructorUsedError; // Disponibilidades/formatos
+  bool? get hasYoutube => throw _privateConstructorUsedError;
+  bool? get hasSpotify => throw _privateConstructorUsedError;
+  bool? get hasDeezer =>
+      throw _privateConstructorUsedError; // ✅ Campos de hiring (contratação)
+  Set<String> get eventTypes => throw _privateConstructorUsedError;
+  Set<String> get gigFormats => throw _privateConstructorUsedError;
+  Set<String> get venueSetups => throw _privateConstructorUsedError;
+  Set<String> get budgetRanges =>
       throw _privateConstructorUsedError; // ✅ Campos de sales (anúncios)
   Set<String> get salesTypes =>
       throw _privateConstructorUsedError; // 'Gravação', 'Ensaios', etc (multi)
@@ -35,8 +42,6 @@ mixin _$SearchParams {
       throw _privateConstructorUsedError; // Faixa de preço máxima
   bool? get onlyWithDiscount =>
       throw _privateConstructorUsedError; // Apenas anúncios com desconto
-  bool? get onlyActivePromos =>
-      throw _privateConstructorUsedError; // Apenas promoções ativas (não expiradas)
   String? get searchUsername => throw _privateConstructorUsedError;
 
   /// Create a copy of SearchParams
@@ -59,13 +64,18 @@ abstract class $SearchParamsCopyWith<$Res> {
       Set<String> instruments,
       Set<String> genres,
       String? postType,
-      String? availableFor,
+      Set<String> availableFor,
       bool? hasYoutube,
+      bool? hasSpotify,
+      bool? hasDeezer,
+      Set<String> eventTypes,
+      Set<String> gigFormats,
+      Set<String> venueSetups,
+      Set<String> budgetRanges,
       Set<String> salesTypes,
       double? minPrice,
       double? maxPrice,
       bool? onlyWithDiscount,
-      bool? onlyActivePromos,
       String? searchUsername});
 }
 
@@ -90,13 +100,18 @@ class _$SearchParamsCopyWithImpl<$Res, $Val extends SearchParams>
     Object? instruments = null,
     Object? genres = null,
     Object? postType = freezed,
-    Object? availableFor = freezed,
+    Object? availableFor = null,
     Object? hasYoutube = freezed,
+    Object? hasSpotify = freezed,
+    Object? hasDeezer = freezed,
+    Object? eventTypes = null,
+    Object? gigFormats = null,
+    Object? venueSetups = null,
+    Object? budgetRanges = null,
     Object? salesTypes = null,
     Object? minPrice = freezed,
     Object? maxPrice = freezed,
     Object? onlyWithDiscount = freezed,
-    Object? onlyActivePromos = freezed,
     Object? searchUsername = freezed,
   }) {
     return _then(_value.copyWith(
@@ -124,14 +139,38 @@ class _$SearchParamsCopyWithImpl<$Res, $Val extends SearchParams>
           ? _value.postType
           : postType // ignore: cast_nullable_to_non_nullable
               as String?,
-      availableFor: freezed == availableFor
+      availableFor: null == availableFor
           ? _value.availableFor
           : availableFor // ignore: cast_nullable_to_non_nullable
-              as String?,
+              as Set<String>,
       hasYoutube: freezed == hasYoutube
           ? _value.hasYoutube
           : hasYoutube // ignore: cast_nullable_to_non_nullable
               as bool?,
+      hasSpotify: freezed == hasSpotify
+          ? _value.hasSpotify
+          : hasSpotify // ignore: cast_nullable_to_non_nullable
+              as bool?,
+      hasDeezer: freezed == hasDeezer
+          ? _value.hasDeezer
+          : hasDeezer // ignore: cast_nullable_to_non_nullable
+              as bool?,
+      eventTypes: null == eventTypes
+          ? _value.eventTypes
+          : eventTypes // ignore: cast_nullable_to_non_nullable
+              as Set<String>,
+      gigFormats: null == gigFormats
+          ? _value.gigFormats
+          : gigFormats // ignore: cast_nullable_to_non_nullable
+              as Set<String>,
+      venueSetups: null == venueSetups
+          ? _value.venueSetups
+          : venueSetups // ignore: cast_nullable_to_non_nullable
+              as Set<String>,
+      budgetRanges: null == budgetRanges
+          ? _value.budgetRanges
+          : budgetRanges // ignore: cast_nullable_to_non_nullable
+              as Set<String>,
       salesTypes: null == salesTypes
           ? _value.salesTypes
           : salesTypes // ignore: cast_nullable_to_non_nullable
@@ -147,10 +186,6 @@ class _$SearchParamsCopyWithImpl<$Res, $Val extends SearchParams>
       onlyWithDiscount: freezed == onlyWithDiscount
           ? _value.onlyWithDiscount
           : onlyWithDiscount // ignore: cast_nullable_to_non_nullable
-              as bool?,
-      onlyActivePromos: freezed == onlyActivePromos
-          ? _value.onlyActivePromos
-          : onlyActivePromos // ignore: cast_nullable_to_non_nullable
               as bool?,
       searchUsername: freezed == searchUsername
           ? _value.searchUsername
@@ -175,13 +210,18 @@ abstract class _$$SearchParamsImplCopyWith<$Res>
       Set<String> instruments,
       Set<String> genres,
       String? postType,
-      String? availableFor,
+      Set<String> availableFor,
       bool? hasYoutube,
+      bool? hasSpotify,
+      bool? hasDeezer,
+      Set<String> eventTypes,
+      Set<String> gigFormats,
+      Set<String> venueSetups,
+      Set<String> budgetRanges,
       Set<String> salesTypes,
       double? minPrice,
       double? maxPrice,
       bool? onlyWithDiscount,
-      bool? onlyActivePromos,
       String? searchUsername});
 }
 
@@ -204,13 +244,18 @@ class __$$SearchParamsImplCopyWithImpl<$Res>
     Object? instruments = null,
     Object? genres = null,
     Object? postType = freezed,
-    Object? availableFor = freezed,
+    Object? availableFor = null,
     Object? hasYoutube = freezed,
+    Object? hasSpotify = freezed,
+    Object? hasDeezer = freezed,
+    Object? eventTypes = null,
+    Object? gigFormats = null,
+    Object? venueSetups = null,
+    Object? budgetRanges = null,
     Object? salesTypes = null,
     Object? minPrice = freezed,
     Object? maxPrice = freezed,
     Object? onlyWithDiscount = freezed,
-    Object? onlyActivePromos = freezed,
     Object? searchUsername = freezed,
   }) {
     return _then(_$SearchParamsImpl(
@@ -238,14 +283,38 @@ class __$$SearchParamsImplCopyWithImpl<$Res>
           ? _value.postType
           : postType // ignore: cast_nullable_to_non_nullable
               as String?,
-      availableFor: freezed == availableFor
-          ? _value.availableFor
+      availableFor: null == availableFor
+          ? _value._availableFor
           : availableFor // ignore: cast_nullable_to_non_nullable
-              as String?,
+              as Set<String>,
       hasYoutube: freezed == hasYoutube
           ? _value.hasYoutube
           : hasYoutube // ignore: cast_nullable_to_non_nullable
               as bool?,
+      hasSpotify: freezed == hasSpotify
+          ? _value.hasSpotify
+          : hasSpotify // ignore: cast_nullable_to_non_nullable
+              as bool?,
+      hasDeezer: freezed == hasDeezer
+          ? _value.hasDeezer
+          : hasDeezer // ignore: cast_nullable_to_non_nullable
+              as bool?,
+      eventTypes: null == eventTypes
+          ? _value._eventTypes
+          : eventTypes // ignore: cast_nullable_to_non_nullable
+              as Set<String>,
+      gigFormats: null == gigFormats
+          ? _value._gigFormats
+          : gigFormats // ignore: cast_nullable_to_non_nullable
+              as Set<String>,
+      venueSetups: null == venueSetups
+          ? _value._venueSetups
+          : venueSetups // ignore: cast_nullable_to_non_nullable
+              as Set<String>,
+      budgetRanges: null == budgetRanges
+          ? _value._budgetRanges
+          : budgetRanges // ignore: cast_nullable_to_non_nullable
+              as Set<String>,
       salesTypes: null == salesTypes
           ? _value._salesTypes
           : salesTypes // ignore: cast_nullable_to_non_nullable
@@ -261,10 +330,6 @@ class __$$SearchParamsImplCopyWithImpl<$Res>
       onlyWithDiscount: freezed == onlyWithDiscount
           ? _value.onlyWithDiscount
           : onlyWithDiscount // ignore: cast_nullable_to_non_nullable
-              as bool?,
-      onlyActivePromos: freezed == onlyActivePromos
-          ? _value.onlyActivePromos
-          : onlyActivePromos // ignore: cast_nullable_to_non_nullable
               as bool?,
       searchUsername: freezed == searchUsername
           ? _value.searchUsername
@@ -284,16 +349,26 @@ class _$SearchParamsImpl implements _SearchParams {
       final Set<String> instruments = const {},
       final Set<String> genres = const {},
       this.postType,
-      this.availableFor,
+      final Set<String> availableFor = const {},
       this.hasYoutube,
+      this.hasSpotify,
+      this.hasDeezer,
+      final Set<String> eventTypes = const {},
+      final Set<String> gigFormats = const {},
+      final Set<String> venueSetups = const {},
+      final Set<String> budgetRanges = const {},
       final Set<String> salesTypes = const {},
       this.minPrice,
       this.maxPrice,
       this.onlyWithDiscount,
-      this.onlyActivePromos,
       this.searchUsername})
       : _instruments = instruments,
         _genres = genres,
+        _availableFor = availableFor,
+        _eventTypes = eventTypes,
+        _gigFormats = gigFormats,
+        _venueSetups = venueSetups,
+        _budgetRanges = budgetRanges,
         _salesTypes = salesTypes;
 
   @override
@@ -322,12 +397,62 @@ class _$SearchParamsImpl implements _SearchParams {
 
   @override
   final String? postType;
-// 'musician', 'band', ou 'sales'
+// 'musician', 'band', 'sales' ou 'hiring'
+  final Set<String> _availableFor;
+// 'musician', 'band', 'sales' ou 'hiring'
   @override
-  final String? availableFor;
-// 'gig', 'rehearsal', etc.
+  @JsonKey()
+  Set<String> get availableFor {
+    if (_availableFor is EqualUnmodifiableSetView) return _availableFor;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableSetView(_availableFor);
+  }
+
+// Disponibilidades/formatos
   @override
   final bool? hasYoutube;
+  @override
+  final bool? hasSpotify;
+  @override
+  final bool? hasDeezer;
+// ✅ Campos de hiring (contratação)
+  final Set<String> _eventTypes;
+// ✅ Campos de hiring (contratação)
+  @override
+  @JsonKey()
+  Set<String> get eventTypes {
+    if (_eventTypes is EqualUnmodifiableSetView) return _eventTypes;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableSetView(_eventTypes);
+  }
+
+  final Set<String> _gigFormats;
+  @override
+  @JsonKey()
+  Set<String> get gigFormats {
+    if (_gigFormats is EqualUnmodifiableSetView) return _gigFormats;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableSetView(_gigFormats);
+  }
+
+  final Set<String> _venueSetups;
+  @override
+  @JsonKey()
+  Set<String> get venueSetups {
+    if (_venueSetups is EqualUnmodifiableSetView) return _venueSetups;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableSetView(_venueSetups);
+  }
+
+  final Set<String> _budgetRanges;
+  @override
+  @JsonKey()
+  Set<String> get budgetRanges {
+    if (_budgetRanges is EqualUnmodifiableSetView) return _budgetRanges;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableSetView(_budgetRanges);
+  }
+
 // ✅ Campos de sales (anúncios)
   final Set<String> _salesTypes;
 // ✅ Campos de sales (anúncios)
@@ -350,14 +475,11 @@ class _$SearchParamsImpl implements _SearchParams {
   final bool? onlyWithDiscount;
 // Apenas anúncios com desconto
   @override
-  final bool? onlyActivePromos;
-// Apenas promoções ativas (não expiradas)
-  @override
   final String? searchUsername;
 
   @override
   String toString() {
-    return 'SearchParams(city: $city, maxDistanceKm: $maxDistanceKm, level: $level, instruments: $instruments, genres: $genres, postType: $postType, availableFor: $availableFor, hasYoutube: $hasYoutube, salesTypes: $salesTypes, minPrice: $minPrice, maxPrice: $maxPrice, onlyWithDiscount: $onlyWithDiscount, onlyActivePromos: $onlyActivePromos, searchUsername: $searchUsername)';
+    return 'SearchParams(city: $city, maxDistanceKm: $maxDistanceKm, level: $level, instruments: $instruments, genres: $genres, postType: $postType, availableFor: $availableFor, hasYoutube: $hasYoutube, hasSpotify: $hasSpotify, hasDeezer: $hasDeezer, eventTypes: $eventTypes, gigFormats: $gigFormats, venueSetups: $venueSetups, budgetRanges: $budgetRanges, salesTypes: $salesTypes, minPrice: $minPrice, maxPrice: $maxPrice, onlyWithDiscount: $onlyWithDiscount, searchUsername: $searchUsername)';
   }
 
   @override
@@ -374,10 +496,22 @@ class _$SearchParamsImpl implements _SearchParams {
             const DeepCollectionEquality().equals(other._genres, _genres) &&
             (identical(other.postType, postType) ||
                 other.postType == postType) &&
-            (identical(other.availableFor, availableFor) ||
-                other.availableFor == availableFor) &&
+            const DeepCollectionEquality()
+                .equals(other._availableFor, _availableFor) &&
             (identical(other.hasYoutube, hasYoutube) ||
                 other.hasYoutube == hasYoutube) &&
+            (identical(other.hasSpotify, hasSpotify) ||
+                other.hasSpotify == hasSpotify) &&
+            (identical(other.hasDeezer, hasDeezer) ||
+                other.hasDeezer == hasDeezer) &&
+            const DeepCollectionEquality()
+                .equals(other._eventTypes, _eventTypes) &&
+            const DeepCollectionEquality()
+                .equals(other._gigFormats, _gigFormats) &&
+            const DeepCollectionEquality()
+                .equals(other._venueSetups, _venueSetups) &&
+            const DeepCollectionEquality()
+                .equals(other._budgetRanges, _budgetRanges) &&
             const DeepCollectionEquality()
                 .equals(other._salesTypes, _salesTypes) &&
             (identical(other.minPrice, minPrice) ||
@@ -386,29 +520,33 @@ class _$SearchParamsImpl implements _SearchParams {
                 other.maxPrice == maxPrice) &&
             (identical(other.onlyWithDiscount, onlyWithDiscount) ||
                 other.onlyWithDiscount == onlyWithDiscount) &&
-            (identical(other.onlyActivePromos, onlyActivePromos) ||
-                other.onlyActivePromos == onlyActivePromos) &&
             (identical(other.searchUsername, searchUsername) ||
                 other.searchUsername == searchUsername));
   }
 
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      city,
-      maxDistanceKm,
-      level,
-      const DeepCollectionEquality().hash(_instruments),
-      const DeepCollectionEquality().hash(_genres),
-      postType,
-      availableFor,
-      hasYoutube,
-      const DeepCollectionEquality().hash(_salesTypes),
-      minPrice,
-      maxPrice,
-      onlyWithDiscount,
-      onlyActivePromos,
-      searchUsername);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        city,
+        maxDistanceKm,
+        level,
+        const DeepCollectionEquality().hash(_instruments),
+        const DeepCollectionEquality().hash(_genres),
+        postType,
+        const DeepCollectionEquality().hash(_availableFor),
+        hasYoutube,
+        hasSpotify,
+        hasDeezer,
+        const DeepCollectionEquality().hash(_eventTypes),
+        const DeepCollectionEquality().hash(_gigFormats),
+        const DeepCollectionEquality().hash(_venueSetups),
+        const DeepCollectionEquality().hash(_budgetRanges),
+        const DeepCollectionEquality().hash(_salesTypes),
+        minPrice,
+        maxPrice,
+        onlyWithDiscount,
+        searchUsername
+      ]);
 
   /// Create a copy of SearchParams
   /// with the given fields replaced by the non-null parameter values.
@@ -427,13 +565,18 @@ abstract class _SearchParams implements SearchParams {
       final Set<String> instruments,
       final Set<String> genres,
       final String? postType,
-      final String? availableFor,
+      final Set<String> availableFor,
       final bool? hasYoutube,
+      final bool? hasSpotify,
+      final bool? hasDeezer,
+      final Set<String> eventTypes,
+      final Set<String> gigFormats,
+      final Set<String> venueSetups,
+      final Set<String> budgetRanges,
       final Set<String> salesTypes,
       final double? minPrice,
       final double? maxPrice,
       final bool? onlyWithDiscount,
-      final bool? onlyActivePromos,
       final String? searchUsername}) = _$SearchParamsImpl;
 
   @override
@@ -447,11 +590,23 @@ abstract class _SearchParams implements SearchParams {
   @override
   Set<String> get genres;
   @override
-  String? get postType; // 'musician', 'band', ou 'sales'
+  String? get postType; // 'musician', 'band', 'sales' ou 'hiring'
   @override
-  String? get availableFor; // 'gig', 'rehearsal', etc.
+  Set<String> get availableFor; // Disponibilidades/formatos
   @override
-  bool? get hasYoutube; // ✅ Campos de sales (anúncios)
+  bool? get hasYoutube;
+  @override
+  bool? get hasSpotify;
+  @override
+  bool? get hasDeezer; // ✅ Campos de hiring (contratação)
+  @override
+  Set<String> get eventTypes;
+  @override
+  Set<String> get gigFormats;
+  @override
+  Set<String> get venueSetups;
+  @override
+  Set<String> get budgetRanges; // ✅ Campos de sales (anúncios)
   @override
   Set<String> get salesTypes; // 'Gravação', 'Ensaios', etc (multi)
   @override
@@ -460,8 +615,6 @@ abstract class _SearchParams implements SearchParams {
   double? get maxPrice; // Faixa de preço máxima
   @override
   bool? get onlyWithDiscount; // Apenas anúncios com desconto
-  @override
-  bool? get onlyActivePromos; // Apenas promoções ativas (não expiradas)
   @override
   String? get searchUsername;
 

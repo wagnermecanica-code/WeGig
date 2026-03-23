@@ -56,6 +56,8 @@ class MarkerCacheService {
       getMarker('band', true),
       getMarker('sales', false),
       getMarker('sales', true),
+      getMarker('hiring', false),
+      getMarker('hiring', true),
     ]);
 
     final duration = DateTime.now().difference(start);
@@ -77,9 +79,11 @@ class MarkerCacheService {
       case 'band':
         pinColor = AppColors.accent;      // Laranja para bandas
       case 'sales':
-        pinColor = AppColors.salesBlue;   // Azul para anúncios
+        pinColor = AppColors.salesColor;   // Cinza escuro para anúncios
+      case 'hiring':
+        pinColor = AppColors.hiringColor; // Pêssego para contratação
       default:
-        pinColor = AppColors.primary;     // Cinza escuro para músicos
+        pinColor = AppColors.musicianColor; // Roxo para músicos
     }
     
     // Círculo de fundo (mais brilhante se ativo)
@@ -109,6 +113,8 @@ class MarkerCacheService {
         icon = Iconsax.people;      // Grupo para bandas
       case 'sales':
         icon = Iconsax.tag;         // Tag para anúncios/vendas
+      case 'hiring':
+        icon = Iconsax.briefcase;   // Maleta para contratação
       default:
         icon = Iconsax.musicnote;   // Nota musical para músicos
     }

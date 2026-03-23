@@ -43,6 +43,8 @@ mixin _$ProfileEntity {
   String? get instagramLink => throw _privateConstructorUsedError;
   String? get tiktokLink => throw _privateConstructorUsedError;
   String? get youtubeLink => throw _privateConstructorUsedError;
+  String? get spotifyLink => throw _privateConstructorUsedError;
+  String? get deezerLink => throw _privateConstructorUsedError;
   String? get neighborhood => throw _privateConstructorUsedError;
   String? get state => throw _privateConstructorUsedError;
   List<String>? get bandMembers =>
@@ -92,6 +94,8 @@ abstract class $ProfileEntityCopyWith<$Res> {
       String? instagramLink,
       String? tiktokLink,
       String? youtubeLink,
+      String? spotifyLink,
+      String? deezerLink,
       String? neighborhood,
       String? state,
       List<String>? bandMembers,
@@ -138,6 +142,8 @@ class _$ProfileEntityCopyWithImpl<$Res, $Val extends ProfileEntity>
     Object? instagramLink = freezed,
     Object? tiktokLink = freezed,
     Object? youtubeLink = freezed,
+    Object? spotifyLink = freezed,
+    Object? deezerLink = freezed,
     Object? neighborhood = freezed,
     Object? state = freezed,
     Object? bandMembers = freezed,
@@ -229,6 +235,14 @@ class _$ProfileEntityCopyWithImpl<$Res, $Val extends ProfileEntity>
           ? _value.youtubeLink
           : youtubeLink // ignore: cast_nullable_to_non_nullable
               as String?,
+      spotifyLink: freezed == spotifyLink
+          ? _value.spotifyLink
+          : spotifyLink // ignore: cast_nullable_to_non_nullable
+              as String?,
+      deezerLink: freezed == deezerLink
+          ? _value.deezerLink
+          : deezerLink // ignore: cast_nullable_to_non_nullable
+              as String?,
       neighborhood: freezed == neighborhood
           ? _value.neighborhood
           : neighborhood // ignore: cast_nullable_to_non_nullable
@@ -298,6 +312,8 @@ abstract class _$$ProfileEntityImplCopyWith<$Res>
       String? instagramLink,
       String? tiktokLink,
       String? youtubeLink,
+      String? spotifyLink,
+      String? deezerLink,
       String? neighborhood,
       String? state,
       List<String>? bandMembers,
@@ -342,6 +358,8 @@ class __$$ProfileEntityImplCopyWithImpl<$Res>
     Object? instagramLink = freezed,
     Object? tiktokLink = freezed,
     Object? youtubeLink = freezed,
+    Object? spotifyLink = freezed,
+    Object? deezerLink = freezed,
     Object? neighborhood = freezed,
     Object? state = freezed,
     Object? bandMembers = freezed,
@@ -433,6 +451,14 @@ class __$$ProfileEntityImplCopyWithImpl<$Res>
           ? _value.youtubeLink
           : youtubeLink // ignore: cast_nullable_to_non_nullable
               as String?,
+      spotifyLink: freezed == spotifyLink
+          ? _value.spotifyLink
+          : spotifyLink // ignore: cast_nullable_to_non_nullable
+              as String?,
+      deezerLink: freezed == deezerLink
+          ? _value.deezerLink
+          : deezerLink // ignore: cast_nullable_to_non_nullable
+              as String?,
       neighborhood: freezed == neighborhood
           ? _value.neighborhood
           : neighborhood // ignore: cast_nullable_to_non_nullable
@@ -497,6 +523,8 @@ class _$ProfileEntityImpl extends _ProfileEntity {
       this.instagramLink,
       this.tiktokLink,
       this.youtubeLink,
+      this.spotifyLink,
+      this.deezerLink,
       this.neighborhood,
       this.state,
       final List<String>? bandMembers,
@@ -578,6 +606,10 @@ class _$ProfileEntityImpl extends _ProfileEntity {
   @override
   final String? youtubeLink;
   @override
+  final String? spotifyLink;
+  @override
+  final String? deezerLink;
+  @override
   final String? neighborhood;
   @override
   final String? state;
@@ -616,7 +648,7 @@ class _$ProfileEntityImpl extends _ProfileEntity {
 
   @override
   String toString() {
-    return 'ProfileEntity(profileId: $profileId, uid: $uid, name: $name, username: $username, isBand: $isBand, profileType: $profileType, city: $city, location: $location, createdAt: $createdAt, notificationRadius: $notificationRadius, notificationRadiusEnabled: $notificationRadiusEnabled, photoUrl: $photoUrl, birthYear: $birthYear, bio: $bio, instruments: $instruments, genres: $genres, level: $level, instagramLink: $instagramLink, tiktokLink: $tiktokLink, youtubeLink: $youtubeLink, neighborhood: $neighborhood, state: $state, bandMembers: $bandMembers, spaceType: $spaceType, phone: $phone, operatingHours: $operatingHours, website: $website, amenities: $amenities, updatedAt: $updatedAt)';
+    return 'ProfileEntity(profileId: $profileId, uid: $uid, name: $name, username: $username, isBand: $isBand, profileType: $profileType, city: $city, location: $location, createdAt: $createdAt, notificationRadius: $notificationRadius, notificationRadiusEnabled: $notificationRadiusEnabled, photoUrl: $photoUrl, birthYear: $birthYear, bio: $bio, instruments: $instruments, genres: $genres, level: $level, instagramLink: $instagramLink, tiktokLink: $tiktokLink, youtubeLink: $youtubeLink, spotifyLink: $spotifyLink, deezerLink: $deezerLink, neighborhood: $neighborhood, state: $state, bandMembers: $bandMembers, spaceType: $spaceType, phone: $phone, operatingHours: $operatingHours, website: $website, amenities: $amenities, updatedAt: $updatedAt)';
   }
 
   @override
@@ -658,6 +690,10 @@ class _$ProfileEntityImpl extends _ProfileEntity {
                 other.tiktokLink == tiktokLink) &&
             (identical(other.youtubeLink, youtubeLink) ||
                 other.youtubeLink == youtubeLink) &&
+            (identical(other.spotifyLink, spotifyLink) ||
+                other.spotifyLink == spotifyLink) &&
+            (identical(other.deezerLink, deezerLink) ||
+                other.deezerLink == deezerLink) &&
             (identical(other.neighborhood, neighborhood) ||
                 other.neighborhood == neighborhood) &&
             (identical(other.state, state) || other.state == state) &&
@@ -699,6 +735,8 @@ class _$ProfileEntityImpl extends _ProfileEntity {
         instagramLink,
         tiktokLink,
         youtubeLink,
+        spotifyLink,
+        deezerLink,
         neighborhood,
         state,
         const DeepCollectionEquality().hash(_bandMembers),
@@ -748,6 +786,8 @@ abstract class _ProfileEntity extends ProfileEntity {
           final String? instagramLink,
           final String? tiktokLink,
           final String? youtubeLink,
+          final String? spotifyLink,
+          final String? deezerLink,
           final String? neighborhood,
           final String? state,
           final List<String>? bandMembers,
@@ -806,6 +846,10 @@ abstract class _ProfileEntity extends ProfileEntity {
   String? get tiktokLink;
   @override
   String? get youtubeLink;
+  @override
+  String? get spotifyLink;
+  @override
+  String? get deezerLink;
   @override
   String? get neighborhood;
   @override

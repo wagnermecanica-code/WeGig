@@ -43,7 +43,19 @@ mixin _$PostEntity {
   List<String> get photoUrls =>
       throw _privateConstructorUsedError; // NOVO: Lista de fotos (até 4)
   String? get youtubeLink => throw _privateConstructorUsedError;
+  String? get spotifyLink => throw _privateConstructorUsedError;
+  String? get deezerLink => throw _privateConstructorUsedError;
   List<String> get availableFor => throw _privateConstructorUsedError;
+  @TimestampConverter()
+  DateTime? get eventDate => throw _privateConstructorUsedError;
+  String? get eventType => throw _privateConstructorUsedError;
+  String? get gigFormat => throw _privateConstructorUsedError;
+  List<String> get venueSetup => throw _privateConstructorUsedError;
+  String? get budgetRange => throw _privateConstructorUsedError;
+  String? get eventStartTime => throw _privateConstructorUsedError;
+  String? get eventEndTime => throw _privateConstructorUsedError;
+  int? get eventDurationMinutes => throw _privateConstructorUsedError;
+  int? get guestCount => throw _privateConstructorUsedError;
   double? get distanceKm => throw _privateConstructorUsedError;
   String? get authorName => throw _privateConstructorUsedError;
   String? get authorPhotoUrl => throw _privateConstructorUsedError;
@@ -60,6 +72,8 @@ mixin _$PostEntity {
   @TimestampConverter()
   DateTime? get promoEndDate => throw _privateConstructorUsedError;
   String? get whatsappNumber => throw _privateConstructorUsedError;
+  int get commentCount => throw _privateConstructorUsedError;
+  int get forwardCount => throw _privateConstructorUsedError;
 
   /// Serializes this PostEntity to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -96,7 +110,18 @@ abstract class $PostEntityCopyWith<$Res> {
       String? photoUrl,
       List<String> photoUrls,
       String? youtubeLink,
+      String? spotifyLink,
+      String? deezerLink,
       List<String> availableFor,
+      @TimestampConverter() DateTime? eventDate,
+      String? eventType,
+      String? gigFormat,
+      List<String> venueSetup,
+      String? budgetRange,
+      String? eventStartTime,
+      String? eventEndTime,
+      int? eventDurationMinutes,
+      int? guestCount,
       double? distanceKm,
       String? authorName,
       String? authorPhotoUrl,
@@ -109,7 +134,9 @@ abstract class $PostEntityCopyWith<$Res> {
       double? discountValue,
       @TimestampConverter() DateTime? promoStartDate,
       @TimestampConverter() DateTime? promoEndDate,
-      String? whatsappNumber});
+      String? whatsappNumber,
+      int commentCount,
+      int forwardCount});
 }
 
 /// @nodoc
@@ -145,7 +172,18 @@ class _$PostEntityCopyWithImpl<$Res, $Val extends PostEntity>
     Object? photoUrl = freezed,
     Object? photoUrls = null,
     Object? youtubeLink = freezed,
+    Object? spotifyLink = freezed,
+    Object? deezerLink = freezed,
     Object? availableFor = null,
+    Object? eventDate = freezed,
+    Object? eventType = freezed,
+    Object? gigFormat = freezed,
+    Object? venueSetup = null,
+    Object? budgetRange = freezed,
+    Object? eventStartTime = freezed,
+    Object? eventEndTime = freezed,
+    Object? eventDurationMinutes = freezed,
+    Object? guestCount = freezed,
     Object? distanceKm = freezed,
     Object? authorName = freezed,
     Object? authorPhotoUrl = freezed,
@@ -159,6 +197,8 @@ class _$PostEntityCopyWithImpl<$Res, $Val extends PostEntity>
     Object? promoStartDate = freezed,
     Object? promoEndDate = freezed,
     Object? whatsappNumber = freezed,
+    Object? commentCount = null,
+    Object? forwardCount = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -233,10 +273,54 @@ class _$PostEntityCopyWithImpl<$Res, $Val extends PostEntity>
           ? _value.youtubeLink
           : youtubeLink // ignore: cast_nullable_to_non_nullable
               as String?,
+      spotifyLink: freezed == spotifyLink
+          ? _value.spotifyLink
+          : spotifyLink // ignore: cast_nullable_to_non_nullable
+              as String?,
+      deezerLink: freezed == deezerLink
+          ? _value.deezerLink
+          : deezerLink // ignore: cast_nullable_to_non_nullable
+              as String?,
       availableFor: null == availableFor
           ? _value.availableFor
           : availableFor // ignore: cast_nullable_to_non_nullable
               as List<String>,
+      eventDate: freezed == eventDate
+          ? _value.eventDate
+          : eventDate // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      eventType: freezed == eventType
+          ? _value.eventType
+          : eventType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      gigFormat: freezed == gigFormat
+          ? _value.gigFormat
+          : gigFormat // ignore: cast_nullable_to_non_nullable
+              as String?,
+      venueSetup: null == venueSetup
+          ? _value.venueSetup
+          : venueSetup // ignore: cast_nullable_to_non_nullable
+              as List<String>,
+      budgetRange: freezed == budgetRange
+          ? _value.budgetRange
+          : budgetRange // ignore: cast_nullable_to_non_nullable
+              as String?,
+      eventStartTime: freezed == eventStartTime
+          ? _value.eventStartTime
+          : eventStartTime // ignore: cast_nullable_to_non_nullable
+              as String?,
+      eventEndTime: freezed == eventEndTime
+          ? _value.eventEndTime
+          : eventEndTime // ignore: cast_nullable_to_non_nullable
+              as String?,
+      eventDurationMinutes: freezed == eventDurationMinutes
+          ? _value.eventDurationMinutes
+          : eventDurationMinutes // ignore: cast_nullable_to_non_nullable
+              as int?,
+      guestCount: freezed == guestCount
+          ? _value.guestCount
+          : guestCount // ignore: cast_nullable_to_non_nullable
+              as int?,
       distanceKm: freezed == distanceKm
           ? _value.distanceKm
           : distanceKm // ignore: cast_nullable_to_non_nullable
@@ -289,6 +373,14 @@ class _$PostEntityCopyWithImpl<$Res, $Val extends PostEntity>
           ? _value.whatsappNumber
           : whatsappNumber // ignore: cast_nullable_to_non_nullable
               as String?,
+      commentCount: null == commentCount
+          ? _value.commentCount
+          : commentCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      forwardCount: null == forwardCount
+          ? _value.forwardCount
+          : forwardCount // ignore: cast_nullable_to_non_nullable
+              as int,
     ) as $Val);
   }
 }
@@ -320,7 +412,18 @@ abstract class _$$PostEntityImplCopyWith<$Res>
       String? photoUrl,
       List<String> photoUrls,
       String? youtubeLink,
+      String? spotifyLink,
+      String? deezerLink,
       List<String> availableFor,
+      @TimestampConverter() DateTime? eventDate,
+      String? eventType,
+      String? gigFormat,
+      List<String> venueSetup,
+      String? budgetRange,
+      String? eventStartTime,
+      String? eventEndTime,
+      int? eventDurationMinutes,
+      int? guestCount,
       double? distanceKm,
       String? authorName,
       String? authorPhotoUrl,
@@ -333,7 +436,9 @@ abstract class _$$PostEntityImplCopyWith<$Res>
       double? discountValue,
       @TimestampConverter() DateTime? promoStartDate,
       @TimestampConverter() DateTime? promoEndDate,
-      String? whatsappNumber});
+      String? whatsappNumber,
+      int commentCount,
+      int forwardCount});
 }
 
 /// @nodoc
@@ -367,7 +472,18 @@ class __$$PostEntityImplCopyWithImpl<$Res>
     Object? photoUrl = freezed,
     Object? photoUrls = null,
     Object? youtubeLink = freezed,
+    Object? spotifyLink = freezed,
+    Object? deezerLink = freezed,
     Object? availableFor = null,
+    Object? eventDate = freezed,
+    Object? eventType = freezed,
+    Object? gigFormat = freezed,
+    Object? venueSetup = null,
+    Object? budgetRange = freezed,
+    Object? eventStartTime = freezed,
+    Object? eventEndTime = freezed,
+    Object? eventDurationMinutes = freezed,
+    Object? guestCount = freezed,
     Object? distanceKm = freezed,
     Object? authorName = freezed,
     Object? authorPhotoUrl = freezed,
@@ -381,6 +497,8 @@ class __$$PostEntityImplCopyWithImpl<$Res>
     Object? promoStartDate = freezed,
     Object? promoEndDate = freezed,
     Object? whatsappNumber = freezed,
+    Object? commentCount = null,
+    Object? forwardCount = null,
   }) {
     return _then(_$PostEntityImpl(
       id: null == id
@@ -455,10 +573,54 @@ class __$$PostEntityImplCopyWithImpl<$Res>
           ? _value.youtubeLink
           : youtubeLink // ignore: cast_nullable_to_non_nullable
               as String?,
+      spotifyLink: freezed == spotifyLink
+          ? _value.spotifyLink
+          : spotifyLink // ignore: cast_nullable_to_non_nullable
+              as String?,
+      deezerLink: freezed == deezerLink
+          ? _value.deezerLink
+          : deezerLink // ignore: cast_nullable_to_non_nullable
+              as String?,
       availableFor: null == availableFor
           ? _value._availableFor
           : availableFor // ignore: cast_nullable_to_non_nullable
               as List<String>,
+      eventDate: freezed == eventDate
+          ? _value.eventDate
+          : eventDate // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      eventType: freezed == eventType
+          ? _value.eventType
+          : eventType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      gigFormat: freezed == gigFormat
+          ? _value.gigFormat
+          : gigFormat // ignore: cast_nullable_to_non_nullable
+              as String?,
+      venueSetup: null == venueSetup
+          ? _value._venueSetup
+          : venueSetup // ignore: cast_nullable_to_non_nullable
+              as List<String>,
+      budgetRange: freezed == budgetRange
+          ? _value.budgetRange
+          : budgetRange // ignore: cast_nullable_to_non_nullable
+              as String?,
+      eventStartTime: freezed == eventStartTime
+          ? _value.eventStartTime
+          : eventStartTime // ignore: cast_nullable_to_non_nullable
+              as String?,
+      eventEndTime: freezed == eventEndTime
+          ? _value.eventEndTime
+          : eventEndTime // ignore: cast_nullable_to_non_nullable
+              as String?,
+      eventDurationMinutes: freezed == eventDurationMinutes
+          ? _value.eventDurationMinutes
+          : eventDurationMinutes // ignore: cast_nullable_to_non_nullable
+              as int?,
+      guestCount: freezed == guestCount
+          ? _value.guestCount
+          : guestCount // ignore: cast_nullable_to_non_nullable
+              as int?,
       distanceKm: freezed == distanceKm
           ? _value.distanceKm
           : distanceKm // ignore: cast_nullable_to_non_nullable
@@ -511,6 +673,14 @@ class __$$PostEntityImplCopyWithImpl<$Res>
           ? _value.whatsappNumber
           : whatsappNumber // ignore: cast_nullable_to_non_nullable
               as String?,
+      commentCount: null == commentCount
+          ? _value.commentCount
+          : commentCount // ignore: cast_nullable_to_non_nullable
+              as int,
+      forwardCount: null == forwardCount
+          ? _value.forwardCount
+          : forwardCount // ignore: cast_nullable_to_non_nullable
+              as int,
     ));
   }
 }
@@ -537,7 +707,18 @@ class _$PostEntityImpl extends _PostEntity {
       this.photoUrl,
       final List<String> photoUrls = const [],
       this.youtubeLink,
+      this.spotifyLink,
+      this.deezerLink,
       final List<String> availableFor = const [],
+      @TimestampConverter() this.eventDate,
+      this.eventType,
+      this.gigFormat,
+      final List<String> venueSetup = const [],
+      this.budgetRange,
+      this.eventStartTime,
+      this.eventEndTime,
+      this.eventDurationMinutes,
+      this.guestCount,
       this.distanceKm,
       this.authorName,
       this.authorPhotoUrl,
@@ -550,12 +731,15 @@ class _$PostEntityImpl extends _PostEntity {
       this.discountValue,
       @TimestampConverter() this.promoStartDate,
       @TimestampConverter() this.promoEndDate,
-      this.whatsappNumber})
+      this.whatsappNumber,
+      this.commentCount = 0,
+      this.forwardCount = 0})
       : _instruments = instruments,
         _genres = genres,
         _seekingMusicians = seekingMusicians,
         _photoUrls = photoUrls,
         _availableFor = availableFor,
+        _venueSetup = venueSetup,
         super._();
 
   factory _$PostEntityImpl.fromJson(Map<String, dynamic> json) =>
@@ -629,6 +813,10 @@ class _$PostEntityImpl extends _PostEntity {
 // NOVO: Lista de fotos (até 4)
   @override
   final String? youtubeLink;
+  @override
+  final String? spotifyLink;
+  @override
+  final String? deezerLink;
   final List<String> _availableFor;
   @override
   @JsonKey()
@@ -638,6 +826,32 @@ class _$PostEntityImpl extends _PostEntity {
     return EqualUnmodifiableListView(_availableFor);
   }
 
+  @override
+  @TimestampConverter()
+  final DateTime? eventDate;
+  @override
+  final String? eventType;
+  @override
+  final String? gigFormat;
+  final List<String> _venueSetup;
+  @override
+  @JsonKey()
+  List<String> get venueSetup {
+    if (_venueSetup is EqualUnmodifiableListView) return _venueSetup;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_venueSetup);
+  }
+
+  @override
+  final String? budgetRange;
+  @override
+  final String? eventStartTime;
+  @override
+  final String? eventEndTime;
+  @override
+  final int? eventDurationMinutes;
+  @override
+  final int? guestCount;
   @override
   final double? distanceKm;
   @override
@@ -667,10 +881,16 @@ class _$PostEntityImpl extends _PostEntity {
   final DateTime? promoEndDate;
   @override
   final String? whatsappNumber;
+  @override
+  @JsonKey()
+  final int commentCount;
+  @override
+  @JsonKey()
+  final int forwardCount;
 
   @override
   String toString() {
-    return 'PostEntity(id: $id, authorProfileId: $authorProfileId, authorUid: $authorUid, content: $content, location: $location, city: $city, type: $type, level: $level, instruments: $instruments, genres: $genres, seekingMusicians: $seekingMusicians, createdAt: $createdAt, expiresAt: $expiresAt, neighborhood: $neighborhood, state: $state, photoUrl: $photoUrl, photoUrls: $photoUrls, youtubeLink: $youtubeLink, availableFor: $availableFor, distanceKm: $distanceKm, authorName: $authorName, authorPhotoUrl: $authorPhotoUrl, activeProfileName: $activeProfileName, activeProfilePhotoUrl: $activeProfilePhotoUrl, title: $title, salesType: $salesType, price: $price, discountMode: $discountMode, discountValue: $discountValue, promoStartDate: $promoStartDate, promoEndDate: $promoEndDate, whatsappNumber: $whatsappNumber)';
+    return 'PostEntity(id: $id, authorProfileId: $authorProfileId, authorUid: $authorUid, content: $content, location: $location, city: $city, type: $type, level: $level, instruments: $instruments, genres: $genres, seekingMusicians: $seekingMusicians, createdAt: $createdAt, expiresAt: $expiresAt, neighborhood: $neighborhood, state: $state, photoUrl: $photoUrl, photoUrls: $photoUrls, youtubeLink: $youtubeLink, spotifyLink: $spotifyLink, deezerLink: $deezerLink, availableFor: $availableFor, eventDate: $eventDate, eventType: $eventType, gigFormat: $gigFormat, venueSetup: $venueSetup, budgetRange: $budgetRange, eventStartTime: $eventStartTime, eventEndTime: $eventEndTime, eventDurationMinutes: $eventDurationMinutes, guestCount: $guestCount, distanceKm: $distanceKm, authorName: $authorName, authorPhotoUrl: $authorPhotoUrl, activeProfileName: $activeProfileName, activeProfilePhotoUrl: $activeProfilePhotoUrl, title: $title, salesType: $salesType, price: $price, discountMode: $discountMode, discountValue: $discountValue, promoStartDate: $promoStartDate, promoEndDate: $promoEndDate, whatsappNumber: $whatsappNumber, commentCount: $commentCount, forwardCount: $forwardCount)';
   }
 
   @override
@@ -707,8 +927,30 @@ class _$PostEntityImpl extends _PostEntity {
                 .equals(other._photoUrls, _photoUrls) &&
             (identical(other.youtubeLink, youtubeLink) ||
                 other.youtubeLink == youtubeLink) &&
+            (identical(other.spotifyLink, spotifyLink) ||
+                other.spotifyLink == spotifyLink) &&
+            (identical(other.deezerLink, deezerLink) ||
+                other.deezerLink == deezerLink) &&
             const DeepCollectionEquality()
                 .equals(other._availableFor, _availableFor) &&
+            (identical(other.eventDate, eventDate) ||
+                other.eventDate == eventDate) &&
+            (identical(other.eventType, eventType) ||
+                other.eventType == eventType) &&
+            (identical(other.gigFormat, gigFormat) ||
+                other.gigFormat == gigFormat) &&
+            const DeepCollectionEquality()
+                .equals(other._venueSetup, _venueSetup) &&
+            (identical(other.budgetRange, budgetRange) ||
+                other.budgetRange == budgetRange) &&
+            (identical(other.eventStartTime, eventStartTime) ||
+                other.eventStartTime == eventStartTime) &&
+            (identical(other.eventEndTime, eventEndTime) ||
+                other.eventEndTime == eventEndTime) &&
+            (identical(other.eventDurationMinutes, eventDurationMinutes) ||
+                other.eventDurationMinutes == eventDurationMinutes) &&
+            (identical(other.guestCount, guestCount) ||
+                other.guestCount == guestCount) &&
             (identical(other.distanceKm, distanceKm) ||
                 other.distanceKm == distanceKm) &&
             (identical(other.authorName, authorName) ||
@@ -732,7 +974,11 @@ class _$PostEntityImpl extends _PostEntity {
             (identical(other.promoEndDate, promoEndDate) ||
                 other.promoEndDate == promoEndDate) &&
             (identical(other.whatsappNumber, whatsappNumber) ||
-                other.whatsappNumber == whatsappNumber));
+                other.whatsappNumber == whatsappNumber) &&
+            (identical(other.commentCount, commentCount) ||
+                other.commentCount == commentCount) &&
+            (identical(other.forwardCount, forwardCount) ||
+                other.forwardCount == forwardCount));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -757,7 +1003,18 @@ class _$PostEntityImpl extends _PostEntity {
         photoUrl,
         const DeepCollectionEquality().hash(_photoUrls),
         youtubeLink,
+        spotifyLink,
+        deezerLink,
         const DeepCollectionEquality().hash(_availableFor),
+        eventDate,
+        eventType,
+        gigFormat,
+        const DeepCollectionEquality().hash(_venueSetup),
+        budgetRange,
+        eventStartTime,
+        eventEndTime,
+        eventDurationMinutes,
+        guestCount,
         distanceKm,
         authorName,
         authorPhotoUrl,
@@ -770,7 +1027,9 @@ class _$PostEntityImpl extends _PostEntity {
         discountValue,
         promoStartDate,
         promoEndDate,
-        whatsappNumber
+        whatsappNumber,
+        commentCount,
+        forwardCount
       ]);
 
   /// Create a copy of PostEntity
@@ -809,7 +1068,18 @@ abstract class _PostEntity extends PostEntity {
       final String? photoUrl,
       final List<String> photoUrls,
       final String? youtubeLink,
+      final String? spotifyLink,
+      final String? deezerLink,
       final List<String> availableFor,
+      @TimestampConverter() final DateTime? eventDate,
+      final String? eventType,
+      final String? gigFormat,
+      final List<String> venueSetup,
+      final String? budgetRange,
+      final String? eventStartTime,
+      final String? eventEndTime,
+      final int? eventDurationMinutes,
+      final int? guestCount,
       final double? distanceKm,
       final String? authorName,
       final String? authorPhotoUrl,
@@ -822,7 +1092,9 @@ abstract class _PostEntity extends PostEntity {
       final double? discountValue,
       @TimestampConverter() final DateTime? promoStartDate,
       @TimestampConverter() final DateTime? promoEndDate,
-      final String? whatsappNumber}) = _$PostEntityImpl;
+      final String? whatsappNumber,
+      final int commentCount,
+      final int forwardCount}) = _$PostEntityImpl;
   const _PostEntity._() : super._();
 
   factory _PostEntity.fromJson(Map<String, dynamic> json) =
@@ -868,7 +1140,30 @@ abstract class _PostEntity extends PostEntity {
   @override
   String? get youtubeLink;
   @override
+  String? get spotifyLink;
+  @override
+  String? get deezerLink;
+  @override
   List<String> get availableFor;
+  @override
+  @TimestampConverter()
+  DateTime? get eventDate;
+  @override
+  String? get eventType;
+  @override
+  String? get gigFormat;
+  @override
+  List<String> get venueSetup;
+  @override
+  String? get budgetRange;
+  @override
+  String? get eventStartTime;
+  @override
+  String? get eventEndTime;
+  @override
+  int? get eventDurationMinutes;
+  @override
+  int? get guestCount;
   @override
   double? get distanceKm;
   @override
@@ -897,6 +1192,10 @@ abstract class _PostEntity extends PostEntity {
   DateTime? get promoEndDate;
   @override
   String? get whatsappNumber;
+  @override
+  int get commentCount;
+  @override
+  int get forwardCount;
 
   /// Create a copy of PostEntity
   /// with the given fields replaced by the non-null parameter values.

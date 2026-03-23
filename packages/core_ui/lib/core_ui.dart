@@ -38,6 +38,7 @@ export 'models/user_type.dart';
 export 'utils/app_snackbar.dart';
 export 'utils/location_utils.dart';
 export 'utils/price_calculator.dart';
+export 'utils/music_constants.dart';
 
 // Core Types
 export 'core/ui_state.dart' hide Success; // Hide Success to avoid conflict with result.dart

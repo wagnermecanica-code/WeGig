@@ -10,6 +10,7 @@ class MultiSelectField extends StatefulWidget {
   final int maxSelections;
   final ValueChanged<Set<String>> onSelectionChanged;
   final bool enabled;
+  final String? errorText;
 
   const MultiSelectField({
     super.key,
@@ -19,6 +20,7 @@ class MultiSelectField extends StatefulWidget {
     required this.selectedItems,
     required this.maxSelections,
     required this.onSelectionChanged,
+    this.errorText,
     this.enabled = true,
   });
 
@@ -47,6 +49,7 @@ class _MultiSelectFieldState extends State<MultiSelectField> {
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           widget.title,
@@ -62,7 +65,7 @@ class _MultiSelectFieldState extends State<MultiSelectField> {
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             decoration: BoxDecoration(
               border: Border.all(
-                color: Colors.grey.shade300,
+                color: widget.errorText != null ? Colors.red : Colors.grey.shade300,
                 width: 1.5,
               ),
               borderRadius: BorderRadius.circular(12),
@@ -75,7 +78,7 @@ class _MultiSelectFieldState extends State<MultiSelectField> {
                       ? Text(
                           widget.placeholder,
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: widget.errorText != null ? Colors.red : Colors.grey[600],
                             fontSize: 15,
                           ),
                         )
@@ -107,13 +110,20 @@ class _MultiSelectFieldState extends State<MultiSelectField> {
                 const SizedBox(width: 8),
                 Icon(
                   Iconsax.arrow_down,
-                  color: Colors.grey[600],
+                  color: widget.errorText != null ? Colors.red : Colors.grey[600],
                   size: 28,
                 ),
               ],
             ),
           ),
         ),
+        if (widget.errorText != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            widget.errorText!,
+            style: const TextStyle(color: Colors.red, fontSize: 12, height: 1.2),
+          ),
+        ],
       ],
     );
   }

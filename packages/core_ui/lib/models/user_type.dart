@@ -1,5 +1,6 @@
 /// Representa os tipos de perfis suportados no app.
-enum UserType { band, musician, sales }
+/// Inclui `sales` e `hiring` para colorir posts que não são perfis.
+enum UserType { band, musician, sales, hiring }
 
 extension UserTypeParsing on UserType {
   /// Valor em string usado pelos documentos do Firestore.
@@ -9,6 +10,8 @@ extension UserTypeParsing on UserType {
         return 'band';
       case UserType.sales:
         return 'sales';
+      case UserType.hiring:
+        return 'hiring';
       case UserType.musician:
         return 'musician';
     }
@@ -17,6 +20,7 @@ extension UserTypeParsing on UserType {
   bool get isBand => this == UserType.band;
   bool get isMusician => this == UserType.musician;
   bool get isSales => this == UserType.sales;
+  bool get isHiring => this == UserType.hiring;
 
   static UserType fromFirestore(String? value) {
     switch (value) {
@@ -24,6 +28,8 @@ extension UserTypeParsing on UserType {
         return UserType.band;
       case 'sales':
         return UserType.sales;
+      case 'hiring':
+        return UserType.hiring;
       default:
         return UserType.musician;
     }
@@ -37,6 +43,8 @@ UserType userTypeFromPostType(String type) {
       return UserType.band;
     case 'sales':
       return UserType.sales;
+    case 'hiring':
+      return UserType.hiring;
     default:
       return UserType.musician;
   }
@@ -48,6 +56,8 @@ String userTypeToPostType(UserType type) {
       return 'band';
     case UserType.sales:
       return 'sales';
+    case UserType.hiring:
+      return 'hiring';
     case UserType.musician:
       return 'musician';
   }
