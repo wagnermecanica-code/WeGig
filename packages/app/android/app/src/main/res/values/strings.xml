@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Facebook SDK: substitua pelos valores do seu app no Meta for Developers -->
+    <string name="facebook_app_id">1192146843031781</string>
+    <string name="facebook_client_token">b4a022713e115dbadca589bbf5944dcf</string>
+</resources>

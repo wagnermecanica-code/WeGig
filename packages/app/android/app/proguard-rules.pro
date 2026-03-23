@@ -28,6 +28,11 @@
 
 # Preserve annotations
 -keepattributes *Annotation*
+
+# TikTok Business SDK
+-keep class com.tiktok.** { *; }
+-keep class com.android.billingclient.api.** { *; }
+-keep class androidx.lifecycle.** { *; }
 -keepattributes Signature
 -keepattributes SourceFile,LineNumberTable
 

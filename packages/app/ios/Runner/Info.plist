@@ -31,11 +31,22 @@
 			<array>
 				<string>com.googleusercontent.apps.278498777601-db30frfmi8dd44khpstus6kgog0nttg1</string>
 				<string>wegig</string>
+				<string>fb1192146843031781</string>
 			</array>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>FacebookAdvertiserIDCollectionEnabled</key>
+	<true/>
+	<key>FacebookAppID</key>
+	<string>1192146843031781</string>
+	<key>FacebookAutoLogAppEventsEnabled</key>
+	<true/>
+	<key>FacebookClientToken</key>
+	<string>b4a022713e115dbadca589bbf5944dcf</string>
+	<key>FacebookDisplayName</key>
+	<string>WeGig</string>
 	<key>FirebaseCrashlyticsCollectionEnabled</key>
 	<false/>
 	<key>FlutterDeepLinkingEnabled</key>
@@ -48,12 +59,27 @@
 	<string>Este app precisa usar a câmera para tirar fotos de perfil e posts.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string></string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Este app usa a sua localização para mostrar anúncios e músicos próximos a você, e enviar notificações de novas oportunidades na sua região.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Este app usa a sua localização para mostrar anúncios próximos a você no mapa.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Este app pode salvar fotos editadas na sua galeria.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Este app precisa acessar suas fotos para adicionar imagens ao perfil e posts.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Usamos seus dados para oferecer anúncios personalizados e melhorar sua experiência no WeGig.</string>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>v9wttpbfk9.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>n38lu8286q.skadnetwork</string>
+		</dict>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
