@@ -1,18 +1,23 @@
 import 'package:core_ui/theme/app_theme.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/app/router/push_notification_router.dart';
 import 'package:wegig_app/bootstrap/bootstrap_core.dart';
 import 'package:wegig_app/firebase_options.dart';
+import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'dart:async' show unawaited;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await bootstrapCoreServices(
     firebaseOptions: DefaultFirebaseOptions.currentPlatform,
     flavorLabel: 'prod',
-    expectedProjectId: 'wegig-dev',
+    expectedProjectId: 'to-sem-banda-83e19',
     backgroundHandler: _firebaseMessagingBackgroundHandler,
     enableCrashlytics: true,
   );
@@ -37,11 +42,142 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 /// Tela de erro exibida quando Firebase não inicializa
-class WeGigApp extends ConsumerWidget {
+class WeGigApp extends ConsumerStatefulWidget {
   const WeGigApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WeGigApp> createState() => _WeGigAppState();
+}
+
+class _WeGigAppState extends ConsumerState<WeGigApp>
+    with WidgetsBindingObserver {
+  ProviderSubscription<GoRouter>? _routerSub;
+  ProviderSubscription<AsyncValue<ProfileState>>? _profileSub;
+
+  /// Push notification recebida ao abrir app do estado terminated.
+  /// Armazenada aqui quando o profile ainda não carregou (router em /splash),
+  /// para ser processada assim que o profile estiver pronto e o router
+  /// estabilizar em /home.
+  RemoteMessage? _deferredPushMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // Bind push notification taps to router navigation once.
+    // Also flushes any pending tap captured during bootstrap (terminated).
+    //
+    // ⚠️ TERMINATED STATE: Quando o app abre do estado terminated via tap
+    // em notificação, o profile ainda está carregando e o GoRouter redirect
+    // manda tudo para /splash. Se navegarmos agora, o push('/post/$id') é
+    // engolido pelo redirect. Solução: armazenar a mensagem em
+    // _deferredPushMessage e processar quando o profile carregar.
+    _routerSub = ref.listenManual<GoRouter>(
+      goRouterProvider,
+      (_, router) {
+        final service = PushNotificationService();
+        service.attachOnNotificationTapped((RemoteMessage message) {
+          final profileState = ref.read(profileProvider);
+          final hasActiveProfile =
+              profileState.valueOrNull?.activeProfile != null;
+
+          if (hasActiveProfile) {
+            // Profile pronto → router já estabilizou em /home → navegar direto
+            unawaited(
+              handlePushNotificationTap(router: router, message: message),
+            );
+          } else {
+            // Profile ainda carregando → adiar navegação
+            debugPrint(
+              '🔔 WeGigApp: Deferring push navigation until profile loads '
+              '(type=${message.data['type']})',
+            );
+            _deferredPushMessage = message;
+          }
+        });
+      },
+      fireImmediately: true,
+    );
+
+    // Sincronizar badge do ícone do app ao iniciar
+    _syncAppBadge();
+
+    // Também sincroniza quando o profileProvider finalmente carregar ou quando
+    // o usuário trocar de perfil (initState pode rodar antes do profile estar pronto).
+    _profileSub = ref.listenManual(
+      profileProvider,
+      (_, next) {
+        final activeProfile = next.valueOrNull?.activeProfile;
+        if (activeProfile == null) return;
+        unawaited(
+          PushNotificationService().updateAppBadge(
+            activeProfile.profileId,
+            activeProfile.uid,
+          ),
+        );
+
+        // ✅ Processar push notification adiada (terminated state).
+        // Agora o profile carregou → redirect vai mandar para /home →
+        // podemos empilhar a tela destino com segurança.
+        final deferred = _deferredPushMessage;
+        if (deferred != null) {
+          _deferredPushMessage = null;
+          debugPrint(
+            '🔔 WeGigApp: Profile loaded, processing deferred push '
+            '(type=${deferred.data['type']})',
+          );
+          final router = ref.read(goRouterProvider);
+          // Pequeno delay para garantir que o redirect de /splash → /home
+          // completou antes de empilhar a tela destino.
+          Future.delayed(const Duration(milliseconds: 500), () {
+            unawaited(
+              handlePushNotificationTap(router: router, message: deferred),
+            );
+          });
+        }
+      },
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Sincronizar badge quando app volta do background
+    if (state == AppLifecycleState.resumed) {
+      _syncAppBadge();
+    }
+  }
+
+  /// Sincroniza o badge do ícone do app com notificações não lidas do Firestore
+  Future<void> _syncAppBadge() async {
+    try {
+      final profileState = ref.read(profileProvider);
+      final activeProfile = profileState.value?.activeProfile;
+      if (activeProfile != null) {
+        await PushNotificationService().updateAppBadge(
+          activeProfile.profileId,
+          activeProfile.uid,
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ WeGigApp: Error syncing app badge: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _routerSub?.close();
+    _routerSub = null;
+    _profileSub?.close();
+    _profileSub = null;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(goRouterProvider);
 
     return MaterialApp.router(
@@ -67,9 +203,10 @@ class WeGigApp extends ConsumerWidget {
 }
 
 class App extends ConsumerWidget {
-
   const App({
-    required this.flavor, required this.appName, super.key,
+    required this.flavor,
+    required this.appName,
+    super.key,
   });
   final String flavor;
   final String appName;

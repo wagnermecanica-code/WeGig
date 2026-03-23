@@ -5,117 +5,101 @@ import 'package:flutter/foundation.dart';
 /// Gerenciador de cache local do Firestore
 /// 
 /// Responsável por:
-/// - Limpar posts expirados (>30 dias) do cache offline
-/// - Agendar limpezas periódicas (1x por dia)
-/// - Otimizar uso de espaço em disco
+/// - Contar posts expirados no cache offline (para analytics)
+/// - Agendar verificações periódicas (1x por dia)
 /// 
-/// WeGig usa posts com expiração de 30 dias. Este manager garante que
-/// posts expirados sejam removidos do cache local para:
-/// - Liberar espaço em disco
-/// - Evitar mostrar conteúdo expirado quando offline
-/// - Manter cache consistente com dados do servidor
+/// ⚠️ IMPORTANTE: O Firestore SDK NÃO suporta "delete from cache only".
+/// WriteBatch.commit() SEMPRE envia deletes ao servidor, mesmo quando a
+/// query original usou Source.cache. Por isso, este manager NÃO deleta
+/// posts expirados — a filtragem é feita nas queries do app
+/// (where expiresAt > now) e os posts expirados saem naturalmente do
+/// cache conforme o LRU do Firestore descarta documentos antigos.
+///
+/// Posts expirados permanecem no Firestore intencionalmente para que o
+/// owner os visualize na ViewProfilePage (histórico de posts).
 class FirestoreCacheManager {
   static Timer? _cleanupTimer;
   static DateTime? _lastCleanup;
   
-  /// Inicializa o manager e agenda limpezas periódicas
+  /// Inicializa o manager e agenda verificações periódicas
   /// 
   /// Deve ser chamado no bootstrap, DEPOIS de Firebase.initializeApp()
   static Future<void> initialize() async {
     debugPrint('🧹 FirestoreCacheManager: Inicializando...');
     
-    // Limpar cache expirado imediatamente
-    await clearExpiredPosts();
+    // Apenas logar stats, NÃO deletar posts
+    await _logExpiredPostsStats();
     
-    // Agendar limpeza periódica (1x por dia às 3h da manhã)
+    // Agendar verificação periódica
     _schedulePeriodicCleanup();
     
     debugPrint('✅ FirestoreCacheManager inicializado');
   }
   
-  /// Limpa posts expirados do cache local
+  /// Loga estatísticas de posts expirados no cache (sem deletar nada)
   /// 
-  /// Query posts com expiresAt < now() usando Source.cache para buscar
-  /// apenas no cache local (não faz network request).
-  static Future<void> clearExpiredPosts() async {
+  /// ⚠️ NÃO deleta posts — batch.delete() + commit() enviaria deletes
+  /// ao servidor Firestore, removendo posts que o owner precisa ver.
+  static Future<void> _logExpiredPostsStats() async {
     try {
       final now = Timestamp.now();
-      debugPrint('🧹 Limpando posts expirados do cache...');
       
-      // ✅ Query APENAS no cache local (sem network)
+      // Query APENAS no cache local (sem network)
       final expiredPosts = await FirebaseFirestore.instance
         .collection('posts')
         .where('expiresAt', isLessThan: now)
         .get(const GetOptions(source: Source.cache));
       
+      _lastCleanup = DateTime.now();
+      
       if (expiredPosts.docs.isEmpty) {
         debugPrint('✅ Nenhum post expirado no cache');
-        _lastCleanup = DateTime.now();
-        return;
+      } else {
+        debugPrint('ℹ️ ${expiredPosts.docs.length} posts expirados no cache (não deletados — filtrados via query)');
       }
-      
-      // Deletar em batch para eficiência
-      final batch = FirebaseFirestore.instance.batch();
-      for (final doc in expiredPosts.docs) {
-        batch.delete(doc.reference);
-      }
-      
-      await batch.commit();
-      
-      _lastCleanup = DateTime.now();
-      debugPrint('✅ ${expiredPosts.docs.length} posts expirados removidos do cache');
-      debugPrint('   Espaço liberado: ~${(expiredPosts.docs.length * 5)} KB');
       
     } catch (e, stackTrace) {
-      debugPrint('⚠️ Erro ao limpar posts expirados: $e');
+      debugPrint('⚠️ Erro ao verificar posts expirados: $e');
       if (kDebugMode) {
         debugPrintStack(stackTrace: stackTrace);
       }
     }
   }
+
+  /// Mantido para compatibilidade — agora é no-op seguro.
+  /// 
+  /// ⚠️ Antes este método usava batch.delete() + commit() que
+  /// deletava posts do servidor real (bug crítico). Agora apenas loga.
+  static Future<void> clearExpiredPosts() async {
+    await _logExpiredPostsStats();
+  }
   
-  /// Limpa posts de um usuário específico (útil ao deletar perfil)
+  /// Limpa referências de posts de um perfil do cache local
+  /// 
+  /// ⚠️ NÃO deleta do servidor — apenas loga para diagnóstico.
+  /// Antes usava batch.delete() + commit() que deletava do servidor real.
   static Future<void> clearPostsForProfile(String profileId) async {
     try {
-      debugPrint('🧹 Limpando posts do perfil $profileId do cache...');
-      
-      final userPosts = await FirebaseFirestore.instance
-        .collection('posts')
-        .where('profileId', isEqualTo: profileId)
-        .get(const GetOptions(source: Source.cache));
-      
-      if (userPosts.docs.isEmpty) {
-        debugPrint('✅ Nenhum post do perfil no cache');
-        return;
-      }
-      
-      final batch = FirebaseFirestore.instance.batch();
-      for (final doc in userPosts.docs) {
-        batch.delete(doc.reference);
-      }
-      
-      await batch.commit();
-      debugPrint('✅ ${userPosts.docs.length} posts removidos do cache');
-      
+      debugPrint('ℹ️ clearPostsForProfile($profileId) — no-op (posts não são deletados do servidor)');
     } catch (e) {
-      debugPrint('⚠️ Erro ao limpar posts do perfil: $e');
+      debugPrint('⚠️ Erro em clearPostsForProfile: $e');
     }
   }
   
-  /// Agenda limpeza periódica do cache
+  /// Agenda verificação periódica do cache
   /// 
-  /// Executa 1x por dia para manter cache otimizado
+  /// Executa 1x por dia para logar stats
   static void _schedulePeriodicCleanup() {
     // Cancelar timer anterior se existir
     _cleanupTimer?.cancel();
     
     // Criar novo timer (24 horas)
     _cleanupTimer = Timer.periodic(const Duration(hours: 24), (_) {
-      debugPrint('⏰ Limpeza agendada do cache iniciando...');
-      clearExpiredPosts();
+      debugPrint('⏰ Verificação agendada do cache iniciando...');
+      _logExpiredPostsStats();
     });
     
-    debugPrint('⏰ Limpeza periódica agendada (1x por dia)');
+    debugPrint('⏰ Verificação periódica agendada (1x por dia)');
   }
   
   /// Limpa TODO o cache do Firestore (útil para debugging)

@@ -3,14 +3,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../navigation/bottom_nav_scaffold.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:wegig_app/core/firebase/blocked_profiles.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/features/auth/presentation/pages/auth_page.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
+import 'package:wegig_app/features/post/presentation/pages/post_feed_page.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_detail_page.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
@@ -19,6 +25,42 @@ import 'package:wegig_app/features/settings/presentation/pages/settings_page.dar
 import 'package:wegig_app/features/notifications_new/presentation/pages/notifications_new_page.dart';
 
 part 'app_router.g.dart';
+
+/// Notifier usado para pedir refresh do GoRouter sem recriar a instância.
+///
+/// Isso elimina glitches de navegação causados por reconstruções do provider
+/// `goRouterProvider` (que desmontavam a AuthPage no meio do fluxo de login).
+class _RouterRefreshNotifier extends ChangeNotifier {
+  _RouterRefreshNotifier(this._ref) {
+    _subs.add(
+      _ref.listen<AsyncValue<User?>>(authStateProvider, (_, __) {
+        notifyListeners();
+      }),
+    );
+    _subs.add(
+      _ref.listen<AsyncValue<ProfileState>>(profileProvider, (_, __) {
+        notifyListeners();
+      }),
+    );
+    _subs.add(
+      _ref.listen<bool>(authOperationInProgressProvider, (_, __) {
+        notifyListeners();
+      }),
+    );
+  }
+
+  final Ref _ref;
+  final List<ProviderSubscription<dynamic>> _subs = [];
+
+  @override
+  void dispose() {
+    for (final s in _subs) {
+      s.close();
+    }
+    _subs.clear();
+    super.dispose();
+  }
+}
 
 // ============================================
 // TYPE-SAFE ROUTE CLASSES
@@ -45,6 +87,9 @@ class AppRoutes {
 
   /// Post detail route template
   static String postDetail(String postId) => '/post/$postId';
+
+  /// Post feed (vertical carrossel)
+  static const String postFeed = '/posts/feed';
 
   /// Conversation/chat route template (legacy - ChatDetailPage)
   static String conversation(String conversationId) =>
@@ -75,8 +120,8 @@ CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) {
 
   return CustomTransitionPage<void>(
     key: state.pageKey,
-    transitionDuration: const Duration(milliseconds: 320),
-    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionDuration: const Duration(milliseconds: 450),
+    reverseTransitionDuration: const Duration(milliseconds: 320),
     barrierColor: Colors.transparent,
     maintainState: true,
     child: child,
@@ -121,13 +166,18 @@ CustomTransitionPage<void> _slideLeftPage(GoRouterState state, Widget child) {
 
 @riverpod
 GoRouter goRouter(Ref ref) {
-  final authState = ref.watch(authStateProvider);
-  final profileState = authState.valueOrNull != null ? ref.watch(profileProvider) : AsyncValue<ProfileState>.data(ProfileState());
+  // ✅ CRÍTICO: manter UMA instância de GoRouter.
+  // Não usar ref.watch(...) aqui, senão o provider reconstrói o GoRouter e
+  // desmonta widgets (glitch + "ref after disposed" em fluxos async).
+  final refreshNotifier = _RouterRefreshNotifier(ref);
+  ref.onDispose(refreshNotifier.dispose);
 
   return GoRouter(
     initialLocation: AppRoutes.auth,
     debugLogDiagnostics: true,
+    refreshListenable: refreshNotifier,
     redirect: (BuildContext context, GoRouterState state) {
+      final authState = ref.read(authStateProvider);
       final user = authState.valueOrNull;
       final isLoggedIn = user != null;
       final isGoingToAuth = state.matchedLocation == AppRoutes.auth;
@@ -136,26 +186,53 @@ GoRouter goRouter(Ref ref) {
           state.matchedLocation == AppRoutes.createProfile;
 
       debugPrint('Router: location=${state.matchedLocation}, isLoggedIn=$isLoggedIn, isGoingToAuth=$isGoingToAuth, isGoingToSplash=$isGoingToSplash, isGoingToCreateProfile=$isGoingToCreateProfile');
+      
+      // ✅ CRÍTICO: Se uma operação de auth está em andamento, não redirecionar
+      // Isso evita race condition durante login social onde precisamos verificar
+      // Firestore antes de decidir se o login é válido
+      final isAuthOperationInProgress =
+          ref.read(authOperationInProgressProvider);
+      if (isAuthOperationInProgress) {
+        debugPrint('Router: ⏸️ Auth operation in progress, NOT redirecting (staying at ${state.matchedLocation})');
+        return null; // Manter na rota atual
+      }
+
+      final profileState = isLoggedIn
+          ? ref.read(profileProvider)
+          : const AsyncValue<ProfileState>.data(ProfileState());
 
       final profileData = profileState.valueOrNull;
-      final hasProfileData = profileState is AsyncData<ProfileState>;
+      final isProfileBootstrapping = profileData?.isLoading ?? false;
+      // NOTE: `AsyncLoading` can carry a previous value during refresh.
+      // We should treat that as usable profile data to avoid getting stuck on /loading.
+      final hasProfileData = profileData != null;
       final hasAnyProfile = (profileData?.profiles.isNotEmpty ?? false);
       final hasActiveProfile = profileData?.activeProfile != null;
       
-      // ✅ FIX: Considerar como "checking" se:
-      // 1. Auth está carregando
-      // 2. Auth OK mas profile está carregando
-      // 3. Auth OK mas profile tem erro (pode ser transitório, tentar novamente)
-      final isCheckingAuth = authState.isLoading ||
-          (isLoggedIn && (profileState.isLoading || profileState.hasError));
+      // ✅ FIX: Mostrar splash apenas durante bootstrap real.
+      // - Auth loading => sempre splash
+      // - Logado, mas profile ainda não tem valor algum (AsyncLoading sem valor anterior) => splash
+      // - Se profile estiver apenas fazendo refresh (AsyncLoading com valor anterior),
+      //   NÃO bloquear navegação (evita bounce após salvar/editar perfil).
+      final shouldShowSplash = authState.isLoading ||
+          (isLoggedIn &&
+              (isProfileBootstrapping || (!hasProfileData && profileState.isLoading)));
 
       debugPrint('Router: authState.isLoading=${authState.isLoading}, authState.hasError=${authState.hasError}, user=$user');
       debugPrint('Router: profileState.isLoading=${profileState.isLoading}, profileState.hasError=${profileState.hasError}');
-      debugPrint('Router: isCheckingAuth=$isCheckingAuth, hasProfileData=$hasProfileData, hasAnyProfile=$hasAnyProfile, hasActiveProfile=$hasActiveProfile');
+      debugPrint('Router: shouldShowSplash=$shouldShowSplash, hasProfileData=$hasProfileData, hasAnyProfile=$hasAnyProfile, hasActiveProfile=$hasActiveProfile');
 
-      if (isCheckingAuth) {
-        debugPrint('Router: isCheckingAuth, returning splash');
+      if (shouldShowSplash) {
+        if (isGoingToSplash) return null;
+        debugPrint('Router: shouldShowSplash, returning splash');
         return AppRoutes.splash;
+      }
+
+      // Se está logado mas o carregamento do profile falhou e não temos dados,
+      // não ficar preso no splash; volta para /auth.
+      if (isLoggedIn && !hasProfileData && profileState.hasError) {
+        debugPrint('Router: profile load error without data, returning auth');
+        return AppRoutes.auth;
       }
 
       if (!isLoggedIn) {
@@ -163,8 +240,21 @@ GoRouter goRouter(Ref ref) {
         return AppRoutes.auth;
       }
 
+      // ✅ CRÍTICO: Se profileState ainda está carregando (isLoading=true), 
+      // NÃO tomar decisão sobre createProfile ainda!
+      // Isso evita race condition onde decidimos "não tem perfis" antes da query do servidor terminar.
+      if (profileState.isLoading && !hasAnyProfile) {
+        debugPrint('Router: ⏳ profile still loading, waiting before deciding (staying at ${state.matchedLocation})');
+        // Se já está no splash, ficar lá
+        if (isGoingToSplash) return null;
+        // Se está em outra rota válida, manter lá temporariamente
+        if (!isGoingToAuth) return null;
+        // Se está na auth, ir para splash para esperar
+        return AppRoutes.splash;
+      }
+
       // Agora sabemos que está logado E profileState carregou com sucesso
-      if (hasProfileData && !hasAnyProfile) {
+      if (hasProfileData && !isProfileBootstrapping && !hasAnyProfile) {
         debugPrint('Router: logged in but no profiles, returning createProfile');
         return AppRoutes.createProfile;
       }
@@ -201,8 +291,22 @@ GoRouter goRouter(Ref ref) {
       GoRoute(
         path: '/home',
         name: 'home',
-        pageBuilder: (context, state) =>
-            _fadePage(state, const BottomNavScaffold()),
+        pageBuilder: (context, state) {
+          final tab = state.uri.queryParameters['tab'];
+          final indexRaw = state.uri.queryParameters['index'];
+
+          int initialIndex = 0;
+          if (tab == 'profile') {
+            initialIndex = 4;
+          } else if (indexRaw != null) {
+            initialIndex = int.tryParse(indexRaw) ?? 0;
+          }
+
+          return _fadePage(
+            state,
+            BottomNavScaffold(initialIndex: initialIndex),
+          );
+        },
       ),
       GoRoute(
         path: '/profile/:profileId',
@@ -223,6 +327,46 @@ GoRouter goRouter(Ref ref) {
           return CupertinoPage<void>(
             key: state.pageKey,
             child: PostDetailPage(postId: postId),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.postFeed,
+        name: 'postFeed',
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          var posts = <PostEntity>[];
+          var initialIndex = 0;
+          String? mapCenterLabel;
+          double? visibleRadiusKm;
+
+          if (extra is Map) {
+            final maybePosts = extra['posts'];
+            if (maybePosts is List<PostEntity>) {
+              posts = maybePosts;
+            }
+            final maybeIndex = extra['initialIndex'];
+            if (maybeIndex is int) {
+              initialIndex = maybeIndex;
+            }
+            final maybeMapLabel = extra['mapCenterLabel'];
+            if (maybeMapLabel is String) {
+              mapCenterLabel = maybeMapLabel;
+            }
+            final maybeRadius = extra['visibleRadiusKm'];
+            if (maybeRadius is double) {
+              visibleRadiusKm = maybeRadius;
+            }
+          }
+
+          return _fadePage(
+            state,
+            PostFeedPage(
+              posts: posts,
+              initialIndex: initialIndex,
+              mapCenterLabel: mapCenterLabel,
+              visibleRadiusKm: visibleRadiusKm,
+            ),
           );
         },
       ),
@@ -373,6 +517,28 @@ extension TypedNavigationExtension on BuildContext {
     push(AppRoutes.postDetail(postId));
   }
 
+  /// Push vertical post feed (carrossel)
+  void pushPostFeed(
+    List<PostEntity> posts, {
+    int initialIndex = 0,
+    String? mapCenterLabel,
+    double? visibleRadiusKm,
+  }) {
+    _logNavigation('post_feed', {
+      'initialIndex': initialIndex.toString(),
+      'count': posts.length.toString(),
+    });
+    push(
+      AppRoutes.postFeed,
+      extra: {
+        'posts': posts,
+        'initialIndex': initialIndex,
+        'mapCenterLabel': mapCenterLabel,
+        'visibleRadiusKm': visibleRadiusKm,
+      },
+    );
+  }
+
   /// Navigate to conversation/chat page
   void goToConversation(
     String conversationId, {
@@ -466,6 +632,18 @@ extension TypedNavigationExtension on BuildContext {
     }
 
     try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final container = ProviderScope.containerOf(this);
+      final activeProfile = container.read(activeProfileProvider);
+      
+      final excludedProfileIds = (currentUser == null || activeProfile == null)
+          ? const <String>[]
+          : await BlockedRelations.getExcludedProfileIds(
+              firestore: FirebaseFirestore.instance,
+              profileId: activeProfile.profileId,
+              uid: currentUser.uid,
+            );
+
       final query = await FirebaseFirestore.instance
           .collection('profiles')
           .where(
@@ -480,7 +658,13 @@ extension TypedNavigationExtension on BuildContext {
         return;
       }
 
-      pushProfile(query.docs.first.id);
+      final targetProfileId = query.docs.first.id;
+      if (excludedProfileIds.contains(targetProfileId)) {
+        AppSnackBar.showInfo(this, 'Perfil indisponível.');
+        return;
+      }
+
+      pushProfile(targetProfileId);
     } catch (error, stackTrace) {
       debugPrint('pushProfileByUsername error: $error');
       debugPrintStack(stackTrace: stackTrace);

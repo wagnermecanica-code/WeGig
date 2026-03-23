@@ -1,6 +1,9 @@
+import 'dart:io' show Platform;
 import 'dart:ui' show PlatformDispatcher;
 
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:core_ui/services/env_service.dart';
+import 'package:facebook_app_events/facebook_app_events.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -10,6 +13,7 @@ import 'package:flutter/widgets.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:wegig_app/core/firebase/firebase_cache_config.dart';
 import 'package:wegig_app/core/firebase/firestore_cache_manager.dart';
+import 'package:wegig_app/core/services/tiktok_service.dart';
 import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 import 'package:wegig_app/utils/firebase_context_logger.dart';
 
@@ -78,6 +82,12 @@ Future<void> bootstrapCoreServices({
 
   debugPrint('🎯 Orientation locked to portrait');
 
+  // ✅ Inicializar Facebook App Events + ATT (iOS)
+  await _initializeFacebookSdk();
+
+  // ✅ Inicializar TikTok Business SDK (track launch)
+  await _initializeTikTokSdk();
+
   debugPrint('✅ Bootstrapping completed for $flavorLabel');
 }
 
@@ -142,6 +152,44 @@ Future<void> _initializePushNotifications(String flavorLabel) async {
     debugPrint('✅ PushNotificationService initialized for $flavorLabel');
   } catch (error, stackTrace) {
     debugPrint('⚠️ PushNotificationService init failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
+Future<void> _initializeFacebookSdk() async {
+  try {
+    final facebookAppEvents = FacebookAppEvents();
+
+    // iOS: solicitar ATT e configurar advertiser tracking
+    if (Platform.isIOS) {
+      final status =
+          await AppTrackingTransparency.requestTrackingAuthorization();
+      final isAuthorized =
+          status == TrackingStatus.authorized;
+      await facebookAppEvents.setAdvertiserTracking(enabled: isAuthorized);
+      debugPrint(
+        '📊 ATT status: $status, AdvertiserTracking: $isAuthorized',
+      );
+    }
+
+    // Ativar coleta de eventos automaticamente (iOS + Android)
+    await facebookAppEvents.setAutoLogAppEventsEnabled(true);
+
+    debugPrint('✅ Facebook App Events SDK initialized');
+  } catch (error, stackTrace) {
+    debugPrint('⚠️ Facebook SDK init failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
+Future<void> _initializeTikTokSdk() async {
+  try {
+    // Android: SDK é inicializado nativamente em WeGigApplication.kt
+    // Aqui apenas registramos o evento de LaunchApp via MethodChannel
+    await TikTokService.instance.trackLaunchApp();
+    debugPrint('✅ TikTok Business SDK: LaunchApp event tracked');
+  } catch (error, stackTrace) {
+    debugPrint('⚠️ TikTok SDK init failed: $error');
     debugPrintStack(stackTrace: stackTrace);
   }
 }

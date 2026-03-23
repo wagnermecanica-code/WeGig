@@ -16,12 +16,16 @@ import 'package:wegig_app/features/home/presentation/pages/search_page_new.dart'
 import 'package:wegig_app/features/mensagens_new/mensagens_new.dart';
 import 'package:wegig_app/features/notifications_new/presentation/pages/notifications_new_page.dart';
 import 'package:wegig_app/features/notifications_new/presentation/providers/notifications_new_providers.dart';
+import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/notifications_new/presentation/utils/notification_new_action_handler.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/profile/presentation/widgets/profile_switcher_bottom_sheet.dart';
+
+/// Cor de realce dos ícones selecionados na bottom nav.
+const _navSelectedColor = Color(0xFF683FFF);
 
 /// Configuração de item da bottom nav
 class _NavItemConfig {
@@ -47,7 +51,9 @@ class _NavItemConfig {
 /// - IndexedStack preserva estado das páginas
 
 class BottomNavScaffold extends ConsumerStatefulWidget {
-  const BottomNavScaffold({super.key});
+  const BottomNavScaffold({super.key, this.initialIndex = 0});
+
+  final int initialIndex;
 
   @override
   ConsumerState<BottomNavScaffold> createState() => _BottomNavScaffoldState();
@@ -79,6 +85,13 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     const ViewProfilePage(),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    final clampedIndex = widget.initialIndex.clamp(0, _pages.length - 1);
+    _currentIndexNotifier.value = clampedIndex;
+  }
+
   // Configuração dos itens da bottom nav (elimina código repetitivo)
   static const List<_NavItemConfig> _navItems = [
     _NavItemConfig(icon: Iconsax.home, label: 'Início'),
@@ -91,11 +104,13 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
 
   /// Abre a tela de filtros/busca
   void _openSearchPage() {
+    final activeProfile = ref.read(activeProfileProvider);
     Navigator.push<void>(
       context,
       MaterialPageRoute<void>(
         builder: (context) => SearchPageNew(
           searchNotifier: _searchNotifier,
+          currentProfileId: activeProfile?.profileId,
           onApply: () {
             // Fecha a tela de filtros e volta para HomePage
             Navigator.pop(context);
@@ -134,14 +149,18 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
               if (i == 2) {
                 // Tab "Criar Post" - mostrar bottom sheet de seleção
                 _showPostTypeBottomSheet(context);
-              } else {
-                if (i == 0 && _currentIndexNotifier.value == 0) {
-                  ref.invalidate(postNotifierProvider);
-                  _homeRefreshNotifier.value++;
-                  return;
-                }
-                _currentIndexNotifier.value = i;
+                return;
               }
+
+              if (i == 0) {
+                // Sempre força refresh ao tocar no ícone de Início
+                _currentIndexNotifier.value = 0;
+                ref.invalidate(postNotifierProvider);
+                _homeRefreshNotifier.value++;
+                return;
+              }
+
+              _currentIndexNotifier.value = i;
             },
             items: List.generate(
               _navItems.length,
@@ -172,8 +191,12 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
       // Avatar do perfil com cache
       icon = _buildAvatarIcon(isSelected);
     } else {
-      // Ícone padrão
-      icon = Icon(config.icon, size: 26);
+      // Ícone padrão (home, criar post, etc.)
+      icon = Icon(
+        config.icon,
+        size: 26,
+        color: isSelected ? _navSelectedColor : AppColors.textSecondary,
+      );
     }
 
     return BottomNavigationBarItem(
@@ -186,14 +209,18 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   Widget _buildNotificationIcon({bool isSelected = false}) {
     final profileState = ref.watch(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
+    final authUid = ref.watch(currentUserProvider)?.uid;
 
-    if (activeProfile == null) {
+    final isProfileReadyForQueries =
+        authUid != null && activeProfile != null && activeProfile.uid == authUid;
+
+    if (!isProfileReadyForQueries) {
       return Container(
         padding: const EdgeInsets.all(4),
         child: Icon(
           Iconsax.notification,
           size: 26,
-          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+          color: isSelected ? _navSelectedColor : AppColors.textSecondary,
         ),
       );
     }
@@ -215,7 +242,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
             Icon(
               Iconsax.notification,
               size: 28,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              color: isSelected ? _navSelectedColor : AppColors.textSecondary,
             ),
             const Positioned(
               right: -4,
@@ -234,7 +261,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
         child: Icon(
           Iconsax.notification_bing,
           size: 28,
-          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+          color: isSelected ? _navSelectedColor : AppColors.textSecondary,
         ),
       ),
       data: (unreadCount) => Container(
@@ -245,7 +272,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
             Icon(
               Iconsax.notification,
               size: 26,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              color: isSelected ? _navSelectedColor : AppColors.textSecondary,
             ),
             if (unreadCount > 0)
               Positioned(
@@ -286,12 +313,16 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   Widget _buildMessagesIcon({bool isSelected = false}) {
     final profileState = ref.watch(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
+    final authUid = ref.watch(currentUserProvider)?.uid;
 
-    if (activeProfile == null) {
+    final isProfileReadyForQueries =
+        authUid != null && activeProfile != null && activeProfile.uid == authUid;
+
+    if (!isProfileReadyForQueries) {
       return Icon(
         Iconsax.message,
         size: 28,
-        color: isSelected ? AppColors.primary : AppColors.textSecondary,
+        color: isSelected ? _navSelectedColor : AppColors.textSecondary,
       );
     }
 
@@ -312,7 +343,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
             Icon(
               Iconsax.message,
               size: 26,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              color: isSelected ? _navSelectedColor : AppColors.textSecondary,
             ),
             const Positioned(
               right: -4,
@@ -331,7 +362,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
         child: Icon(
           Iconsax.message,
           size: 26,
-          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+          color: isSelected ? _navSelectedColor : AppColors.textSecondary,
         ),
       ),
       data: (unreadCount) => Container(
@@ -342,7 +373,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
             Icon(
               Iconsax.message,
               size: 26,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              color: isSelected ? _navSelectedColor : AppColors.textSecondary,
             ),
             if (unreadCount > 0)
               Positioned(
@@ -402,7 +433,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
           shape: BoxShape.circle,
           border: Border.all(
             color: isSelected
-                ? AppColors.primary
+                ? _navSelectedColor
                 : Colors.transparent,
             width: 2,
           ),
@@ -424,9 +455,8 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
 
     // URL remota - usar CachedNetworkImage para performance
     if (photoUrl.startsWith('http')) {
-      return CircleAvatar(
-        radius: 14,
-        backgroundColor: Colors.grey[200],
+      return SizedBox.square(
+        dimension: 28,
         child: ClipOval(
           child: CachedNetworkImage(
             cacheManager: WeGigImageCacheManager.instance,
@@ -435,8 +465,6 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
             height: 28,
             fit: BoxFit.cover,
             placeholder: (context, url) => Container(
-              width: 28,
-              height: 28,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -706,6 +734,12 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
       case NotificationType.newMessage:
         icon = Iconsax.message;
         color = Colors.blue;
+      case NotificationType.comment:
+        icon = Iconsax.message_text;
+        color = Colors.indigo;
+      case NotificationType.commentLike:
+        icon = Iconsax.heart5;
+        color = Colors.red;
       case NotificationType.postExpiring:
         icon = Iconsax.clock;
         color = Colors.orange;
@@ -783,20 +817,15 @@ extension on _BottomNavScaffoldState {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
-        // Padding dinâmico para respeitar safe area (Android/iOS)
         final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
         return Container(
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          padding: EdgeInsets.only(
-            top: 24,
-            left: 20,
-            right: 20,
-            bottom: 20 + bottomPadding,
-          ),
+          padding: EdgeInsets.fromLTRB(16, 24, 16, 24 + bottomPadding),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -828,7 +857,7 @@ extension on _BottomNavScaffoldState {
               icon: Iconsax.user,
               title: 'Músico',
               subtitle: 'Procuro banda, freela ou projeto',
-              color: const Color(0xFF37475A), // Cor escura para músicos
+              color: AppColors.musicianColor, // Roxo vibrante para músicos
               onTap: () async {
                 Navigator.pop(context);
                 final result = await Navigator.push<bool>(
@@ -840,7 +869,6 @@ extension on _BottomNavScaffoldState {
                 if (result == true) {
                   // Post criado com sucesso - invalidar providers
                   ref.invalidate(postNotifierProvider);
-                  ref.invalidate(profileProvider);
                 }
               },
             ),
@@ -852,7 +880,7 @@ extension on _BottomNavScaffoldState {
               icon: Iconsax.people,
               title: 'Banda',
               subtitle: 'Procuro músico para a banda',
-              color: const Color(0xFFE47911), // Cor laranja para bandas
+              color: AppColors.bandColor, // Cor laranja para bandas
               onTap: () async {
                 Navigator.pop(context);
                 final result = await Navigator.push<bool>(
@@ -864,11 +892,10 @@ extension on _BottomNavScaffoldState {
                 if (result == true) {
                   // Post criado com sucesso - invalidar providers
                   ref.invalidate(postNotifierProvider);
-                  ref.invalidate(profileProvider);
                 }
               },
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
 
             // Opção: Anúncio
             _buildPostTypeOption(
@@ -876,7 +903,7 @@ extension on _BottomNavScaffoldState {
               icon: Iconsax.tag,
               title: 'Anúncio',
               subtitle: 'Oferecer produto ou serviço',
-              color: AppColors.salesBlue, // Cor azul para anúncios
+              color: AppColors.salesColor,
               onTap: () async {
                 Navigator.pop(context);
                 final result = await Navigator.push<bool>(
@@ -886,9 +913,29 @@ extension on _BottomNavScaffoldState {
                   ),
                 );
                 if (result == true) {
-                  // Post criado com sucesso - invalidar providers
                   ref.invalidate(postNotifierProvider);
-                  ref.invalidate(profileProvider);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Opção: Contratação
+            _buildPostTypeOption(
+              context: context,
+              icon: Iconsax.briefcase,
+              title: 'Contratação',
+              subtitle: 'Oportunidade de contratação',
+              color: AppColors.hiringColor,
+              onTap: () async {
+                Navigator.pop(context);
+                final result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute<bool>(
+                    builder: (context) => PostPage(postType: 'hiring'),
+                  ),
+                );
+                if (result == true) {
+                  ref.invalidate(postNotifierProvider);
                 }
               },
             ),
@@ -971,12 +1018,11 @@ extension on _BottomNavScaffoldState {
       backgroundColor: Colors.transparent,
       builder: (context) => ProfileSwitcherBottomSheet(
         activeProfileId: activeProfileId,
-        onProfileSelected: (String profileId) {
-          // Invalidar providers quando perfil mudar
-          ref.invalidate(profileProvider);
-          ref.invalidate(postNotifierProvider);
-          Navigator.pop(context);
-        },
+        // NOTE: o próprio ProfileSwitcherBottomSheet já executa a troca via
+        // profileSwitcherNotifierProvider e fecha o modal.
+        // Evitar invalidar profileProvider aqui (causa estados inconsistentes)
+        // e evitar Navigator.pop extra (poderia fechar a tela por engano).
+        onProfileSelected: (_) {},
       ),
     );
   }

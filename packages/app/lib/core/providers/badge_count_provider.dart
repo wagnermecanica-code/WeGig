@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 part 'badge_count_provider.g.dart';
@@ -93,18 +94,23 @@ class BadgeCountNotifier extends _$BadgeCountNotifier {
   StreamSubscription<QuerySnapshot>? _notificationsSubscription;
   StreamSubscription<QuerySnapshot>? _messagesSubscription;
   String? _currentProfileId;
+  String? _currentAuthUid;
   
   @override
   BadgeCounts build() {
+    // Observar mudanças no usuário autenticado
+    ref.listen(currentUserProvider, (previous, next) {
+      final newAuthUid = next?.uid;
+      if (newAuthUid != _currentAuthUid) {
+        debugPrint('🔔 BadgeCount: Auth mudou, reavaliando streams');
+        _currentAuthUid = newAuthUid;
+        _refreshStreamsFromCurrentState();
+      }
+    });
+
     // Observar mudanças no perfil ativo
     ref.listen(profileProvider, (previous, next) {
-      final newProfileId = next.value?.activeProfile?.profileId;
-      
-      if (newProfileId != _currentProfileId) {
-        debugPrint('🔔 BadgeCount: Perfil mudou, invalidando badges');
-        _currentProfileId = newProfileId;
-        _setupStreams(newProfileId);
-      }
+      _refreshStreamsFromCurrentState();
     });
     
     // Cleanup ao dispose
@@ -115,13 +121,33 @@ class BadgeCountNotifier extends _$BadgeCountNotifier {
     });
     
     // Setup inicial
-    final profileId = ref.read(profileProvider).value?.activeProfile?.profileId;
-    if (profileId != null) {
-      _currentProfileId = profileId;
-      _setupStreams(profileId);
-    }
+    _currentAuthUid = ref.read(currentUserProvider)?.uid;
+    _refreshStreamsFromCurrentState();
     
     return const BadgeCounts();
+  }
+
+  void _refreshStreamsFromCurrentState() {
+    final authUid = ref.read(currentUserProvider)?.uid;
+    final activeProfile = ref.read(profileProvider).value?.activeProfile;
+
+    final eligibleProfileId = (authUid != null &&
+            activeProfile != null &&
+            activeProfile.uid == authUid)
+        ? activeProfile.profileId
+        : null;
+
+    if (eligibleProfileId != _currentProfileId) {
+      debugPrint('🔔 BadgeCount: Atualizando streams (profileId: $eligibleProfileId)');
+      _currentProfileId = eligibleProfileId;
+      _setupStreams(eligibleProfileId);
+      return;
+    }
+
+    if (eligibleProfileId == null) {
+      // Garante que, durante transições (logout/login/switch), não fiquem streams ativos.
+      _setupStreams(null);
+    }
   }
   
   /// Configura streams do Firestore para contagem em tempo real
@@ -189,9 +215,7 @@ class BadgeCountNotifier extends _$BadgeCountNotifier {
   
   /// Força atualização das contagens
   Future<void> refresh() async {
-    if (_currentProfileId != null) {
-      _setupStreams(_currentProfileId);
-    }
+    _refreshStreamsFromCurrentState();
   }
   
   /// Invalida badges (zera contagens locais)

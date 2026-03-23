@@ -84,7 +84,7 @@ final hasBadgesProvider = AutoDisposeProvider<bool>.internal(
 // ignore: unused_element
 typedef HasBadgesRef = AutoDisposeProviderRef<bool>;
 String _$badgeCountNotifierHash() =>
-    r'c8e326d64503366677fbff4f6e5f2d071c310cbf';
+    r'896c019348efad14495985a5672421ca4f29dc12';
 
 /// Provider de contagem de badges com invalidação automática
 ///

@@ -77,7 +77,7 @@ final messageCacheTTLProvider = AutoDisposeProvider<Duration>.internal(
 // ignore: unused_element
 typedef MessageCacheTTLRef = AutoDisposeProviderRef<Duration>;
 String _$cacheConfigNotifierHash() =>
-    r'927848aed28a221e885bc470f98cb0867bd98bee';
+    r'5cadc9307a4363262ddd15d1a8e8d271ab0a4796';
 
 /// Provider de configuração de cache
 ///
