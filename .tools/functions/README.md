@@ -1,5 +1,9 @@
 # Firebase Cloud Functions - WeGig
 
+<!-- PATCH_TEST: apply_patch works in this directory -->
+
+# Firebase Cloud Functions - WeGig
+
 Cloud Functions para notificações in-app e push notifications.
 
 ## 📋 Funções Deployadas
@@ -23,11 +27,6 @@ Notifica perfis quando um novo post é criado próximo a eles.
 
 **Lógica:**
 
-- Busca perfis com `notificationRadiusEnabled = true`
-- Calcula distância Haversine
-- Se distância ≤ `notificationRadius` (5-100km), cria notificação in-app
-- Envia push notification via FCM
-
 **Payload:**
 
 ```json
@@ -43,8 +42,6 @@ Notifica perfis quando um novo post é criado próximo a eles.
   }
 }
 ```
-
----
 
 ### 2. sendInterestNotification
 
@@ -69,8 +66,6 @@ Notifica quando alguém demonstra interesse em um post.
 }
 ```
 
----
-
 ### 3. sendMessageNotification
 
 **Trigger:** `onCreate('conversations/{conversationId}/messages/{messageId}')`  
@@ -79,11 +74,6 @@ Notifica quando alguém demonstra interesse em um post.
 Notifica quando uma nova mensagem é recebida.
 
 **Lógica:**
-
-- Verifica se já existe notificação não lida da conversa
-- Se sim, atualiza (agregação) → "João (2 mensagens)"
-- Se não, cria nova notificação
-- Envia push notification
 
 **Payload:**
 
@@ -101,8 +91,6 @@ Notifica quando uma nova mensagem é recebida.
 }
 ```
 
----
-
 ### 4. cleanupExpiredNotifications
 
 **Trigger:** Scheduled (daily at 3am BRT)  
@@ -111,8 +99,6 @@ Notifica quando uma nova mensagem é recebida.
 Remove notificações expiradas do Firestore.
 
 **Schedule:** `0 3 * * *` (cron)
-
----
 
 ### 5. onProfileDelete
 
@@ -130,11 +116,6 @@ Executa cleanup automático quando um perfil é deletado.
 5. **FCM Tokens:** Limpa tokens de notificação push da subcoleção `fcmTokens`
 
 **Segurança:**
-
-- Executa em batches de 500 documentos
-- Timeout: 9 minutos (máximo permitido)
-- Memória: 512MB
-- Fail-safe: não lança exceções (cleanup parcial é melhor que falha completa)
 
 **Logs:**
 
@@ -160,13 +141,6 @@ Executa cleanup automático quando um perfil é deletado.
 ```
 
 **Importante:**
-
-- Esta função é **automática** e dispara sempre que um perfil é deletado
-- Não requer intervenção manual
-- Garante que não há dados órfãos no Firestore/Storage
-- Previne acúmulo de storage desnecessário
-
----
 
 ## 🚀 Deploy
 
@@ -207,8 +181,6 @@ firebase functions:log --only-errors
 firebase functions:log --only sendInterestNotification --tail
 ```
 
----
-
 ## 📦 Dependências
 
 ```json
@@ -220,19 +192,11 @@ firebase functions:log --only sendInterestNotification --tail
 
 **Node.js Runtime:** v20 (padrão Firebase Functions Gen2)
 
----
-
 ## 🔐 Variáveis de Ambiente
 
 As funções usam configurações do Firebase Admin SDK automaticamente:
 
-- Firestore: `admin.firestore()`
-- Messaging: `admin.messaging()`
-- Auth: `admin.auth()`
-
 **Nenhuma variável adicional necessária.**
-
----
 
 ## 🧪 Testing Local
 
@@ -247,8 +211,6 @@ firebase emulators:start --only functions,firestore
 1. Criar post de teste no Firestore Console
 2. Verificar logs do emulator ou Firebase Console
 3. Confirmar notificação criada e push enviado
-
----
 
 ## 📊 Monitoramento de Produção
 
@@ -266,13 +228,6 @@ firebase emulators:start --only functions,firestore
    - Taxa de abertura
 
 ### Métricas Importantes
-
-- **Invocações por dia:** ~100-500 (depende do volume de posts)
-- **Latência média:** 1-3 segundos
-- **Taxa de erro:** <1%
-- **Push delivery rate:** >95%
-
----
 
 ## 🐛 Troubleshooting
 
@@ -304,10 +259,6 @@ firebase emulators:start --only functions,firestore
 
 **Soluções:**
 
-- Função automaticamente remove tokens inválidos
-- Verificar Firestore Rules permitem delete em `fcmTokens`
-- Logs mostrarão: `🗑️ Removidos X tokens inválidos`
-
 ### Rate Limiting / Quotas
 
 **Sintomas:** Erros `quota-exceeded`
@@ -317,8 +268,6 @@ firebase emulators:start --only functions,firestore
 1. Verificar Firebase quotas: [console.firebase.google.com/project/\*/usage](https://console.firebase.google.com/u/0/project/to-sem-banda-83e19/usage/details)
 2. Implementar batching maior (atualmente 500 tokens/batch)
 3. Adicionar delay entre batches se necessário
-
----
 
 ## 🔧 Configuração Avançada
 
@@ -367,32 +316,11 @@ exports.notifyNearbyPostsUS = functions
   .onCreate(handler);
 ```
 
----
-
 ## 📚 Referências
-
-- [Firebase Functions Docs](https://firebase.google.com/docs/functions)
-- [Firebase Cloud Messaging](https://firebase.google.com/docs/cloud-messaging)
-- [Node.js Admin SDK](https://firebase.google.com/docs/admin/setup)
-- [Cron Schedule Format](https://cloud.google.com/scheduler/docs/configuring/cron-job-schedules)
-
----
 
 ## ✅ Checklist de Deploy
 
 Antes de fazer deploy em produção:
-
-- [ ] Testar localmente via emulator
-- [ ] Verificar região: `southamerica-east1`
-- [ ] Verificar Firebase Messaging API habilitada
-- [ ] Verificar billing (Blaze plan) ativo
-- [ ] Deploy: `firebase deploy --only functions`
-- [ ] Monitorar logs por 1 hora: `firebase functions:log --tail`
-- [ ] Testar criando post real
-- [ ] Verificar notificações recebidas no app
-- [ ] Verificar métricas no Firebase Console
-
----
 
 **Última atualização:** 25/11/2025  
 **Versão:** 1.0.0

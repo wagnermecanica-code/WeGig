@@ -11,8 +11,8 @@
  * Região: southamerica-east1 (São Paulo)
  */
 
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+const functions = require('firebase-functions');
+const admin = require('firebase-admin');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -26,7 +26,7 @@ const messaging = admin.messaging();
 async function checkRateLimit(userId, action, limit, windowMs) {
   const now = Date.now();
   const windowStart = new Date(now - windowMs);
-  const counterRef = db.collection("rateLimits").doc(`${userId}_${action}`);
+  const counterRef = db.collection('rateLimits').doc(`${userId}_${action}`);
 
   try {
     const counterDoc = await counterRef.get();
@@ -57,7 +57,7 @@ async function checkRateLimit(userId, action, limit, windowMs) {
     // Verificar limite
     if (data.count >= limit) {
       console.log(
-        `⚠️ Rate limit exceeded: ${userId} - ${action} (${data.count}/${limit})`,
+        `⚠️ Rate limit exceeded: ${userId} - ${action} (${data.count}/${limit})`
       );
       return {
         allowed: false,
@@ -90,13 +90,13 @@ async function checkRateLimit(userId, action, limit, windowMs) {
  * @param {string} context - Contexto para logging (ex: 'nearbyPost:postId')
  * @returns {Promise<boolean>} - true se bloqueado em qualquer direção
  */
-async function isBlockedByProfile(profileId1, profileId2, context = "") {
+async function isBlockedByProfile(profileId1, profileId2, context = '') {
   if (!profileId1 || !profileId2) return false;
   const p1 = profileId1.trim();
   const p2 = profileId2.trim();
-  if (p1 === "" || p2 === "") return false;
+  if (p1 === '' || p2 === '') return false;
 
-  const logTag = context ? `[BLOCK_CHECK][${context}]` : "[BLOCK_CHECK]";
+  const logTag = context ? `[BLOCK_CHECK][${context}]` : '[BLOCK_CHECK]';
 
   try {
     // Verificar bloqueio em ambas as direções usando IDs de documento (profileId-based)
@@ -104,27 +104,27 @@ async function isBlockedByProfile(profileId1, profileId2, context = "") {
     const blockId2 = `${p2}_${p1}`; // p2 bloqueou p1
 
     const [block1, block2] = await Promise.all([
-      db.collection("blocks").doc(blockId1).get(),
-      db.collection("blocks").doc(blockId2).get(),
+      db.collection('blocks').doc(blockId1).get(),
+      db.collection('blocks').doc(blockId2).get(),
     ]);
 
     if (block1.exists || block2.exists) {
       console.log(
-        `${logTag} 🚫 Bloqueio detectado entre profiles ${p1} e ${p2} (via blocks collection)`,
+        `${logTag} 🚫 Bloqueio detectado entre profiles ${p1} e ${p2} (via blocks collection)`
       );
       return true;
     }
 
     // Fallback: verificar blockedProfileIds dos perfis (fonte de verdade canônica)
     const [profile1, profile2] = await Promise.all([
-      db.collection("profiles").doc(p1).get(),
-      db.collection("profiles").doc(p2).get(),
+      db.collection('profiles').doc(p1).get(),
+      db.collection('profiles').doc(p2).get(),
     ]);
 
     // Fail-closed if qualquer perfil não existe (evita vazamento)
     if (!profile1.exists || !profile2.exists) {
       console.log(
-        `${logTag} 🚫 Bloqueio fail-closed: perfil ausente (p1=${p1} exists=${profile1.exists}, p2=${p2} exists=${profile2.exists})`,
+        `${logTag} 🚫 Bloqueio fail-closed: perfil ausente (p1=${p1} exists=${profile1.exists}, p2=${p2} exists=${profile2.exists})`
       );
       return true;
     }
@@ -176,11 +176,11 @@ async function isBlockedByProfile(profileId1, profileId2, context = "") {
  */
 exports.notifyNearbyPosts = functions
   .runWith({
-    memory: "256MB",
+    memory: '256MB',
     timeoutSeconds: 60,
   })
-  .region("southamerica-east1") // São Paulo region para menor latência
-  .firestore.document("posts/{postId}")
+  .region('southamerica-east1') // São Paulo region para menor latência
+  .firestore.document('posts/{postId}')
   .onCreate(async (snap) => {
     const post = snap.data();
     const postId = snap.id;
@@ -202,14 +202,14 @@ exports.notifyNearbyPosts = functions
     if (authorUid) {
       const rateLimitCheck = await checkRateLimit(
         authorUid,
-        "posts",
+        'posts',
         20,
-        24 * 60 * 60 * 1000, // 24 horas
+        24 * 60 * 60 * 1000 // 24 horas
       );
 
       if (!rateLimitCheck.allowed) {
         console.log(
-          `🚫 Rate limit: ${authorUid} excedeu limite de posts diários`,
+          `🚫 Rate limit: ${authorUid} excedeu limite de posts diários`
         );
         // Não bloquear a função, mas logar para monitoramento
         // O post já foi criado (onCreate), então apenas não enviar notificações
@@ -220,39 +220,39 @@ exports.notifyNearbyPosts = functions
     // Firebase Admin SDK v12+ usa .latitude/.longitude (sem underscore)
     const postLat = post.location.latitude ?? post.location._latitude;
     const postLng = post.location.longitude ?? post.location._longitude;
-    const postCity = post.city || "cidade desconhecida";
+    const postCity = post.city || 'cidade desconhecida';
 
     // Mapear tipo do post para texto amigável
     const postTypeMap = {
-      musician: "banda",
-      band: "músico",
-      sales: "serviço/produto",
-      hiring: "músico/banda", // Para contratações
+      musician: 'banda',
+      band: 'músico',
+      sales: 'serviço/produto',
+      hiring: 'músico/banda', // Para contratações
     };
-    const postType = postTypeMap[post.type] || "músico";
+    const postType = postTypeMap[post.type] || 'músico';
 
-    const authorName = post.authorName || "Alguém";
-    const authorUsername = post.authorUsername || "";
+    const authorName = post.authorName || 'Alguém';
+    const authorUsername = post.authorUsername || '';
     const authorProfileId = post.authorProfileId;
 
     // Usa username se disponível, senão usa nome (para exibição no body)
     const displayAuthor = authorUsername || authorName;
 
     console.log(
-      `📍 Novo post criado em ${postCity}: ${authorName} (${postType})`,
+      `📍 Novo post criado em ${postCity}: ${authorName} (${postType})`
     );
     console.log(
-      `   Coordenadas: (${postLat.toFixed(4)}, ${postLng.toFixed(4)})`,
+      `   Coordenadas: (${postLat.toFixed(4)}, ${postLng.toFixed(4)})`
     );
 
     // Query: Busca perfis com notificações de posts próximos habilitadas
     const profilesSnap = await db
-      .collection("profiles")
-      .where("notificationRadiusEnabled", "==", true)
+      .collection('profiles')
+      .where('notificationRadiusEnabled', '==', true)
       .get();
 
     console.log(
-      `🔍 Encontrados ${profilesSnap.size} perfis com notificações habilitadas`,
+      `🔍 Encontrados ${profilesSnap.size} perfis com notificações habilitadas`
     );
 
     const notifications = [];
@@ -283,13 +283,13 @@ exports.notifyNearbyPosts = functions
       ]);
       if (authorBlocksRecipient || recipientBlocksAuthor) {
         console.log(
-          `   🚫 ${profile.name}: bloqueio detectado (author=${authorProfileId} recipient=${profileId} post=${postId} authorBlocks=${authorBlocksRecipient} recipientBlocks=${recipientBlocksAuthor})`,
+          `   🚫 ${profile.name}: bloqueio detectado (author=${authorProfileId} recipient=${profileId} post=${postId} authorBlocks=${authorBlocksRecipient} recipientBlocks=${recipientBlocksAuthor})`
         );
         continue;
       }
 
       console.log(
-        `   🟢 [BLOCK_CHECK][nearbyPost:${postId}] author=${authorProfileId} <-> recipient=${profileId}`,
+        `   🟢 [BLOCK_CHECK][nearbyPost:${postId}] author=${authorProfileId} <-> recipient=${profileId}`
       );
 
       // Firebase Admin SDK v12+ usa .latitude/.longitude (sem underscore)
@@ -316,44 +316,44 @@ exports.notifyNearbyPosts = functions
         console.log(
           `   ✅ ${profile.name} (${profileId.substring(
             0,
-            8,
-          )}...): ${distanceStr} km (raio: ${radius} km)`,
+            8
+          )}...): ${distanceStr} km (raio: ${radius} km)`
         );
 
         // Verificar se já existe notificação não lida para este post próximo
         const existingNearbyNotification = await db
-          .collection("notifications")
-          .where("recipientProfileId", "==", profileId)
-          .where("type", "==", "nearbyPost")
-          .where("actionData.postId", "==", postId)
-          .where("read", "==", false)
+          .collection('notifications')
+          .where('recipientProfileId', '==', profileId)
+          .where('type', '==', 'nearbyPost')
+          .where('actionData.postId', '==', postId)
+          .where('read', '==', false)
           .limit(1)
           .get();
 
         if (!existingNearbyNotification.empty) {
           console.log(
-            `   📭 ${profile.name} já foi notificado sobre este post próximo, pulando...`,
+            `   📭 ${profile.name} já foi notificado sobre este post próximo, pulando...`
           );
           continue; // Pular este perfil, já foi notificado
         }
 
         // Mensagem personalizada baseada no tipo de post
         const nearbyBody =
-          post.type === "sales"
+          post.type === 'sales'
             ? `@${displayAuthor} • anunciou perto de você`
-            : post.type === "hiring"
-              ? `@${displayAuthor} • está contratando perto de você`
-              : `@${displayAuthor} • postou perto de você`;
+            : post.type === 'hiring'
+            ? `@${displayAuthor} • está contratando perto de você`
+            : `@${displayAuthor} • postou perto de você`;
 
         notifications.push({
           recipientProfileId: profileId,
           recipientUid: profileUid, // 🔒 SECURITY: UID do dono do perfil para push
           profileUid: profileId, // CRITICAL: Isolamento de perfil
-          type: "nearbyPost",
-          priority: "medium",
-          title: "Novo post próximo!",
+          type: 'nearbyPost',
+          priority: 'medium',
+          title: 'Novo post próximo!',
           body: nearbyBody,
-          actionType: "viewPost",
+          actionType: 'viewPost',
           actionData: {
             postId: postId,
             distance: distanceStr,
@@ -368,7 +368,7 @@ exports.notifyNearbyPosts = functions
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           read: false,
           expiresAt: admin.firestore.Timestamp.fromDate(
-            new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
           ), // 7 dias
         });
       } else {
@@ -376,8 +376,8 @@ exports.notifyNearbyPosts = functions
         if (distance <= radius * 1.5) {
           console.log(
             `   ❌ ${profile.name}: ${distance.toFixed(
-              1,
-            )} km (fora do raio de ${radius} km)`,
+              1
+            )} km (fora do raio de ${radius} km)`
           );
         }
       }
@@ -387,13 +387,13 @@ exports.notifyNearbyPosts = functions
     if (notifications.length > 0) {
       const batch = db.batch();
       notifications.forEach((notification) => {
-        const notificationRef = db.collection("notifications").doc();
+        const notificationRef = db.collection('notifications').doc();
         batch.set(notificationRef, notification);
       });
 
       await batch.commit();
       console.log(
-        `🔔 Enviadas ${notifications.length} notificações in-app de post próximo`,
+        `🔔 Enviadas ${notifications.length} notificações in-app de post próximo`
       );
 
       // Enviar push notifications para cada perfil
@@ -403,10 +403,10 @@ exports.notifyNearbyPosts = functions
         authorName,
         postType,
         postCity,
-        post.type, // tipo original do post
+        post.type // tipo original do post
       );
     } else {
-      console.log("📭 Nenhum perfil próximo encontrado para notificar");
+      console.log('📭 Nenhum perfil próximo encontrado para notificar');
     }
 
     return null;
@@ -424,7 +424,7 @@ async function sendPushNotificationsForNearbyPost(
   authorName,
   postType,
   city,
-  originalPostType, // tipo original do post ('musician', 'band', 'sales')
+  originalPostType // tipo original do post ('musician', 'band', 'sales')
 ) {
   const tokens = [];
   const tokenToProfile = {}; // Map token -> profileId para debug
@@ -439,7 +439,7 @@ async function sendPushNotificationsForNearbyPost(
     // Pular se já processamos este UID (usuário pode ter múltiplos perfis)
     if (processedUids.has(recipientUid)) {
       console.log(
-        `   ⏭️ UID ${recipientUid} já processado, pulando perfil ${profileId}...`,
+        `   ⏭️ UID ${recipientUid} já processado, pulando perfil ${profileId}...`
       );
       continue;
     }
@@ -447,7 +447,7 @@ async function sendPushNotificationsForNearbyPost(
 
     const profileTokens = await getValidTokensForProfile(
       profileId,
-      recipientUid,
+      recipientUid
     );
 
     profileTokens.forEach((token) => {
@@ -460,7 +460,7 @@ async function sendPushNotificationsForNearbyPost(
   }
 
   if (tokens.length === 0) {
-    console.log("📭 Nenhum token FCM encontrado para enviar push");
+    console.log('📭 Nenhum token FCM encontrado para enviar push');
     return;
   }
 
@@ -468,24 +468,24 @@ async function sendPushNotificationsForNearbyPost(
 
   // Texto personalizado baseado no tipo de post
   const notificationBody =
-    originalPostType === "sales"
+    originalPostType === 'sales'
       ? `${authorName} está oferecendo ${postType} em ${city}`
-      : originalPostType === "hiring"
-        ? `${authorName} está contratando ${postType} em ${city}`
-        : `${authorName} está procurando ${postType} em ${city}`;
+      : originalPostType === 'hiring'
+      ? `${authorName} está contratando ${postType} em ${city}`
+      : `${authorName} está procurando ${postType} em ${city}`;
 
   // Payload da notificação
   const payload = {
     notification: {
-      title: "Novo post próximo!",
+      title: 'Novo post próximo!',
       body: notificationBody,
     },
     data: {
-      type: "nearbyPost",
+      type: 'nearbyPost',
       postId: postId,
       authorName: authorName,
       city: city,
-      click_action: "FLUTTER_NOTIFICATION_CLICK",
+      click_action: 'FLUTTER_NOTIFICATION_CLICK',
     },
   };
 
@@ -500,12 +500,12 @@ async function sendPushNotificationsForNearbyPost(
         notification: payload.notification,
         data: payload.data,
         android: {
-          priority: "high",
+          priority: 'high',
           notification: {
-            channelId: "high_importance_channel",
-            priority: "high",
-            color: "#E47911",
-            sound: "default",
+            channelId: 'high_importance_channel',
+            priority: 'high',
+            color: '#E47911',
+            sound: 'default',
           },
         },
         apns: {
@@ -515,7 +515,7 @@ async function sendPushNotificationsForNearbyPost(
                 title: payload.notification.title,
                 body: payload.notification.body,
               },
-              sound: "default",
+              sound: 'default',
               badge: 1,
             },
           },
@@ -523,7 +523,7 @@ async function sendPushNotificationsForNearbyPost(
       });
 
       console.log(
-        `✅ Push enviado: ${response.successCount} sucesso, ${response.failureCount} falhas`,
+        `✅ Push enviado: ${response.successCount} sucesso, ${response.failureCount} falhas`
       );
 
       // Remover tokens inválidos
@@ -536,13 +536,13 @@ async function sendPushNotificationsForNearbyPost(
 
             // ✅ LOG DETALHADO: Mostrar erro específico para debugging
             console.log(
-              `❌ Push falhou para token ${idx}: ${errorCode} - ${errorMsg}`,
+              `❌ Push falhou para token ${idx}: ${errorCode} - ${errorMsg}`
             );
 
             // Tokens inválidos ou desinstalados
             if (
-              errorCode === "messaging/registration-token-not-registered" ||
-              errorCode === "messaging/invalid-registration-token"
+              errorCode === 'messaging/registration-token-not-registered' ||
+              errorCode === 'messaging/invalid-registration-token'
             ) {
               tokensToRemove.push(batchTokens[idx]);
             }
@@ -568,7 +568,7 @@ async function sendPushNotificationsForNearbyPost(
 async function getValidTokensForProfile(profileId, expectedUid) {
   try {
     // Validar que o profileId pertence ao expectedUid
-    const profileDoc = await db.collection("profiles").doc(profileId).get();
+    const profileDoc = await db.collection('profiles').doc(profileId).get();
     if (!profileDoc.exists) {
       console.log(`⚠️ Perfil ${profileId} não encontrado`);
       return [];
@@ -577,16 +577,16 @@ async function getValidTokensForProfile(profileId, expectedUid) {
     const profileData = profileDoc.data();
     if (profileData.uid !== expectedUid) {
       console.log(
-        `🚨 SECURITY: Perfil ${profileId} não pertence ao usuário ${expectedUid}`,
+        `🚨 SECURITY: Perfil ${profileId} não pertence ao usuário ${expectedUid}`
       );
       return [];
     }
 
     // Buscar tokens FCM
     const tokensSnap = await db
-      .collection("profiles")
+      .collection('profiles')
       .doc(profileId)
-      .collection("fcmTokens")
+      .collection('fcmTokens')
       .get();
 
     if (tokensSnap.empty) {
@@ -597,54 +597,27 @@ async function getValidTokensForProfile(profileId, expectedUid) {
     // Filtrar tokens válidos e ordenar por updatedAt (mais recente primeiro)
     // NOTA: NÃO expiramos tokens por idade - FCM reporta tokens inválidos no envio
     const validTokens = [];
-    let skippedNonMobileTokens = 0;
 
     tokensSnap.docs.forEach((tokenDoc) => {
       const tokenData = tokenDoc.data();
-      const token =
-        typeof tokenData.token === "string" ? tokenData.token.trim() : "";
+      const token = typeof tokenData.token === "string" ? tokenData.token.trim() : "";
       if (!token) return;
 
-      // 🚫 Ignorar tokens de plataformas não-mobile (causam third-party-auth-error)
-      const platform = (tokenData.platform || "").toLowerCase();
-      if (
-        platform === "web" ||
-        platform === "linux" ||
-        platform === "windows" ||
-        platform === "macos"
-      ) {
-        skippedNonMobileTokens++;
-        return;
-      }
+      const updatedAt = tokenData.updatedAt?.toMillis() ||
+        tokenData.createdAt?.toMillis() || 0;
 
-      const updatedAt =
-        tokenData.updatedAt?.toMillis() || tokenData.createdAt?.toMillis() || 0;
-
-      validTokens.push({ token, updatedAt, platform });
+      validTokens.push({ token, updatedAt });
     });
 
     // Ordenar por updatedAt (mais recente primeiro) e pegar apenas o mais recente
     // para evitar notificações duplicadas em múltiplos dispositivos
-    if (skippedNonMobileTokens > 0) {
-      console.log(
-        `⏭️ Ignorados ${skippedNonMobileTokens} tokens de plataformas desktop/web`,
-      );
-    }
-
     validTokens.sort((a, b) => b.updatedAt - a.updatedAt);
     const tokensToUse = validTokens.slice(0, 5).map((t) => t.token); // Até 5 tokens mais recentes
 
     console.log(
       `✅ ${tokensToUse.length} token(s) válido(s) para perfil ` +
-        `${profileId} (${validTokens.length} tokens válidos)`,
+        `${profileId} (${validTokens.length} tokens válidos)`
     );
-    // Debug: log platforms for troubleshooting
-    const platformSummary = validTokens
-      .slice(0, 5)
-      .map((t) => t.platform || "NO_PLATFORM")
-      .join(", ");
-    console.log(`📱 Platforms dos 5 tokens mais recentes: ${platformSummary}`);
-    // Debug: log platforms for troubleshooting
     return tokensToUse;
   } catch (error) {
     console.log(`❌ Erro ao buscar tokens do perfil ${profileId}: ${error}`);
@@ -665,9 +638,9 @@ async function removeInvalidTokens(tokens, tokenToProfile) {
     const profileId = tokenToProfile[token];
     if (profileId) {
       const tokenRef = db
-        .collection("profiles")
+        .collection('profiles')
         .doc(profileId)
-        .collection("fcmTokens")
+        .collection('fcmTokens')
         .doc(token);
       batch.delete(tokenRef);
     }
@@ -685,27 +658,27 @@ async function removeInvalidTokens(tokens, tokenToProfile) {
  */
 exports.sendInterestNotification = functions
   .runWith({
-    memory: "128MB",
+    memory: '128MB',
     timeoutSeconds: 30,
   })
-  .region("southamerica-east1")
-  .firestore.document("interests/{interestId}")
+  .region('southamerica-east1')
+  .firestore.document('interests/{interestId}')
   .onCreate(async (snap) => {
     const interest = snap.data();
     const postAuthorProfileId = interest.postAuthorProfileId;
-    const interestedProfileName = interest.interestedProfileName || "Alguém";
-    const interestedProfileUsername = interest.interestedProfileUsername || "";
+    const interestedProfileName = interest.interestedProfileName || 'Alguém';
+    const interestedProfileUsername = interest.interestedProfileUsername || '';
     const postId = interest.postId;
 
     // Buscar dados do post para personalizar mensagem
-    let postType = "unknown";
-    let postCity = "";
+    let postType = 'unknown';
+    let postCity = '';
     try {
-      const postDoc = await db.collection("posts").doc(postId).get();
+      const postDoc = await db.collection('posts').doc(postId).get();
       if (postDoc.exists) {
         const postData = postDoc.data();
-        postType = postData.type || "unknown";
-        postCity = postData.city || "";
+        postType = postData.type || 'unknown';
+        postCity = postData.city || '';
       }
     } catch (err) {
       console.log(`⚠️ Erro ao buscar post ${postId}:`, err.message);
@@ -716,7 +689,7 @@ exports.sendInterestNotification = functions
 
     // Mensagem personalizada baseada no tipo de post
     const interestBody =
-      postType === "sales"
+      postType === 'sales'
         ? `@${displayName} • salvou seu anúncio`
         : `@${displayName} • demonstrou interesse no seu post`;
 
@@ -725,14 +698,14 @@ exports.sendInterestNotification = functions
     if (interestedProfileId) {
       const rateLimitCheck = await checkRateLimit(
         interestedProfileId,
-        "interests",
+        'interests',
         50,
-        24 * 60 * 60 * 1000,
+        24 * 60 * 60 * 1000
       );
 
       if (!rateLimitCheck.allowed) {
         console.log(
-          `🚫 Rate limit: ${interestedProfileId} excedeu limite de interesses diários`,
+          `🚫 Rate limit: ${interestedProfileId} excedeu limite de interesses diários`
         );
         // Interesse já criado, apenas não enviar notificação
         return null;
@@ -743,7 +716,7 @@ exports.sendInterestNotification = functions
 
     // 🔒 SECURITY: Buscar UID do perfil autor para validação
     const postAuthorProfile = await db
-      .collection("profiles")
+      .collection('profiles')
       .doc(postAuthorProfileId)
       .get();
     if (!postAuthorProfile.exists) {
@@ -755,29 +728,28 @@ exports.sendInterestNotification = functions
 
     // 🔒 BLOCKING: Checar bloqueio em ambas as direções (interessado <-> autor)
     if (interestedProfileId && postAuthorProfileId) {
-      const [interestedBlocksAuthor, authorBlocksInterested] =
-        await Promise.all([
-          isBlockedByProfile(
-            interestedProfileId,
-            postAuthorProfileId,
-            `interest:${postId}`,
-          ),
-          isBlockedByProfile(
-            postAuthorProfileId,
-            interestedProfileId,
-            `interest:${postId}`,
-          ),
-        ]);
+      const [interestedBlocksAuthor, authorBlocksInterested] = await Promise.all([
+        isBlockedByProfile(
+          interestedProfileId,
+          postAuthorProfileId,
+          `interest:${postId}`
+        ),
+        isBlockedByProfile(
+          postAuthorProfileId,
+          interestedProfileId,
+          `interest:${postId}`
+        ),
+      ]);
 
       if (interestedBlocksAuthor || authorBlocksInterested) {
         console.log(
-          `🚫 [BLOCK_CHECK][interest:${postId}] Bloqueio detectado (interested=${interestedProfileId} author=${postAuthorProfileId} interestedBlocks=${interestedBlocksAuthor} authorBlocks=${authorBlocksInterested}), não enviando notificação`,
+          `🚫 [BLOCK_CHECK][interest:${postId}] Bloqueio detectado (interested=${interestedProfileId} author=${postAuthorProfileId} interestedBlocks=${interestedBlocksAuthor} authorBlocks=${authorBlocksInterested}), não enviando notificação`
         );
         return null;
       }
 
       console.log(
-        `🟢 [BLOCK_CHECK][interest:${postId}] autorizado: ${interestedProfileId} <-> ${postAuthorProfileId}`,
+        `🟢 [BLOCK_CHECK][interest:${postId}] autorizado: ${interestedProfileId} <-> ${postAuthorProfileId}`
       );
     }
 
@@ -785,21 +757,41 @@ exports.sendInterestNotification = functions
     const notifyInterests = postAuthorProfileData.notifyInterests ?? true;
     if (!notifyInterests) {
       console.log(
-        `🔕 Notificação de interesse desativada para perfil ${postAuthorProfileId}`,
+        `🔕 Notificação de interesse desativada para perfil ${postAuthorProfileId}`
       );
       return null;
     }
 
+    // Verificar se já existe notificação de interesse não lida para este post/interessado
+    const existingInterestNotification = await db
+      .collection('notifications')
+      .where('recipientProfileId', '==', postAuthorProfileId)
+      .where('type', '==', 'interest')
+      .where('actionData.postId', '==', postId)
+      .where(
+        'actionData.interestedProfileId',
+        '==',
+        interest.interestedProfileId
+      )
+      .where('read', '==', false)
+      .limit(1)
+      .get();
+
+    if (!existingInterestNotification.empty) {
+      console.log(`📭 Interesse já notificado anteriormente, pulando...`);
+      return null; // Já existe notificação para este interesse específico
+    }
+
     // Criar notificação in-app
-    await db.collection("notifications").add({
+    await db.collection('notifications').add({
       recipientProfileId: postAuthorProfileId,
       recipientUid: recipientUid, // 🔒 SECURITY: UID do dono do perfil
       profileUid: postAuthorProfileId, // LEGACY: manter para compatibilidade
-      type: "interest",
-      priority: "high",
-      title: "Novo interesse!",
+      type: 'interest',
+      priority: 'high',
+      title: 'Novo interesse!',
       body: interestBody,
-      actionType: "viewPost",
+      actionType: 'viewPost',
       actionData: {
         postId: postId,
         interestedProfileId: interest.interestedProfileId,
@@ -813,7 +805,7 @@ exports.sendInterestNotification = functions
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       read: false,
       expiresAt: admin.firestore.Timestamp.fromDate(
-        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       ), // 30 dias
     });
 
@@ -822,15 +814,15 @@ exports.sendInterestNotification = functions
       postAuthorProfileId,
       recipientUid, // 🔒 SECURITY: passar UID para validação
       {
-        title: "Novo interesse!",
+        title: 'Novo interesse!',
         body: interestBody,
       },
       {
-        type: "interest",
+        type: 'interest',
         postId: postId,
         interestedProfileId: interest.interestedProfileId,
         postType: postType,
-      },
+      }
     );
 
     return null;
@@ -846,38 +838,38 @@ exports.sendInterestNotification = functions
  */
 exports.sendMessageNotification = functions
   .runWith({
-    memory: "128MB",
+    memory: '128MB',
     timeoutSeconds: 30,
   })
-  .region("southamerica-east1")
-  .firestore.document("conversations/{conversationId}/messages/{messageId}")
+  .region('southamerica-east1')
+  .firestore.document('conversations/{conversationId}/messages/{messageId}')
   .onCreate(async (snap, context) => {
     const message = snap.data();
     const conversationId = context.params.conversationId;
     const senderProfileId = message.senderProfileId;
-    const senderName = message.senderName || "Alguém";
-    const messageText = message.text || "Enviou uma mensagem";
+    const senderName = message.senderName || 'Alguém';
+    const messageText = message.text || 'Enviou uma mensagem';
 
     // Metadados do remetente (úteis para deep link do app)
-    const senderUid = message.senderId || message.senderUid || "";
-    const senderPhotoUrl = message.senderPhotoUrl || "";
+    const senderUid = message.senderId || message.senderUid || '';
+    const senderPhotoUrl = message.senderPhotoUrl || '';
 
     console.log(
-      `💬 Nova mensagem de ${senderName} na conversa ${conversationId}`,
+      `💬 Nova mensagem de ${senderName} na conversa ${conversationId}`
     );
 
     // Rate limiting: 500 mensagens por dia por perfil (proteção contra spam)
     if (senderProfileId) {
       const rateLimitCheck = await checkRateLimit(
         senderProfileId,
-        "messages",
+        'messages',
         500,
-        24 * 60 * 60 * 1000,
+        24 * 60 * 60 * 1000
       );
 
       if (!rateLimitCheck.allowed) {
         console.log(
-          `🚫 Rate limit: ${senderProfileId} excedeu limite de mensagens diárias`,
+          `🚫 Rate limit: ${senderProfileId} excedeu limite de mensagens diárias`
         );
         // Mensagem já criada, apenas não enviar notificação
         return null;
@@ -886,12 +878,12 @@ exports.sendMessageNotification = functions
 
     // Buscar conversa para obter destinatário
     const conversationDoc = await db
-      .collection("conversations")
+      .collection('conversations')
       .doc(conversationId)
       .get();
 
     if (!conversationDoc.exists) {
-      console.log("⚠️ Conversa não encontrada");
+      console.log('⚠️ Conversa não encontrada');
       return null;
     }
 
@@ -900,17 +892,17 @@ exports.sendMessageNotification = functions
 
     // Encontrar destinatário (não é o sender)
     const recipientProfileId = participantProfiles.find(
-      (id) => id !== senderProfileId,
+      (id) => id !== senderProfileId
     );
 
     if (!recipientProfileId) {
-      console.log("⚠️ Destinatário não encontrado");
+      console.log('⚠️ Destinatário não encontrado');
       return null;
     }
 
     // ✅ FIX: Buscar UID do destinatário para permissões (Security Rules)
     const recipientProfileDoc = await db
-      .collection("profiles")
+      .collection('profiles')
       .doc(recipientProfileId)
       .get();
 
@@ -933,24 +925,24 @@ exports.sendMessageNotification = functions
         isBlockedByProfile(
           senderProfileId,
           recipientProfileId,
-          `message:${conversationId}`,
+          `message:${conversationId}`
         ),
         isBlockedByProfile(
           recipientProfileId,
           senderProfileId,
-          `message:${conversationId}`,
+          `message:${conversationId}`
         ),
       ]);
 
       if (senderBlocksRecipient || recipientBlocksSender) {
         console.log(
-          `🚫 [BLOCK_CHECK][message:${conversationId}] Bloqueio detectado (sender=${senderProfileId} recipient=${recipientProfileId} senderBlocks=${senderBlocksRecipient} recipientBlocks=${recipientBlocksSender}), não enviando notificação de mensagem`,
+          `🚫 [BLOCK_CHECK][message:${conversationId}] Bloqueio detectado (sender=${senderProfileId} recipient=${recipientProfileId} senderBlocks=${senderBlocksRecipient} recipientBlocks=${recipientBlocksSender}), não enviando notificação de mensagem`
         );
         return null;
       }
 
       console.log(
-        `🟢 [BLOCK_CHECK][message:${conversationId}] autorizado: ${senderProfileId} <-> ${recipientProfileId}`,
+        `🟢 [BLOCK_CHECK][message:${conversationId}] autorizado: ${senderProfileId} <-> ${recipientProfileId}`
       );
     }
 
@@ -958,7 +950,7 @@ exports.sendMessageNotification = functions
     const notifyMessages = recipientProfileData.notifyMessages ?? true;
     if (!notifyMessages) {
       console.log(
-        `🔕 Notificação de mensagem desativada para perfil ${recipientProfileId}`,
+        `🔕 Notificação de mensagem desativada para perfil ${recipientProfileId}`
       );
       return null;
     }
@@ -968,11 +960,11 @@ exports.sendMessageNotification = functions
 
     // Verificar se já existe notificação não lida desta conversa (agregação)
     const existingNotifications = await db
-      .collection("notifications")
-      .where("recipientProfileId", "==", recipientProfileId)
-      .where("type", "==", "newMessage")
-      .where("data.conversationId", "==", conversationId)
-      .where("read", "==", false)
+      .collection('notifications')
+      .where('recipientProfileId', '==', recipientProfileId)
+      .where('type', '==', 'newMessage')
+      .where('data.conversationId', '==', conversationId)
+      .where('read', '==', false)
       .limit(1)
       .get();
 
@@ -981,24 +973,24 @@ exports.sendMessageNotification = functions
       const notificationDoc = existingNotifications.docs[0];
       await notificationDoc.ref.update({
         body: `${senderName}: ${messageText}`,
-        "data.messagePreview": messageText,
-        "data.messageCount": admin.firestore.FieldValue.increment(1),
-        "data.otherProfileId": senderProfileId,
-        "data.otherUid": senderUid,
-        "data.otherName": senderName,
-        "data.otherPhotoUrl": senderPhotoUrl,
+        'data.messagePreview': messageText,
+        'data.messageCount': admin.firestore.FieldValue.increment(1),
+        'data.otherProfileId': senderProfileId,
+        'data.otherUid': senderUid,
+        'data.otherName': senderName,
+        'data.otherPhotoUrl': senderPhotoUrl,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      console.log("📝 Notificação de mensagem atualizada (agregação)");
+      console.log('📝 Notificação de mensagem atualizada (agregação)');
     } else {
       // Criar nova notificação
-      await db.collection("notifications").add({
+      await db.collection('notifications').add({
         recipientProfileId: recipientProfileId,
         recipientUid: recipientUid, // ✅ FIX: Auth UID para Security Rules
-        type: "newMessage",
-        priority: "high",
-        title: "Nova mensagem",
+        type: 'newMessage',
+        priority: 'high',
+        title: 'Nova mensagem',
         body: `${senderName}: ${messageText}`,
         data: {
           conversationId: conversationId,
@@ -1015,11 +1007,11 @@ exports.sendMessageNotification = functions
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         read: false,
         expiresAt: admin.firestore.Timestamp.fromDate(
-          new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
         ), // 7 dias
       });
 
-      console.log("📨 Notificação de mensagem criada");
+      console.log('📨 Notificação de mensagem criada');
     }
 
     // ✅ Sempre enviar push notification para cada mensagem recebida
@@ -1031,7 +1023,7 @@ exports.sendMessageNotification = functions
         body: messageText,
       },
       {
-        type: "newMessage",
+        type: 'newMessage',
         conversationId: conversationId,
         // Compat: manter senderProfileId (já usado em algumas telas)
         senderProfileId: senderProfileId,
@@ -1040,168 +1032,11 @@ exports.sendMessageNotification = functions
         otherUid: senderUid,
         otherName: senderName,
         otherPhotoUrl: senderPhotoUrl,
-      },
+      }
     );
 
     return null;
   });
-
-/**
- * Envia notificacao quando alguem curte um comentario
- *
- * Trigger: onUpdate em posts/{postId}/comments/{commentId}
- * Detecta novas curtidas comparando likedBy antes/depois.
- * Cria notificacao in-app + push notification para o autor do comentario.
- */
-exports.sendCommentLikeNotification = functions
-  .runWith({
-    memory: "128MB",
-    timeoutSeconds: 30,
-  })
-  .region("southamerica-east1")
-  .firestore.document("posts/{postId}/comments/{commentId}")
-  .onUpdate(async (change, context) => {
-    const before = change.before.data() || {};
-    const after = change.after.data() || {};
-    const postId = context.params.postId;
-    const commentId = context.params.commentId;
-
-    const beforeLikedBy = before.likedBy || [];
-    const afterLikedBy = after.likedBy || [];
-
-    const beforeSet = new Set(beforeLikedBy);
-    const newLikers = afterLikedBy.filter((id) => !beforeSet.has(id));
-
-    if (newLikers.length === 0) {
-      return null;
-    }
-
-    const commentAuthorProfileId = (after.authorProfileId || "").trim();
-    const commentAuthorUid = (after.authorUid || "").trim();
-
-    if (!commentAuthorProfileId || !commentAuthorUid) {
-      console.log(
-        "Comment like notification skipped: missing authorProfileId or authorUid",
-      );
-      return null;
-    }
-
-    for (const likerProfileId of newLikers) {
-      if (likerProfileId === commentAuthorProfileId) {
-        continue;
-      }
-
-      const rateLimitCheck = await checkRateLimit(
-        likerProfileId,
-        "commentLikes",
-        200,
-        24 * 60 * 60 * 1000,
-      );
-      if (!rateLimitCheck.allowed) {
-        console.log(
-          "Rate limit: " + likerProfileId + " excedeu limite de curtidas",
-        );
-        continue;
-      }
-
-      const [likerBlocksAuthor, authorBlocksLiker] = await Promise.all([
-        isBlockedByProfile(
-          likerProfileId,
-          commentAuthorProfileId,
-          "commentLike:" + commentId,
-        ),
-        isBlockedByProfile(
-          commentAuthorProfileId,
-          likerProfileId,
-          "commentLike:" + commentId,
-        ),
-      ]);
-
-      if (likerBlocksAuthor || authorBlocksLiker) {
-        continue;
-      }
-
-      const authorProfileDoc = await db
-        .collection("profiles")
-        .doc(commentAuthorProfileId)
-        .get();
-      if (!authorProfileDoc.exists) continue;
-
-      const authorProfileData = authorProfileDoc.data() || {};
-      const authorUid = (authorProfileData.uid || "").trim();
-      if (!authorUid) continue;
-
-      const notifyComments = authorProfileData.notifyComments ?? true;
-      if (!notifyComments) continue;
-
-      const likerProfileDoc = await db
-        .collection("profiles")
-        .doc(likerProfileId)
-        .get();
-      const likerName = likerProfileDoc.exists
-        ? likerProfileDoc.data().name || "Alguem"
-        : "Alguem";
-      const likerPhoto = likerProfileDoc.exists
-        ? likerProfileDoc.data().photoUrl || null
-        : null;
-
-      const commentText = after.text || "";
-      const commentPreview =
-        commentText.length > 80
-          ? commentText.substring(0, 80) + "..."
-          : commentText;
-
-      const notificationTitle = likerName + " curtiu seu comentário";
-      const notificationBody = "Curtiu seu comentário: " + commentPreview;
-
-      await db.collection("notifications").add({
-        recipientProfileId: commentAuthorProfileId,
-        recipientUid: authorUid,
-        profileUid: commentAuthorProfileId,
-        type: "comment_like",
-        priority: "low",
-        title: notificationTitle,
-        body: notificationBody,
-        actionType: "viewPost",
-        actionData: {
-          postId: postId,
-          commentId: commentId,
-          likerProfileId: likerProfileId,
-          likerName: likerName,
-        },
-        senderName: likerName,
-        senderPhoto: likerPhoto,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        read: false,
-        expiresAt: admin.firestore.Timestamp.fromDate(
-          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        ),
-      });
-
-      await sendPushToProfile(
-        commentAuthorProfileId,
-        authorUid,
-        { title: notificationTitle, body: notificationBody },
-        {
-          type: "comment_like",
-          postId: postId,
-          commentId: commentId,
-          likerProfileId: likerProfileId,
-          recipientProfileId: commentAuthorProfileId,
-        },
-      );
-
-      console.log(
-        "Notificacao de curtida enviada: " +
-          likerName +
-          " -> " +
-          commentAuthorProfileId,
-      );
-    }
-
-    return null;
-  });
-
 
 /**
  * Helper: Envia push notification para um perfil específico
@@ -1215,51 +1050,47 @@ async function sendPushToProfile(profileId, recipientUid, notification, data) {
 
     if (tokens.length === 0) {
       console.log(
-        `📭 Nenhum token FCM válido encontrado para perfil ${profileId}`,
+        `📭 Nenhum token FCM válido encontrado para perfil ${profileId}`
       );
       return;
     }
 
     console.log(
-      `📤 Enviando push para ${tokens.length} dispositivo(s) do perfil ${profileId}`,
+      `📤 Enviando push para ${tokens.length} dispositivo(s) do perfil ${profileId}`
     );
 
     // Adicionar click_action para navegação no app
-    data.click_action = "FLUTTER_NOTIFICATION_CLICK";
+    data.click_action = 'FLUTTER_NOTIFICATION_CLICK';
 
     const response = await messaging.sendEachForMulticast({
       tokens: tokens,
       notification: notification,
       data: data,
       android: {
-        priority: "high",
+        priority: 'high',
         notification: {
-          channelId: "high_importance_channel",
-          priority: "high",
-          color: "#E47911",
-          sound: "default",
+          channelId: 'high_importance_channel',
+          priority: 'high',
+          color: '#E47911',
+          sound: 'default',
         },
       },
       apns: {
-        headers: {
-          "apns-priority": "10",
-        },
         payload: {
           aps: {
             alert: {
               title: notification.title,
               body: notification.body,
             },
-            sound: "default",
+            sound: 'default',
             badge: 1,
-            "content-available": 1,
           },
         },
       },
     });
 
     console.log(
-      `✅ Push enviado: ${response.successCount} sucesso, ${response.failureCount} falhas`,
+      `✅ Push enviado: ${response.successCount} sucesso, ${response.failureCount} falhas`
     );
 
     // Remover tokens inválidos (podem ter expirado entre busca e envio)
@@ -1272,12 +1103,12 @@ async function sendPushToProfile(profileId, recipientUid, notification, data) {
 
           // ✅ LOG DETALHADO: Mostrar erro específico para debugging
           console.log(
-            `❌ Push falhou para token ${idx}: ${errorCode} - ${errorMsg}`,
+            `❌ Push falhou para token ${idx}: ${errorCode} - ${errorMsg}`
           );
 
           if (
-            errorCode === "messaging/registration-token-not-registered" ||
-            errorCode === "messaging/invalid-registration-token"
+            errorCode === 'messaging/registration-token-not-registered' ||
+            errorCode === 'messaging/invalid-registration-token'
           ) {
             tokensToRemove.push(tokens[idx]);
           }
@@ -1306,23 +1137,23 @@ async function sendPushToProfile(profileId, recipientUid, notification, data) {
  */
 exports.cleanupExpiredNotifications = functions
   .runWith({
-    memory: "256MB",
+    memory: '256MB',
     timeoutSeconds: 120,
   })
-  .region("southamerica-east1")
-  .pubsub.schedule("0 3 * * *") // 3h da manhã todos os dias
-  .timeZone("America/Sao_Paulo")
+  .region('southamerica-east1')
+  .pubsub.schedule('0 3 * * *') // 3h da manhã todos os dias
+  .timeZone('America/Sao_Paulo')
   .onRun(async () => {
     const now = admin.firestore.Timestamp.now();
 
     const expiredSnap = await db
-      .collection("notifications")
-      .where("expiresAt", "<", now)
+      .collection('notifications')
+      .where('expiresAt', '<', now)
       .limit(500) // Limite de segurança
       .get();
 
     if (expiredSnap.empty) {
-      console.log("🧹 Nenhuma notificação expirada encontrada");
+      console.log('🧹 Nenhuma notificação expirada encontrada');
       return null;
     }
 
@@ -1333,356 +1164,6 @@ exports.cleanupExpiredNotifications = functions
 
     await batch.commit();
     console.log(`🧹 Deletadas ${expiredSnap.size} notificações expiradas`);
-
-    return null;
-  });
-
-/**
- * Notifica autores quando seus posts estão prestes a expirar
- *
- * Execução: Diária às 10h da manhã (horário de Brasília)
- *
- * Lógica:
- * 1. Busca posts com expiresAt entre agora e +24h
- * 2. Para cada post, cria notificação para o autor
- * 3. Envia push notification
- *
- * Nota: Não notifica posts que já foram notificados (dedup via notificationId fixo)
- */
-exports.notifyPostExpiring = functions
-  .runWith({
-    memory: "256MB",
-    timeoutSeconds: 120,
-  })
-  .region("southamerica-east1")
-  .pubsub.schedule("0 10 * * *") // 10h da manhã todos os dias
-  .timeZone("America/Sao_Paulo")
-  .onRun(async () => {
-    const now = admin.firestore.Timestamp.now();
-    const in24Hours = admin.firestore.Timestamp.fromDate(
-      new Date(Date.now() + 24 * 60 * 60 * 1000),
-    );
-
-    console.log(
-      `⏰ [POST_EXPIRING] Buscando posts que expiram nas próximas 24h...`,
-    );
-
-    // Buscar posts que expiram entre agora e +24h
-    const expiringPostsSnap = await db
-      .collection("posts")
-      .where("expiresAt", ">", now)
-      .where("expiresAt", "<=", in24Hours)
-      .orderBy("expiresAt")
-      .limit(200) // Limite de segurança
-      .get();
-
-    if (expiringPostsSnap.empty) {
-      console.log("⏰ [POST_EXPIRING] Nenhum post expirando nas próximas 24h");
-      return null;
-    }
-
-    console.log(
-      `⏰ [POST_EXPIRING] Encontrados ${expiringPostsSnap.size} posts expirando`,
-    );
-
-    let notificationsCreated = 0;
-    let notificationsSkipped = 0;
-
-    for (const postDoc of expiringPostsSnap.docs) {
-      const post = postDoc.data();
-      const postId = postDoc.id;
-      const authorProfileId = (post.authorProfileId || "").trim();
-      const authorUid = (post.authorUid || "").trim();
-
-      if (!authorProfileId || !authorUid) {
-        console.log(
-          `⚠️ Post ${postId} sem authorProfileId/authorUid, pulando...`,
-        );
-        continue;
-      }
-
-      // Verificar se já notificamos este post (dedup)
-      // Usamos um ID fixo baseado no postId para evitar múltiplas notificações
-      const notificationId = `postExpiring_${postId}`;
-      const existingNotification = await db
-        .collection("notifications")
-        .doc(notificationId)
-        .get();
-
-      if (existingNotification.exists) {
-        notificationsSkipped++;
-        continue;
-      }
-
-      // Calcular horas restantes
-      const expiresAt = post.expiresAt?.toDate?.() || new Date();
-      const hoursRemaining = Math.max(
-        0,
-        Math.round((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)),
-      );
-
-      const postCity = post.city || "sua cidade";
-      const postType = post.type || "post";
-
-      // Mensagem personalizada
-      const expiringBody =
-        postType === "sales"
-          ? `Seu anúncio em ${postCity} expira em ${hoursRemaining}h. Deseja renovar?`
-          : postType === "hiring"
-            ? `Sua vaga em ${postCity} expira em ${hoursRemaining}h. Deseja renovar?`
-            : `Seu post em ${postCity} expira em ${hoursRemaining}h. Deseja renovar?`;
-
-      // Criar notificação com ID fixo (dedup)
-      await db
-        .collection("notifications")
-        .doc(notificationId)
-        .set({
-          recipientProfileId: authorProfileId,
-          recipientUid: authorUid,
-          profileUid: authorProfileId, // Legacy
-          type: "postExpiring",
-          priority: "high",
-          title: "Post expirando!",
-          body: expiringBody,
-          actionType: "renewPost",
-          actionData: {
-            postId: postId,
-            postType: postType,
-            city: postCity,
-            hoursRemaining: hoursRemaining,
-          },
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          read: false,
-          expiresAt: admin.firestore.Timestamp.fromDate(
-            new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // Notificação expira em 3 dias
-          ),
-        });
-
-      // Enviar push notification
-      await sendPushToProfile(
-        authorProfileId,
-        authorUid,
-        {
-          title: "⏰ Post expirando!",
-          body: expiringBody,
-        },
-        {
-          type: "postExpiring",
-          postId: postId,
-          postType: postType,
-        },
-      );
-
-      notificationsCreated++;
-      console.log(
-        `⏰ [POST_EXPIRING] Notificado: post ${postId} (${hoursRemaining}h restantes)`,
-      );
-    }
-
-    console.log(
-      `⏰ [POST_EXPIRING] Concluído: ${notificationsCreated} notificações criadas, ${notificationsSkipped} puladas (já notificadas)`,
-    );
-
-    return null;
-  });
-
-/**
- * Notifica interessados quando um post é atualizado
- *
- * Trigger: onUpdate em posts/{postId}
- *
- * Lógica:
- * 1. Verifica se o post foi realmente atualizado (não apenas metadata)
- * 2. Busca todos os interessados (interests) no post
- * 3. Cria notificação para cada interessado
- * 4. Envia push notifications
- *
- * Campos monitorados: content, title, images, location, city, type
- */
-exports.notifyPostUpdated = functions
-  .runWith({
-    memory: "256MB",
-    timeoutSeconds: 60,
-  })
-  .region("southamerica-east1")
-  .firestore.document("posts/{postId}")
-  .onUpdate(async (change, context) => {
-    const postId = context.params.postId;
-    const before = change.before.data();
-    const after = change.after.data();
-
-    // Verificar se houve mudança significativa no conteúdo
-    const significantFields = [
-      "content",
-      "title",
-      "images",
-      "location",
-      "city",
-      "type",
-    ];
-    const hasSignificantChange = significantFields.some((field) => {
-      const beforeVal = JSON.stringify(before[field] || "");
-      const afterVal = JSON.stringify(after[field] || "");
-      return beforeVal !== afterVal;
-    });
-
-    if (!hasSignificantChange) {
-      console.log(
-        `📝 [POST_UPDATED] Post ${postId} atualizado sem mudanças significativas, ignorando`,
-      );
-      return null;
-    }
-
-    const authorProfileId = (after.authorProfileId || "").trim();
-    const authorName = after.authorName || "O autor";
-    const authorUsername = after.authorUsername || "";
-    const postCity = after.city || "";
-    const postType = after.type || "post";
-
-    if (!authorProfileId) {
-      console.log(`⚠️ Post ${postId} sem authorProfileId, pulando...`);
-      return null;
-    }
-
-    console.log(
-      `📝 [POST_UPDATED] Post ${postId} atualizado, notificando interessados...`,
-    );
-
-    // Buscar todos os interessados no post
-    const interestsSnap = await db
-      .collection("interests")
-      .where("postId", "==", postId)
-      .get();
-
-    if (interestsSnap.empty) {
-      console.log(`📝 [POST_UPDATED] Nenhum interessado no post ${postId}`);
-      return null;
-    }
-
-    console.log(
-      `📝 [POST_UPDATED] Encontrados ${interestsSnap.size} interessados no post`,
-    );
-
-    const displayAuthor = authorUsername || authorName;
-    const updateBody =
-      postType === "sales"
-        ? `@${displayAuthor} • atualizou o anúncio que você salvou`
-        : `@${displayAuthor} • atualizou o post que você curtiu`;
-
-    let notificationsCreated = 0;
-    let notificationsSkipped = 0;
-
-    for (const interestDoc of interestsSnap.docs) {
-      const interest = interestDoc.data();
-      const interestedProfileId = (interest.interestedProfileId || "").trim();
-
-      if (!interestedProfileId) continue;
-
-      // Buscar UID do interessado
-      const interestedProfile = await db
-        .collection("profiles")
-        .doc(interestedProfileId)
-        .get();
-
-      if (!interestedProfile.exists) {
-        notificationsSkipped++;
-        continue;
-      }
-
-      const interestedProfileData = interestedProfile.data();
-      const recipientUid = interestedProfileData.uid;
-
-      if (!recipientUid) {
-        notificationsSkipped++;
-        continue;
-      }
-
-      // Verificar bloqueio entre autor e interessado
-      const isBlocked = await isBlockedByProfile(
-        authorProfileId,
-        interestedProfileId,
-        `postUpdated:${postId}`,
-      );
-
-      if (isBlocked) {
-        console.log(
-          `🚫 [POST_UPDATED] Bloqueio detectado, não notificando ${interestedProfileId}`,
-        );
-        notificationsSkipped++;
-        continue;
-      }
-
-      // Verificar se já existe notificação recente de update para este post/interessado
-      const recentNotification = await db
-        .collection("notifications")
-        .where("recipientProfileId", "==", interestedProfileId)
-        .where("type", "==", "postUpdated")
-        .where("actionData.postId", "==", postId)
-        .where("read", "==", false)
-        .limit(1)
-        .get();
-
-      if (!recentNotification.empty) {
-        // Atualizar notificação existente ao invés de criar nova
-        await recentNotification.docs[0].ref.update({
-          body: updateBody,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        console.log(
-          `📝 [POST_UPDATED] Notificação atualizada para ${interestedProfileId}`,
-        );
-        notificationsCreated++;
-        continue;
-      }
-
-      // Criar nova notificação
-      await db.collection("notifications").add({
-        recipientProfileId: interestedProfileId,
-        recipientUid: recipientUid,
-        profileUid: interestedProfileId, // Legacy
-        type: "postUpdated",
-        priority: "medium",
-        title: "Post atualizado!",
-        body: updateBody,
-        actionType: "viewPost",
-        actionData: {
-          postId: postId,
-          postType: postType,
-          city: postCity,
-          authorProfileId: authorProfileId,
-          authorName: authorName,
-        },
-        senderName: authorName,
-        senderUsername: authorUsername,
-        senderPhoto: after.authorPhotoUrl || null,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        read: false,
-        expiresAt: admin.firestore.Timestamp.fromDate(
-          new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 dias
-        ),
-      });
-
-      // Enviar push notification
-      await sendPushToProfile(
-        interestedProfileId,
-        recipientUid,
-        {
-          title: "Post atualizado!",
-          body: updateBody,
-        },
-        {
-          type: "postUpdated",
-          postId: postId,
-          authorProfileId: authorProfileId,
-        },
-      );
-
-      notificationsCreated++;
-    }
-
-    console.log(
-      `📝 [POST_UPDATED] Concluído: ${notificationsCreated} notificações, ${notificationsSkipped} puladas`,
-    );
 
     return null;
   });
@@ -1703,11 +1184,11 @@ exports.notifyPostUpdated = functions
  */
 exports.onProfileDelete = functions
   .runWith({
-    memory: "512MB",
+    memory: '512MB',
     timeoutSeconds: 540, // 9 minutos (máximo permitido)
   })
-  .region("southamerica-east1")
-  .firestore.document("profiles/{profileId}")
+  .region('southamerica-east1')
+  .firestore.document('profiles/{profileId}')
   .onDelete(async (snap, context) => {
     const profileId = context.params.profileId;
     const profileData = snap.data();
@@ -1727,8 +1208,8 @@ exports.onProfileDelete = functions
       console.log(`📝 Cleaning up posts for profile ${profileId}...`);
 
       const postsQuery = db
-        .collection("posts")
-        .where("authorProfileId", "==", profileId)
+        .collection('posts')
+        .where('authorProfileId', '==', profileId)
         .limit(500);
 
       let postsSnapshot = await postsQuery.get();
@@ -1751,7 +1232,7 @@ exports.onProfileDelete = functions
         await batch.commit();
         totalPostsDeleted += postsSnapshot.size;
         console.log(
-          `📝 Deleted ${postsSnapshot.size} posts (total: ${totalPostsDeleted})`,
+          `📝 Deleted ${postsSnapshot.size} posts (total: ${totalPostsDeleted})`
         );
 
         // Deletar imagens do Storage
@@ -1762,7 +1243,7 @@ exports.onProfileDelete = functions
             const pathMatch = decodedUrl.match(/\/o\/(.+?)\?/);
 
             if (pathMatch && pathMatch[1]) {
-              const filePath = pathMatch[1].replace(/%2F/g, "/");
+              const filePath = pathMatch[1].replace(/%2F/g, '/');
               const fileRef = admin.storage().bucket().file(filePath);
 
               await fileRef.delete();
@@ -1772,7 +1253,7 @@ exports.onProfileDelete = functions
           } catch (storageError) {
             // Não falhar se imagem já foi deletada ou não existe
             console.warn(
-              `⚠️ Could not delete image ${imageUrl}: ${storageError.message}`,
+              `⚠️ Could not delete image ${imageUrl}: ${storageError.message}`
             );
           }
         }
@@ -1782,7 +1263,7 @@ exports.onProfileDelete = functions
       }
 
       console.log(
-        `✅ Posts cleanup complete: ${totalPostsDeleted} posts, ${totalImagesDeleted} images`,
+        `✅ Posts cleanup complete: ${totalPostsDeleted} posts, ${totalImagesDeleted} images`
       );
 
       // ========================================
@@ -1792,8 +1273,8 @@ exports.onProfileDelete = functions
 
       // Notificações onde o perfil é destinatário
       const recipientNotificationsQuery = db
-        .collection("notifications")
-        .where("recipientProfileId", "==", profileId)
+        .collection('notifications')
+        .where('recipientProfileId', '==', profileId)
         .limit(500);
 
       let notifSnapshot = await recipientNotificationsQuery.get();
@@ -1804,15 +1285,15 @@ exports.onProfileDelete = functions
         await batch.commit();
         totalNotificationsDeleted += notifSnapshot.size;
         console.log(
-          `🔔 Deleted ${notifSnapshot.size} recipient notifications (total: ${totalNotificationsDeleted})`,
+          `🔔 Deleted ${notifSnapshot.size} recipient notifications (total: ${totalNotificationsDeleted})`
         );
         notifSnapshot = await recipientNotificationsQuery.get();
       }
 
       // Notificações onde o perfil é remetente (postAuthorProfileId)
       const senderNotificationsQuery = db
-        .collection("notifications")
-        .where("postAuthorProfileId", "==", profileId)
+        .collection('notifications')
+        .where('postAuthorProfileId', '==', profileId)
         .limit(500);
 
       notifSnapshot = await senderNotificationsQuery.get();
@@ -1823,13 +1304,13 @@ exports.onProfileDelete = functions
         await batch.commit();
         totalNotificationsDeleted += notifSnapshot.size;
         console.log(
-          `🔔 Deleted ${notifSnapshot.size} sender notifications (total: ${totalNotificationsDeleted})`,
+          `🔔 Deleted ${notifSnapshot.size} sender notifications (total: ${totalNotificationsDeleted})`
         );
         notifSnapshot = await senderNotificationsQuery.get();
       }
 
       console.log(
-        `✅ Notifications cleanup complete: ${totalNotificationsDeleted} notifications`,
+        `✅ Notifications cleanup complete: ${totalNotificationsDeleted} notifications`
       );
 
       // ========================================
@@ -1838,8 +1319,8 @@ exports.onProfileDelete = functions
       console.log(`💚 Cleaning up interests for profile ${profileId}...`);
 
       const interestsQuery = db
-        .collection("interests")
-        .where("profileId", "==", profileId)
+        .collection('interests')
+        .where('profileId', '==', profileId)
         .limit(500);
 
       let interestsSnapshot = await interestsQuery.get();
@@ -1850,13 +1331,13 @@ exports.onProfileDelete = functions
         await batch.commit();
         totalInterestsDeleted += interestsSnapshot.size;
         console.log(
-          `💚 Deleted ${interestsSnapshot.size} interests (total: ${totalInterestsDeleted})`,
+          `💚 Deleted ${interestsSnapshot.size} interests (total: ${totalInterestsDeleted})`
         );
         interestsSnapshot = await interestsQuery.get();
       }
 
       console.log(
-        `✅ Interests cleanup complete: ${totalInterestsDeleted} interests`,
+        `✅ Interests cleanup complete: ${totalInterestsDeleted} interests`
       );
 
       // ========================================
@@ -1865,9 +1346,9 @@ exports.onProfileDelete = functions
       console.log(`🔔 Cleaning up FCM tokens for profile ${profileId}...`);
 
       const tokensSnapshot = await db
-        .collection("profiles")
+        .collection('profiles')
         .doc(profileId)
-        .collection("fcmTokens")
+        .collection('fcmTokens')
         .get();
 
       if (!tokensSnapshot.empty) {
@@ -1888,7 +1369,7 @@ exports.onProfileDelete = functions
       console.log(
         `   🔔 FCM tokens deletados: ${
           tokensSnapshot ? tokensSnapshot.size : 0
-        }`,
+        }`
       );
 
       return null;
@@ -1921,11 +1402,11 @@ exports.onProfileDelete = functions
  */
 exports.onReportCreated = functions
   .runWith({
-    memory: "256MB",
+    memory: '256MB',
     timeoutSeconds: 30,
   })
-  .region("southamerica-east1")
-  .firestore.document("reports/{reportId}")
+  .region('southamerica-east1')
+  .firestore.document('reports/{reportId}')
   .onCreate(async (snap, context) => {
     const report = snap.data();
     const reportId = context.params.reportId;
@@ -1938,49 +1419,49 @@ exports.onReportCreated = functions
       // Determinar tipo de conteúdo reportado
       const isPostReport = !!report.reportedPostId;
       const targetId = report.reportedPostId || report.reportedProfileId;
-      const targetType = isPostReport ? "post" : "perfil";
+      const targetType = isPostReport ? 'post' : 'perfil';
 
       // Buscar informações adicionais sobre o conteúdo reportado
       let targetInfo = {};
       if (isPostReport) {
-        const postDoc = await db.collection("posts").doc(targetId).get();
+        const postDoc = await db.collection('posts').doc(targetId).get();
         if (postDoc.exists) {
           const postData = postDoc.data();
           targetInfo = {
-            authorName: postData.authorName || "Desconhecido",
+            authorName: postData.authorName || 'Desconhecido',
             authorProfileId: postData.authorProfileId,
-            content: postData.content?.substring(0, 100) || "",
-            city: postData.city || "",
+            content: postData.content?.substring(0, 100) || '',
+            city: postData.city || '',
           };
         }
       } else {
-        const profileDoc = await db.collection("profiles").doc(targetId).get();
+        const profileDoc = await db.collection('profiles').doc(targetId).get();
         if (profileDoc.exists) {
           const profileData = profileDoc.data();
           targetInfo = {
-            name: profileData.name || "Desconhecido",
-            username: profileData.username || "",
-            city: profileData.city || "",
+            name: profileData.name || 'Desconhecido',
+            username: profileData.username || '',
+            city: profileData.city || '',
           };
         }
       }
 
       // Contar reports anteriores para este conteúdo (para priorização)
       const reportCountField = isPostReport
-        ? "reportedPostId"
-        : "reportedProfileId";
+        ? 'reportedPostId'
+        : 'reportedProfileId';
       const previousReports = await db
-        .collection("reports")
-        .where(reportCountField, "==", targetId)
-        .where("status", "==", "pending")
+        .collection('reports')
+        .where(reportCountField, '==', targetId)
+        .where('status', '==', 'pending')
         .count()
         .get();
 
       const totalReports = previousReports.data().count || 1;
 
       // Criar notificação para dashboard admin
-      await db.collection("adminNotifications").add({
-        type: "new_report",
+      await db.collection('adminNotifications').add({
+        type: 'new_report',
         reportId: reportId,
         targetType: targetType,
         targetId: targetId,
@@ -1990,7 +1471,7 @@ exports.onReportCreated = functions
         totalReports: totalReports,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
         read: false,
-        priority: totalReports >= 3 ? "high" : "normal", // Prioridade alta se 3+ reports
+        priority: totalReports >= 3 ? 'high' : 'normal', // Prioridade alta se 3+ reports
       });
 
       console.log(`✅ Admin notification criada para report ${reportId}`);
@@ -2001,51 +1482,51 @@ exports.onReportCreated = functions
       // ✅ ENVIAR EMAIL PARA TODA DENÚNCIA
       // Enviar email via SendGrid para contato@wegig.com.br
       try {
-        const sgMail = require("@sendgrid/mail");
+        const sgMail = require('@sendgrid/mail');
         const sendgridKey = functions.config().sendgrid?.key;
 
         if (sendgridKey) {
           sgMail.setApiKey(sendgridKey);
 
           // Determinar prioridade e assunto baseado no número de denúncias
-          let priority = "normal";
-          let subjectPrefix = "📢 Nova Denúncia";
+          let priority = 'normal';
+          let subjectPrefix = '📢 Nova Denúncia';
           if (totalReports >= 5) {
-            priority = "urgente";
-            subjectPrefix = "🚨 URGENTE - Múltiplas Denúncias";
+            priority = 'urgente';
+            subjectPrefix = '🚨 URGENTE - Múltiplas Denúncias';
           } else if (totalReports >= 3) {
-            priority = "alta";
-            subjectPrefix = "⚠️ ALERTA - Denúncias Recorrentes";
+            priority = 'alta';
+            subjectPrefix = '⚠️ ALERTA - Denúncias Recorrentes';
           }
 
           // Buscar informações do denunciante
-          let reporterInfo = { name: "Desconhecido", email: "" };
+          let reporterInfo = { name: 'Desconhecido', email: '' };
           try {
             const reporterProfiles = await db
-              .collection("profiles")
-              .where("uid", "==", report.reporterUid)
+              .collection('profiles')
+              .where('uid', '==', report.reporterUid)
               .limit(1)
               .get();
             if (!reporterProfiles.empty) {
               const reporterData = reporterProfiles.docs[0].data();
               reporterInfo = {
-                name: reporterData.name || "Desconhecido",
-                username: reporterData.username || "",
+                name: reporterData.name || 'Desconhecido',
+                username: reporterData.username || '',
                 profileId: reporterProfiles.docs[0].id,
               };
             }
           } catch (e) {
-            console.warn("Não foi possível buscar dados do denunciante:", e);
+            console.warn('Não foi possível buscar dados do denunciante:', e);
           }
 
           const emailData = {
-            to: "contato@wegig.com.br",
+            to: 'contato@wegig.com.br',
             from: {
-              email: "noreply@wegig.com.br",
-              name: "WeGig - Sistema de Denúncias",
+              email: 'noreply@wegig.com.br',
+              name: 'WeGig - Sistema de Denúncias',
             },
             subject: `${subjectPrefix} - ${
-              targetType === "post" ? "Post" : "Perfil"
+              targetType === 'post' ? 'Post' : 'Perfil'
             } #${targetId.substring(0, 8)}`,
             html: `
               <!DOCTYPE html>
@@ -2060,17 +1541,17 @@ exports.onReportCreated = functions
                   <div style="background: linear-gradient(135deg, #E47911 0%, #c96a0f 100%); padding: 25px; text-align: center;">
                     <h1 style="color: white; margin: 0; font-size: 24px;">
                       ${
-                        priority === "urgente"
-                          ? "🚨"
-                          : priority === "alta"
-                            ? "⚠️"
-                            : "📢"
+                        priority === 'urgente'
+                          ? '🚨'
+                          : priority === 'alta'
+                          ? '⚠️'
+                          : '📢'
                       } 
                       Nova Denúncia Recebida
                     </h1>
                     <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0;">
-                      ${new Date().toLocaleString("pt-BR", {
-                        timeZone: "America/Sao_Paulo",
+                      ${new Date().toLocaleString('pt-BR', {
+                        timeZone: 'America/Sao_Paulo',
                       })}
                     </p>
                   </div>
@@ -2080,17 +1561,17 @@ exports.onReportCreated = functions
                     totalReports > 1
                       ? `
                   <div style="background: ${
-                    priority === "urgente"
-                      ? "#dc3545"
-                      : priority === "alta"
-                        ? "#fd7e14"
-                        : "#17a2b8"
+                    priority === 'urgente'
+                      ? '#dc3545'
+                      : priority === 'alta'
+                      ? '#fd7e14'
+                      : '#17a2b8'
                   }; 
                        color: white; text-align: center; padding: 10px; font-weight: bold;">
                     ${totalReports} DENÚNCIA(S) PENDENTE(S) PARA ESTE ${targetType.toUpperCase()}
                   </div>
                   `
-                      : ""
+                      : ''
                   }
                   
                   <!-- Conteúdo -->
@@ -2106,7 +1587,7 @@ exports.onReportCreated = functions
                         <tr>
                           <td style="padding: 8px 0; color: #666;"><strong>Tipo:</strong></td>
                           <td style="padding: 8px 0; color: #333;">${
-                            targetType === "post" ? "📝 Post" : "👤 Perfil"
+                            targetType === 'post' ? '📝 Post' : '👤 Perfil'
                           }</td>
                         </tr>
                         <tr>
@@ -2127,7 +1608,7 @@ exports.onReportCreated = functions
                           <td style="padding: 8px 0; color: #333;">${report.description}</td>
                         </tr>
                         `
-                            : ""
+                            : ''
                         }
                       </table>
                     </div>
@@ -2136,31 +1617,31 @@ exports.onReportCreated = functions
                     <div style="background: #fff3e6; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #fd7e14;">
                       <h3 style="margin: 0 0 15px; color: #333;">
                         ${
-                          targetType === "post"
-                            ? "📝 Informações do Post"
-                            : "👤 Informações do Perfil"
+                          targetType === 'post'
+                            ? '📝 Informações do Post'
+                            : '👤 Informações do Perfil'
                         }
                       </h3>
                       <table style="width: 100%; border-collapse: collapse;">
                         ${
-                          targetType === "post"
+                          targetType === 'post'
                             ? `
                         <tr>
                           <td style="padding: 8px 0; color: #666; width: 140px;"><strong>Autor:</strong></td>
                           <td style="padding: 8px 0; color: #333;">${
-                            targetInfo.authorName || "N/A"
+                            targetInfo.authorName || 'N/A'
                           }</td>
                         </tr>
                         <tr>
                           <td style="padding: 8px 0; color: #666;"><strong>ID do Perfil:</strong></td>
                           <td style="padding: 8px 0; color: #333; font-family: monospace;">${
-                            targetInfo.authorProfileId || "N/A"
+                            targetInfo.authorProfileId || 'N/A'
                           }</td>
                         </tr>
                         <tr>
                           <td style="padding: 8px 0; color: #666;"><strong>Cidade:</strong></td>
                           <td style="padding: 8px 0; color: #333;">${
-                            targetInfo.city || "N/A"
+                            targetInfo.city || 'N/A'
                           }</td>
                         </tr>
                         ${
@@ -2171,30 +1652,30 @@ exports.onReportCreated = functions
                           <td style="padding: 8px 0; color: #333;">"${
                             targetInfo.content
                           }${
-                            targetInfo.content.length >= 100 ? "..." : ""
-                          }"</td>
+                                targetInfo.content.length >= 100 ? '...' : ''
+                              }"</td>
                         </tr>
                         `
-                            : ""
+                            : ''
                         }
                         `
                             : `
                         <tr>
                           <td style="padding: 8px 0; color: #666; width: 140px;"><strong>Nome:</strong></td>
                           <td style="padding: 8px 0; color: #333;">${
-                            targetInfo.name || "N/A"
+                            targetInfo.name || 'N/A'
                           }</td>
                         </tr>
                         <tr>
                           <td style="padding: 8px 0; color: #666;"><strong>Username:</strong></td>
                           <td style="padding: 8px 0; color: #333;">@${
-                            targetInfo.username || "N/A"
+                            targetInfo.username || 'N/A'
                           }</td>
                         </tr>
                         <tr>
                           <td style="padding: 8px 0; color: #666;"><strong>Cidade:</strong></td>
                           <td style="padding: 8px 0; color: #333;">${
-                            targetInfo.city || "N/A"
+                            targetInfo.city || 'N/A'
                           }</td>
                         </tr>
                         `
@@ -2220,7 +1701,7 @@ exports.onReportCreated = functions
                           <td style="padding: 8px 0; color: #333;">@${reporterInfo.username}</td>
                         </tr>
                         `
-                            : ""
+                            : ''
                         }
                         <tr>
                           <td style="padding: 8px 0; color: #666;"><strong>UID Firebase:</strong></td>
@@ -2236,7 +1717,7 @@ exports.onReportCreated = functions
                           <td style="padding: 8px 0; color: #333; font-family: monospace; font-size: 12px;">${reporterInfo.profileId}</td>
                         </tr>
                         `
-                            : ""
+                            : ''
                         }
                       </table>
                     </div>
@@ -2267,25 +1748,25 @@ exports.onReportCreated = functions
 
           await sgMail.send(emailData);
           console.log(
-            `📧 Email de denúncia enviado para contato@wegig.com.br - Report: ${reportId}`,
+            `📧 Email de denúncia enviado para contato@wegig.com.br - Report: ${reportId}`
           );
         } else {
           console.warn(
-            "⚠️ SendGrid key não configurada - pulando envio de email",
+            '⚠️ SendGrid key não configurada - pulando envio de email'
           );
           console.log(
-            "   Para configurar: firebase functions:config:set sendgrid.key='SUA_API_KEY'",
+            '   Para configurar: firebase functions:config:set sendgrid.key=\'SUA_API_KEY\''
           );
         }
       } catch (emailError) {
-        console.error("❌ Erro ao enviar email via SendGrid:", emailError);
+        console.error('❌ Erro ao enviar email via SendGrid:', emailError);
         // Não falhar a função por erro de email
       }
 
       // Log adicional para monitoramento de denúncias recorrentes
       if (totalReports >= 3) {
         console.log(
-          `⚠️ ATENÇÃO: ${targetType} ${targetId} tem ${totalReports} denúncias pendentes!`,
+          `⚠️ ATENÇÃO: ${targetType} ${targetId} tem ${totalReports} denúncias pendentes!`
         );
       }
 
@@ -2314,14 +1795,14 @@ exports.onReportCreated = functions
  */
 exports.onUserDelete = functions
   .runWith({
-    memory: "512MB",
+    memory: '512MB',
     timeoutSeconds: 540,
   })
-  .region("southamerica-east1")
+  .region('southamerica-east1')
   .auth.user()
   .onDelete(async (user) => {
     const uid = user.uid;
-    const email = user.email || "unknown";
+    const email = user.email || 'unknown';
 
     console.log(`🗑️ User deleted from Firebase Auth: ${uid} (${email})`);
     console.log(`🧹 Starting cleanup for user ${uid}...`);
@@ -2334,11 +1815,11 @@ exports.onUserDelete = functions
       // 1. DELETAR DOCUMENTO users/{uid}
       console.log(`📄 Deleting user document for ${uid}...`);
       try {
-        await db.collection("users").doc(uid).delete();
+        await db.collection('users').doc(uid).delete();
         console.log(`✅ User document deleted`);
       } catch (userDocError) {
         console.warn(
-          `⚠️ Could not delete user document: ${userDocError.message}`,
+          `⚠️ Could not delete user document: ${userDocError.message}`
         );
       }
 
@@ -2346,8 +1827,8 @@ exports.onUserDelete = functions
       console.log(`👤 Finding and deleting profiles for user ${uid}...`);
 
       const profilesQuery = db
-        .collection("profiles")
-        .where("uid", "==", uid)
+        .collection('profiles')
+        .where('uid', '==', uid)
         .limit(100);
       let profilesSnapshot = await profilesQuery.get();
 
@@ -2359,21 +1840,21 @@ exports.onUserDelete = functions
         await batch.commit();
         totalProfilesDeleted += profilesSnapshot.size;
         console.log(
-          `👤 Deleted ${profilesSnapshot.size} profiles (total: ${totalProfilesDeleted})`,
+          `👤 Deleted ${profilesSnapshot.size} profiles (total: ${totalProfilesDeleted})`
         );
         profilesSnapshot = await profilesQuery.get();
       }
 
       console.log(
-        `✅ Profile cleanup complete: ${totalProfilesDeleted} profiles deleted`,
+        `✅ Profile cleanup complete: ${totalProfilesDeleted} profiles deleted`
       );
 
       // 3. LIMPAR CONVERSAS ÓRFÃS
       console.log(`💬 Cleaning up conversations for user ${uid}...`);
 
       const conversationsQuery = db
-        .collection("conversations")
-        .where("participants", "array-contains", uid)
+        .collection('conversations')
+        .where('participants', 'array-contains', uid)
         .limit(500);
       let conversationsSnapshot = await conversationsQuery.get();
 
@@ -2381,7 +1862,7 @@ exports.onUserDelete = functions
         const batch = db.batch();
         for (const doc of conversationsSnapshot.docs) {
           const messagesSnapshot = await doc.ref
-            .collection("messages")
+            .collection('messages')
             .limit(500)
             .get();
           messagesSnapshot.docs.forEach((msgDoc) => {
@@ -2392,21 +1873,21 @@ exports.onUserDelete = functions
         await batch.commit();
         totalConversationsDeleted += conversationsSnapshot.size;
         console.log(
-          `💬 Deleted ${conversationsSnapshot.size} conversations (total: ${totalConversationsDeleted})`,
+          `💬 Deleted ${conversationsSnapshot.size} conversations (total: ${totalConversationsDeleted})`
         );
         conversationsSnapshot = await conversationsQuery.get();
       }
 
       console.log(
-        `✅ Conversation cleanup complete: ${totalConversationsDeleted} conversations deleted`,
+        `✅ Conversation cleanup complete: ${totalConversationsDeleted} conversations deleted`
       );
 
       // 4. LIMPAR INTERESSES CRIADOS PELO USUÁRIO
       console.log(`❤️ Cleaning up interests created by user ${uid}...`);
 
       const interestsQuery = db
-        .collection("interests")
-        .where("interestedUid", "==", uid)
+        .collection('interests')
+        .where('interestedUid', '==', uid)
         .limit(500);
       let interestsSnapshot = await interestsQuery.get();
 
@@ -2418,22 +1899,22 @@ exports.onUserDelete = functions
         await batch.commit();
         totalInterestsDeleted += interestsSnapshot.size;
         console.log(
-          `❤️ Deleted ${interestsSnapshot.size} interests (total: ${totalInterestsDeleted})`,
+          `❤️ Deleted ${interestsSnapshot.size} interests (total: ${totalInterestsDeleted})`
         );
         interestsSnapshot = await interestsQuery.get();
       }
 
       console.log(
-        `✅ Interest cleanup complete: ${totalInterestsDeleted} interests deleted`,
+        `✅ Interest cleanup complete: ${totalInterestsDeleted} interests deleted`
       );
 
       // 5. LIMPAR RATE LIMITS
       console.log(`⏱️ Cleaning up rate limits for user ${uid}...`);
 
       const rateLimitsQuery = db
-        .collection("rateLimits")
-        .where(admin.firestore.FieldPath.documentId(), ">=", `${uid}_`)
-        .where(admin.firestore.FieldPath.documentId(), "<", `${uid}_~`)
+        .collection('rateLimits')
+        .where(admin.firestore.FieldPath.documentId(), '>=', `${uid}_`)
+        .where(admin.firestore.FieldPath.documentId(), '<', `${uid}_~`)
         .limit(100);
 
       const rateLimitsSnapshot = await rateLimitsQuery.get();
@@ -2454,7 +1935,7 @@ exports.onUserDelete = functions
       console.log(`   - Conversations deleted: ${totalConversationsDeleted}`);
       console.log(`   - Interests deleted: ${totalInterestsDeleted}`);
       console.log(
-        `   - Note: Posts and storage were cleaned by onProfileDelete triggers`,
+        `   - Note: Posts and storage were cleaned by onProfileDelete triggers`
       );
 
       return null;

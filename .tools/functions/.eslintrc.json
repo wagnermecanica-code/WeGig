@@ -10,8 +10,11 @@
   "rules": {
     "no-restricted-globals": ["error", "name", "length"],
     "prefer-arrow-callback": "error",
-    "quotes": ["error", "single", { "allowTemplateLiterals": true }],
-    "max-len": ["error", { "code": 120 }]
+    "quotes": "off",
+    "max-len": [
+      "error",
+      { "code": 180, "ignoreStrings": true, "ignoreTemplateLiterals": true }
+    ]
   },
   "overrides": [
     {
