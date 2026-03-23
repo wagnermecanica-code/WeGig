@@ -54,7 +54,7 @@ class PostFormFields extends StatelessWidget {
           validator: descriptionValidator,
           decoration: InputDecoration(
             labelText: 'Descrição',
-            hintText: 'Conte mais sobre o projeto, influências, objetivos...',
+            hintText: 'Conte mais sobre o projeto, objetivos, expectativas, etc...',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),

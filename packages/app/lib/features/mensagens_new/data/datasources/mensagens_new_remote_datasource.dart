@@ -55,6 +55,14 @@ abstract class IMensagensNewRemoteDataSource {
     String? senderPhotoUrl,
     MessageReplyData? replyTo,
   });
+  Future<MessageNewEntity> sendSharedPostMessage({
+    required String conversationId,
+    required String senderId,
+    required String senderProfileId,
+    required Map<String, dynamic> postData,
+    String? senderName,
+    String? senderPhotoUrl,
+  });
   Future<void> editMessage(String conversationId, String messageId, String newText);
   Future<void> deleteMessageForMe(String conversationId, String messageId, String profileId);
   Future<void> deleteMessageForEveryone(String conversationId, String messageId);
@@ -69,6 +77,12 @@ abstract class IMensagensNewRemoteDataSource {
   Future<void> updateMessageStatus(String conversationId, String messageId, MessageDeliveryStatus status);
   Future<void> updateTypingIndicator(String conversationId, String profileId, bool isTyping);
   Future<int> getUnreadCount(String profileId, String profileUid);
+
+  // Status para grupos
+  /// Marca mensagens como recebidas por um perfil em um grupo
+  Future<void> markGroupMessagesAsReceived(String conversationId, String profileId);
+  /// Marca mensagens como lidas por um perfil em um grupo
+  Future<void> markGroupMessagesAsRead(String conversationId, String profileId);
 
   // Streams
   Stream<List<ConversationNewEntity>> watchConversations({
@@ -110,6 +124,99 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
   // CONVERSAS
   // ============================================
 
+  /// Inferir e normalizar o tipo de conversa para dados legados.
+  ///
+  /// Regra canônica:
+  /// - conversationType: 'group' | 'direct'
+  ///
+  /// Compatibilidade (legado):
+  /// - Se isGroup=true OU participantProfiles.length>2 OU groupName preenchido => group
+  /// - Caso contrário => direct
+  String _inferConversationType(Map<String, dynamic> data) {
+    final conversationType = data['conversationType'] as String?;
+    if (conversationType == 'group' || conversationType == 'direct') {
+      return conversationType!;
+    }
+
+    final participantProfiles =
+        (data['participantProfiles'] as List<dynamic>?)?.cast<String>() ?? const <String>[];
+    final explicitIsGroup = data['isGroup'] as bool?;
+    final groupName = data['groupName'] as String?;
+
+    final inferredIsGroup = (explicitIsGroup ?? false) ||
+        participantProfiles.length > 2 ||
+        (groupName != null && groupName.trim().isNotEmpty);
+
+    return inferredIsGroup ? 'group' : 'direct';
+  }
+
+  /// Gera updates para normalizar conversa legada; retorna null se não precisa.
+  Map<String, dynamic>? _getLegacyConversationNormalizationUpdates(
+    Map<String, dynamic> data,
+  ) {
+    final desiredType = _inferConversationType(data);
+
+    final currentType = data['conversationType'] as String?;
+    final explicitIsGroup = data['isGroup'] as bool?;
+
+    final updates = <String, dynamic>{};
+
+    if (currentType != desiredType) {
+      updates['conversationType'] = desiredType;
+    }
+
+    final desiredIsGroup = desiredType == 'group';
+    if (explicitIsGroup != desiredIsGroup) {
+      updates['isGroup'] = desiredIsGroup;
+    }
+
+    // Se for direct, limpar campos específicos de grupo que causam confusão
+    if (!desiredIsGroup) {
+      if (data['groupName'] != null) updates['groupName'] = FieldValue.delete();
+      if (data['groupPhotoUrl'] != null) updates['groupPhotoUrl'] = FieldValue.delete();
+    }
+
+    return updates.isEmpty ? null : updates;
+  }
+
+  Future<void> _normalizeLegacyConversationsIfNeeded({
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    required String profileId,
+  }) async {
+    // Atualiza apenas conversas do perfil atual (por participantProfiles)
+    // para evitar writes desnecessários em conversas que não pertencem ao perfil.
+    final batch = _firestore.batch();
+    var updatesCount = 0;
+
+    for (final doc in docs) {
+      if (updatesCount >= 20) break; // Evita batch enorme em um único snapshot
+
+      final data = doc.data();
+      final participantProfiles =
+          (data['participantProfiles'] as List<dynamic>?)?.cast<String>() ?? const <String>[];
+      if (!participantProfiles.contains(profileId)) continue;
+
+      final updates = _getLegacyConversationNormalizationUpdates(data);
+      if (updates == null) continue;
+
+      batch.update(doc.reference, {
+        ...updates,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      updatesCount++;
+    }
+
+    if (updatesCount == 0) return;
+
+    try {
+      await batch.commit();
+      debugPrint('🧹 MensagensNewDS: Normalizadas $updatesCount conversas legadas');
+    } catch (e) {
+      // Best-effort: se falhar (rules/offline), não quebra a UI.
+      debugPrint('⚠️ MensagensNewDS: Falha ao normalizar conversas legadas: $e');
+    }
+  }
+
   @override
   Future<List<ConversationNewEntity>> getConversations({
     required String profileId,
@@ -127,6 +234,12 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
           .limit(limit * 2); // Aumentar para compensar filtro client-side
 
       final snapshot = await query.get();
+
+      // Best-effort: normaliza conversas legadas para evitar confusão de tipo.
+      await _normalizeLegacyConversationsIfNeeded(
+        docs: snapshot.docs,
+        profileId: profileId,
+      );
 
       // Filtro client-side para garantir que é o perfil correto
       var conversations = snapshot.docs
@@ -208,36 +321,67 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
           .get();
 
       for (final doc in snapshot.docs) {
-        final conv = ConversationNewEntity.fromFirestore(doc);
-        // Verificar se é a conversa correta entre os dois perfis
-        if (conv.participantProfiles.contains(currentProfileId) && 
-            conv.participantProfiles.contains(otherProfileId)) {
-          debugPrint('✅ MensagensNewDS: Conversa existente encontrada');
-          
+        final data = doc.data();
+        final participantProfiles =
+            (data['participantProfiles'] as List<dynamic>?)?.cast<String>() ?? [];
+        final participants =
+            (data['participants'] as List<dynamic>?)?.cast<String>() ?? [];
+        final profileUid =
+            (data['profileUid'] as List<dynamic>?)?.cast<String>() ?? [];
+        final rawIsGroup = data['isGroup'] as bool?;
+        final rawGroupName = data['groupName'];
+        final conversationType = data['conversationType'] as String?;
+
+        // Inferir grupo mesmo quando o campo isGroup está ausente (dados legados)
+        final inferredIsGroup = (conversationType == 'group') ||
+          (rawIsGroup ?? false) ||
+          participantProfiles.length > 2 ||
+          (rawGroupName is String && rawGroupName.trim().isNotEmpty);
+
+        // Conversa 1:1 válida: precisa ter exatamente 2 perfis e não ser grupo
+        final is1to1 = !inferredIsGroup && participantProfiles.length == 2;
+
+        if (is1to1 &&
+            participantProfiles.contains(currentProfileId) &&
+            participantProfiles.contains(otherProfileId)) {
+          debugPrint('✅ MensagensNewDS: Conversa 1:1 existente encontrada');
+
           // Desarquivar se estava arquivada
+          final conv = ConversationNewEntity.fromFirestore(doc);
           if (conv.isArchivedForProfile(currentProfileId)) {
             await unarchiveConversation(conv.id, currentProfileId);
           }
 
-          // 🛡️ SECURITY FIX: Garantir que participants e profileUid estão corretos
-          // Isso corrige conversas antigas que podem ter dados inconsistentes
-          final participants = (doc.data()['participants'] as List<dynamic>?)?.cast<String>() ?? [];
-          final profileUid = (doc.data()['profileUid'] as List<dynamic>?)?.cast<String>() ?? [];
-          
-          final needsUpdate = !participants.contains(currentUid) || 
-                            !participants.contains(otherUid) ||
-                            !profileUid.contains(currentUid) ||
-                            !profileUid.contains(otherUid);
+          // 🛡️ Self-healing: corrigir flags e permissões legadas
+          final updates = <String, dynamic>{};
+          final existingConvType = data['conversationType'] as String?;
 
-          if (needsUpdate) {
-             debugPrint('🛡️ MensagensNewDS: Atualizando permissões da conversa (Self-Healing)');
-             await doc.reference.update({
-               'participants': FieldValue.arrayUnion([currentUid, otherUid]),
-               'profileUid': FieldValue.arrayUnion([currentUid, otherUid]),
-             });
+          // Garantir conversationType=direct para 1:1
+          if (existingConvType != 'direct') {
+            updates['conversationType'] = 'direct';
           }
           
-          return conv;
+          // Garantir isGroup=false e remover campos de grupo herdados
+          if (rawIsGroup != false) updates['isGroup'] = false;
+          if (rawGroupName != null) updates['groupName'] = FieldValue.delete();
+          if (data['groupPhotoUrl'] != null) {
+            updates['groupPhotoUrl'] = FieldValue.delete();
+          }
+
+          // Garantir participantes por UID e profileUid consistentes
+          if (!participants.contains(currentUid) || !participants.contains(otherUid)) {
+            updates['participants'] = FieldValue.arrayUnion([currentUid, otherUid]);
+          }
+          if (!profileUid.contains(currentUid) || !profileUid.contains(otherUid)) {
+            updates['profileUid'] = FieldValue.arrayUnion([currentUid, otherUid]);
+          }
+
+          if (updates.isNotEmpty) {
+            debugPrint('🛡️ MensagensNewDS: Self-healing 1:1 (atualizando flags/participantes)');
+            await doc.reference.update(updates);
+          }
+
+          return conv.copyWith(isGroup: false); // garantir flag correta no retorno atual
         }
       }
 
@@ -254,6 +398,7 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
         lastMessageTimestamp: now,
         unreadCount: {currentProfileId: 0, otherProfileId: 0},
         createdAt: now,
+        isGroup: false, // Explicitamente marcar como conversa 1:1
         participantsData: [
           if (currentProfileData != null)
             ParticipantData.fromMap({
@@ -482,6 +627,7 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
         'lastMessage': message.preview,
         'lastMessageTimestamp': Timestamp.fromDate(now),
         'lastMessageSenderId': senderProfileId,
+        'lastMessageStatus': MessageDeliveryStatus.sent.name,
         'updatedAt': FieldValue.serverTimestamp(),
         // ✅ Restaurar conversa para TODOS os participantes ao enviar mensagem
         // Remove do deletedByProfiles para que a conversa "reapareça" como nova
@@ -554,6 +700,7 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
         'lastMessage': message.preview,
         'lastMessageTimestamp': Timestamp.fromDate(now),
         'lastMessageSenderId': senderProfileId,
+        'lastMessageStatus': MessageDeliveryStatus.sent.name,
         'updatedAt': FieldValue.serverTimestamp(),
         // ✅ Restaurar conversa para TODOS os participantes ao enviar imagem
         // Remove do deletedByProfiles para que a conversa "reapareça" como nova
@@ -575,6 +722,81 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
       return message;
     } catch (e) {
       debugPrint('❌ MensagensNewDS: Erro em sendImageMessage - $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<MessageNewEntity> sendSharedPostMessage({
+    required String conversationId,
+    required String senderId,
+    required String senderProfileId,
+    required Map<String, dynamic> postData,
+    String? senderName,
+    String? senderPhotoUrl,
+  }) async {
+    try {
+      debugPrint('📤 MensagensNewDS: sendSharedPostMessage - conv=$conversationId');
+
+      final batch = _firestore.batch();
+      final messageRef = _messagesRef(conversationId).doc();
+      final now = DateTime.now();
+
+      final message = MessageNewEntity(
+        id: messageRef.id,
+        conversationId: conversationId,
+        senderId: senderId,
+        senderProfileId: senderProfileId,
+        senderName: senderName,
+        senderPhotoUrl: senderPhotoUrl,
+        text: '📌 Compartilhou um post',
+        type: MessageType.sharedPost,
+        status: MessageDeliveryStatus.sent,
+        createdAt: now,
+        metadata: postData,
+      );
+
+      batch.set(messageRef, message.toFirestore());
+
+      // Atualizar conversa
+      final convRef = _conversationsRef.doc(conversationId);
+      final convDoc = await convRef.get();
+      final participantProfiles =
+          (convDoc.data()?['participantProfiles'] as List<dynamic>?)
+                  ?.cast<String>() ??
+              [];
+
+      final updates = <String, dynamic>{
+        'lastMessage': message.preview,
+        'lastMessageTimestamp': Timestamp.fromDate(now),
+        'lastMessageSenderId': senderProfileId,
+        'lastMessageStatus': MessageDeliveryStatus.sent.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'deletedByProfiles': <String>[],
+        'archivedByProfiles': <String>[],
+      };
+
+      for (final profileId in participantProfiles) {
+        if (profileId != senderProfileId) {
+          updates['unreadCount.$profileId'] = FieldValue.increment(1);
+        }
+      }
+
+      batch.update(convRef, updates);
+
+      // Incrementar forwardCount no post original
+      final postId = postData['postId'] as String?;
+      if (postId != null && postId.isNotEmpty) {
+        final postRef = _firestore.collection('posts').doc(postId);
+        batch.update(postRef, {'forwardCount': FieldValue.increment(1)});
+      }
+
+      await batch.commit();
+
+      debugPrint('✅ MensagensNewDS: Post compartilhado enviado - id=${messageRef.id}');
+      return message;
+    } catch (e) {
+      debugPrint('❌ MensagensNewDS: Erro em sendSharedPostMessage - $e');
       rethrow;
     }
   }
@@ -685,10 +907,146 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
   Future<void> markAsRead(String conversationId, String profileId) async {
     try {
       debugPrint('👁️ MensagensNewDS: markAsRead - conv=$conversationId');
+      final convRef = _conversationsRef.doc(conversationId);
+      final convSnapshot = await convRef.get();
+      final convData = convSnapshot.data();
+      final isGroup = (convData?['isGroup'] as bool?) ?? false;
+      final lastSenderId = convData?['lastMessageSenderId'] as String?;
 
-      await _conversationsRef.doc(conversationId).update({
+      final updates = <String, dynamic>{
         'unreadCount.$profileId': 0,
-      });
+      };
+
+      // Atualiza indicador de leitura da última mensagem (para o remetente ver o check azul)
+      if (!isGroup && lastSenderId != null && lastSenderId != profileId) {
+        updates['lastMessageStatus'] = MessageDeliveryStatus.read.name;
+      }
+
+      await convRef.update(updates);
+
+      // Mantém consistência com o badge do ícone do app:
+      // A Cloud Function agrega notificações `newMessage` por conversa, então ao
+      // ler a conversa precisamos marcar esse doc como `read: true`.
+      // Best-effort (non-critical): se falhar, o app ainda funciona.
+      try {
+        // 🔒 IMPORTANT (Firestore Rules): queries em `notifications` precisam filtrar por
+        // `recipientUid == auth.uid`. Como este método recebe só `profileId`, resolvemos
+        // o UID via `profiles/{profileId}` (leitura pública permitida).
+        final profileSnap = await _firestore.collection('profiles').doc(profileId).get();
+        final recipientUid = (profileSnap.data()?['uid'] as String?)?.trim();
+
+        if (recipientUid == null || recipientUid.isEmpty) {
+          debugPrint(
+            '⚠️ MensagensNewDS: Não foi possível resolver recipientUid para profileId=$profileId; skip marcar notificação newMessage como lida',
+          );
+        } else {
+          // Evita query com múltiplos filtros (índice composto). Fazemos uma query "barata"
+          // compatível com rules e filtramos client-side.
+          QuerySnapshot<Map<String, dynamic>> unreadSnap;
+          try {
+            unreadSnap = await _firestore
+                .collection('notifications')
+                .where('recipientUid', isEqualTo: recipientUid)
+                .where('read', isEqualTo: false)
+                .limit(100)
+                .get(const GetOptions(source: Source.server));
+          } catch (e) {
+            debugPrint(
+              '⚠️ MensagensNewDS: Falha ao buscar notificações no server; usando cache: $e',
+            );
+            unreadSnap = await _firestore
+                .collection('notifications')
+                .where('recipientUid', isEqualTo: recipientUid)
+                .where('read', isEqualTo: false)
+                .limit(100)
+                .get(const GetOptions(source: Source.cache));
+          }
+
+          final toMarkRead = unreadSnap.docs.where((doc) {
+            final data = doc.data();
+            if ((data['recipientProfileId'] as String?) != profileId) return false;
+            if ((data['type'] as String?) != 'newMessage') return false;
+
+            final payload = data['data'];
+            if (payload is! Map<String, dynamic>) return false;
+            if ((payload['conversationId'] as String?) != conversationId) return false;
+
+            return true;
+          }).toList(growable: false);
+
+          if (toMarkRead.isNotEmpty) {
+            final batch = _firestore.batch();
+            for (final doc in toMarkRead) {
+              batch.update(doc.reference, {'read': true});
+            }
+            await batch.commit();
+            debugPrint(
+              '✅ MensagensNewDS: ${toMarkRead.length} notificação(ões) newMessage marcada(s) como lida (conv=$conversationId)',
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ MensagensNewDS: Falha ao marcar notificação newMessage como lida (non-critical): $e');
+      }
+
+      if (isGroup) {
+        debugPrint('ℹ️ MensagensNewDS: markAsRead ignorou batch (grupo)');
+        return;
+      }
+
+      // Marcar as últimas mensagens recebidas como lidas (para read receipts nos bubbles)
+      final messagesSnapshot = await _messagesRef(conversationId)
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .get();
+
+      debugPrint('📨 MensagensNewDS: Encontradas ${messagesSnapshot.docs.length} mensagens para analisar');
+
+      final batch = _firestore.batch();
+      var updatedCount = 0;
+
+      for (final doc in messagesSnapshot.docs) {
+        final data = doc.data();
+        final senderProfileId =
+            (data['senderProfileId'] as String?) ?? (data['senderId'] as String?) ?? '';
+        final statusStr = (data['status'] as String?) ?? MessageDeliveryStatus.sent.name;
+        final status = MessageDeliveryStatus.values.firstWhere(
+          (e) => e.name == statusStr,
+          orElse: () => MessageDeliveryStatus.sent,
+        );
+
+        debugPrint('📝 MensagensNewDS: msg=${doc.id}, sender=$senderProfileId, currentStatus=$status, myProfileId=$profileId');
+
+        // Apenas mensagens do outro participante precisam ser marcadas como lidas
+        if (senderProfileId == profileId) {
+          debugPrint('   ⏭️ Pulando: sou o remetente');
+          continue;
+        }
+        if (status == MessageDeliveryStatus.read) {
+          debugPrint('   ⏭️ Pulando: já está read');
+          continue;
+        }
+
+        debugPrint('   ✏️ Marcando como read');
+        batch.update(doc.reference, {
+          'status': MessageDeliveryStatus.read.name,
+        });
+
+        updatedCount++;
+        if (updatedCount >= 20) break; // evitar batches muito grandes
+      }
+
+      if (updatedCount > 0) {
+        try {
+          await batch.commit();
+          debugPrint('✅ MensagensNewDS: $updatedCount mensagens marcadas como lidas (status=read)');
+        } catch (batchError) {
+          debugPrint('❌ MensagensNewDS: Erro ao commit batch de status read - $batchError');
+          // Não propagar - atualização de read receipt não é crítica
+        }
+      } else {
+        debugPrint('ℹ️ MensagensNewDS: Nenhuma mensagem precisou ser marcada como lida');
+      }
 
       debugPrint('✅ MensagensNewDS: Conversa marcada como lida');
     } catch (e) {
@@ -710,6 +1068,165 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
     } catch (e) {
       debugPrint('❌ MensagensNewDS: Erro em markAsUnread - $e');
       rethrow;
+    }
+  }
+
+  @override
+  Future<void> markGroupMessagesAsReceived(String conversationId, String profileId) async {
+    try {
+      debugPrint('📥 MensagensNewDS: markGroupMessagesAsReceived - conv=$conversationId, profile=$profileId');
+
+      // Buscar últimas mensagens que não são do próprio usuário
+      final messagesSnapshot = await _messagesRef(conversationId)
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .get();
+
+      final batch = _firestore.batch();
+      var updatedCount = 0;
+
+      for (final doc in messagesSnapshot.docs) {
+        final data = doc.data();
+        final senderProfileId = (data['senderProfileId'] as String?) ?? '';
+        
+        // Pular mensagens próprias
+        if (senderProfileId == profileId) continue;
+        
+        // Verificar se já está na lista de receivedBy
+        final receivedBy = (data['receivedBy'] as List<dynamic>?)?.cast<String>() ?? [];
+        if (receivedBy.contains(profileId)) continue;
+
+        // Adicionar profileId à lista receivedBy
+        batch.update(doc.reference, {
+          'receivedBy': FieldValue.arrayUnion([profileId]),
+        });
+        updatedCount++;
+        
+        if (updatedCount >= 20) break; // Limitar batch
+      }
+
+      if (updatedCount > 0) {
+        await batch.commit();
+        debugPrint('✅ MensagensNewDS: $updatedCount mensagens marcadas como recebidas pelo perfil $profileId');
+      } else {
+        debugPrint('ℹ️ MensagensNewDS: Nenhuma mensagem precisou ser marcada como recebida');
+      }
+    } catch (e) {
+      debugPrint('❌ MensagensNewDS: Erro em markGroupMessagesAsReceived - $e');
+      // Não propagar - não é crítico
+    }
+  }
+
+  @override
+  Future<void> markGroupMessagesAsRead(String conversationId, String profileId) async {
+    try {
+      debugPrint('👁️ MensagensNewDS: markGroupMessagesAsRead - conv=$conversationId, profile=$profileId');
+
+      // Primeiro atualiza o unreadCount
+      await _conversationsRef.doc(conversationId).update({
+        'unreadCount.$profileId': 0,
+      });
+
+      // Buscar últimas mensagens que não são do próprio usuário
+      final messagesSnapshot = await _messagesRef(conversationId)
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .get();
+
+      final batch = _firestore.batch();
+      var updatedCount = 0;
+
+      for (final doc in messagesSnapshot.docs) {
+        final data = doc.data();
+        final senderProfileId = (data['senderProfileId'] as String?) ?? '';
+        
+        // Pular mensagens próprias
+        if (senderProfileId == profileId) continue;
+        
+        // Verificar se já está na lista de readBy
+        final readBy = (data['readBy'] as List<dynamic>?)?.cast<String>() ?? [];
+        if (readBy.contains(profileId)) continue;
+
+        // Adicionar profileId às listas receivedBy e readBy (read implica received)
+        batch.update(doc.reference, {
+          'receivedBy': FieldValue.arrayUnion([profileId]),
+          'readBy': FieldValue.arrayUnion([profileId]),
+        });
+        updatedCount++;
+        
+        if (updatedCount >= 20) break; // Limitar batch
+      }
+
+      if (updatedCount > 0) {
+        await batch.commit();
+        debugPrint('✅ MensagensNewDS: $updatedCount mensagens marcadas como lidas pelo perfil $profileId');
+        
+        // Atualizar lastMessageStatus se todas as mensagens foram lidas
+        // Busca a conversa para verificar se todos leram
+        await _updateGroupLastMessageStatus(conversationId);
+      } else {
+        debugPrint('ℹ️ MensagensNewDS: Nenhuma mensagem precisou ser marcada como lida no grupo');
+      }
+    } catch (e) {
+      debugPrint('❌ MensagensNewDS: Erro em markGroupMessagesAsRead - $e');
+      // Não propagar - não é crítico
+    }
+  }
+
+  /// Atualiza o lastMessageStatus da conversa de grupo baseado em quem leu/recebeu
+  Future<void> _updateGroupLastMessageStatus(String conversationId) async {
+    try {
+      final convSnapshot = await _conversationsRef.doc(conversationId).get();
+      final convData = convSnapshot.data();
+      if (convData == null) return;
+
+      final participantProfiles = (convData['participantProfiles'] as List<dynamic>?)?.cast<String>() ?? [];
+      final lastSenderId = convData['lastMessageSenderId'] as String?;
+      
+      if (lastSenderId == null || participantProfiles.length < 2) return;
+
+      // IDs dos outros participantes (exceto o remetente)
+      final otherParticipants = participantProfiles.where((id) => id != lastSenderId).toList();
+      if (otherParticipants.isEmpty) return;
+
+      // Buscar última mensagem
+      final lastMessageSnapshot = await _messagesRef(conversationId)
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
+
+      if (lastMessageSnapshot.docs.isEmpty) return;
+
+      final lastMessageData = lastMessageSnapshot.docs.first.data();
+      final readBy = (lastMessageData['readBy'] as List<dynamic>?)?.cast<String>() ?? [];
+      final receivedBy = (lastMessageData['receivedBy'] as List<dynamic>?)?.cast<String>() ?? [];
+
+      // Verifica se TODOS os outros participantes leram
+      final allRead = otherParticipants.every((id) => readBy.contains(id));
+      if (allRead) {
+        await _conversationsRef.doc(conversationId).update({
+          'lastMessageStatus': MessageDeliveryStatus.read.name,
+        });
+        debugPrint('✅ MensagensNewDS: lastMessageStatus atualizado para read (todos leram)');
+        return;
+      }
+
+      // Verifica se TODOS os outros participantes receberam
+      final allReceived = otherParticipants.every((id) => receivedBy.contains(id));
+      if (allReceived) {
+        await _conversationsRef.doc(conversationId).update({
+          'lastMessageStatus': MessageDeliveryStatus.delivered.name,
+        });
+        debugPrint('✅ MensagensNewDS: lastMessageStatus atualizado para delivered (todos receberam)');
+        return;
+      }
+
+      // Se nem todos receberam, mantém como sent
+      await _conversationsRef.doc(conversationId).update({
+        'lastMessageStatus': MessageDeliveryStatus.sent.name,
+      });
+    } catch (e) {
+      debugPrint('⚠️ MensagensNewDS: Erro ao atualizar lastMessageStatus do grupo - $e');
     }
   }
 
@@ -807,13 +1324,24 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
 
     // IMPORTANTE: Query por UID (participants) para satisfazer as security rules do Firestore
     // As regras verificam: request.auth.uid in resource.data.participants
+    // Buscamos mais resultados que o limite para evitar perda de 1:1
+    // após filtros client-side (arquivadas/deletadas/bloqueios).
+    final fetchLimit = limit * 5;
+
     return _conversationsRef
-        .where('participants', arrayContains: profileUid)
-        .orderBy('lastMessageTimestamp', descending: true)
-        .limit(limit * 2)
+      .where('participants', arrayContains: profileUid)
+      .orderBy('lastMessageTimestamp', descending: true)
+      .limit(fetchLimit)
         .snapshots()
         .asyncMap((snapshot) async {
       debugPrint('📨 MensagensNewDS: watchConversations snapshot com ${snapshot.docs.length} docs');
+
+      // Best-effort: normaliza conversas legadas para reduzir conflitos grupo vs 1:1.
+      // Isso roda uma vez por conversa (após normalizar, não haverá novo update).
+      await _normalizeLegacyConversationsIfNeeded(
+        docs: snapshot.docs,
+        profileId: profileId,
+      );
       
       var conversations = snapshot.docs
           .where((doc) {
@@ -836,7 +1364,6 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
               return !conv.isArchivedForProfile(profileId);
             }
           })
-          .take(limit)
           .toList();
 
       // Ordenar: fixadas primeiro, depois por timestamp
@@ -847,6 +1374,11 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
         if (!aPinned && bPinned) return 1;
         return b.lastMessageTimestamp.compareTo(a.lastMessageTimestamp);
       });
+
+      // Aplicar limite final após todos os filtros/ordenação
+      if (conversations.length > limit) {
+        conversations = conversations.take(limit).toList(growable: false);
+      }
 
       debugPrint('✅ MensagensNewDS: watchConversations retornando ${conversations.length} conversas');
       
@@ -961,26 +1493,32 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
   // ============================================
 
   /// Enriquece conversas com dados completos dos participantes
+  /// 
+  /// Para conversas 1:1: busca apenas o outro participante
+  /// Para grupos: busca TODOS os participantes (exceto o atual)
   Future<List<ConversationNewEntity>> _enrichConversationsWithParticipants(
     List<ConversationNewEntity> conversations,
     String currentProfileId,
   ) async {
     if (conversations.isEmpty) return conversations;
 
-    // Coletar todos os profileIds únicos dos outros participantes
-    final otherProfileIds = <String>{};
+    // Coletar todos os profileIds únicos de TODOS os participantes (exceto o atual)
+    final allProfileIds = <String>{};
     for (final conv in conversations) {
-      final otherId = conv.getOtherProfileId(currentProfileId);
-      if (otherId != null) otherProfileIds.add(otherId);
+      for (final profileId in conv.participantProfiles) {
+        if (profileId != currentProfileId) {
+          allProfileIds.add(profileId);
+        }
+      }
     }
 
-    if (otherProfileIds.isEmpty) return conversations;
+    if (allProfileIds.isEmpty) return conversations;
 
     // Buscar dados dos perfis em batch
     final profilesData = <String, ParticipantData>{};
     
     // Firestore permite no máximo 10 IDs por whereIn
-    final chunks = _chunkList(otherProfileIds.toList(), 10);
+    final chunks = _chunkList(allProfileIds.toList(), 10);
     
     for (final chunk in chunks) {
       final profilesSnapshot = await _firestore
@@ -1000,17 +1538,31 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
       }
     }
 
-    // Enriquecer conversas com dados dos participantes
+    // Enriquecer conversas com dados de TODOS os participantes
     return conversations.map((conv) {
-      final otherProfileId = conv.getOtherProfileId(currentProfileId);
-      if (otherProfileId == null) return conv;
+      final isGroup = conv.isGroup || conv.participantProfiles.length > 2;
+      
+      if (isGroup) {
+        // Para grupos: incluir dados de TODOS os outros participantes
+        final participants = <ParticipantData>[];
+        for (final profileId in conv.participantProfiles) {
+          if (profileId == currentProfileId) continue;
+          final data = profilesData[profileId];
+          if (data != null) {
+            participants.add(data);
+          }
+        }
+        return conv.copyWith(participantsData: participants);
+      } else {
+        // Para 1:1: apenas o outro participante
+        final otherProfileId = conv.getOtherProfileId(currentProfileId);
+        if (otherProfileId == null) return conv;
 
-      final otherData = profilesData[otherProfileId];
-      if (otherData == null) return conv;
+        final otherData = profilesData[otherProfileId];
+        if (otherData == null) return conv;
 
-      return conv.copyWith(
-        participantsData: [otherData],
-      );
+        return conv.copyWith(participantsData: [otherData]);
+      }
     }).toList();
   }
 

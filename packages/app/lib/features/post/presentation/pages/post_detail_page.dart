@@ -16,8 +16,12 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
 import 'package:wegig_app/features/mensagens_new/presentation/providers/mensagens_new_providers.dart';
+import 'package:wegig_app/features/mensagens_new/presentation/widgets/share_post_bottom_sheet.dart';
+import 'package:wegig_app/features/comment/presentation/widgets/comments_bottom_sheet.dart';
+import 'package:wegig_app/features/comment/presentation/providers/comment_providers.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/post/presentation/widgets/interest_options_dialog.dart';
 import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
@@ -59,6 +63,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   bool _isLoadingInterests = false;
   int _currentPhotoIndex = 0;
   bool _isOpeningConversation = false; // Loading ao abrir chat
+  bool _isReposting = false; // Loading ao repostar
 
   void _handleBackNavigation() {
     if (!mounted) return;
@@ -100,6 +105,48 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
       final post = PostEntity.fromFirestore(doc);
 
+      // 🔒 Reverse visibility: se o autor estiver excluído (bloqueado em qualquer direção),
+      // não exibe detalhes do post.
+      final currentUid = FirebaseAuth.instance.currentUser?.uid;
+      final activeProfile = ref.read(activeProfileProvider);
+      final isOwner = activeProfile != null && 
+          post.authorProfileId == activeProfile.profileId;
+      
+      if (currentUid != null && currentUid.isNotEmpty && 
+          activeProfile != null && post.authorProfileId.isNotEmpty) {
+        if (!isOwner) {
+          try {
+            final excluded = await BlockedRelations.getExcludedProfileIds(
+              firestore: FirebaseFirestore.instance,
+              profileId: activeProfile.profileId,
+              uid: currentUid,
+            );
+            if (excluded.contains(post.authorProfileId)) {
+              if (mounted) {
+                setState(() {
+                  _post = null;
+                  _isLoading = false;
+                });
+              }
+              return;
+            }
+          } catch (_) {
+            // Se falhar, não bloqueia o carregamento.
+          }
+          
+          // 🚫 NOVO: Bloquear visitantes de ver posts expirados
+          final now = DateTime.now();
+          final isExpired = post.expiresAt.isBefore(now);
+          if (isExpired) {
+            if (mounted) {
+              Navigator.pop(context);
+              AppSnackBar.showError(context, 'Este post expirou e não está mais disponível');
+            }
+            return;
+          }
+        }
+      }
+
       // Buscar informações do autor
       await _loadAuthorProfile(post.authorProfileId);
 
@@ -139,6 +186,22 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     if (_post == null) {
       debugPrint('⚠️ _loadInterestedUsers: _post é null, retornando');
       return;
+    }
+
+    // 🔒 Filtrar perfis que não podem ser vistos (bloqueios em qualquer direção)
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final activeProfile = ref.read(activeProfileProvider);
+    List<String> excludedProfileIds = const <String>[];
+    if (currentUid != null && currentUid.isNotEmpty && activeProfile != null) {
+      try {
+        excludedProfileIds = await BlockedRelations.getExcludedProfileIds(
+          firestore: FirebaseFirestore.instance,
+          profileId: activeProfile.profileId,
+          uid: currentUid,
+        );
+      } catch (_) {
+        excludedProfileIds = const <String>[];
+      }
     }
 
     debugPrint('🔍 Carregando interessados para post: ${_post!.id}');
@@ -188,6 +251,13 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
           if (profileDoc.exists) {
             final profileData = profileDoc.data()!;
+
+            final interestedProfileIdTrim = interestedProfileId.trim();
+            if (interestedProfileIdTrim.isNotEmpty && excludedProfileIds.contains(interestedProfileIdTrim)) {
+              debugPrint('🔒 Perfil interessado filtrado por bloqueio: $interestedProfileId');
+              continue;
+            }
+
             users.add({
               'profileId': interestedProfileId,
               'userId': data['interestedUid'] as String? ?? '',
@@ -229,15 +299,127 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
+  /// Verifica se o post está expirado
+  bool _isPostExpired() {
+    if (_post == null) return false;
+    return _post!.expiresAt.isBefore(DateTime.now());
+  }
 
+  /// Verifica se o post expira em até 1 dia (mas ainda não expirou)
+  bool _isPostExpiringSoon() {
+    if (_post == null) return false;
+    final now = DateTime.now();
+    if (_post!.expiresAt.isBefore(now)) return false; // já expirou
+    return _post!.expiresAt.difference(now).inDays <= 1;
+  }
 
   /// Verifica se o post pertence ao perfil ativo
   bool _isOwnPost() {
     if (_post == null) return false;
-    final profileState = ref.read(profileProvider);
-    final activeProfile = profileState.value?.activeProfile;
+    final activeProfile = ref.read(activeProfileProvider);
     if (activeProfile == null) return false;
     return _post!.authorProfileId == activeProfile.profileId;
+  }
+
+  /// Lida com a ação de repostar
+  Future<void> _handleRepost() async {
+    if (_post == null) return;
+    
+    // Para hiring e sales, precisa abrir editor para definir novas datas
+    if (_post!.type == 'hiring' || _post!.type == 'sales') {
+      _openEditorForRepost();
+      return;
+    }
+    
+    // Para musician e band, repostar direto com +30 dias
+    await _repostWithNewExpiry();
+  }
+
+  /// Abre o editor do post para repostar (hiring/sales precisam de novas datas)
+  void _openEditorForRepost() {
+    Navigator.push<bool?>(
+      context,
+      MaterialPageRoute<bool?>(
+        builder: (_) => PostPage(
+          postType: _post!.type,
+          existingPostData: {
+            'postId': _post!.id,
+            'content': _post!.content,
+            'city': _post!.city,
+            'neighborhood': _post!.neighborhood,
+            'state': _post!.state,
+            'photoUrls': _post!.photoUrls,
+            'youtubeLink': _post!.youtubeLink,
+            'spotifyLink': _post!.spotifyLink,
+            'deezerLink': _post!.deezerLink,
+            'genres': _post!.genres,
+            'instruments': _post!.instruments,
+            'seekingMusicians': _post!.seekingMusicians,
+            'availableFor': _post!.availableFor,
+            'level': _post!.level,
+            'location': _post!.location,
+            'createdAt': _post!.createdAt,
+            // Hiring fields
+            'eventDate': null, // Força usuário a escolher nova data
+            'eventType': _post!.eventType,
+            'gigFormat': _post!.gigFormat,
+            'venueSetup': _post!.venueSetup,
+            'budgetRange': _post!.budgetRange,
+            'eventStartTime': _post!.eventStartTime,
+            'eventEndTime': _post!.eventEndTime,
+            'eventDurationMinutes': _post!.eventDurationMinutes,
+            'guestCount': _post!.guestCount,
+            // Sales fields
+            'title': _post!.title,
+            'salesType': _post!.salesType,
+            'price': _post!.price,
+            'discountMode': _post!.discountMode,
+            'discountValue': _post!.discountValue,
+            'promoStartDate': null, // Força usuário a escolher novas datas
+            'promoEndDate': null,
+            'whatsappNumber': _post!.whatsappNumber,
+          },
+        ),
+      ),
+    ).then((result) {
+      if (result == true && mounted) {
+        _loadPost(); // Recarrega o post atualizado
+      }
+    });
+  }
+
+  /// Reposta diretamente com nova data de expiração (+30 dias)
+  Future<void> _repostWithNewExpiry() async {
+    if (_post == null) return;
+    
+    setState(() => _isReposting = true);
+    
+    try {
+      final newExpiresAt = DateTime.now().add(const Duration(days: 30));
+      
+      await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(_post!.id)
+          .update({
+        'expiresAt': Timestamp.fromDate(newExpiresAt),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      
+      if (mounted) {
+        AppSnackBar.showSuccess(context, 'Post repostado! Válido por mais 30 dias.');
+        // Recarrega o post para atualizar o estado
+        await _loadPost();
+      }
+    } catch (e) {
+      debugPrint('❌ Erro ao repostar: $e');
+      if (mounted) {
+        AppSnackBar.showError(context, 'Erro ao repostar. Tente novamente.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isReposting = false);
+      }
+    }
   }
 
   /// Carrega informações do perfil do autor
@@ -265,11 +447,18 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   Future<void> _showInterest() async {
     if (_post == null) return;
 
+    // 🚫 Bloquear interesse em posts expirados
+    if (_isPostExpired()) {
+      if (mounted) {
+        AppSnackBar.showError(context, 'Este post expirou. Não é possível demonstrar interesse.');
+      }
+      return;
+    }
+
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
 
-    final profileState = ref.read(profileProvider);
-    final activeProfile = profileState.value?.activeProfile;
+    final activeProfile = ref.read(activeProfileProvider);
     if (activeProfile == null) return;
 
     // Usar provider global para optimistic update
@@ -342,14 +531,33 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           ? _post!.instruments
           : _post!.seekingMusicians,
       genres: _post!.genres,
+      title: _post!.title,
+      salesType: _post!.salesType,
+      price: _post!.price,
+      discountMode: _post!.discountMode,
+      discountValue: _post!.discountValue,
     );
 
     SharePlus.instance.share(ShareParams(text: text));
   }
 
+  /// Encaminha o post para uma conversa (estilo Instagram)
+  void _sharePostToChat() {
+    if (_post == null) return;
+    SharePostBottomSheet.show(context, _post!);
+  }
+
   /// Abre conversa direta com o autor do post
   Future<void> _openConversation() async {
     if (_post == null || _authorUid.isEmpty) return;
+
+    // 🚫 Bloquear conversa em posts expirados
+    if (_isPostExpired()) {
+      if (mounted) {
+        AppSnackBar.showError(context, 'Este post expirou. Não é possível iniciar conversa.');
+      }
+      return;
+    }
 
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
@@ -357,8 +565,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       return;
     }
 
-    final profileState = ref.read(profileProvider);
-    final activeProfile = profileState.value?.activeProfile;
+    final activeProfile = ref.read(activeProfileProvider);
     if (activeProfile == null) {
       AppSnackBar.showError(context, 'Selecione um perfil primeiro');
       return;
@@ -368,6 +575,22 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     if (activeProfile.profileId == _post!.authorProfileId) {
       AppSnackBar.showInfo(context, 'Este é seu próprio post');
       return;
+    }
+
+    // 🔒 Bloqueios: impede abrir conversa com usuário bloqueado (ambos os sentidos)
+    try {
+      final excluded = await BlockedRelations.getExcludedProfileIds(
+        firestore: FirebaseFirestore.instance,
+        profileId: activeProfile.profileId,
+        uid: currentUser.uid,
+      );
+      if (!mounted) return;
+      if (excluded.contains(_post!.authorProfileId)) {
+        AppSnackBar.showError(context, 'Conversa indisponível');
+        return;
+      }
+    } catch (_) {
+      // Se falhar, continua (ChatNewPage também tem guard)
     }
 
     if (mounted) {
@@ -417,6 +640,277 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         setState(() => _isOpeningConversation = false);
       }
     }
+  }
+
+  /// Helper para criar ícone com contador
+  Widget _buildIconWithCounter({
+    required IconData icon,
+    required int count,
+    required String tooltip,
+    required VoidCallback onPressed,
+    required Color iconColor,
+    required Color bgColor,
+    double iconSize = 24,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          onPressed: onPressed,
+          icon: Icon(icon, color: iconColor, size: iconSize),
+          tooltip: tooltip,
+          style: IconButton.styleFrom(
+            backgroundColor: bgColor,
+            shape: const CircleBorder(),
+          ),
+        ),
+        if (count > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              count > 999 ? '${(count / 1000).toStringAsFixed(1)}k' : '$count',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: iconColor,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Ícone de interesse (heart/tag) ou menu de opções (more) com contador
+  Widget _buildInterestOrMoreIcon() {
+    if (_isOwnPost()) {
+      return _buildIconWithCounter(
+        icon: Iconsax.more,
+        count: 0,
+        tooltip: 'Opções',
+        onPressed: _showOwnPostOptions,
+        iconColor: AppColors.textSecondary,
+        bgColor: AppColors.textSecondary.withValues(alpha: 0.1),
+      );
+    }
+
+    final isSales = _post!.type == 'sales';
+    return Builder(
+      builder: (context) {
+        final hasInterest = ref.watch(interestNotifierProvider).contains(_post!.id);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: _showInterestOptions,
+              icon: Icon(
+                hasInterest
+                    ? (isSales ? Iconsax.tag5 : Iconsax.heart5)
+                    : (isSales ? Iconsax.tag : Iconsax.heart),
+                color: hasInterest ? Colors.pink : AppColors.textSecondary,
+                size: 24,
+              ),
+              tooltip: 'Interesse',
+              style: IconButton.styleFrom(
+                backgroundColor: hasInterest
+                    ? Colors.pink.withValues(alpha: 0.1)
+                    : AppColors.textSecondary.withValues(alpha: 0.1),
+                shape: const CircleBorder(),
+              ),
+            ),
+            if (_interestedUsers.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  _interestedUsers.length > 999
+                      ? '${(_interestedUsers.length / 1000).toStringAsFixed(1)}k'
+                      : '${_interestedUsers.length}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: hasInterest ? Colors.pink : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Banner de aviso para posts expirados (visível apenas para o owner)
+  Widget _buildExpiredBanner() {
+    final daysExpired = DateTime.now().difference(_post!.expiresAt).inDays;
+    final needsDateSelection = _post!.type == 'hiring' || _post!.type == 'sales';
+    
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Iconsax.warning_2,
+                color: Colors.red.shade700,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Post Expirado',
+                      style: TextStyle(
+                        color: Colors.red.shade800,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      daysExpired == 0
+                          ? 'Expirou hoje. Este post não está mais visível para outros usuários.'
+                          : 'Expirou há $daysExpired ${daysExpired == 1 ? 'dia' : 'dias'}. Este post não está mais visível para outros usuários.',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Botão de Repostar
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isReposting ? null : _handleRepost,
+              icon: _isReposting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Iconsax.refresh, size: 18),
+              label: Text(
+                _isReposting
+                    ? 'Repostando...'
+                    : needsDateSelection
+                        ? 'Editar e Repostar'
+                        : 'Repostar (+30 dias)',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Banner para posts prestes a expirar (≤ 1 dia)
+  Widget _buildExpiringSoonBanner() {
+    final hoursLeft = _post!.expiresAt.difference(DateTime.now()).inHours;
+    final needsDateSelection = _post!.type == 'hiring' || _post!.type == 'sales';
+    final timeText = hoursLeft > 0 ? 'em ${hoursLeft}h' : 'em breve';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Iconsax.timer_1,
+                color: Colors.orange.shade800,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Post expira $timeText',
+                      style: TextStyle(
+                        color: Colors.orange.shade900,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Renove para manter visível por mais 30 dias.',
+                      style: TextStyle(
+                        color: Colors.orange.shade800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isReposting ? null : _handleRepost,
+              icon: _isReposting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Iconsax.refresh, size: 18),
+              label: Text(
+                _isReposting
+                    ? 'Renovando...'
+                    : needsDateSelection
+                        ? 'Editar e Renovar'
+                        : 'Renovar (+30 dias)',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Widget para exibir usuários interessados (visível para todos)
@@ -700,6 +1194,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
   /// Mostra opções do próprio post
   void _showOwnPostOptions() {
+    final isExpired = _isPostExpired();
+    final needsDateSelection = _post!.type == 'hiring' || _post!.type == 'sales';
+    
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -709,6 +1206,26 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Opção de Repostar (para posts expirados ou expirando em breve)
+            if (isExpired || _isPostExpiringSoon())
+              ListTile(
+                leading: Icon(Iconsax.refresh, color: isExpired ? AppColors.accent : Colors.orange.shade700),
+                title: Text(isExpired
+                    ? (needsDateSelection ? 'Editar e Repostar' : 'Repostar (+30 dias)')
+                    : (needsDateSelection ? 'Editar e Renovar' : 'Renovar (+30 dias)')),
+                subtitle: Text(
+                  isExpired
+                      ? (needsDateSelection 
+                          ? 'Defina novas datas para o ${_post!.type == 'hiring' ? 'evento' : 'anúncio'}'
+                          : 'Renova a validade do post')
+                      : 'Post expira em breve — renove agora',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _handleRepost();
+                },
+              ),
             ListTile(
               leading: const Icon(Iconsax.edit, color: AppColors.primary),
               title: const Text('Editar post'),
@@ -730,6 +1247,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                         'photoUrls': _post!.photoUrls,
                         'photoUrl': _post!.photoUrl, // fallback
                         'youtubeLink': _post!.youtubeLink,
+                        'spotifyLink': _post!.spotifyLink,
+                        'deezerLink': _post!.deezerLink,
                         'location': GeoPoint(_post!.location.latitude,
                             _post!.location.longitude),
                         'createdAt': _post!.createdAt,
@@ -777,9 +1296,16 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   void _showInterestOptions() {
     if (_post == null) return;
     
-    final activeProfile = ref.read(profileProvider).value?.activeProfile;
+    final activeProfile = ref.read(activeProfileProvider);
     final isOwner = _post!.authorProfileId == activeProfile?.profileId;
     final isInterestSent = ref.read(interestNotifierProvider).contains(_post!.id);
+    final isExpired = _isPostExpired();
+    
+    // 🚫 Se expirado e não é owner, mostra mensagem e retorna
+    if (isExpired && !isOwner) {
+      AppSnackBar.showError(context, 'Este post expirou. Não é possível interagir.');
+      return;
+    }
     
     showInterestOptionsDialog(
       context: context,
@@ -794,6 +1320,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         // Recarregar dados do post após edição
         _loadPost();
       },
+      onRepost: isOwner ? _handleRepost : null,
     );
   }
   
@@ -1056,83 +1583,82 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Avatar do autor (clicável)
-                              GestureDetector(
-                                onTap: () {
-                                  context.pushProfile(_post!.authorProfileId);
-                                },
-                                child: CircleAvatar(
-                                  radius: 28,
-                                  backgroundColor:
-                                      AppColors.primary.withValues(alpha: 0.1),
-                                  backgroundImage: _authorPhotoUrl.isNotEmpty
-                                      ? CachedNetworkImageProvider(
-                                          _authorPhotoUrl)
-                                      : null,
-                                  child: _authorPhotoUrl.isEmpty
-                                      ? const Icon(
-                                          Icons.person,
-                                          color: AppColors.primary,
-                                          size: 32,
-                                        )
-                                      : null,
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    context.pushProfile(_post!.authorProfileId);
+                                  },
+                                  child: CircleAvatar(
+                                    radius: 28,
+                                    backgroundColor:
+                                        AppColors.primary.withValues(alpha: 0.1),
+                                    backgroundImage: _authorPhotoUrl.isNotEmpty
+                                        ? CachedNetworkImageProvider(
+                                            _authorPhotoUrl)
+                                        : null,
+                                    child: _authorPhotoUrl.isEmpty
+                                        ? const Icon(
+                                            Icons.person,
+                                            color: AppColors.primary,
+                                            size: 32,
+                                          )
+                                        : null,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               // Nome e localização
                               Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Nome do perfil (clicável e destacado)
-                                    GestureDetector(
-                                      onTap: () {
-                                        context.pushProfile(_post!.authorProfileId);
-                                      },
-                                      child: Text(
-                                        _authorName,
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Botão de mensagem direta (aviãozinho de papel)
-                              // Só aparece se não for o próprio post
-                              if (!_isOwnPost())
-                                _isOpeningConversation
-                                    ? const SizedBox(
-                                        width: 44,
-                                        height: 44,
-                                        child: Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
-                                            ),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Nome do perfil (clicável e destacado)
+                                      GestureDetector(
+                                        onTap: () {
+                                          context.pushProfile(_post!.authorProfileId);
+                                        },
+                                        child: Text(
+                                          _authorName,
+                                          style: const TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
                                           ),
                                         ),
-                                      )
-                                    : IconButton(
-                                        onPressed: _openConversation,
-                                        icon: const Icon(
-                                          Iconsax.send_2, // Aviãozinho de papel
-                                          color: AppColors.textSecondary,
-                                          size: 24,
-                                        ),
-                                        tooltip: 'Enviar mensagem',
-                                        style: IconButton.styleFrom(
-                                          backgroundColor: AppColors.textSecondary.withValues(alpha: 0.1),
-                                          shape: const CircleBorder(),
-                                        ),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              // Ícones de ação alinhados pelo topo
+                              if (_post != null) ...[
+                                _buildIconWithCounter(
+                                  icon: Iconsax.message,
+                                  count: _post!.commentCount,
+                                  tooltip: 'Comentários',
+                                  onPressed: () {
+                                    CommentsBottomSheet.show(context, _post!);
+                                  },
+                                  iconColor: AppColors.textSecondary,
+                                  bgColor: AppColors.textSecondary.withValues(alpha: 0.1),
+                                ),
+                                _buildIconWithCounter(
+                                  icon: Iconsax.send_1,
+                                  count: _post!.forwardCount,
+                                  tooltip: 'Enviar para conversa',
+                                  onPressed: _sharePostToChat,
+                                  iconColor: AppColors.textSecondary,
+                                  bgColor: AppColors.textSecondary.withValues(alpha: 0.1),
+                                ),
+                                // Interesse ou Menu de opções
+                                _buildInterestOrMoreIcon(),
+                              ],
                             ],
                           ),
                         ),
@@ -1143,12 +1669,20 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                           child: Divider(height: 1, color: Colors.grey[300]),
                         ),
 
+                        // 🚫 Banner de expiração/renovação (para owner vendo post expirado OU expirando em breve)
+                        if (_isOwnPost() && _isPostExpired())
+                          _buildExpiredBanner()
+                        else if (_isOwnPost() && _isPostExpiringSoon())
+                          _buildExpiringSoonBanner(),
+
                         // Seção de interessados (visível para todos)
                         _buildInterestedUsers(),
 
                         // ✅ Renderização condicional por tipo de post
                         if (_post!.type == 'sales')
                           _buildSalesContent()
+                        else if (_post!.type == 'hiring')
+                          _buildHiringContent()
                         else
                           _buildMusicianBandContent(),
 
@@ -1209,44 +1743,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                             onPressed: _sharePost,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        // Interesse ou Menu de opções
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: _isOwnPost()
-                              ? IconButton(
-                                  icon: const Icon(
-                                    Iconsax.more,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                  padding: const EdgeInsets.all(8),
-                                  constraints: const BoxConstraints(),
-                                  onPressed: _showOwnPostOptions,
-                                )
-                              : Builder(
-                                  builder: (context) {
-                                    final hasInterest = ref.watch(interestNotifierProvider).contains(_post!.id);
-                                    return IconButton(
-                                      icon: Icon(
-                                        hasInterest
-                                            ? (_post!.type == 'sales' ? Iconsax.tag5 : Iconsax.heart5)
-                                            : (_post!.type == 'sales' ? Iconsax.tag : Iconsax.heart),
-                                        color: hasInterest
-                                            ? Colors.pink
-                                            : Colors.white,
-                                        size: 20,
-                                      ),
-                                      padding: const EdgeInsets.all(8),
-                                      constraints: const BoxConstraints(),
-                                      onPressed: _showInterestOptions,
-                                    );
-                                  },
-                                ),
-                        ),
+
                       ],
                     ),
                   ],
@@ -1314,6 +1811,35 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       default:
         return level;
     }
+  }
+
+  String _formatEventDate(DateTime? date) {
+    if (date == null) return 'Data a combinar';
+    return DateFormat('dd/MM/yyyy').format(date);
+  }
+
+  String _formatEventTime(String? start, String? end, int? durationMinutes) {
+    if (start != null && start.isNotEmpty && end != null && end.isNotEmpty) {
+      final duration = durationMinutes != null && durationMinutes > 0
+          ? ' (${_formatDurationLabel(durationMinutes)})'
+          : '';
+      return '$start - $end$duration';
+    }
+    if (start != null && start.isNotEmpty) {
+      return 'A partir das $start';
+    }
+    if (durationMinutes != null && durationMinutes > 0) {
+      return _formatDurationLabel(durationMinutes);
+    }
+    return 'Horário a combinar';
+  }
+
+  String _formatDurationLabel(int minutes) {
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours > 0 && mins > 0) return '${hours}h${mins.toString().padLeft(2, '0')}min';
+    if (hours > 0) return '${hours}h';
+    return '${minutes}min';
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1465,6 +1991,78 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
         const SizedBox(height: 16),
 
+        // Link Spotify
+        if (_post?.spotifyLink != null && _post!.spotifyLink!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Iconsax.music, color: AppColors.primary),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Ouça no Spotify',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => _launchExternalLink(_post!.spotifyLink!),
+                    child: const Text('Abrir'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        if (_post?.spotifyLink != null && _post!.spotifyLink!.isNotEmpty)
+          const SizedBox(height: 12),
+
+        // Link Deezer
+        if (_post?.deezerLink != null && _post!.deezerLink!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Iconsax.music_square, color: AppColors.primary),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Ouça no Deezer',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => _launchExternalLink(_post!.deezerLink!),
+                    child: const Text('Abrir'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        if (_post?.deezerLink != null && _post!.deezerLink!.isNotEmpty)
+          const SizedBox(height: 12),
+
         // Card de vídeo do YouTube
         if (_youtubeController != null)
           Padding(
@@ -1480,10 +2078,238 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   controller: _youtubeController!,
                   showVideoProgressIndicator: true,
                   progressIndicatorColor: AppColors.primary,
+                  bottomActions: const [
+                    SizedBox(width: 14.0),
+                    CurrentPosition(),
+                    SizedBox(width: 8.0),
+                    ProgressBar(isExpanded: true),
+                    RemainingDuration(),
+                    PlaybackSpeedButton(),
+                  ],
                 ),
               ),
             ),
           ),
+
+        // Espaçamento inferior para não colar na borda
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ✅ CONTEÚDO PARA HIRING (CONTRATAÇÃO / EVENTOS)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildHiringContent() {
+    final post = _post!;
+
+    final locationLabel = formatCleanLocation(
+      neighborhood: post.neighborhood,
+      city: post.city,
+      state: post.state,
+      fallback: 'Local a combinar',
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              post.eventType?.isNotEmpty == true
+                  ? 'Evento: ${post.eventType}'
+                  : 'Contratação / Oportunidade',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ),
+
+        // Resumo do evento
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildInfoRow(
+                  Iconsax.calendar,
+                  'Data do evento',
+                  _formatEventDate(post.eventDate),
+                ),
+                const SizedBox(height: 12),
+                _buildInfoRow(
+                  Iconsax.clock,
+                  'Horário',
+                  _formatEventTime(post.eventStartTime, post.eventEndTime, post.eventDurationMinutes),
+                ),
+                const SizedBox(height: 12),
+                if (post.gigFormat?.isNotEmpty == true)
+                  _buildInfoRow(
+                    Iconsax.music_filter,
+                    'Formação desejada',
+                    post.gigFormat!,
+                  ),
+                if (post.gigFormat?.isNotEmpty == true) const SizedBox(height: 12),
+                if (post.eventType?.isNotEmpty == true)
+                  _buildInfoRow(
+                    Iconsax.tick_circle,
+                    'Tipo de evento',
+                    post.eventType!,
+                  ),
+                if (post.eventType?.isNotEmpty == true) const SizedBox(height: 12),
+                _buildInfoRow(
+                  Iconsax.location,
+                  'Local',
+                  locationLabel,
+                ),
+                if (post.guestCount != null) ...[
+                  const SizedBox(height: 12),
+                  _buildInfoRow(
+                    Iconsax.user,
+                    'Público estimado',
+                    '${post.guestCount} convidados',
+                  ),
+                ],
+                if (post.budgetRange?.isNotEmpty == true) ...[
+                  const SizedBox(height: 12),
+                  _buildInfoRow(
+                    Iconsax.money,
+                    'Orçamento',
+                    post.budgetRange!,
+                  ),
+                ],
+                if (post.venueSetup.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildInfoRow(
+                    Iconsax.microphone_2,
+                    'Estrutura disponível',
+                    post.venueSetup.join(', '),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Preferências musicais
+        if (post.instruments.isNotEmpty || post.genres.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(
+                        Iconsax.music,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Perfil musical',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (post.instruments.isNotEmpty)
+                    _buildInfoRow(
+                      Iconsax.search_favorite,
+                      'Formação/Instrumentos',
+                      post.instruments.join(', '),
+                    ),
+                  if (post.instruments.isNotEmpty && post.genres.isNotEmpty)
+                    const SizedBox(height: 10),
+                  if (post.genres.isNotEmpty)
+                    _buildInfoRow(
+                      Iconsax.music_playlist,
+                      'Gêneros desejados',
+                      post.genres.join(', '),
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+        // Mensagem
+        if (post.content.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(
+                        Iconsax.message,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Detalhes adicionais',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  MentionText(
+                    text: post.content,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: Colors.black87,
+                    ),
+                    mentionStyle: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -1578,10 +2404,10 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
             const SizedBox(width: 6),
             Text(
               isExpired
-                  ? 'PROMOÇÃO EXPIRADA'
+                  ? 'ANÚNCIO EXPIRADO'
                   : isUrgent
                       ? 'EXPIRA EM ${daysRemaining + 1} ${daysRemaining == 0 ? 'DIA' : 'DIAS'}'
-                      : 'PROMOÇÃO ATIVA',
+                      : 'ANÚNCIO ATIVO',
               style: TextStyle(
                 color: isExpired
                     ? Colors.red
@@ -1623,13 +2449,43 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   Widget _buildPriceBlock() {
     final price = _post!.price;
 
-    // Se não tem preço, não mostra o bloco
-    if (price == null || price <= 0) {
+    // Se não tem preço (null), não mostra o bloco
+    if (price == null) {
       return const SizedBox.shrink();
     }
 
     // ✅ USAR PriceCalculator PARA CALCULOS CONSISTENTES
     final priceData = PriceCalculator.getPriceDisplayData(_post!);
+
+    // ✅ Se é gratuito, mostrar badge "Grátis"
+    if (priceData.isFree) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green.shade300),
+          ),
+          child: Row(
+            children: [
+              Icon(Iconsax.gift, size: 28, color: Colors.green.shade700),
+              const SizedBox(width: 12),
+              Text(
+                'Grátis',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     // ✅ FORMATADOR BRASILEIRO PARA PREÇOS
     final currencyFormatter = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ');
@@ -1936,6 +2792,17 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       if (mounted) {
         AppSnackBar.showError(context, 'Erro ao abrir WhatsApp');
       }
+    }
+  }
+
+  Future<void> _launchExternalLink(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('Erro ao abrir link externo: $e');
     }
   }
 

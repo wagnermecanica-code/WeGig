@@ -9,12 +9,13 @@ import '../../domain/entities/entities.dart';
 /// Item de conversa na lista de mensagens
 ///
 /// Exibe:
-/// - Avatar do outro participante
-/// - Nome do participante
-/// - Preview da última mensagem
+/// - Avatar do outro participante (ou avatares empilhados para grupos)
+/// - Nome do participante ou nome do grupo
+/// - Preview da última mensagem (com nome do remetente em grupos)
 /// - Horário da última mensagem
 /// - Badge de não lidas
 /// - Indicadores de fixada/silenciada
+/// - Ícone de grupo para conversas em grupo
 class ConversationNewItem extends StatelessWidget {
   const ConversationNewItem({
     required this.conversation,
@@ -39,6 +40,27 @@ class ConversationNewItem extends StatelessWidget {
 
   /// Se o item está selecionado (modo seleção)
   final bool isSelected;
+
+  /// Verifica se é uma conversa em grupo
+  bool get _isGroup => 
+      conversation.isGroup || conversation.participantProfiles.length > 2;
+
+  /// Nome para exibição (nome do grupo ou nome do outro participante)
+  String get _displayName {
+    if (_isGroup) {
+      return conversation.groupName?.isNotEmpty == true
+          ? conversation.groupName!
+          : 'Grupo';
+    }
+    return conversation.getOtherParticipantData(currentProfileId)?.name ?? 'Usuário';
+  }
+
+  /// Obtém os outros participantes (excluindo o usuário atual)
+  List<ParticipantData> get _otherParticipants {
+    return conversation.participantsData
+        .where((p) => p.profileId != currentProfileId)
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,8 +87,11 @@ class ConversationNewItem extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // Avatar
-              _buildAvatar(otherParticipant),
+              // Avatar (empilhado para grupos, simples para 1:1)
+              if (_isGroup)
+                _buildGroupAvatar()
+              else
+                _buildSingleAvatar(otherParticipant),
               const SizedBox(width: 12),
 
               // Conteúdo
@@ -77,13 +102,22 @@ class ConversationNewItem extends StatelessWidget {
                     // Nome + indicadores + horário
                     Row(
                       children: [
+                        // Ícone de grupo (se aplicável)
+                        if (_isGroup) ...[
+                          Icon(
+                            Iconsax.people,
+                            size: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
                         // Nome
                         Expanded(
                           child: Row(
                             children: [
                               Flexible(
                                 child: Text(
-                                  otherParticipant?.name ?? 'Usuário',
+                                  _displayName,
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: unreadCount > 0
@@ -159,21 +193,22 @@ class ConversationNewItem extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatar(ParticipantData? participant) {
+  /// Avatar para conversas 1:1
+  Widget _buildSingleAvatar(ParticipantData? participant) {
     return Stack(
       children: [
-        Container(
+        SizedBox(
           width: 56,
           height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.surfaceVariant,
-          ),
           child: participant?.photoUrl != null && participant!.photoUrl!.isNotEmpty
               ? ClipOval(
                   child: CachedNetworkImage(
                     imageUrl: participant.photoUrl!,
+                    width: 56,
+                    height: 56,
                     fit: BoxFit.cover,
+                    memCacheWidth: 112,
+                    memCacheHeight: 112,
                     placeholder: (context, url) => _buildPlaceholderAvatar(participant.name),
                     errorWidget: (context, url, error) => _buildPlaceholderAvatar(participant.name),
                   ),
@@ -200,13 +235,160 @@ class ConversationNewItem extends StatelessWidget {
     );
   }
 
-  Widget _buildPlaceholderAvatar(String name) {
+  /// Avatar empilhado para grupos (estilo Instagram/WhatsApp)
+  Widget _buildGroupAvatar() {
+    final participants = _otherParticipants;
+    
+    // Se tem foto de grupo, usa ela
+    if (conversation.groupPhotoUrl != null && 
+        conversation.groupPhotoUrl!.isNotEmpty) {
+      return SizedBox(
+        width: 56,
+        height: 56,
+        child: ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: conversation.groupPhotoUrl!,
+            width: 56,
+            height: 56,
+            fit: BoxFit.cover,
+            memCacheWidth: 112,
+            memCacheHeight: 112,
+            placeholder: (context, url) => _buildGroupPlaceholder(),
+            errorWidget: (context, url, error) => _buildGroupPlaceholder(),
+          ),
+        ),
+      );
+    }
+
+    // Sem foto de grupo: mostrar avatares empilhados (máximo 2)
+    if (participants.isEmpty) {
+      return _buildGroupPlaceholderContainer();
+    }
+
+    if (participants.length == 1) {
+      return _buildSingleAvatar(participants.first);
+    }
+
+    // 2+ participantes: avatares empilhados
+    return SizedBox(
+      width: 56,
+      height: 56,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Avatar de trás (segundo participante)
+          Positioned(
+            top: 0,
+            right: 0,
+            child: _buildSmallAvatar(
+              participants.length > 1 ? participants[1] : null,
+              size: 36,
+            ),
+          ),
+          // Avatar da frente (primeiro participante)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.background, width: 2),
+              ),
+              child: _buildSmallAvatar(participants.first, size: 36),
+            ),
+          ),
+          // Badge com número de participantes extras
+          if (participants.length > 2)
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.background, width: 1.5),
+                ),
+                child: Center(
+                  child: Text(
+                    '+${participants.length - 2}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Avatar pequeno para composição de grupo
+  Widget _buildSmallAvatar(ParticipantData? participant, {required double size}) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: participant?.photoUrl != null && participant!.photoUrl!.isNotEmpty
+          ? ClipOval(
+              child: CachedNetworkImage(
+                imageUrl: participant.photoUrl!,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                memCacheWidth: (size * 2).toInt(),
+                memCacheHeight: (size * 2).toInt(),
+                placeholder: (context, url) => _buildPlaceholderAvatar(
+                  participant.name,
+                  fontSize: size * 0.4,
+                ),
+                errorWidget: (context, url, error) => _buildPlaceholderAvatar(
+                  participant.name,
+                  fontSize: size * 0.4,
+                ),
+              ),
+            )
+          : _buildPlaceholderAvatar(
+              participant?.name ?? '?',
+              fontSize: size * 0.4,
+            ),
+    );
+  }
+
+  /// Placeholder para grupo (ícone de pessoas)
+  Widget _buildGroupPlaceholder() {
+    return Center(
+      child: Icon(
+        Iconsax.people,
+        size: 28,
+        color: AppColors.textSecondary,
+      ),
+    );
+  }
+
+  /// Container com placeholder de grupo
+  Widget _buildGroupPlaceholderContainer() {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.surfaceVariant,
+      ),
+      child: _buildGroupPlaceholder(),
+    );
+  }
+
+  Widget _buildPlaceholderAvatar(String name, {double fontSize = 24}) {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     return Center(
       child: Text(
         initial,
         style: TextStyle(
-          fontSize: 24,
+          fontSize: fontSize,
           fontWeight: FontWeight.w600,
           color: AppColors.textSecondary,
         ),
@@ -217,33 +399,101 @@ class ConversationNewItem extends StatelessWidget {
   Widget _buildMessagePreview(int unreadCount) {
     final preview = conversation.lastMessage;
     final isFromMe = conversation.lastMessageSenderId == currentProfileId;
+    final status = conversation.lastMessageStatus;
+
+    // Para grupos, mostrar nome do remetente
+    String? senderName;
+    if (_isGroup && !isFromMe && conversation.lastMessageSenderId != null) {
+      final sender = conversation.participantsData.firstWhere(
+        (p) => p.profileId == conversation.lastMessageSenderId,
+        orElse: () => const ParticipantData(
+          profileId: '',
+          uid: '',
+          name: 'Alguém',
+        ),
+      );
+      senderName = sender.name.split(' ').first; // Primeiro nome apenas
+    }
 
     return Row(
       children: [
-        if (isFromMe) ...[
-          Icon(
-            Iconsax.tick_circle,
-            size: 14,
-            color: AppColors.textHint,
-          ),
+        if (isFromMe && !_isGroup) ...[
+          _buildStatusIcon(status),
           const SizedBox(width: 4),
         ],
         Expanded(
-          child: Text(
-            preview.isEmpty ? 'Conversa iniciada' : preview,
-            style: TextStyle(
-              fontSize: 14,
-              color: unreadCount > 0
-                  ? AppColors.textPrimary
-                  : AppColors.textSecondary,
-              fontWeight:
-                  unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
+          child: Text.rich(
+            TextSpan(
+              children: [
+                // Nome do remetente em grupos
+                if (isFromMe && _isGroup)
+                  TextSpan(
+                    text: 'Você: ',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  )
+                else if (senderName != null)
+                  TextSpan(
+                    text: '$senderName: ',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                // Conteúdo da mensagem
+                TextSpan(
+                  text: preview.isEmpty ? 'Conversa iniciada' : preview,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: unreadCount > 0
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
+                    fontWeight:
+                        unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
+                  ),
+                ),
+              ],
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStatusIcon(MessageDeliveryStatus status) {
+    late final IconData icon;
+    Color color = AppColors.textHint;
+
+    switch (status) {
+      case MessageDeliveryStatus.sending:
+        icon = Iconsax.clock;
+        break;
+      case MessageDeliveryStatus.sent:
+        icon = Iconsax.tick_circle;
+        break;
+      case MessageDeliveryStatus.delivered:
+        icon = Iconsax.tick_circle;
+        color = AppColors.textSecondary;
+        break;
+      case MessageDeliveryStatus.read:
+        icon = Iconsax.tick_circle;
+        color = AppColors.success;
+        break;
+      case MessageDeliveryStatus.failed:
+        icon = Iconsax.warning_2;
+        color = AppColors.error;
+        break;
+    }
+
+    return Transform.translate(
+      offset: const Offset(-2, 0),
+      child: Icon(icon, size: 14, color: color),
     );
   }
 

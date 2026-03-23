@@ -30,10 +30,13 @@ class CustomMarkerWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBand = type == 'band';
+    final isHiring = type == 'hiring';
     final isSales = type == 'sales';
     final primaryColor = isSales 
-        ? AppColors.salesBlue 
-        : (isBand ? AppColors.accent : AppColors.primary);
+        ? AppColors.salesColor 
+        : (isHiring
+            ? AppColors.hiringColor
+            : (isBand ? AppColors.accent : AppColors.musicianColor));
     
     return Stack(
       alignment: Alignment.center,
@@ -148,7 +151,11 @@ class CustomMarkerWidget extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    isSales ? Iconsax.tag : (isBand ? Iconsax.people : Iconsax.musicnote),
+                    isSales
+                        ? Iconsax.tag
+                        : (isHiring
+                            ? Iconsax.briefcase
+                            : (isBand ? Icons.group : Icons.music_note)),
                     size: 12,
                     color: primaryColor,
                   ),
@@ -173,15 +180,28 @@ class CustomMarkerWidget extends StatelessWidget {
 
   Widget _buildDefaultIcon(bool isBand, bool isActive) {
     final isSales = type == 'sales';
-    final backgroundColor = isSales
-        ? AppColors.salesBlue.withValues(alpha: 0.2)
-        : (isBand 
-            ? AppColors.accent.withValues(alpha: 0.2)
-            : AppColors.primary.withValues(alpha: 0.2));
-    
-    final iconData = isSales
-        ? Iconsax.tag
-        : (isBand ? Icons.group : Icons.music_note);
+    final isHiring = type == 'hiring';
+    Color backgroundColor;
+    if (isSales) {
+      backgroundColor = AppColors.salesColor.withValues(alpha: 0.2);
+    } else if (isHiring) {
+      backgroundColor = AppColors.hiringColor.withValues(alpha: 0.2);
+    } else if (isBand) {
+      backgroundColor = AppColors.accent.withValues(alpha: 0.2);
+    } else {
+      backgroundColor = AppColors.primary.withValues(alpha: 0.2);
+    }
+
+    IconData iconData;
+    if (isSales) {
+      iconData = Iconsax.tag;
+    } else if (isHiring) {
+      iconData = Iconsax.briefcase;
+    } else if (isBand) {
+      iconData = Icons.group;
+    } else {
+      iconData = Icons.music_note;
+    }
     
     return Container(
       color: backgroundColor,
@@ -214,7 +234,7 @@ class SimpleMarkerWidget extends StatelessWidget {
     final isBand = type == 'band';
     final isSales = type == 'sales';
     final color = customColor ?? 
-        (isSales ? AppColors.salesBlue : (isBand ? AppColors.accent : AppColors.primary));
+        (isSales ? AppColors.salesColor : (isBand ? AppColors.accent : AppColors.musicianColor));
     
     return Container(
       width: isActive ? 50 : 40,

@@ -33,6 +33,10 @@ mixin _$ConversationNewEntity {
   /// Preview da última mensagem
   String get lastMessage => throw _privateConstructorUsedError;
 
+  /// Status de entrega da última mensagem (para indicar leitura)
+  MessageDeliveryStatus get lastMessageStatus =>
+      throw _privateConstructorUsedError;
+
   /// Timestamp da última mensagem
   DateTime get lastMessageTimestamp => throw _privateConstructorUsedError;
 
@@ -78,6 +82,15 @@ mixin _$ConversationNewEntity {
   Map<String, DateTime> get typingIndicators =>
       throw _privateConstructorUsedError;
 
+  /// Flag de grupo
+  bool get isGroup => throw _privateConstructorUsedError;
+
+  /// Nome do grupo (se isGroup=true)
+  String? get groupName => throw _privateConstructorUsedError;
+
+  /// Foto do grupo (se isGroup=true)
+  String? get groupPhotoUrl => throw _privateConstructorUsedError;
+
   /// Serializes this ConversationNewEntity to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -99,6 +112,7 @@ abstract class $ConversationNewEntityCopyWith<$Res> {
       List<String> participants,
       List<String> participantProfiles,
       String lastMessage,
+      MessageDeliveryStatus lastMessageStatus,
       DateTime lastMessageTimestamp,
       String? lastMessageSenderId,
       Map<String, int> unreadCount,
@@ -112,7 +126,10 @@ abstract class $ConversationNewEntityCopyWith<$Res> {
       List<String> pinnedByProfiles,
       List<String> deletedByProfiles,
       Map<String, DateTime> clearHistoryTimestamp,
-      Map<String, DateTime> typingIndicators});
+      Map<String, DateTime> typingIndicators,
+      bool isGroup,
+      String? groupName,
+      String? groupPhotoUrl});
 }
 
 /// @nodoc
@@ -135,6 +152,7 @@ class _$ConversationNewEntityCopyWithImpl<$Res,
     Object? participants = null,
     Object? participantProfiles = null,
     Object? lastMessage = null,
+    Object? lastMessageStatus = null,
     Object? lastMessageTimestamp = null,
     Object? lastMessageSenderId = freezed,
     Object? unreadCount = null,
@@ -148,6 +166,9 @@ class _$ConversationNewEntityCopyWithImpl<$Res,
     Object? deletedByProfiles = null,
     Object? clearHistoryTimestamp = null,
     Object? typingIndicators = null,
+    Object? isGroup = null,
+    Object? groupName = freezed,
+    Object? groupPhotoUrl = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -166,6 +187,10 @@ class _$ConversationNewEntityCopyWithImpl<$Res,
           ? _value.lastMessage
           : lastMessage // ignore: cast_nullable_to_non_nullable
               as String,
+      lastMessageStatus: null == lastMessageStatus
+          ? _value.lastMessageStatus
+          : lastMessageStatus // ignore: cast_nullable_to_non_nullable
+              as MessageDeliveryStatus,
       lastMessageTimestamp: null == lastMessageTimestamp
           ? _value.lastMessageTimestamp
           : lastMessageTimestamp // ignore: cast_nullable_to_non_nullable
@@ -218,6 +243,18 @@ class _$ConversationNewEntityCopyWithImpl<$Res,
           ? _value.typingIndicators
           : typingIndicators // ignore: cast_nullable_to_non_nullable
               as Map<String, DateTime>,
+      isGroup: null == isGroup
+          ? _value.isGroup
+          : isGroup // ignore: cast_nullable_to_non_nullable
+              as bool,
+      groupName: freezed == groupName
+          ? _value.groupName
+          : groupName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      groupPhotoUrl: freezed == groupPhotoUrl
+          ? _value.groupPhotoUrl
+          : groupPhotoUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -236,6 +273,7 @@ abstract class _$$ConversationNewEntityImplCopyWith<$Res>
       List<String> participants,
       List<String> participantProfiles,
       String lastMessage,
+      MessageDeliveryStatus lastMessageStatus,
       DateTime lastMessageTimestamp,
       String? lastMessageSenderId,
       Map<String, int> unreadCount,
@@ -249,7 +287,10 @@ abstract class _$$ConversationNewEntityImplCopyWith<$Res>
       List<String> pinnedByProfiles,
       List<String> deletedByProfiles,
       Map<String, DateTime> clearHistoryTimestamp,
-      Map<String, DateTime> typingIndicators});
+      Map<String, DateTime> typingIndicators,
+      bool isGroup,
+      String? groupName,
+      String? groupPhotoUrl});
 }
 
 /// @nodoc
@@ -270,6 +311,7 @@ class __$$ConversationNewEntityImplCopyWithImpl<$Res>
     Object? participants = null,
     Object? participantProfiles = null,
     Object? lastMessage = null,
+    Object? lastMessageStatus = null,
     Object? lastMessageTimestamp = null,
     Object? lastMessageSenderId = freezed,
     Object? unreadCount = null,
@@ -283,6 +325,9 @@ class __$$ConversationNewEntityImplCopyWithImpl<$Res>
     Object? deletedByProfiles = null,
     Object? clearHistoryTimestamp = null,
     Object? typingIndicators = null,
+    Object? isGroup = null,
+    Object? groupName = freezed,
+    Object? groupPhotoUrl = freezed,
   }) {
     return _then(_$ConversationNewEntityImpl(
       id: null == id
@@ -301,6 +346,10 @@ class __$$ConversationNewEntityImplCopyWithImpl<$Res>
           ? _value.lastMessage
           : lastMessage // ignore: cast_nullable_to_non_nullable
               as String,
+      lastMessageStatus: null == lastMessageStatus
+          ? _value.lastMessageStatus
+          : lastMessageStatus // ignore: cast_nullable_to_non_nullable
+              as MessageDeliveryStatus,
       lastMessageTimestamp: null == lastMessageTimestamp
           ? _value.lastMessageTimestamp
           : lastMessageTimestamp // ignore: cast_nullable_to_non_nullable
@@ -353,6 +402,18 @@ class __$$ConversationNewEntityImplCopyWithImpl<$Res>
           ? _value._typingIndicators
           : typingIndicators // ignore: cast_nullable_to_non_nullable
               as Map<String, DateTime>,
+      isGroup: null == isGroup
+          ? _value.isGroup
+          : isGroup // ignore: cast_nullable_to_non_nullable
+              as bool,
+      groupName: freezed == groupName
+          ? _value.groupName
+          : groupName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      groupPhotoUrl: freezed == groupPhotoUrl
+          ? _value.groupPhotoUrl
+          : groupPhotoUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -365,6 +426,7 @@ class _$ConversationNewEntityImpl extends _ConversationNewEntity {
       required final List<String> participants,
       required final List<String> participantProfiles,
       required this.lastMessage,
+      this.lastMessageStatus = MessageDeliveryStatus.sent,
       required this.lastMessageTimestamp,
       this.lastMessageSenderId,
       required final Map<String, int> unreadCount,
@@ -379,7 +441,10 @@ class _$ConversationNewEntityImpl extends _ConversationNewEntity {
       final List<String> deletedByProfiles = const <String>[],
       final Map<String, DateTime> clearHistoryTimestamp =
           const <String, DateTime>{},
-      final Map<String, DateTime> typingIndicators = const {}})
+      final Map<String, DateTime> typingIndicators = const {},
+      this.isGroup = false,
+      this.groupName,
+      this.groupPhotoUrl})
       : _participants = participants,
         _participantProfiles = participantProfiles,
         _unreadCount = unreadCount,
@@ -425,6 +490,11 @@ class _$ConversationNewEntityImpl extends _ConversationNewEntity {
   /// Preview da última mensagem
   @override
   final String lastMessage;
+
+  /// Status de entrega da última mensagem (para indicar leitura)
+  @override
+  @JsonKey()
+  final MessageDeliveryStatus lastMessageStatus;
 
   /// Timestamp da última mensagem
   @override
@@ -551,9 +621,22 @@ class _$ConversationNewEntityImpl extends _ConversationNewEntity {
     return EqualUnmodifiableMapView(_typingIndicators);
   }
 
+  /// Flag de grupo
+  @override
+  @JsonKey()
+  final bool isGroup;
+
+  /// Nome do grupo (se isGroup=true)
+  @override
+  final String? groupName;
+
+  /// Foto do grupo (se isGroup=true)
+  @override
+  final String? groupPhotoUrl;
+
   @override
   String toString() {
-    return 'ConversationNewEntity(id: $id, participants: $participants, participantProfiles: $participantProfiles, lastMessage: $lastMessage, lastMessageTimestamp: $lastMessageTimestamp, lastMessageSenderId: $lastMessageSenderId, unreadCount: $unreadCount, createdAt: $createdAt, updatedAt: $updatedAt, participantsData: $participantsData, archived: $archived, archivedByProfiles: $archivedByProfiles, mutedByProfiles: $mutedByProfiles, pinnedByProfiles: $pinnedByProfiles, deletedByProfiles: $deletedByProfiles, clearHistoryTimestamp: $clearHistoryTimestamp, typingIndicators: $typingIndicators)';
+    return 'ConversationNewEntity(id: $id, participants: $participants, participantProfiles: $participantProfiles, lastMessage: $lastMessage, lastMessageStatus: $lastMessageStatus, lastMessageTimestamp: $lastMessageTimestamp, lastMessageSenderId: $lastMessageSenderId, unreadCount: $unreadCount, createdAt: $createdAt, updatedAt: $updatedAt, participantsData: $participantsData, archived: $archived, archivedByProfiles: $archivedByProfiles, mutedByProfiles: $mutedByProfiles, pinnedByProfiles: $pinnedByProfiles, deletedByProfiles: $deletedByProfiles, clearHistoryTimestamp: $clearHistoryTimestamp, typingIndicators: $typingIndicators, isGroup: $isGroup, groupName: $groupName, groupPhotoUrl: $groupPhotoUrl)';
   }
 
   @override
@@ -568,6 +651,8 @@ class _$ConversationNewEntityImpl extends _ConversationNewEntity {
                 .equals(other._participantProfiles, _participantProfiles) &&
             (identical(other.lastMessage, lastMessage) ||
                 other.lastMessage == lastMessage) &&
+            (identical(other.lastMessageStatus, lastMessageStatus) ||
+                other.lastMessageStatus == lastMessageStatus) &&
             (identical(other.lastMessageTimestamp, lastMessageTimestamp) ||
                 other.lastMessageTimestamp == lastMessageTimestamp) &&
             (identical(other.lastMessageSenderId, lastMessageSenderId) ||
@@ -593,30 +678,40 @@ class _$ConversationNewEntityImpl extends _ConversationNewEntity {
             const DeepCollectionEquality()
                 .equals(other._clearHistoryTimestamp, _clearHistoryTimestamp) &&
             const DeepCollectionEquality()
-                .equals(other._typingIndicators, _typingIndicators));
+                .equals(other._typingIndicators, _typingIndicators) &&
+            (identical(other.isGroup, isGroup) || other.isGroup == isGroup) &&
+            (identical(other.groupName, groupName) ||
+                other.groupName == groupName) &&
+            (identical(other.groupPhotoUrl, groupPhotoUrl) ||
+                other.groupPhotoUrl == groupPhotoUrl));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      id,
-      const DeepCollectionEquality().hash(_participants),
-      const DeepCollectionEquality().hash(_participantProfiles),
-      lastMessage,
-      lastMessageTimestamp,
-      lastMessageSenderId,
-      const DeepCollectionEquality().hash(_unreadCount),
-      createdAt,
-      updatedAt,
-      const DeepCollectionEquality().hash(_participantsData),
-      archived,
-      const DeepCollectionEquality().hash(_archivedByProfiles),
-      const DeepCollectionEquality().hash(_mutedByProfiles),
-      const DeepCollectionEquality().hash(_pinnedByProfiles),
-      const DeepCollectionEquality().hash(_deletedByProfiles),
-      const DeepCollectionEquality().hash(_clearHistoryTimestamp),
-      const DeepCollectionEquality().hash(_typingIndicators));
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        id,
+        const DeepCollectionEquality().hash(_participants),
+        const DeepCollectionEquality().hash(_participantProfiles),
+        lastMessage,
+        lastMessageStatus,
+        lastMessageTimestamp,
+        lastMessageSenderId,
+        const DeepCollectionEquality().hash(_unreadCount),
+        createdAt,
+        updatedAt,
+        const DeepCollectionEquality().hash(_participantsData),
+        archived,
+        const DeepCollectionEquality().hash(_archivedByProfiles),
+        const DeepCollectionEquality().hash(_mutedByProfiles),
+        const DeepCollectionEquality().hash(_pinnedByProfiles),
+        const DeepCollectionEquality().hash(_deletedByProfiles),
+        const DeepCollectionEquality().hash(_clearHistoryTimestamp),
+        const DeepCollectionEquality().hash(_typingIndicators),
+        isGroup,
+        groupName,
+        groupPhotoUrl
+      ]);
 
   /// Create a copy of ConversationNewEntity
   /// with the given fields replaced by the non-null parameter values.
@@ -637,25 +732,28 @@ class _$ConversationNewEntityImpl extends _ConversationNewEntity {
 
 abstract class _ConversationNewEntity extends ConversationNewEntity {
   const factory _ConversationNewEntity(
-          {required final String id,
-          required final List<String> participants,
-          required final List<String> participantProfiles,
-          required final String lastMessage,
-          required final DateTime lastMessageTimestamp,
-          final String? lastMessageSenderId,
-          required final Map<String, int> unreadCount,
-          required final DateTime createdAt,
-          final DateTime? updatedAt,
-          @JsonKey(includeFromJson: false, includeToJson: false)
-          final List<ParticipantData> participantsData,
-          final bool archived,
-          final List<String> archivedByProfiles,
-          final List<String> mutedByProfiles,
-          final List<String> pinnedByProfiles,
-          final List<String> deletedByProfiles,
-          final Map<String, DateTime> clearHistoryTimestamp,
-          final Map<String, DateTime> typingIndicators}) =
-      _$ConversationNewEntityImpl;
+      {required final String id,
+      required final List<String> participants,
+      required final List<String> participantProfiles,
+      required final String lastMessage,
+      final MessageDeliveryStatus lastMessageStatus,
+      required final DateTime lastMessageTimestamp,
+      final String? lastMessageSenderId,
+      required final Map<String, int> unreadCount,
+      required final DateTime createdAt,
+      final DateTime? updatedAt,
+      @JsonKey(includeFromJson: false, includeToJson: false)
+      final List<ParticipantData> participantsData,
+      final bool archived,
+      final List<String> archivedByProfiles,
+      final List<String> mutedByProfiles,
+      final List<String> pinnedByProfiles,
+      final List<String> deletedByProfiles,
+      final Map<String, DateTime> clearHistoryTimestamp,
+      final Map<String, DateTime> typingIndicators,
+      final bool isGroup,
+      final String? groupName,
+      final String? groupPhotoUrl}) = _$ConversationNewEntityImpl;
   const _ConversationNewEntity._() : super._();
 
   factory _ConversationNewEntity.fromJson(Map<String, dynamic> json) =
@@ -676,6 +774,10 @@ abstract class _ConversationNewEntity extends ConversationNewEntity {
   /// Preview da última mensagem
   @override
   String get lastMessage;
+
+  /// Status de entrega da última mensagem (para indicar leitura)
+  @override
+  MessageDeliveryStatus get lastMessageStatus;
 
   /// Timestamp da última mensagem
   @override
@@ -731,6 +833,18 @@ abstract class _ConversationNewEntity extends ConversationNewEntity {
   /// Quem está digitando atualmente (profileId -> timestamp)
   @override
   Map<String, DateTime> get typingIndicators;
+
+  /// Flag de grupo
+  @override
+  bool get isGroup;
+
+  /// Nome do grupo (se isGroup=true)
+  @override
+  String? get groupName;
+
+  /// Foto do grupo (se isGroup=true)
+  @override
+  String? get groupPhotoUrl;
 
   /// Create a copy of ConversationNewEntity
   /// with the given fields replaced by the non-null parameter values.

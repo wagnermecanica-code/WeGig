@@ -8,15 +8,19 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/core/cache/image_cache_manager.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/features/notifications_new/domain/entities/notification_new_entity.dart';
 import 'package:wegig_app/features/notifications_new/presentation/controllers/notifications_new_controller.dart';
 import 'package:wegig_app/features/notifications_new/presentation/utils/notification_new_action_handler.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 /// Widget para item de notificação individual
 ///
@@ -150,6 +154,23 @@ class NotificationNewItem extends ConsumerWidget {
       );
     }
 
+    // ✅ Interesses sem foto: usar avatar de perfil (não coração)
+    if (notification.type == NotificationType.interest) {
+      return Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: _getTypeColor().withValues(alpha: 0.15),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Iconsax.user,
+          color: _getTypeColor(),
+          size: 24,
+        ),
+      );
+    }
+
     // Senão, usa ícone baseado no tipo
     return Container(
       width: 48,
@@ -173,6 +194,10 @@ class NotificationNewItem extends ConsumerWidget {
         return Iconsax.heart5;
       case NotificationType.newMessage:
         return Iconsax.message;
+      case NotificationType.comment:
+        return Iconsax.message_text;
+      case NotificationType.commentLike:
+        return Iconsax.heart5;
       case NotificationType.postExpiring:
         return Iconsax.clock;
       case NotificationType.nearbyPost:
@@ -199,6 +224,10 @@ class NotificationNewItem extends ConsumerWidget {
         return Colors.pink;
       case NotificationType.newMessage:
         return AppColors.primary;
+      case NotificationType.comment:
+        return Colors.indigo;
+      case NotificationType.commentLike:
+        return Colors.red;
       case NotificationType.postExpiring:
         return Colors.orange;
       case NotificationType.nearbyPost:
@@ -345,6 +374,31 @@ class _NotificationInlineContentState extends State<NotificationInlineContent> {
       }
 
       final data = doc.data();
+
+      // 🔒 Reverse visibility: se o autor do post estiver excluído, não exibe localização.
+      final currentUid = FirebaseAuth.instance.currentUser?.uid?.trim() ?? '';
+      final authorProfileId = (data?['authorProfileId'] as String?)?.trim() ?? '';
+      if (currentUid.isNotEmpty && authorProfileId.isNotEmpty) {
+        try {
+          final container = ProviderScope.containerOf(context);
+          final activeProfile = container.read(activeProfileProvider);
+          if (activeProfile != null && authorProfileId != activeProfile.profileId) {
+            final excluded = await BlockedRelations.getExcludedProfileIds(
+              firestore: FirebaseFirestore.instance,
+              profileId: activeProfile.profileId,
+              uid: currentUid,
+            );
+            if (excluded.contains(authorProfileId)) {
+              _locationCache[postId] = null;
+              if (mounted) setState(() => _isLoading = false);
+              return;
+            }
+          }
+        } catch (_) {
+          // Se falhar, segue fluxo normal.
+        }
+      }
+
       final city = data?['city'] as String? ?? '';
       final neighborhood = data?['neighborhood'] as String? ?? '';
 
@@ -376,7 +430,7 @@ class _NotificationInlineContentState extends State<NotificationInlineContent> {
     
     // Usa senderUsername se disponível, senão usa senderName como fallback
     final senderUsername = notification.senderUsername;
-    final senderName = notification.senderName ?? 'Alguém';
+    final senderName = notification.senderName ?? 'WeGig';
     
     // Username para exibição (prefere username, fallback para nome)
     final displayUsername = (senderUsername != null && senderUsername.isNotEmpty)
@@ -404,6 +458,11 @@ class _NotificationInlineContentState extends State<NotificationInlineContent> {
     
     if (actionText.isNotEmpty) {
       restParts.add(actionText);
+    }
+
+    final eventMeta = _buildEventMeta(notification);
+    if (eventMeta != null && eventMeta.isNotEmpty) {
+      restParts.add(eventMeta);
     }
     
     if (_locationText != null && _locationText!.isNotEmpty) {
@@ -451,6 +510,29 @@ class _NotificationInlineContentState extends State<NotificationInlineContent> {
       maxLines: 3,
       overflow: TextOverflow.ellipsis,
     );
+  }
+
+  String? _buildEventMeta(NotificationEntity notification) {
+    final data = notification.data;
+    final actionData = notification.actionData;
+    final eventType = ((actionData?['eventType'] ?? data['eventType']) as String?)?.trim();
+    final rawDate = actionData?['eventDate'] ?? data['eventDate'];
+
+    DateTime? eventDate;
+    if (rawDate is Timestamp) {
+      eventDate = rawDate.toDate();
+    } else if (rawDate is String) {
+      eventDate = DateTime.tryParse(rawDate);
+    }
+
+    final parts = <String>[];
+    if (eventType != null && eventType.isNotEmpty) parts.add(eventType);
+    if (eventDate != null) {
+      parts.add(DateFormat('dd/MM').format(eventDate));
+    }
+
+    if (parts.isEmpty) return null;
+    return parts.join(' • ');
   }
 
   /// Extrai a ação do body da notificação

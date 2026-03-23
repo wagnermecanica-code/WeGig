@@ -2,10 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/utils/geo_utils.dart' as geo;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wegig_app/features/home/domain/repositories/home_repository.dart';
 import 'package:wegig_app/features/post/domain/repositories/post_repository.dart';
+
+import 'package:rxdart/rxdart.dart';
+import 'package:wegig_app/core/firebase/blocked_profiles.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 
 /// Implementação do HomeRepository
 /// Reutiliza PostRepository para operações de posts
@@ -18,6 +23,16 @@ class HomeRepositoryImpl implements HomeRepository {
         _firestore = firestore ?? FirebaseFirestore.instance;
   final PostRepository _postRepository;
   final FirebaseFirestore _firestore;
+
+  Stream<List<String>> _excludedProfileIds$({required String profileId, String? uid}) {
+    final trimmedProfileId = profileId.trim();
+    if (trimmedProfileId.isEmpty) return Stream.value(const <String>[]);
+    return BlockedRelations.watchExcludedProfileIds(
+      firestore: _firestore,
+      profileId: trimmedProfileId,
+      uid: uid,
+    ).onErrorReturn(const <String>[]);
+  }
 
   @override
   Future<List<PostEntity>> loadNearbyPosts({
@@ -97,8 +112,17 @@ class HomeRepositoryImpl implements HomeRepository {
     String? instrument,
     String? city,
     int limit = 20,
+    String? currentProfileId,
   }) async {
     try {
+      final excludedProfileIds = currentProfileId == null || currentProfileId.isEmpty
+          ? const <String>[]
+          : await BlockedRelations.getExcludedProfileIds(
+              firestore: _firestore,
+              profileId: currentProfileId,
+            );
+      final excludedSet = excludedProfileIds.toSet();
+
       Query<Map<String, dynamic>> query = _firestore.collection('profiles');
 
       // Filtro por nome (case-insensitive via Firestore array search)
@@ -127,6 +151,7 @@ class HomeRepositoryImpl implements HomeRepository {
       final profiles = snapshot.docs
           .map((doc) =>
               ProfileEntity.fromJson({...doc.data(), 'profileId': doc.id}))
+          .where((profile) => !excludedSet.contains(profile.profileId))
           .toList();
 
       return profiles;
@@ -157,47 +182,62 @@ class HomeRepositoryImpl implements HomeRepository {
     required double latitude,
     required double longitude,
     required double radiusKm,
+    String? currentProfileId,
+    String? currentUid,
   }) {
     try {
       // Calcula bounds do retângulo que contém o círculo de busca
       final bounds = _calculateBounds(latitude, longitude, radiusKm);
 
-      return _firestore
-          .collection('posts')
-          .where('expiresAt', isGreaterThan: Timestamp.now())
-          .where('location',
-              isGreaterThan: GeoPoint(bounds['minLat']!, bounds['minLng']!))
-          .where('location',
-              isLessThan: GeoPoint(bounds['maxLat']!, bounds['maxLng']!))
-          .orderBy('location')
-          .orderBy('createdAt', descending: true)
-          .limit(50)
-          .snapshots()
-          .map((snapshot) {
-        final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
+      // ✅ Atualiza instantaneamente quando a lista de bloqueados muda.
+      // ⚠️ Firestore: não dá para usar `whereNotIn` aqui porque já existe
+      // inequality em `location` (geosearch) e em `expiresAt`.
+      final profileId = currentProfileId ?? '';
+      final uid = currentUid;
+      
+      return _excludedProfileIds$(profileId: profileId, uid: uid).switchMap((excludedProfileIds) {
+        final excludedSet = excludedProfileIds.toSet();
 
-        // Filtra posts dentro do raio circular
-        final postsInRadius = posts.where((post) {
-          final distance = geo.calculateDistance(
-            LatLng(latitude, longitude),
-            LatLng(post.latitude, post.longitude),
-          );
-          return distance <= radiusKm;
-        }).toList();
+        return _firestore
+            .collection('posts')
+            .where('expiresAt', isGreaterThan: Timestamp.now())
+            .where('location',
+                isGreaterThan: GeoPoint(bounds['minLat']!, bounds['minLng']!))
+            .where('location',
+                isLessThan: GeoPoint(bounds['maxLat']!, bounds['maxLng']!))
+            .orderBy('location')
+            .orderBy('createdAt', descending: true)
+            .limit(50)
+            .snapshots()
+            .map((snapshot) {
+          final posts = snapshot.docs
+              .map(PostEntity.fromFirestore)
+              .where((post) => !excludedSet.contains(post.authorProfileId))
+              .toList();
 
-        // Adiciona distância e ordena
-        final postsWithDistance = postsInRadius.map((post) {
-          final distance = geo.calculateDistance(
-            LatLng(latitude, longitude),
-            LatLng(post.latitude, post.longitude),
-          );
-          return post.copyWith(distanceKm: distance);
-        }).toList();
+          // Filtra posts dentro do raio circular
+          final postsInRadius = posts.where((post) {
+            final distance = geo.calculateDistance(
+              LatLng(latitude, longitude),
+              LatLng(post.latitude, post.longitude),
+            );
+            return distance <= radiusKm;
+          }).toList();
 
-        postsWithDistance.sort((a, b) => (a.distanceKm ?? double.infinity)
-            .compareTo(b.distanceKm ?? double.infinity));
+          // Adiciona distância e ordena
+          final postsWithDistance = postsInRadius.map((post) {
+            final distance = geo.calculateDistance(
+              LatLng(latitude, longitude),
+              LatLng(post.latitude, post.longitude),
+            );
+            return post.copyWith(distanceKm: distance);
+          }).toList();
 
-        return postsWithDistance;
+          postsWithDistance.sort((a, b) => (a.distanceKm ?? double.infinity)
+              .compareTo(b.distanceKm ?? double.infinity));
+
+          return postsWithDistance;
+        });
       });
     } catch (e) {
       debugPrint('❌ HomeRepositoryImpl.watchNearbyPosts error: $e');

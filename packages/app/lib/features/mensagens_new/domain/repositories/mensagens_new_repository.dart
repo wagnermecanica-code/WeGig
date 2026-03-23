@@ -112,6 +112,16 @@ abstract class MensagensNewRepository {
     MessageReplyData? replyTo,
   });
 
+  /// Envia uma mensagem com post compartilhado
+  Future<MessageNewEntity> sendSharedPostMessage({
+    required String conversationId,
+    required String senderId,
+    required String senderProfileId,
+    required Map<String, dynamic> postData,
+    String? senderName,
+    String? senderPhotoUrl,
+  });
+
   /// Edita uma mensagem existente
   Future<void> editMessage({
     required String conversationId,
@@ -172,6 +182,22 @@ abstract class MensagensNewRepository {
     required String conversationId,
     required String messageId,
     required MessageDeliveryStatus status,
+  });
+
+  // ============================================
+  // STATUS PARA GRUPOS
+  // ============================================
+
+  /// Marca mensagens como recebidas por um perfil em um grupo
+  Future<void> markGroupMessagesAsReceived({
+    required String conversationId,
+    required String profileId,
+  });
+
+  /// Marca mensagens como lidas por um perfil em um grupo
+  Future<void> markGroupMessagesAsRead({
+    required String conversationId,
+    required String profileId,
   });
 
   // ============================================

@@ -16,7 +16,9 @@ import 'package:flutter/foundation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:wegig_app/features/notifications_new/domain/entities/notification_new_entity.dart';
+import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 import 'package:wegig_app/features/notifications_new/presentation/providers/notifications_new_providers.dart';
+import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 part 'notifications_new_controller.freezed.dart';
@@ -69,22 +71,17 @@ class NotificationsNewController extends _$NotificationsNewController {
     String profileId, {
     NotificationType? type,
   }) async {
-    // Obter UID do perfil ativo para Security Rules
-    final activeProfile = ref.read(activeProfileProvider);
-    final recipientUid = activeProfile?.uid;
+    // Obter UID do usuário autenticado para Security Rules
+    // (Evita mismatch durante troca de perfil/conta)
+    final recipientUid = ref.read(currentUserProvider)?.uid;
 
     debugPrint(
-        '🔔 NotificationsNewController: build() - profileId=$profileId, activeProfile=${activeProfile?.profileId}, uid=$recipientUid, type=${type?.name ?? 'all'}');
+        '🔔 NotificationsNewController: build() - profileId=$profileId, uid=$recipientUid, type=${type?.name ?? 'all'}');
 
     if (recipientUid == null) {
-      debugPrint('⚠️ NotificationsNewController: recipientUid is null - activeProfile=$activeProfile');
-      return const NotificationsNewState(hasMore: false);
-    }
-
-    // VALIDAÇÃO: Verificar se profileId passado == profileId do activeProfile
-    if (activeProfile!.profileId != profileId) {
       debugPrint(
-          '⚠️ NotificationsNewController: MISMATCH! profileId passado ($profileId) != activeProfile.profileId (${activeProfile.profileId})');
+          '⚠️ NotificationsNewController: recipientUid is null (not authenticated?)');
+      return const NotificationsNewState(hasMore: false);
     }
 
     try {
@@ -130,9 +127,12 @@ class NotificationsNewController extends _$NotificationsNewController {
       return;
     }
 
-    // Obter UID
-    final activeProfile = ref.read(activeProfileProvider);
-    final recipientUid = activeProfile?.uid;
+    // Se o perfil ativo mudou desde que este controller foi criado, não continue.
+    final activeProfileId = ref.read(activeProfileProvider)?.profileId;
+    if (activeProfileId != profileId) return;
+
+    // Obter UID do usuário autenticado (Security Rules)
+    final recipientUid = ref.read(currentUserProvider)?.uid;
     if (recipientUid == null) return;
 
     debugPrint('🔔 NotificationsNewController: loadMore');
@@ -205,8 +205,15 @@ class NotificationsNewController extends _$NotificationsNewController {
         notificationId: notificationId,
         profileId: profileId,
       );
+
+      // Atualizar badge do ícone do app baseado no Firestore (fonte da verdade)
+      final recipientUid = ref.read(currentUserProvider)?.uid;
+      if (recipientUid != null) {
+        await PushNotificationService().updateAppBadge(profileId, recipientUid);
+      }
     } catch (e) {
-      debugPrint('⚠️ NotificationsNewController: markAsRead backend error - $e');
+      debugPrint(
+          '⚠️ NotificationsNewController: markAsRead backend error - $e');
       // Não reverte UI - atualização otimista permanece
     }
   }
@@ -249,8 +256,12 @@ class NotificationsNewController extends _$NotificationsNewController {
     final currentState = state.valueOrNull;
     if (currentState == null) return;
 
-    final activeProfile = ref.read(activeProfileProvider);
-    final recipientUid = activeProfile?.uid;
+    // Se o perfil ativo mudou desde que este controller foi criado, não continue.
+    final activeProfileId = ref.read(activeProfileProvider)?.profileId;
+    if (activeProfileId != profileId) return;
+
+    // Obter UID do usuário autenticado (Security Rules)
+    final recipientUid = ref.read(currentUserProvider)?.uid;
     if (recipientUid == null) return;
 
     debugPrint('🔔 NotificationsNewController: markAllAsRead');
@@ -273,6 +284,9 @@ class NotificationsNewController extends _$NotificationsNewController {
         profileId: profileId,
         recipientUid: recipientUid,
       );
+
+      // Atualizar badge do ícone do app (remove se 0)
+      await PushNotificationService().updateAppBadge(profileId, recipientUid);
     } catch (e) {
       debugPrint(
           '⚠️ NotificationsNewController: markAllAsRead backend error - $e');

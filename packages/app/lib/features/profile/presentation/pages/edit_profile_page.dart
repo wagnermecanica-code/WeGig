@@ -14,6 +14,8 @@ import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/utils/debouncer.dart';
 import 'package:core_ui/utils/location_utils.dart';
+import 'package:core_ui/utils/music_constants.dart';
+import 'package:core_ui/utils/objectionable_content_filter.dart';
 import 'package:core_ui/widgets/multi_select_field.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -26,10 +28,12 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:go_router/go_router.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/auth/presentation/widgets/age_verification_dialog.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_switcher_provider.dart';
 
 class EditProfilePage extends ConsumerStatefulWidget {
   const EditProfilePage({
@@ -53,6 +57,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   final _profileUsernameController = TextEditingController();
   final _locationFocusNode = FocusNode();
   final _youtubeController = TextEditingController();
+  final _spotifyController = TextEditingController();
+  final _deezerController = TextEditingController();
   final _instagramController = TextEditingController();
   final _tiktokController = TextEditingController();
   // Space-specific controllers
@@ -79,6 +85,14 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   String? _selectedState;
   String? _accountUsername;
 
+  // ✅ Estado para validação de username em tempo real (apenas para novos perfis)
+  bool _isCheckingUsername = false;
+  bool? _isUsernameAvailable; // null = não verificado, true = disponível, false = em uso
+  String? _lastCheckedUsername;
+  Timer? _usernameDebounceTimer;
+  List<String> _usernameSuggestions = []; // ✅ Sugestões de username do login social
+  int _usernameAutoResolveGeneration = 0;
+
   // Computed property para evitar lógica no build
   bool get _isFirstAccess => _profile == null && !_isLoadingProfile;
   bool get _canNavigateBack => widget.isNewProfile || !_isFirstAccess;
@@ -90,166 +104,131 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
   static const int maxBioLength = 110;
   static const int maxInstruments = 5;
-  static const int maxGenres = 3;
-
-  static const List<String> _levelOptions = [
-    'Iniciante',
-    'Intermediário',
-    'Avançado',
-    'Profissional',
-  ];
-
-  static const List<String> _instrumentOptions = [
-    'Violão',
-    'Guitarra',
-    'Baixo',
-    'Contrabaixo',
-    'Bateria',
-    'Teclado',
-    'Piano',
-    'Saxofone',
-    'Flauta',
-    'Trompete',
-    'Trombone',
-    'Clarinete',
-    'Oboé',
-    'Fagote',
-    'Violino',
-    'Viola',
-    'Cello',
-    'Contrabaixo Acústico',
-    'Voz',
-    'Voz (Soprano)',
-    'Voz (Contralto)',
-    'Voz (Tenor)',
-    'Voz (Barítono)',
-    'Voz (Baixo)',
-    'DJ',
-    'Percussão',
-    'Bateria Eletrônica',
-    'Caixa',
-    'Cajón',
-    'Bongô',
-    'Pandeiro',
-    'Zabumba',
-    'Timbal',
-    'Harmônica',
-    'Gaita',
-    'Acordeon',
-    'Sanfona',
-    'Bandolim',
-    'Cavaquinho',
-    'Ukulele',
-    'Banjo',
-    'Harpa',
-    'Sitar',
-    'Alaúde',
-    'Guitarra Clássica',
-    'Berimbau',
-    'Escaleta',
-    'Melódica',
-    'Theremin',
-    'Sintetizador',
-    'Teclado MIDI',
-    'Sampler',
-    'Produtor Musical',
-    'Beatmaker',
-    'Outros',
-  ];
-
-  // ✨ EXPANDIDO: Lista completa de gêneros musicais com opção "Outros"
-  static const List<String> _genreOptions = [
-    'Rock',
-    'Pop',
-    'Jazz',
-    'Blues',
-    'Funk',
-    'Soul',
-    'R&B',
-    'Reggae',
-    'MPB',
-    'Sertanejo',
-    'Sertanejo Universitário',
-    'Sertanejo Raiz',
-    'Forró',
-    'Forró Eletrônico',
-    'Axé',
-    'Hip-Hop',
-    'Rap',
-    'Trap',
-    'Drill',
-    'Eletrônica',
-    'House',
-    'Techno',
-    'Trance',
-    'Dubstep',
-    'Drum and Bass',
-    'EDM',
-    'Folk',
-    'Country',
-    'Classical',
-    'Ópera',
-    'Metal',
-    'Heavy Metal',
-    'Death Metal',
-    'Black Metal',
-    'Thrash Metal',
-    'Power Metal',
-    'Punk',
-    'Punk Rock',
-    'Hardcore',
-    'Post-Punk',
-    'Indie',
-    'Indie Rock',
-    'Alternative',
-    'Grunge',
-    'Samba',
-    'Samba-Enredo',
-    'Pagode',
-    'Bossa Nova',
-    'Gospel',
-    'Música Católica',
-    'Música Evangélica',
-    'Choro',
-    'Baião',
-    'Maracatu',
-    'Frevo',
-    'Salsa',
-    'Merengue',
-    'Bachata',
-    'Tango',
-    'Flamenco',
-    'Brega',
-    'Piseiro',
-    'Arrocha',
-    'Música Sertaneja',
-    'Música Gaúcha',
-    'Música Caipira',
-    'Rock Progressivo',
-    'Psicodélico',
-    'Disco',
-    'New Wave',
-    'Synth-pop',
-    'Ska',
-    'Reggaeton',
-    'K-Pop',
-    'J-Pop',
-    'World Music',
-    'Afrobeat',
-    'Zouk',
-    'Ambient',
-    'Experimental',
-    'Avant-garde',
-    'Minimalista',
-    'Lo-fi',
-    'Vaporwave',
-    'Outros',
-  ];
+  static const int maxGenres = 5;
 
   @override
   void initState() {
     super.initState();
+    
+    // ✅ Para novos perfis, consumir dados do login social após o frame inicial
+    // Isso garante que os providers foram atualizados antes de ler
+    if (widget.isNewProfile) {
+      debugPrint('EditProfile: 🆕 initState - isNewProfile=true, agendando consumo de dados');
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await _consumeSocialLoginData();
+      });
+    }
+    
     _loadProfile();
+  }
+  
+  /// Consome dados do login social (Apple/Google) e preenche os campos
+  /// Deve ser chamado após o frame inicial para garantir sincronização
+  Future<void> _consumeSocialLoginData() async {
+    if (!widget.isNewProfile) {
+      debugPrint('EditProfile: ⚠️ _consumeSocialLoginData ignorado - não é novo perfil');
+      return;
+    }
+    
+    debugPrint('EditProfile: 🔄 _consumeSocialLoginData() chamado');
+    debugPrint('EditProfile: 🔄 mounted=$mounted');
+    
+    // ✅ Ler dados do login social
+    final socialLoginData = ref.read(socialLoginDataProvider);
+    final verifiedBirthYear = ref.read(verifiedBirthYearProvider);
+    
+    debugPrint('EditProfile: 📊 ====== VALORES DOS PROVIDERS ======');
+    debugPrint('EditProfile: 📊 socialLoginDataProvider:');
+    if (socialLoginData != null) {
+      debugPrint('EditProfile:    ├─ provider: ${socialLoginData.provider}');
+      debugPrint('EditProfile:    ├─ displayName: "${socialLoginData.displayName}"');
+      debugPrint('EditProfile:    ├─ email: "${socialLoginData.email}"');
+      debugPrint('EditProfile:    └─ photoUrl: "${socialLoginData.photoUrl}"');
+    } else {
+      debugPrint('EditProfile:    └─ NULL');
+    }
+    debugPrint('EditProfile: 📊 verifiedBirthYearProvider: $verifiedBirthYear');
+    debugPrint('EditProfile: 📊 ===================================');
+    
+    // Pré-preencher ano de nascimento
+    if (verifiedBirthYear != null && _birthYearController.text.isEmpty) {
+      _birthYearController.text = verifiedBirthYear.toString();
+      debugPrint('EditProfile: ✅ Ano de nascimento pré-preenchido: $verifiedBirthYear');
+    }
+    
+    // Consumir dados do login social
+    if (socialLoginData != null) {
+      debugPrint('EditProfile: ✅ Processando dados de login social (${socialLoginData.provider})...');
+      
+      bool shouldUpdate = false;
+      
+      // Pré-preencher nome
+      if (socialLoginData.displayName != null && 
+          socialLoginData.displayName!.isNotEmpty &&
+          _nameController.text.isEmpty) {
+        _nameController.text = socialLoginData.displayName!;
+        shouldUpdate = true;
+        debugPrint('EditProfile: ✅ Nome pré-preenchido: "${socialLoginData.displayName}"');
+      } else {
+        debugPrint('EditProfile: ⏭️ Nome não pré-preenchido (displayName=${socialLoginData.displayName}, nameController.text=${_nameController.text})');
+      }
+
+      // Fallback Apple: usar parte local do email como nome (melhor que vazio)
+      if ((_nameController.text.trim().isEmpty) &&
+          (socialLoginData.email ?? '').trim().isNotEmpty) {
+        final localPart = socialLoginData.email!.split('@').first.trim();
+        final cleaned = localPart
+            .replaceAll(RegExp(r'[._-]+'), ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+        if (cleaned.isNotEmpty) {
+          _nameController.text = cleaned;
+          shouldUpdate = true;
+          debugPrint('EditProfile: ✅ Nome fallback (email) pré-preenchido: "$cleaned"');
+        }
+      }
+      
+      // Pré-preencher foto
+      if (socialLoginData.photoUrl != null && 
+          socialLoginData.photoUrl!.isNotEmpty &&
+          _photoUrl == null) {
+        _photoUrl = socialLoginData.photoUrl;
+        shouldUpdate = true;
+        debugPrint('EditProfile: ✅ Foto pré-preenchida: "${socialLoginData.photoUrl}"');
+      } else {
+        debugPrint('EditProfile: ⏭️ Foto não pré-preenchida (photoUrl=${socialLoginData.photoUrl}, _photoUrl=$_photoUrl)');
+      }
+      
+      // Gerar sugestões de username
+      if (_profileUsernameController.text.isEmpty) {
+        final suggestions = socialLoginData.generateUsernameSuggestions();
+        debugPrint('EditProfile: 📝 Sugestões de username geradas: $suggestions');
+        if (suggestions.isNotEmpty) {
+          _usernameSuggestions = suggestions;
+          shouldUpdate = true;
+          debugPrint('EditProfile: ✅ Sugestões aplicadas - escolhendo automaticamente a primeira disponível');
+
+          // ✅ Escolher automaticamente a primeira sugestão disponível
+          await _autoPickFirstAvailableUsernameSuggestion(suggestions);
+        }
+      } else {
+        debugPrint('EditProfile: ⏭️ Username não sugerido (usernameController.text=${_profileUsernameController.text})');
+      }
+      
+      // ⚠️ NÃO limpar providers aqui - limpar apenas após SALVAR o perfil
+      // Isso evita perda de dados se o usuário voltar para esta tela
+      debugPrint('EditProfile: ℹ️ Providers NÃO limpos (serão limpos ao salvar)');
+      
+      // Atualizar UI se necessário
+      if (shouldUpdate && mounted) {
+        setState(() {});
+        debugPrint('EditProfile: 🔄 UI atualizada com dados sociais');
+      } else {
+        debugPrint('EditProfile: ⚠️ UI não atualizada (shouldUpdate=$shouldUpdate, mounted=$mounted)');
+      }
+    } else {
+      debugPrint('EditProfile: ⚠️ socialLoginData é NULL - cadastro manual ou email/senha');
+    }
   }
 
   @override
@@ -262,6 +241,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     _profileUsernameController.dispose();
     _locationFocusNode.dispose();
     _youtubeController.dispose();
+    _spotifyController.dispose();
+    _deezerController.dispose();
     _instagramController.dispose();
     _tiktokController.dispose();
     // Space-specific controllers
@@ -269,6 +250,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     _operatingHoursController.dispose();
     _websiteController.dispose();
     _locationDebouncer.dispose(); // ✅ Cancela Timer pendente
+    _usernameDebounceTimer?.cancel(); // ✅ Cancela Timer de username
     super.dispose();
   }
 
@@ -286,24 +268,26 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         if (username != null && username.isNotEmpty) {
           _accountUsername = username;
           if (_profileUsernameController.text.isEmpty) {
-            _profileUsernameController.text =
-                _sanitizeProfileUsername(username);
+            final base = _sanitizeProfileUsername(username);
+            _profileUsernameController.text = base;
+
+            // ✅ Para novo perfil: se este username estiver em uso, já sugerir/auto-escolher uma alternativa
+            if (widget.isNewProfile) {
+              final suggestions = _generateUsernameSuggestionsFromUsername(base);
+              _usernameSuggestions = suggestions;
+              await _autoPickFirstAvailableUsernameSuggestion(suggestions);
+            }
           }
         }
       }
 
-      // Se é novo perfil, deixa tudo vazio (exceto ano de nascimento verificado)
+      // Se é novo perfil, apenas finaliza loading (dados sociais já consumidos via addPostFrameCallback)
       if (widget.isNewProfile) {
-        debugPrint('EditProfile: Modo novo perfil - campos vazios');
+        debugPrint('EditProfile: Modo novo perfil - aguardando consumo de dados sociais via callback');
         
-        // ✅ Pré-preenche ano de nascimento da verificação de idade no cadastro
-        final verifiedBirthYear = ref.read(verifiedBirthYearProvider);
-        if (verifiedBirthYear != null) {
-          _birthYearController.text = verifiedBirthYear.toString();
-          debugPrint('EditProfile: Ano de nascimento pré-preenchido: $verifiedBirthYear');
+        if (mounted) {
+          setState(() => _isLoadingProfile = false);
         }
-        
-        setState(() => _isLoadingProfile = false);
         return;
       }
 
@@ -337,8 +321,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           );
 
           _youtubeController.text = profile.youtubeLink ?? '';
-          _instagramController.text = profile.instagramLink ?? '';
-          _tiktokController.text = profile.tiktokLink ?? '';
+          _spotifyController.text = profile.spotifyLink ?? '';
+          _deezerController.text = profile.deezerLink ?? '';
+          _instagramController.text = _extractInstagramUsername(profile.instagramLink);
+          _tiktokController.text = _extractTikTokUsername(profile.tiktokLink);
           _photoUrl = profile.photoUrl;
           _profileType = profile.profileType;
           _selectedLevel = profile.level;
@@ -376,8 +362,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           );
 
           _youtubeController.text = activeProfile.youtubeLink ?? '';
-          _instagramController.text = activeProfile.instagramLink ?? '';
-          _tiktokController.text = activeProfile.tiktokLink ?? '';
+          _spotifyController.text = activeProfile.spotifyLink ?? '';
+          _deezerController.text = activeProfile.deezerLink ?? '';
+          _instagramController.text = _extractInstagramUsername(activeProfile.instagramLink);
+          _tiktokController.text = _extractTikTokUsername(activeProfile.tiktokLink);
           _photoUrl = activeProfile.photoUrl;
           _profileType = activeProfile.profileType;
           _selectedLevel = activeProfile.level;
@@ -487,47 +475,41 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
       debugPrint('EditProfile: Imagem selecionada: ${picked.path}');
 
-      // Crop da imagem com opções de aspect ratio
+      // Crop da imagem travado em 1:1 para evitar avatares achatados
       final cropped = await ImageCropper().cropImage(
         sourcePath: picked.path,
         compressQuality: 85,
         maxWidth: 1200,
         maxHeight: 1200,
         compressFormat: ImageCompressFormat.jpg,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
         uiSettings: [
           AndroidUiSettings(
             toolbarTitle: 'Editar Foto de Perfil',
             toolbarColor: AppColors.primary,
             toolbarWidgetColor: Colors.white,
-            statusBarColor: AppColors.primary,
+            statusBarLight: false,
             backgroundColor: Colors.black,
             activeControlsWidgetColor: AppColors.primary,
-            hideBottomControls: false,
+            hideBottomControls: true,
             cropFrameColor: AppColors.primary,
             cropGridColor: Colors.white24,
             dimmedLayerColor: Colors.black.withValues(alpha: 0.8),
             initAspectRatio: CropAspectRatioPreset.square,
             aspectRatioPresets: [
               CropAspectRatioPreset.square,
-              CropAspectRatioPreset.ratio3x2,
-              CropAspectRatioPreset.ratio4x3,
-              CropAspectRatioPreset.ratio16x9,
-              CropAspectRatioPreset.original,
             ],
-            lockAspectRatio: false,
+            lockAspectRatio: true,
           ),
           IOSUiSettings(
             title: 'Editar Foto de Perfil',
-            minimumAspectRatio: 0.5,
-            aspectRatioLockDimensionSwapEnabled: true,
-            rotateButtonsHidden: false,
-            resetButtonHidden: false,
+            minimumAspectRatio: 1,
+            aspectRatioLockEnabled: true,
+            aspectRatioLockDimensionSwapEnabled: false,
+            rotateButtonsHidden: true,
+            resetButtonHidden: true,
             aspectRatioPresets: [
               CropAspectRatioPreset.square,
-              CropAspectRatioPreset.ratio3x2,
-              CropAspectRatioPreset.ratio4x3,
-              CropAspectRatioPreset.ratio16x9,
-              CropAspectRatioPreset.original,
             ],
           ),
         ],
@@ -594,6 +576,14 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       // pois o perfil já foi salvo com sucesso
     }
 
+    // ✅ Limpar providers de login social após salvar com sucesso
+    // Isso evita que os dados sejam reutilizados em futuras criações de perfil
+    if (isCreation && widget.isNewProfile) {
+      debugPrint('EditProfile: 🧹 Limpando providers de login social após salvar');
+      ref.read(socialLoginDataProvider.notifier).state = null;
+      ref.read(verifiedBirthYearProvider.notifier).state = null;
+    }
+
     if (!mounted) return;
 
     final navigator = Navigator.of(context);
@@ -609,17 +599,34 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     // Para primeiro perfil criado (isNewProfile), vai direto para home
     // Para edição de perfil, volta para a página do perfil
     if (widget.isNewProfile && isCreation) {
-      debugPrint('EditProfile: Primeiro perfil criado, indo para home');
-      router.go(AppRoutes.home);
-    } else {
+      debugPrint(
+        'EditProfile: Perfil criado, indo para Home (aba Perfil): ${profile.profileId}',
+      );
+      // ✅ Se a página foi aberta via Navigator.push (ex: modal), fechá-la.
+      // Em alguns fluxos, um `router.go(...)` não remove rotas fora do GoRouter.
       if (navigator.canPop()) {
         navigator.pop(profile.profileId);
       }
 
+      // ✅ Garantir que o usuário veja o perfil novo dentro do BottomNavScaffold.
+      // Usamos post-frame para evitar navegar durante pop/transition.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        // Executa navegação após a finalização do pop para evitar flicker
-        router.go(AppRoutes.profile(profile.profileId));
+        router.go('${AppRoutes.home}?tab=profile');
       });
+      return;
+    } else {
+      // ✅ IMPORTANT: Do not force a `go(/profile/...)` here.
+      // That replaces the navigation stack and lands the user on ViewProfile
+      // with no BottomNavScaffold and (since it becomes the root) no back button.
+      // Instead, return to the previous screen (ViewProfile/Home/Settings),
+      // preserving the expected navigation chrome.
+      if (navigator.canPop()) {
+        navigator.pop(profile.profileId);
+        return;
+      }
+
+      // Fallback for deep-linked edit route (no back stack): go to home.
+      router.go(AppRoutes.home);
     }
   }
 
@@ -670,6 +677,32 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         'Por favor, selecione o tipo de perfil (Músico, Banda ou Espaço)',
       );
       return;
+    }
+
+    // Músico: ano de nascimento obrigatório e >= 18 anos
+    if (_profileType == ProfileType.musician) {
+      final birthYearStr = _birthYearController.text.trim();
+      final birthYear = int.tryParse(birthYearStr);
+      final currentYear = DateTime.now().year;
+
+      if (birthYear == null) {
+        AppSnackBar.showWarning(context, 'Informe um ano de nascimento válido (apenas números)');
+        return;
+      }
+
+      if (birthYear > currentYear) {
+        AppSnackBar.showWarning(context, 'Ano de nascimento não pode ser no futuro');
+        return;
+      }
+
+      final age = currentYear - birthYear;
+      if (age < 18) {
+        AppSnackBar.showWarning(
+          context,
+          'Idade mínima para músicos é 18 anos',
+        );
+        return;
+      }
     }
 
     // Validar campos específicos de Espaço
@@ -748,6 +781,15 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       // Use profileProvider.notifier methods (Clean Architecture)
       final currentProfile = _profile;
 
+      final bioText = _bioController.text.trim();
+      final bioError = ObjectionableContentFilter.validate(
+        'bio',
+        bioText.isEmpty ? null : bioText,
+      );
+      if (bioError != null) {
+        throw Exception(bioError);
+      }
+
       if (widget.isNewProfile || currentProfile == null) {
         // ✅ Criar novo perfil via ProfileService (Clean Architecture)
         debugPrint('✨ EditProfile: Criando novo perfil...');
@@ -782,12 +824,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           youtubeLink: _youtubeController.text.trim().isEmpty
               ? null
               : _youtubeController.text.trim(),
-          instagramLink: _instagramController.text.trim().isEmpty
-              ? null
-              : _instagramController.text.trim(),
-          tiktokLink: _tiktokController.text.trim().isEmpty
-              ? null
-              : _tiktokController.text.trim(),
+            spotifyLink: _buildSpotifyUrl(_spotifyController.text),
+          deezerLink: _buildDeezerUrl(_deezerController.text),
+          instagramLink: _buildInstagramUrl(_instagramController.text),
+          tiktokLink: _buildTikTokUrl(_tiktokController.text),
           // Space-specific fields
           spaceType: _selectedSpaceType,
           phone: _phoneController.text.trim().isEmpty
@@ -822,7 +862,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
               profile.username,
             );
 
-            await profileNotifier.switchProfile(profile.profileId);
+            await ref
+                .read(profileSwitcherNotifierProvider.notifier)
+                .switchToProfile(profile.profileId);
 
             final userDocRef =
                 FirebaseFirestore.instance.collection('users').doc(user.uid);
@@ -890,12 +932,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           youtubeLink: _youtubeController.text.trim().isEmpty
               ? null
               : _youtubeController.text.trim(),
-          instagramLink: _instagramController.text.trim().isEmpty
-              ? null
-              : _instagramController.text.trim(),
-          tiktokLink: _tiktokController.text.trim().isEmpty
-              ? null
-              : _tiktokController.text.trim(),
+            spotifyLink: _buildSpotifyUrl(_spotifyController.text),
+          deezerLink: _buildDeezerUrl(_deezerController.text),
+          instagramLink: _buildInstagramUrl(_instagramController.text),
+          tiktokLink: _buildTikTokUrl(_tiktokController.text),
           // Space-specific fields
           spaceType: _selectedSpaceType,
           phone: _phoneController.text.trim().isEmpty
@@ -1119,7 +1159,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             child: FractionallySizedBox(
               widthFactor: 0.8, // 80% da largura
               child: ElevatedButton(
-                onPressed: _isSaving ? null : _saveProfile,
+                onPressed: _shouldDisableSaveButton ? null : _saveProfile,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1250,6 +1290,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
               helperText:
                   'Único por perfil. Use letras, números, ponto e underline.',
               prefixText: '@',
+              // ✅ Sufixo com indicador de status (apenas para novos perfis)
+              suffixIcon: _buildUsernameSuffixIcon(),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -1259,7 +1301,13 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             validator: _validateProfileUsername,
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.none,
+            // ✅ Verificar disponibilidade em tempo real
+            onChanged: _checkUsernameAvailability,
           ),
+          // ✅ Indicador de disponibilidade abaixo do campo
+          _buildUsernameAvailabilityIndicator(),
+          // ✅ Sugestões de username do login social
+          _buildUsernameSuggestions(),
         ],
         const SizedBox(height: 16),
 
@@ -1334,7 +1382,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           ),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return null; // Campo opcional
+              if (_profileType == ProfileType.musician) {
+                return 'Informe seu ano de nascimento (18+)';
+              }
+              return null; // Opcional para banda/espaço
             }
 
             final yearStr = value.trim();
@@ -1355,12 +1406,15 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 return 'Ano não pode ser no futuro';
               }
             } else {
-              // MÚSICOS: Validação de idade (13 a 120 anos)
+              // MÚSICOS: Validação de idade (18 a 120 anos)
+              if (year > currentYear) {
+                return 'Ano não pode ser no futuro';
+              }
               final age = currentYear - year;
 
-              // Idade muito baixa (< 13 anos)
-              if (age < 13) {
-                return 'Idade mínima é 13 anos (ano máximo: ${currentYear - 13})';
+              // Idade muito baixa (< 18 anos)
+              if (age < 18) {
+                return 'Idade mínima é 18 anos (ano máximo: ${currentYear - 18})';
               }
 
               // Idade muito alta (> 120 anos)
@@ -1590,7 +1644,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         MultiSelectField(
           title: 'Gêneros musicais',
           placeholder: 'Selecione até 5 gêneros',
-          options: _genreOptions,
+          options: MusicConstants.genreOptions,
           selectedItems: _selectedGenres,
           maxSelections: maxGenres,
           onSelectionChanged: (values) {
@@ -1607,7 +1661,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         MultiSelectField(
           title: _profileType == ProfileType.band ? 'Instrumentação' : 'Instrumentos',
           placeholder: 'Selecione até 5 instrumentos',
-          options: _instrumentOptions,
+          options: MusicConstants.instrumentOptions,
           selectedItems: _selectedInstruments,
           maxSelections: maxInstruments,
           onSelectionChanged: (values) {
@@ -1633,7 +1687,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             value: _selectedLevel,
-            items: _levelOptions
+            items: MusicConstants.levelOptions
                 .map(
                   (level) => DropdownMenuItem(
                     value: level,
@@ -1856,22 +1910,108 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     );
   }
 
-  bool _isValidInstagramUrl(String url) {
-    if (url.trim().isEmpty) return false;
-    final instagramRegex = RegExp(
-      r'^(https?://)?(www\.)?(instagram\.com|instagr\.am)/([a-zA-Z0-9._]+)/?',
-      caseSensitive: false,
-    );
-    return instagramRegex.hasMatch(url.trim());
+  /// Valida username do Instagram (1-30 chars, letras, números, pontos e underscores)
+  bool _isValidInstagramUsername(String username) {
+    if (username.trim().isEmpty) return true; // Campo opcional
+    final cleanUsername = username.trim().replaceFirst('@', '');
+    // Instagram: 1-30 chars, letras, números, pontos e underscores
+    final usernameRegex = RegExp(r'^[a-zA-Z0-9._]{1,30}$');
+    return usernameRegex.hasMatch(cleanUsername);
   }
 
-  bool _isValidTikTokUrl(String url) {
-    if (url.trim().isEmpty) return false;
-    final tiktokRegex = RegExp(
-      r'^(https?://)?(www\.)?(tiktok\.com|vm\.tiktok\.com)/@?([a-zA-Z0-9._]+)/?',
+  /// Valida username do TikTok (1-24 chars, letras, números, pontos e underscores)
+  bool _isValidTikTokUsername(String username) {
+    if (username.trim().isEmpty) return true; // Campo opcional
+    final cleanUsername = username.trim().replaceFirst('@', '');
+    // TikTok: 1-24 chars, letras, números, pontos e underscores
+    final usernameRegex = RegExp(r'^[a-zA-Z0-9._]{1,24}$');
+    return usernameRegex.hasMatch(cleanUsername);
+  }
+
+  /// Extrai username de uma URL do Instagram (para compatibilidade com dados existentes)
+  String _extractInstagramUsername(String? url) {
+    if (url == null || url.isEmpty) return '';
+    
+    // Se já é apenas o username (sem URL)
+    if (!url.contains('/') && !url.contains('.com')) {
+      return url.replaceFirst('@', '');
+    }
+    
+    // Extrai username da URL
+    final regex = RegExp(
+      r'(?:instagram\.com|instagr\.am)/([a-zA-Z0-9._]+)/?',
       caseSensitive: false,
     );
-    return tiktokRegex.hasMatch(url.trim());
+    final match = regex.firstMatch(url);
+    return match?.group(1) ?? url.replaceFirst('@', '');
+  }
+
+  /// Extrai username de uma URL do TikTok (para compatibilidade com dados existentes)
+  String _extractTikTokUsername(String? url) {
+    if (url == null || url.isEmpty) return '';
+    
+    // Se já é apenas o username (sem URL)
+    if (!url.contains('/') && !url.contains('.com')) {
+      return url.replaceFirst('@', '');
+    }
+    
+    // Extrai username da URL
+    final regex = RegExp(
+      r'(?:tiktok\.com|vm\.tiktok\.com)/@?([a-zA-Z0-9._]+)/?',
+      caseSensitive: false,
+    );
+    final match = regex.firstMatch(url);
+    return match?.group(1) ?? url.replaceFirst('@', '');
+  }
+
+  /// Converte username para URL completa do Instagram
+  String? _buildInstagramUrl(String username) {
+    final cleanUsername = username.trim().replaceFirst('@', '');
+    if (cleanUsername.isEmpty) return null;
+    return 'https://instagram.com/$cleanUsername';
+  }
+
+  /// Converte username para URL completa do TikTok
+  String? _buildTikTokUrl(String username) {
+    final cleanUsername = username.trim().replaceFirst('@', '');
+    if (cleanUsername.isEmpty) return null;
+    return 'https://tiktok.com/@$cleanUsername';
+  }
+
+  bool _isValidSpotifyUrl(String url) {
+    final normalized = url.trim();
+    if (normalized.isEmpty) return false;
+    return normalized.startsWith('https://open.spotify.com/') || normalized.startsWith('spotify:');
+  }
+
+  bool _isValidDeezerUrl(String url) {
+    final normalized = url.trim();
+    if (normalized.isEmpty) return false;
+    return normalized.startsWith('https://www.deezer.com/') ||
+        normalized.startsWith('https://deezer.com/') ||
+        normalized.startsWith('https://deezer.page.link/') ||
+        normalized.startsWith('deezer://');
+  }
+
+  String? _buildSpotifyUrl(String rawUrl) {
+    final normalized = rawUrl.trim();
+    if (normalized.isEmpty) return null;
+    if (_isValidSpotifyUrl(normalized)) return normalized;
+    // Se o usuário colar apenas o caminho (ex: /artist/abc), prefixa domínio
+    if (normalized.startsWith('/')) {
+      return 'https://open.spotify.com$normalized';
+    }
+    return null; // inválido
+  }
+
+  String? _buildDeezerUrl(String rawUrl) {
+    final normalized = rawUrl.trim();
+    if (normalized.isEmpty) return null;
+    if (_isValidDeezerUrl(normalized)) return normalized;
+    if (normalized.startsWith('/')) {
+      return 'https://www.deezer.com$normalized';
+    }
+    return null;
   }
 
   bool _isValidYouTubeUrl(String url) {
@@ -1881,6 +2021,110 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       caseSensitive: false,
     );
     return youtubeRegex.hasMatch(url.trim());
+  }
+
+  /// Extrai o videoId de uma URL do YouTube
+  String? _extractYouTubeVideoId(String? originalUrl) {
+    if (originalUrl == null || originalUrl.isEmpty) return null;
+
+    var url = originalUrl.trim();
+
+    final patterns = [
+      RegExp(r'(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})'),
+      RegExp(r'youtube\.com\/embed\/([a-zA-Z0-9_-]{11})'),
+      RegExp(r'youtube\.com\/v\/([a-zA-Z0-9_-]{11})'),
+      RegExp(r'youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})'),
+      RegExp(r'youtube\.com\/live\/([a-zA-Z0-9_-]{11})'),
+      RegExp(r'\?v=([a-zA-Z0-9_-]{11})'),
+    ];
+
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(url);
+      if (match != null && match.groupCount >= 1) {
+        return match.group(1);
+      }
+    }
+    return null;
+  }
+
+  /// Constrói a preview do vídeo do YouTube
+  Widget _buildYouTubePreview() {
+    final videoId = _extractYouTubeVideoId(_youtubeController.text);
+    if (videoId == null) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Texto explicativo
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+            ),
+            child: Row(
+              children: [
+                Icon(Iconsax.video_play, size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Este vídeo será exibido na visualização do seu perfil',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Thumbnail do vídeo
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CachedNetworkImage(
+                    imageUrl: 'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      color: Colors.grey[200],
+                      child: const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.error_outline, size: 40),
+                    ),
+                  ),
+                  // Overlay escuro com ícone de play
+                  Container(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    child: const Center(
+                      child: Icon(
+                        Icons.play_circle_filled,
+                        color: Colors.white,
+                        size: 64,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   bool _isValidWebsiteUrl(String url) {
@@ -1907,19 +2151,20 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           controller: _instagramController,
           decoration: InputDecoration(
             labelText: 'Instagram',
-            hintText: 'https://instagram.com/seu_perfil',
+            hintText: 'seu_usuario',
+            prefixText: '@ ',
             suffixIcon: _instagramController.text.isEmpty
                 ? null
-                : _isValidInstagramUrl(_instagramController.text)
+                : _isValidInstagramUsername(_instagramController.text)
                     ? const Icon(Icons.check_circle, color: Colors.green)
                     : const Icon(Icons.error_outline, color: Colors.red),
             helperText: _instagramController.text.isNotEmpty
-                ? (_isValidInstagramUrl(_instagramController.text)
-                    ? '✓ Link válido'
-                    : '✗ URL inválida. Use: instagram.com/perfil')
+                ? (_isValidInstagramUsername(_instagramController.text)
+                    ? '✓ instagram.com/${_instagramController.text.trim().replaceFirst('@', '')}'
+                    : '✗ Usuário inválido. Use letras, números, . ou _')
                 : null,
             helperStyle: TextStyle(
-              color: _isValidInstagramUrl(_instagramController.text)
+              color: _isValidInstagramUsername(_instagramController.text)
                   ? Colors.green
                   : Colors.red,
               fontSize: 12,
@@ -1938,19 +2183,20 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           controller: _tiktokController,
           decoration: InputDecoration(
             labelText: 'TikTok',
-            hintText: 'https://tiktok.com/@seu_perfil',
+            hintText: 'seu_usuario',
+            prefixText: '@ ',
             suffixIcon: _tiktokController.text.isEmpty
                 ? null
-                : _isValidTikTokUrl(_tiktokController.text)
+                : _isValidTikTokUsername(_tiktokController.text)
                     ? const Icon(Icons.check_circle, color: Colors.green)
                     : const Icon(Icons.error_outline, color: Colors.red),
             helperText: _tiktokController.text.isNotEmpty
-                ? (_isValidTikTokUrl(_tiktokController.text)
-                    ? '✓ Link válido'
-                    : '✗ URL inválida. Use: tiktok.com/@perfil')
+                ? (_isValidTikTokUsername(_tiktokController.text)
+                    ? '✓ tiktok.com/@${_tiktokController.text.trim().replaceFirst('@', '')}'
+                    : '✗ Usuário inválido. Use letras, números, . ou _')
                 : null,
             helperStyle: TextStyle(
-              color: _isValidTikTokUrl(_tiktokController.text)
+              color: _isValidTikTokUsername(_tiktokController.text)
                   ? Colors.green
                   : Colors.red,
               fontSize: 12,
@@ -1964,30 +2210,113 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         ),
         const SizedBox(height: 12),
 
-        // YouTube
+        // Spotify
+        TextFormField(
+          controller: _spotifyController,
+          decoration: InputDecoration(
+            labelText: 'Spotify (artista, álbum, playlist)',
+            hintText: 'https://open.spotify.com/artist/...',
+            suffixIcon: _spotifyController.text.isEmpty
+                ? null
+                : _isValidSpotifyUrl(_spotifyController.text)
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : const Icon(Icons.error_outline, color: Colors.red),
+            helperText: _spotifyController.text.isNotEmpty
+                ? (_isValidSpotifyUrl(_spotifyController.text)
+                    ? '✓ Link válido'
+                    : '✗ Use open.spotify.com ou spotify:')
+                : 'Link opcional para músicos/bandas',
+            helperStyle: TextStyle(
+              color: _spotifyController.text.isEmpty
+                  ? AppColors.textSecondary
+                  : (_isValidSpotifyUrl(_spotifyController.text)
+                      ? Colors.green
+                      : Colors.red),
+              fontSize: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            prefixIcon: const Icon(Iconsax.musicnote),
+          ),
+          keyboardType: TextInputType.url,
+          onChanged: (_) => setState(() {}),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) return null;
+            if (!_isValidSpotifyUrl(value)) {
+              return 'Link do Spotify inválido';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 12),
+
+        // Deezer
+        TextFormField(
+          controller: _deezerController,
+          decoration: InputDecoration(
+            labelText: 'Deezer (artista, álbum, playlist)',
+            hintText: 'https://www.deezer.com/artist/...',
+            suffixIcon: _deezerController.text.isEmpty
+                ? null
+                : _isValidDeezerUrl(_deezerController.text)
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : const Icon(Icons.error_outline, color: Colors.red),
+            helperText: _deezerController.text.isNotEmpty
+                ? (_isValidDeezerUrl(_deezerController.text)
+                    ? '✓ Link válido'
+                    : '✗ Use deezer.com ou deezer.page.link')
+                : 'Link opcional para músicos/bandas',
+            helperStyle: TextStyle(
+              color: _deezerController.text.isEmpty
+                  ? AppColors.textSecondary
+                  : (_isValidDeezerUrl(_deezerController.text)
+                      ? Colors.green
+                      : Colors.red),
+              fontSize: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            prefixIcon: const Icon(Iconsax.music_square),
+          ),
+          keyboardType: TextInputType.url,
+          onChanged: (_) => setState(() {}),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) return null;
+            if (!_isValidDeezerUrl(value)) {
+              return 'Link do Deezer inválido';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 12),
+
+        // YouTube - Vídeo de apresentação
         TextFormField(
           controller: _youtubeController,
           decoration: InputDecoration(
-            labelText: 'YouTube',
+            labelText: 'Vídeo de Apresentação (YouTube)',
             hintText: 'https://youtube.com/watch?v=...',
             suffixIcon: _youtubeController.text.isEmpty
                 ? null
                 : _isValidYouTubeUrl(_youtubeController.text)
                     ? const Icon(Icons.check_circle, color: Colors.green)
                     : const Icon(Icons.error_outline, color: Colors.red),
-            helperText: _youtubeController.text.isNotEmpty
-                ? (_isValidYouTubeUrl(_youtubeController.text)
+            helperText: _youtubeController.text.isEmpty
+                ? 'Adicione um vídeo do YouTube para destacar seu perfil!'
+                : (_isValidYouTubeUrl(_youtubeController.text)
                     ? '✓ Vídeo encontrado'
-                    : '✗ URL inválida. Use: youtube.com ou youtu.be')
-                : 'Cole o link completo (será convertido para shortlink)',
-            helperStyle: _youtubeController.text.isEmpty
-                ? null
-                : TextStyle(
-                    color: _isValidYouTubeUrl(_youtubeController.text)
-                        ? Colors.green
-                        : Colors.red,
-                    fontSize: 12,
-                  ),
+                    : '✗ URL inválida. Use: youtube.com ou youtu.be'),
+            helperMaxLines: 2,
+            helperStyle: TextStyle(
+              color: _youtubeController.text.isEmpty
+                  ? AppColors.textSecondary
+                  : (_isValidYouTubeUrl(_youtubeController.text)
+                      ? Colors.green
+                      : Colors.red),
+              fontSize: 12,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -1995,6 +2324,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           ),
           onChanged: (_) => setState(() {}),
         ),
+        
+        // ✅ Preview do vídeo do YouTube
+        if (_youtubeController.text.isNotEmpty && _isValidYouTubeUrl(_youtubeController.text))
+          _buildYouTubePreview(),
       ],
     );
   }
@@ -2003,6 +2336,222 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     final trimmed = value.trim();
     final withoutAt = trimmed.startsWith('@') ? trimmed.substring(1) : trimmed;
     return withoutAt.replaceAll(RegExp(r'\s+'), '');
+  }
+
+  bool _isBasicProfileUsernameValid(String value) {
+    final sanitized = _sanitizeProfileUsername(value);
+    if (sanitized.length < 3) return false;
+    final regex = RegExp(r'^[A-Za-z0-9._]+$');
+    return regex.hasMatch(sanitized);
+  }
+
+  bool get _shouldDisableSaveButton {
+    if (_isSaving) return true;
+    if (!widget.isNewProfile) return false;
+
+    final text = _profileUsernameController.text;
+    final basicValid = _isBasicProfileUsernameValid(text);
+
+    // ✅ Evita "Salvar" enquanto verifica / quando já sabemos que está em uso
+    if (basicValid && _isCheckingUsername) return true;
+    if (basicValid && _isUsernameAvailable == false) return true;
+    return false;
+  }
+
+  List<String> _generateUsernameSuggestionsFromUsername(String baseUsername) {
+    final base = _sanitizeProfileUsername(baseUsername).toLowerCase();
+    if (base.length < 3) return [];
+
+    String clamp20(String value) =>
+        value.length <= 20 ? value : value.substring(0, 20);
+
+    final suggestions = <String>[
+      clamp20(base),
+      clamp20('${base}1'),
+      clamp20('${base}2'),
+      clamp20('${base}3'),
+      clamp20('${base}4'),
+    ];
+
+    return suggestions
+        .where((s) => s.length >= 3)
+        .where((s) => RegExp(r'^[a-z0-9._]+$').hasMatch(s))
+        .toSet()
+        .take(5)
+        .toList();
+  }
+
+  List<String> _generateFallbackUsernameSuggestions(String baseUsername) {
+    final base = _sanitizeProfileUsername(baseUsername).toLowerCase();
+    if (base.length < 3) return [];
+
+    String clamp20(String value) =>
+        value.length <= 20 ? value : value.substring(0, 20);
+
+    final year = DateTime.now().year;
+    final shortYear = year % 100;
+    final stamp = DateTime.now().millisecondsSinceEpoch % 1000;
+
+    final candidates = <String>[
+      clamp20('${base}_$year'),
+      clamp20('$base$year'),
+      clamp20('${base}_$shortYear'),
+      clamp20('$base$shortYear'),
+      clamp20('${base}_$stamp'),
+      clamp20('$base$stamp'),
+      clamp20('${base}01'),
+      clamp20('${base}99'),
+    ];
+
+    return candidates
+        .where((s) => s.length >= 3)
+        .where((s) => RegExp(r'^[a-z0-9._]+$').hasMatch(s))
+        .toSet()
+        .take(8)
+        .toList();
+  }
+
+  Future<bool> _isUsernameAvailableRemote(String normalizedUsername) async {
+    final usernameLowercase = normalizedUsername.toLowerCase();
+    final snapshot = await FirebaseFirestore.instance
+        .collection('profiles')
+        .where('usernameLowercase', isEqualTo: usernameLowercase)
+        .limit(1)
+        .get();
+    return snapshot.docs.isEmpty;
+  }
+
+  Future<void> _autoPickFirstAvailableUsernameSuggestion(
+    List<String> suggestions,
+  ) async {
+    if (!widget.isNewProfile) return;
+    if (suggestions.isEmpty) return;
+    if (!mounted) return;
+
+    final generation = ++_usernameAutoResolveGeneration;
+
+    setState(() {
+      _isCheckingUsername = true;
+      _isUsernameAvailable = null;
+      _lastCheckedUsername = null;
+    });
+
+    final checked = <String>{};
+
+    for (final rawSuggestion in suggestions) {
+      if (!mounted) return;
+      if (generation != _usernameAutoResolveGeneration) return;
+
+      final candidate = _sanitizeProfileUsername(rawSuggestion);
+      if (!_isBasicProfileUsernameValid(candidate)) {
+        continue;
+      }
+
+      final normalized = candidate.toLowerCase();
+      if (checked.contains(normalized)) continue;
+      checked.add(normalized);
+
+      bool available;
+      try {
+        available = await _isUsernameAvailableRemote(candidate);
+      } catch (_) {
+        // Em caso de falha na rede, não travar o usuário aqui; deixa para validar no save.
+        if (!mounted) return;
+        if (generation != _usernameAutoResolveGeneration) return;
+        setState(() {
+          _isCheckingUsername = false;
+          _isUsernameAvailable = null;
+        });
+        return;
+      }
+
+      if (!mounted) return;
+      if (generation != _usernameAutoResolveGeneration) return;
+
+      if (available) {
+        _profileUsernameController.text = candidate;
+        setState(() {
+          _isCheckingUsername = false;
+          _isUsernameAvailable = true;
+          _lastCheckedUsername = candidate.toLowerCase();
+        });
+        return;
+      }
+    }
+
+    // ✅ Nenhuma sugestão inicial funcionou: gerar variações e tentar mais algumas
+    final base = _profileUsernameController.text.trim().isNotEmpty
+        ? _profileUsernameController.text
+        : _sanitizeProfileUsername(suggestions.first);
+    final fallback = _generateFallbackUsernameSuggestions(base);
+    if (fallback.isNotEmpty) {
+      final merged = <String>{
+        ...suggestions.map(_sanitizeProfileUsername),
+        ...fallback.map(_sanitizeProfileUsername),
+      }
+          .where((s) => s.trim().isNotEmpty)
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _usernameSuggestions = merged.take(8).toList();
+        });
+      }
+
+      for (final rawSuggestion in fallback) {
+        if (!mounted) return;
+        if (generation != _usernameAutoResolveGeneration) return;
+
+        final candidate = _sanitizeProfileUsername(rawSuggestion);
+        if (!_isBasicProfileUsernameValid(candidate)) {
+          continue;
+        }
+
+        final normalized = candidate.toLowerCase();
+        if (checked.contains(normalized)) continue;
+        checked.add(normalized);
+
+        bool available;
+        try {
+          available = await _isUsernameAvailableRemote(candidate);
+        } catch (_) {
+          if (!mounted) return;
+          if (generation != _usernameAutoResolveGeneration) return;
+          setState(() {
+            _isCheckingUsername = false;
+            _isUsernameAvailable = null;
+          });
+          return;
+        }
+
+        if (!mounted) return;
+        if (generation != _usernameAutoResolveGeneration) return;
+
+        if (available) {
+          _profileUsernameController.text = candidate;
+          setState(() {
+            _isCheckingUsername = false;
+            _isUsernameAvailable = true;
+            _lastCheckedUsername = candidate.toLowerCase();
+          });
+          return;
+        }
+      }
+    }
+
+    if (!mounted) return;
+    if (generation != _usernameAutoResolveGeneration) return;
+
+    // Nenhuma sugestão disponível
+    final first = _sanitizeProfileUsername(suggestions.first);
+    if (_profileUsernameController.text.trim().isEmpty) {
+      _profileUsernameController.text = first;
+    }
+    setState(() {
+      _isCheckingUsername = false;
+      _isUsernameAvailable = false;
+      _lastCheckedUsername = first.toLowerCase();
+    });
   }
 
   String? _validateProfileUsername(String? value) {
@@ -2020,7 +2569,287 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     if (!regex.hasMatch(sanitized)) {
       return 'Use letras, números, ponto ou underline';
     }
+    // ✅ Validação de disponibilidade em tempo real (apenas para novos perfis)
+    if (widget.isNewProfile && _isUsernameAvailable == false) {
+      return 'Este nome de usuário já está em uso';
+    }
     return null;
+  }
+
+  /// ✅ Verifica disponibilidade do username em tempo real com debounce
+  void _checkUsernameAvailability(String username) {
+    // Só verifica em tempo real para novos perfis
+    if (!widget.isNewProfile) return;
+
+    // Usuário começou a digitar: cancela qualquer auto-seleção em andamento
+    _usernameAutoResolveGeneration++;
+    
+    // Cancelar timer anterior
+    _usernameDebounceTimer?.cancel();
+    
+    final normalizedUsername = _sanitizeProfileUsername(username).toLowerCase();
+    
+    // Se username inválido ou muito curto, resetar estado
+    if (normalizedUsername.isEmpty || normalizedUsername.length < 3) {
+      setState(() {
+        _isUsernameAvailable = null;
+        _isCheckingUsername = false;
+        _lastCheckedUsername = null;
+      });
+      return;
+    }
+    
+    // Se já verificou este username, não verificar novamente
+    if (_lastCheckedUsername == normalizedUsername) {
+      return;
+    }
+    
+    // Mostrar loading
+    setState(() {
+      _isCheckingUsername = true;
+      _isUsernameAvailable = null;
+    });
+    
+    // Debounce de 500ms para não sobrecarregar o Firestore
+    _usernameDebounceTimer = Timer(const Duration(milliseconds: 500), () async {
+      if (!mounted) return;
+      
+      try {
+        debugPrint('🔍 EditProfile: Verificando disponibilidade de @$normalizedUsername...');
+        
+        final snapshot = await FirebaseFirestore.instance
+            .collection('profiles')
+            .where('usernameLowercase', isEqualTo: normalizedUsername)
+            .limit(1)
+            .get();
+        
+        if (!mounted) return;
+        
+        final isAvailable = snapshot.docs.isEmpty;
+        
+        setState(() {
+          _isUsernameAvailable = isAvailable;
+          _isCheckingUsername = false;
+          _lastCheckedUsername = normalizedUsername;
+        });
+        
+        debugPrint(isAvailable 
+            ? '✅ EditProfile: @$normalizedUsername está disponível!' 
+            : '❌ EditProfile: @$normalizedUsername já está em uso');
+            
+      } catch (e) {
+        debugPrint('⚠️ EditProfile: Erro ao verificar username: $e');
+        if (mounted) {
+          setState(() {
+            _isCheckingUsername = false;
+            _isUsernameAvailable = null;
+          });
+        }
+      }
+    });
+  }
+
+  /// ✅ Ícone de status no sufixo do campo username (apenas para novos perfis)
+  Widget? _buildUsernameSuffixIcon() {
+    // Só mostra indicadores para novos perfis
+    if (!widget.isNewProfile) return null;
+    
+    final username = _profileUsernameController.text.trim();
+    
+    // Não mostrar nada se username muito curto
+    if (username.length < 3) return null;
+    
+    if (_isCheckingUsername) {
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          ),
+        ),
+      );
+    }
+    
+    if (_isUsernameAvailable == true) {
+      return const Icon(Icons.check_circle, color: Colors.green);
+    }
+    
+    if (_isUsernameAvailable == false) {
+      return const Icon(Icons.cancel, color: AppColors.error);
+    }
+    
+    return null;
+  }
+
+  /// ✅ Indicador de disponibilidade abaixo do campo (apenas para novos perfis)
+  Widget _buildUsernameAvailabilityIndicator() {
+    // Só mostra indicadores para novos perfis
+    if (!widget.isNewProfile) return const SizedBox.shrink();
+    
+    final username = _profileUsernameController.text.trim();
+    
+    // Não mostrar nada se username muito curto ou validação básica falhou
+    if (username.length < 3 || !RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(username)) {
+      return const SizedBox.shrink();
+    }
+    
+    if (_isCheckingUsername) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 6, left: 12),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[600]!),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Verificando disponibilidade...',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    if (_isUsernameAvailable == true) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 6, left: 12),
+        child: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 14),
+            SizedBox(width: 6),
+            Text(
+              'Nome de usuário disponível!',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.green,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    if (_isUsernameAvailable == false) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 6, left: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.error, color: AppColors.error, size: 14),
+                SizedBox(width: 6),
+                Text(
+                  'Este nome de usuário já está em uso',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.error,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _usernameSuggestions.isNotEmpty
+                  ? 'Escolha uma sugestão abaixo para continuar.'
+                  : 'Tente adicionar números no final para ficar único.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[700],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return const SizedBox.shrink();
+  }
+
+  /// ✅ Mostra sugestões de username baseadas no nome do login social
+  Widget _buildUsernameSuggestions() {
+    // Só mostra se há sugestões e é novo perfil
+    if (!widget.isNewProfile || _usernameSuggestions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Sugestões de username:',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _usernameSuggestions.take(5).map((suggestion) {
+              final isSelected = _profileUsernameController.text.trim().toLowerCase() == suggestion.toLowerCase();
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    _profileUsernameController.text = suggestion;
+                    // Reset estado de verificação para verificar a nova sugestão
+                    _isUsernameAvailable = null;
+                    _lastCheckedUsername = null;
+                  });
+                  // Disparar verificação de disponibilidade
+                  _checkUsernameAvailability(suggestion);
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected 
+                        ? AppColors.primary.withOpacity(0.2) 
+                        : AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected 
+                          ? AppColors.primary 
+                          : AppColors.primary.withOpacity(0.3),
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    '@$suggestion',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.primary,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _ensureProfileUsernameUnique(

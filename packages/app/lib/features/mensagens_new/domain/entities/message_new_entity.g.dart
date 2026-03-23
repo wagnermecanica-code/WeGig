@@ -41,6 +41,14 @@ _$MessageNewEntityImpl _$$MessageNewEntityImplFromJson(
       deletedForEveryone: json['deletedForEveryone'] as bool? ?? false,
       originalText: json['originalText'] as String?,
       metadata: json['metadata'] as Map<String, dynamic>? ?? const {},
+      receivedBy: (json['receivedBy'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      readBy: (json['readBy'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
     );
 
 Map<String, dynamic> _$$MessageNewEntityImplToJson(
@@ -65,6 +73,8 @@ Map<String, dynamic> _$$MessageNewEntityImplToJson(
       'deletedForEveryone': instance.deletedForEveryone,
       'originalText': instance.originalText,
       'metadata': instance.metadata,
+      'receivedBy': instance.receivedBy,
+      'readBy': instance.readBy,
     };
 
 const _$MessageTypeEnumMap = {
@@ -72,6 +82,7 @@ const _$MessageTypeEnumMap = {
   MessageType.image: 'image',
   MessageType.system: 'system',
   MessageType.deleted: 'deleted',
+  MessageType.sharedPost: 'sharedPost',
 };
 
 const _$MessageDeliveryStatusEnumMap = {

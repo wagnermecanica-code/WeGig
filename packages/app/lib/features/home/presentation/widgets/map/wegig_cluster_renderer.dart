@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -18,6 +19,14 @@ class WeGigClusterRenderer {
 
   final WeGigPinDescriptorBuilder _pinDescriptorBuilder;
   final Map<_ClusterCacheKey, BitmapDescriptor> _clusterBadgeCache = {};
+
+  /// Tamanho do badge de cluster ajustado por plataforma
+  static Size get _clusterBadgeSize => Platform.isAndroid
+      ? const Size(66, 66) // ~69% do tamanho iOS
+      : const Size(96, 96);
+
+  /// Pixel ratio para clusters ajustado por plataforma
+  static double get _clusterPixelRatio => Platform.isAndroid ? 2.0 : 2.5;
 
   Future<void> warmup() => _pinDescriptorBuilder.warmup();
 
@@ -68,8 +77,8 @@ class WeGigClusterRenderer {
         count: cluster.count,
         color: color,
       ),
-      logicalSize: const Size(96, 96),
-      pixelRatioMultiplier: 2.5,
+      logicalSize: _clusterBadgeSize, // Tamanho ajustado por plataforma
+      pixelRatioMultiplier: _clusterPixelRatio, // Ratio ajustado por plataforma
     );
 
     _clusterBadgeCache[key] = descriptor;

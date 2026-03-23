@@ -50,7 +50,7 @@ final mensagensNewRemoteDataSourceProvider =
 typedef MensagensNewRemoteDataSourceRef
     = AutoDisposeProviderRef<IMensagensNewRemoteDataSource>;
 String _$mensagensNewRepositoryHash() =>
-    r'655ecea6998cb59133bbf131a03f400531c3880e';
+    r'0ec9c3e1cd07d400eeb38afd694a0e068095db27';
 
 /// Provider para MensagensNewRepository
 ///
@@ -370,6 +370,26 @@ final sendImageMessageNewUseCaseProvider =
 // ignore: unused_element
 typedef SendImageMessageNewUseCaseRef
     = AutoDisposeProviderRef<SendImageMessageNewUseCase>;
+String _$sendSharedPostMessageNewUseCaseHash() =>
+    r'f464291ce556bf004f4f4c2e721ec41c91857000';
+
+/// See also [sendSharedPostMessageNewUseCase].
+@ProviderFor(sendSharedPostMessageNewUseCase)
+final sendSharedPostMessageNewUseCaseProvider =
+    AutoDisposeProvider<SendSharedPostMessageNewUseCase>.internal(
+  sendSharedPostMessageNewUseCase,
+  name: r'sendSharedPostMessageNewUseCaseProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$sendSharedPostMessageNewUseCaseHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef SendSharedPostMessageNewUseCaseRef
+    = AutoDisposeProviderRef<SendSharedPostMessageNewUseCase>;
 String _$editMessageNewUseCaseHash() =>
     r'4f80fd32832dcc9d32f2e0d605e83a3c2ff07046';
 

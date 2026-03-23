@@ -6,8 +6,12 @@ library;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wegig_app/features/notifications_new/domain/entities/notification_new_entity.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 /// Cache estático para dados de localização de posts
 ///
@@ -113,6 +117,36 @@ class _NotificationNewLocationRowState
       }
 
       final data = doc.data();
+
+      // 🔒 Reverse visibility: se o autor do post estiver excluído, não exibe localização.
+      final currentUid = FirebaseAuth.instance.currentUser?.uid;
+      final authorProfileId = (data?['authorProfileId'] as String?)?.trim() ?? '';
+      if (currentUid != null && currentUid.isNotEmpty && authorProfileId.isNotEmpty) {
+        try {
+          final container = ProviderScope.containerOf(context);
+          final activeProfile = container.read(activeProfileProvider);
+          if (activeProfile != null && authorProfileId != activeProfile.profileId) {
+            final excluded = await BlockedRelations.getExcludedProfileIds(
+              firestore: FirebaseFirestore.instance,
+              profileId: activeProfile.profileId,
+              uid: currentUid,
+            );
+            if (excluded.contains(authorProfileId)) {
+              _locationCache[postId] = null;
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                  _hasError = true;
+                });
+              }
+              return;
+            }
+          }
+        } catch (_) {
+          // Se falhar, segue fluxo normal.
+        }
+      }
+
       final locationData = {
         'city': data?['city'] as String? ?? '',
         'neighborhood': data?['neighborhood'] as String? ?? '',

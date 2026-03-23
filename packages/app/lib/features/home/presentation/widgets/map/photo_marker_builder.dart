@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -28,6 +29,19 @@ class PhotoMarkerBuilder {
   
   // Cache de marcadores por tipo (fallback quando sem foto)
   final Map<String, BitmapDescriptor> _iconCache = {};
+
+  /// Fator de escala para normalizar tamanho entre Android e iOS
+  /// Android tem densidade de pixels maior, então reduzimos o tamanho base
+  double get _platformScale => Platform.isAndroid ? 0.65 : 1.0;
+
+  /// Tamanho base do marcador com foto (ajustado por plataforma)
+  double get _photoMarkerSize => 80.0 * _platformScale;
+  
+  /// Tamanho base da foto dentro do marcador (ajustado por plataforma)
+  double get _photoSize => 60.0 * _platformScale;
+  
+  /// Tamanho base do marcador de ícone (ajustado por plataforma)
+  double get _iconMarkerSize => 60.0 * _platformScale;
 
   /// Constrói marcadores com foto do perfil
   Future<Set<Marker>> buildMarkersForPosts(
@@ -144,8 +158,9 @@ class PhotoMarkerBuilder {
     String type,
     bool isActive,
   ) async {
-    const double size = 80.0; // Tamanho do marcador
-    const double photoSize = 60.0; // Tamanho da foto dentro
+    final double size = _photoMarkerSize; // Tamanho ajustado por plataforma
+    final double photoSize = _photoSize; // Tamanho da foto ajustado
+    final double scale = _platformScale; // Fator de escala para proporcionalidade
     
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
@@ -164,10 +179,10 @@ class PhotoMarkerBuilder {
     if (isActive) {
       final glowPaint = Paint()
         ..color = borderColor.withValues(alpha: 0.3)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 12 * scale);
       canvas.drawCircle(
         Offset(size / 2, size / 2),
-        size / 2 + 8,
+        size / 2 + (8 * scale),
         glowPaint,
       );
     }
@@ -199,29 +214,32 @@ class PhotoMarkerBuilder {
     canvas.drawImageRect(image, srcRect, dstRect, Paint());
     canvas.restore();
 
-    // Borda colorida
+    // Borda colorida (proporcional ao tamanho)
     final borderPaint = Paint()
       ..color = borderColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = isActive ? 5.0 : 3.0;
+      ..strokeWidth = (isActive ? 5.0 : 3.0) * scale;
     canvas.drawCircle(
       Offset(size / 2, size / 2),
       photoSize / 2,
       borderPaint,
     );
 
-    // Badge pequeno com ícone de tipo
+    // Badge pequeno com ícone de tipo (valores proporcionais)
     if (isActive) {
+      final badgeOffset = 12.0 * scale;
+      final badgeRadius = 10.0 * scale;
+      
       // Fundo do badge
       final badgePaint = Paint()..color = borderColor;
-      canvas.drawCircle(Offset(size - 12, 12), 10, badgePaint);
+      canvas.drawCircle(Offset(size - badgeOffset, badgeOffset), badgeRadius, badgePaint);
       
       // Borda branca do badge
       final badgeBorderPaint = Paint()
         ..color = Colors.white
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
-      canvas.drawCircle(Offset(size - 12, 12), 10, badgeBorderPaint);
+        ..strokeWidth = 2.0 * scale;
+      canvas.drawCircle(Offset(size - badgeOffset, badgeOffset), badgeRadius, badgeBorderPaint);
 
       // Ícone no badge
       final icon = type == 'band' ? Iconsax.people : Iconsax.musicnote;
@@ -230,25 +248,26 @@ class PhotoMarkerBuilder {
           text: String.fromCharCode(icon.codePoint),
           style: TextStyle(
             fontFamily: icon.fontFamily,
-            fontSize: 12,
+            fontSize: 12 * scale,
             color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
+        textDirection: TextDirection.ltr,
       );
       textPainter.layout();
       textPainter.paint(
         canvas,
-        Offset(size - 12 - textPainter.width / 2, 12 - textPainter.height / 2),
+        Offset(size - badgeOffset - textPainter.width / 2, badgeOffset - textPainter.height / 2),
       );
     }
 
-    // Sombra
+    // Sombra (proporcional)
     final shadowPaint = Paint()
       ..color = Colors.black.withValues(alpha: 0.3)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4 * scale);
     canvas.drawCircle(
-      Offset(size / 2, size / 2 + 2),
+      Offset(size / 2, size / 2 + (2 * scale)),
       size / 2,
       shadowPaint,
     );
@@ -261,7 +280,7 @@ class PhotoMarkerBuilder {
 
   /// Cria marcador com ícone (fallback quando sem foto)
   Future<BitmapDescriptor> _createIconMarker(String type, bool isActive) async {
-    const double size = 60.0;
+    final double size = _iconMarkerSize; // Tamanho ajustado por plataforma
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
 

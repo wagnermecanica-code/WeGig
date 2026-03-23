@@ -17,6 +17,9 @@ _$ConversationNewEntityImpl _$$ConversationNewEntityImplFromJson(
           .map((e) => e as String)
           .toList(),
       lastMessage: json['lastMessage'] as String,
+      lastMessageStatus: $enumDecodeNullable(
+              _$MessageDeliveryStatusEnumMap, json['lastMessageStatus']) ??
+          MessageDeliveryStatus.sent,
       lastMessageTimestamp:
           DateTime.parse(json['lastMessageTimestamp'] as String),
       lastMessageSenderId: json['lastMessageSenderId'] as String?,
@@ -52,6 +55,9 @@ _$ConversationNewEntityImpl _$$ConversationNewEntityImplFromJson(
                 (k, e) => MapEntry(k, DateTime.parse(e as String)),
               ) ??
               const {},
+      isGroup: json['isGroup'] as bool? ?? false,
+      groupName: json['groupName'] as String?,
+      groupPhotoUrl: json['groupPhotoUrl'] as String?,
     );
 
 Map<String, dynamic> _$$ConversationNewEntityImplToJson(
@@ -61,6 +67,8 @@ Map<String, dynamic> _$$ConversationNewEntityImplToJson(
       'participants': instance.participants,
       'participantProfiles': instance.participantProfiles,
       'lastMessage': instance.lastMessage,
+      'lastMessageStatus':
+          _$MessageDeliveryStatusEnumMap[instance.lastMessageStatus]!,
       'lastMessageTimestamp': instance.lastMessageTimestamp.toIso8601String(),
       'lastMessageSenderId': instance.lastMessageSenderId,
       'unreadCount': instance.unreadCount,
@@ -75,7 +83,18 @@ Map<String, dynamic> _$$ConversationNewEntityImplToJson(
           .map((k, e) => MapEntry(k, e.toIso8601String())),
       'typingIndicators': instance.typingIndicators
           .map((k, e) => MapEntry(k, e.toIso8601String())),
+      'isGroup': instance.isGroup,
+      'groupName': instance.groupName,
+      'groupPhotoUrl': instance.groupPhotoUrl,
     };
+
+const _$MessageDeliveryStatusEnumMap = {
+  MessageDeliveryStatus.sending: 'sending',
+  MessageDeliveryStatus.sent: 'sent',
+  MessageDeliveryStatus.delivered: 'delivered',
+  MessageDeliveryStatus.read: 'read',
+  MessageDeliveryStatus.failed: 'failed',
+};
 
 _$ParticipantDataImpl _$$ParticipantDataImplFromJson(
         Map<String, dynamic> json) =>

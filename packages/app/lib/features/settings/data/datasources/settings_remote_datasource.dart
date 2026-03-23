@@ -54,12 +54,15 @@ class SettingsRemoteDataSource implements ISettingsRemoteDataSource {
       debugPrint(
           '📝 SettingsDataSource: updateSettings for profile ${settings.profileId}');
 
+      // 🔒 Clamp radius to [5, 100] km to guarantee valid range
+      final clampedRadius = settings.nearbyRadiusKm.clamp(5.0, 100.0);
+
       await _firestore
           .collection('profiles')
           .doc(settings.profileId)
           .update({
         'notificationRadiusEnabled': settings.notifyNearbyPosts,
-        'notificationRadius': settings.nearbyRadiusKm,
+        'notificationRadius': clampedRadius,
         // ✅ FIX: Persistir notifyInterests e notifyMessages no Firestore
         'notifyInterests': settings.notifyInterests,
         'notifyMessages': settings.notifyMessages,

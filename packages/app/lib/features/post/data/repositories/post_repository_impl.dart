@@ -1,7 +1,11 @@
 import 'dart:math' show min;
 
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:wegig_app/core/firebase/blocked_profiles.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/features/post/data/datasources/post_remote_datasource.dart';
 import 'package:wegig_app/features/post/domain/repositories/post_repository.dart';
 
@@ -141,6 +145,20 @@ class PostRepositoryImpl implements PostRepository {
       final post = await _remoteDataSource.getPostById(postId);
       if (post == null) {
         throw Exception('Post não encontrado');
+      }
+
+      // 🔒 Bloqueios: não envia interesse para autor bloqueado
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('Usuário não autenticado');
+      }
+      final excluded = await BlockedRelations.getExcludedProfileIds(
+        firestore: FirebaseFirestore.instance,
+        profileId: profileId,
+        uid: currentUser.uid,
+      );
+      if (excluded.contains(post.authorProfileId)) {
+        throw StateError('Você não pode interagir com este post');
       }
 
       await _remoteDataSource.addInterest(

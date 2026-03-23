@@ -27,13 +27,13 @@ abstract class AuthRemoteDataSource {
 
   /// Cadastro com email e senha
   ///
+  /// Username será definido posteriormente na criação do perfil (EditProfilePage)
+  ///
   /// Throws:
   /// - FirebaseAuthException se email já existe ou senha fraca
-  /// - UsernameAlreadyTakenException se username já está em uso
   Future<User> signUpWithEmail(
     String email,
     String password,
-    String username,
   );
 
   /// Login com Google
@@ -126,11 +126,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<User> signUpWithEmail(
     String email,
     String password,
-    String username,
   ) async {
     debugPrint('🔐 AuthRemoteDataSource: signUpWithEmail');
-
-    final normalizedUsername = _normalizeUsername(username);
 
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
@@ -145,23 +142,23 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
 
     try {
-      await _ensureUsernameAvailable(normalizedUsername);
-    } on UsernameAlreadyTakenException {
+      await createUserDocument(
+        credential.user!,
+        'email',
+      );
+    } catch (e) {
+      // Se falhar ao criar documento, remove usuário para evitar órfãos
+      debugPrint('⚠️ Erro ao criar documento do usuário: $e');
       await _deleteUserOnConflict(credential.user);
       rethrow;
     }
-
-    await createUserDocument(
-      credential.user!,
-      'email',
-      username: normalizedUsername,
-    );
 
     debugPrint(
         '✅ AuthRemoteDataSource: signUpWithEmail success - ${credential.user!.uid}');
     // Enviar email de verificação automaticamente
     await credential.user!.sendEmailVerification();
     debugPrint('📧 AuthRemoteDataSource: Email de verificação enviado');
+
 
     return credential.user!;
   }
@@ -187,10 +184,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           );
         }
 
+        // ✅ NÃO criar documento automaticamente aqui (web)
+        // A criação do documento será feita pela camada de apresentação
         if (userCredential.additionalUserInfo?.isNewUser ?? false) {
           debugPrint(
-              '🆕 AuthRemoteDataSource: Novo usuário Google (web), criando documento...');
-          await createUserDocument(user, 'google');
+              '🆕 AuthRemoteDataSource: Novo usuário Google (web) detectado (documento será criado após verificação)');
         }
 
         debugPrint('✅ AuthRemoteDataSource: Google Sign-In web concluído');
@@ -233,15 +231,36 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
       }
 
+      // ✅ Melhorar preenchimento: algumas vezes displayName/photoURL vêm nulos
+      // no primeiro frame. Garantimos que o Firebase User receba os dados do
+      // GoogleSignInAccount e recarregamos antes de retornar.
+      try {
+        final googleDisplayName = googleUser.displayName;
+        final googlePhotoUrl = googleUser.photoUrl;
+        if ((user.displayName ?? '').trim().isEmpty &&
+            (googleDisplayName ?? '').trim().isNotEmpty) {
+          await user.updateDisplayName(googleDisplayName);
+        }
+        if ((user.photoURL ?? '').trim().isEmpty &&
+            (googlePhotoUrl ?? '').trim().isNotEmpty) {
+          await user.updatePhotoURL(googlePhotoUrl);
+        }
+        await user.reload();
+      } catch (e) {
+        debugPrint('⚠️ AuthRemoteDataSource: Falha ao sincronizar dados Google: $e');
+      }
+
+      // ✅ NÃO criar documento automaticamente aqui
+      // A criação do documento será feita pela camada de apresentação
+      // após verificar se estamos em modo Login ou Cadastro
       if (userCredential.additionalUserInfo?.isNewUser ?? false) {
         debugPrint(
-            '🆕 AuthRemoteDataSource: Novo usuário Google, criando documento...');
-        await createUserDocument(user, 'google');
+            '🆕 AuthRemoteDataSource: Novo usuário Google detectado (documento será criado após verificação)');
       }
 
       debugPrint(
           '✅ AuthRemoteDataSource: Google Sign-In completo - ${user.uid}');
-      return user;
+        return _auth.currentUser;
     } on FirebaseAuthException catch (e) {
       debugPrint('❌ AuthRemoteDataSource: FirebaseAuthException - ${e.code}');
       rethrow;
@@ -300,15 +319,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           }
         }
 
-        // Criar documento
+        // ✅ NÃO criar documento automaticamente aqui
+        // A criação do documento será feita pela camada de apresentação
+        // após verificar se estamos em modo Login ou Cadastro
         debugPrint(
-            '🆕 AuthRemoteDataSource: Novo usuário Apple, criando documento...');
-        await createUserDocument(userCredential.user!, 'apple');
+            '🆕 AuthRemoteDataSource: Novo usuário Apple detectado (documento será criado após verificação)');
       }
 
       debugPrint(
           '✅ AuthRemoteDataSource: Apple Sign-In completo - ${userCredential.user!.uid}');
-      return userCredential.user!;
+      // ✅ Garantir que displayName/email do FirebaseAuth estejam atualizados
+      try {
+        await userCredential.user!.reload();
+      } catch (e) {
+        debugPrint('⚠️ AuthRemoteDataSource: Falha ao reload após Apple Sign-In: $e');
+      }
+      return _auth.currentUser;
     } on SignInWithAppleAuthorizationException catch (e) {
       // Usuário cancelou
       if (e.code == AuthorizationErrorCode.canceled) {
@@ -374,7 +400,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return;
     }
 
-    // Criar documento
+    // Criar documento com campos de auditoria para compliance
     await userDoc.set({
       'email': user.email ?? '',
       'activeProfileId': null, // Será definido ao criar primeiro perfil
@@ -384,6 +410,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       'photoURL': user.photoURL,
       if (username != null) 'username': username,
       if (username != null) 'usernameLowercase': username.toLowerCase(),
+      // ✅ AUDITORIA: Registro de aceite de termos (cadastro via email)
+      'termsAcceptedAt': FieldValue.serverTimestamp(),
+      'termsVersion': '1.0', // Incrementar quando os termos mudarem
+      'ageVerifiedAt': FieldValue.serverTimestamp(),
     });
 
     debugPrint('✅ AuthRemoteDataSource: Documento users/${user.uid} criado');
@@ -398,47 +428,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     return exists;
   }
 
-  String _normalizeUsername(String username) {
-    final sanitized = username.trim().replaceAll(RegExp(r'\s+'), '');
-    if (sanitized.startsWith('@')) {
-      return sanitized.substring(1);
-    }
-    return sanitized;
-  }
-
-  Future<void> _ensureUsernameAvailable(String username) async {
-    final usernameLowercase = username.toLowerCase();
-    final snapshot = await _firestore
-        .collection('profiles')
-        .where('usernameLowercase', isEqualTo: usernameLowercase)
-        .limit(1)
-        .get();
-
-    if (snapshot.docs.isNotEmpty) {
-      throw const UsernameAlreadyTakenException();
-    }
-  }
-
   Future<void> _deleteUserOnConflict(User? user) async {
     if (user == null) return;
     try {
       await user.delete();
       debugPrint(
-          '🗑️ AuthRemoteDataSource: Usuário removido após conflito de username');
+          '🗑️ AuthRemoteDataSource: Usuário removido após conflito');
     } catch (e) {
       debugPrint(
           '⚠️ AuthRemoteDataSource: Falha ao remover usuário temporário: $e');
     }
   }
-}
-
-class UsernameAlreadyTakenException implements Exception {
-  const UsernameAlreadyTakenException({
-    this.message = 'Este @username já está em uso. Escolha outro.',
-  });
-
-  final String message;
-
-  @override
-  String toString() => 'UsernameAlreadyTakenException: $message';
 }

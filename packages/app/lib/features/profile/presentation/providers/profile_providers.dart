@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/profile_result.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
@@ -8,7 +9,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
+import 'package:core_ui/utils/objectionable_content_filter.dart';
 import 'package:wegig_app/features/profile/data/datasources/profile_remote_datasource.dart';
 import 'package:wegig_app/features/profile/data/repositories/profile_repository_impl.dart';
 import 'package:wegig_app/features/profile/domain/repositories/profile_repository.dart';
@@ -18,7 +21,7 @@ import 'package:wegig_app/features/profile/domain/usecases/get_active_profile.da
 import 'package:wegig_app/features/profile/domain/usecases/load_all_profiles.dart';
 import 'package:wegig_app/features/profile/domain/usecases/switch_active_profile.dart';
 import 'package:wegig_app/features/profile/domain/usecases/update_profile.dart';
-import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
+import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 
 part 'profile_providers.freezed.dart';
 part 'profile_providers.g.dart';
@@ -107,6 +110,8 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
 
   final StreamController<ProfileState> _streamController =
       StreamController.broadcast();
+  bool _retryScheduled = false;
+  bool _isDisposed = false;
 
   @override
   set state(AsyncValue<ProfileState> value) {
@@ -118,31 +123,61 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
 
   @override
   FutureOr<ProfileState> build() async {
+    // ✅ IMPORTANT: react to auth user changes (login/logout/account switch)
+    // This prevents leaking profile state (activeProfile/profileUid/profileId) between users.
+    // Also distinguish cold-start auth bootstrap (auth loading) from an actual logged-out state.
+    final authState = ref.watch(authStateProvider);
+    final uid = authState.valueOrNull?.uid;
+
     // Registra dispose para cleanup (com verificação)
     ref.onDispose(() {
+      _isDisposed = true;
       if (!_streamController.isClosed) {
         _streamController.close();  // ✅ Only close if not already closed
       }
     });
 
-    return _loadProfiles();
+    if (authState.isLoading) {
+      debugPrint('⏳ ProfileNotifier: Auth carregando (cold start)');
+      return const ProfileState(isLoading: true);
+    }
+
+    if (uid == null) {
+      debugPrint('⚠️ ProfileNotifier: Usuário não autenticado (build)');
+      return const ProfileState();
+    }
+
+    return _loadProfiles(uid);
   }
 
-  Future<ProfileState> _loadProfiles() async {
+  Future<ProfileState> _loadProfiles(String uid) async {
     try {
       debugPrint('🔄 ProfileNotifier: Carregando perfis...');
-
-      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
-      if (uid == null) {
-        debugPrint('⚠️ ProfileNotifier: Usuário não autenticado');
-        return ProfileState();
-      }
 
       final loadAllProfiles = ref.read(loadAllProfilesUseCaseProvider);
       final getActiveProfile = ref.read(getActiveProfileUseCaseProvider);
 
       final profiles = await loadAllProfiles(uid);
-      final activeProfile = await getActiveProfile(uid);
+      ProfileEntity? activeProfile = await getActiveProfile(uid);
+
+      // Compat: contas legadas podem ter perfis mas não ter users/{uid}.activeProfileId.
+      // Nesse caso, escolher um perfil padrão e persistir (best-effort) para estabilizar o login.
+      if (activeProfile == null && profiles.isNotEmpty) {
+        activeProfile = profiles.first;
+        Future.microtask(() async {
+          try {
+            await FirebaseFirestore.instance.collection('users').doc(uid).set(
+              {
+                'activeProfileId': activeProfile!.profileId,
+              },
+              SetOptions(merge: true),
+            );
+            debugPrint('🧩 ProfileNotifier: activeProfileId ausente, definido para ${activeProfile!.profileId}');
+          } catch (e) {
+            debugPrint('⚠️ ProfileNotifier: Falha ao definir activeProfileId (non-critical): $e');
+          }
+        });
+      }
 
       debugPrint(
           '✅ ProfileNotifier: ${profiles.length} perfis carregados, ativo: ${activeProfile?.name ?? "nenhum"}');
@@ -155,8 +190,20 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
       // CRITICAL: Salvar token FCM em TODOS os perfis do usuário
       // Isso garante que push notifications cheguem independente do perfil ativo
       if (profiles.isNotEmpty) {
-        _saveFcmTokenForAllProfiles(profiles.map((p) => p.profileId).toList());
+        _saveFcmTokenForAllProfiles(
+          profiles.map((p) => p.profileId).toList(),
+          expectedUid: uid,
+        );
       }
+      
+      // BEST-EFFORT: Reparar edges de bloqueio antigos que não têm blockedUid.
+      // Executa em background sem bloquear o carregamento.
+      // Isso é necessário para garantir reverse visibility (perfil bloqueado
+      // conseguir ver que foi bloqueado).
+      _repairBlockedRelationsInBackground(
+        profileIds: profiles.map((p) => p.profileId).toList(growable: false),
+        uid: uid,
+      );
 
       return ProfileState(
         activeProfile: activeProfile,
@@ -165,15 +212,55 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
     } catch (e, stackTrace) {
       debugPrint('❌ ProfileNotifier: Erro ao carregar - $e');
       debugPrint(stackTrace.toString());
+
+      // 🔁 Android/Google Sign-In: às vezes o token ainda não está pronto.
+      // Se receber permission-denied/unauthenticated, reintentar automaticamente.
+      if (e is FirebaseException &&
+          (e.code == 'permission-denied' || e.code == 'unauthenticated')) {
+        if (!_retryScheduled) {
+          _retryScheduled = true;
+          debugPrint('🔁 ProfileNotifier: agendando retry após erro ${e.code}');
+          Future<void>.delayed(const Duration(milliseconds: 800), () {
+            _retryScheduled = false;
+            if (!_isDisposed) {
+              ref.invalidateSelf();
+            }
+          });
+        }
+        return ProfileState(
+          isLoading: true,
+          error: e.toString(),
+        );
+      }
+
       return ProfileState(
         error: e.toString(),
       );
     }
   }
+  
+  /// Repara edges de bloqueio em background (fire-and-forget).
+  /// Necessário apenas uma vez para corrigir bloqueios antigos.
+  void _repairBlockedRelationsInBackground({required List<String> profileIds, required String uid}) {
+    Future.microtask(() async {
+      try {
+        final synced = await BlockedRelations.syncEdgesForBlockedLists(
+          firestore: FirebaseFirestore.instance,
+          blockerProfileIds: profileIds,
+          blockerUid: uid,
+        );
+        if (synced > 0) {
+          debugPrint('✅ ProfileNotifier: Sincronizou $synced edges de bloqueio (blockedProfileIds → blocks)');
+        }
+      } catch (e) {
+        debugPrint('⚠️ ProfileNotifier: Falha ao reparar edges (non-critical): $e');
+      }
+    });
+  }
 
   Future<void> switchProfile(String profileId) async {
     try {
-      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
+      final uid = ref.read(currentUserProvider)?.uid;
       if (uid == null) throw Exception('Usuário não autenticado');
 
       final switchUseCase = ref.read(switchActiveProfileUseCaseProvider);
@@ -183,13 +270,7 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
       _setAnalyticsProfile(profileId);
       _logProfileSwitch(profileId);
 
-      // ✅ Invalidar providers dependentes para recarregar dados do novo perfil
-      debugPrint('🔄 ProfileNotifier: Invalidando providers após troca de perfil');
-      ref.invalidate(postNotifierProvider);
-      // Nota: notificationsStream e conversationsStream são @riverpod com parâmetro,
-      // serão automaticamente recarregados quando o profileProvider mudar
-
-      state = AsyncValue.data(await _loadProfiles());
+      state = AsyncValue.data(await _loadProfiles(uid));
     } catch (e) {
       debugPrint('❌ ProfileNotifier: Erro ao trocar perfil - $e');
       rethrow;
@@ -228,11 +309,22 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
   /// Chamado quando perfis são carregados (login) para garantir que
   /// push notifications cheguem independente do perfil ativo.
   /// Também solicita permissão de notificação se ainda não concedida.
-  void _saveFcmTokenForAllProfiles(List<String> profileIds) {
+  void _saveFcmTokenForAllProfiles(
+    List<String> profileIds, {
+    required String expectedUid,
+  }) {
     debugPrint('🔔 FCM: Iniciando salvamento de token para ${profileIds.length} perfis');
     // Usar Future para não bloquear o carregamento de perfis
     Future.microtask(() async {
       try {
+        final currentUid = FirebaseAuth.instance.currentUser?.uid;
+        if (currentUid == null || currentUid != expectedUid) {
+          debugPrint(
+            '🔔 FCM: Ignorando salvamento de token (uid mudou: $expectedUid -> $currentUid)',
+          );
+          return;
+        }
+
         final service = PushNotificationService();
         
         debugPrint('🔔 FCM: Solicitando permissão de notificação...');
@@ -263,16 +355,21 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
 
   Future<ProfileResult> createProfile(ProfileEntity profile) async {
     try {
-      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
+      final uid = ref.read(currentUserProvider)?.uid;
       if (uid == null) {
         return const ProfileFailure(message: 'Usuário não autenticado');
+      }
+
+      final bioError = ObjectionableContentFilter.validate('bio', profile.bio);
+      if (bioError != null) {
+        return ProfileFailure(message: bioError);
       }
 
       final createUseCase =
           ref.read(createProfileUseCaseProvider);
       await createUseCase(profile, uid);
 
-      state = AsyncValue.data(await _loadProfiles());
+      state = AsyncValue.data(await _loadProfiles(uid));
       return ProfileSuccess(profile: profile);
     } catch (e) {
       debugPrint('❌ ProfileNotifier: Erro ao criar perfil - $e');
@@ -285,16 +382,21 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
 
   Future<ProfileResult> updateProfile(ProfileEntity profile) async {
     try {
-      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
+      final uid = ref.read(currentUserProvider)?.uid;
       if (uid == null) {
         return const ProfileFailure(message: 'Usuário não autenticado');
+      }
+
+      final bioError = ObjectionableContentFilter.validate('bio', profile.bio);
+      if (bioError != null) {
+        return ProfileFailure(message: bioError);
       }
 
       final updateUseCase =
           ref.read(updateProfileUseCaseProvider);
       await updateUseCase(profile, uid);
 
-      state = AsyncValue.data(await _loadProfiles());
+      state = AsyncValue.data(await _loadProfiles(uid));
       return ProfileSuccess(profile: profile);
     } catch (e) {
       debugPrint('❌ ProfileNotifier: Erro ao atualizar perfil - $e');
@@ -305,15 +407,15 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
     }
   }
 
-  Future<void> deleteProfile(String profileId) async {
+  Future<void> deleteProfile(String profileId, {bool forceDelete = false}) async {
     try {
-      final uid = ref.read(profileFirebaseAuthProvider).currentUser?.uid;
+      final uid = ref.read(currentUserProvider)?.uid;
       if (uid == null) throw Exception('Usuário não autenticado');
 
       final deleteUseCase = ref.read(deleteProfileUseCaseProvider);
-      await deleteUseCase(profileId, uid);
+      await deleteUseCase(profileId, uid, forceDelete: forceDelete);
 
-      state = AsyncValue.data(await _loadProfiles());
+      state = AsyncValue.data(await _loadProfiles(uid));
     } catch (e) {
       debugPrint('❌ ProfileNotifier: Erro ao deletar perfil - $e');
       rethrow;
@@ -321,7 +423,12 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
   }
 
   Future<void> refresh() async {
-    state = AsyncValue.data(await _loadProfiles());
+    final uid = ref.read(currentUserProvider)?.uid;
+    if (uid == null) {
+      state = const AsyncValue.data(ProfileState());
+      return;
+    }
+    state = AsyncValue.data(await _loadProfiles(uid));
   }
 }
 

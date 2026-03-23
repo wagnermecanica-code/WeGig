@@ -4,6 +4,7 @@ import 'package:wegig_app/features/auth/domain/repositories/auth_repository.dart
 /// UseCase: Cadastro com email e senha
 ///
 /// Single Responsibility: Executar lógica de negócio para cadastro
+/// Username será definido posteriormente na criação do perfil (EditProfilePage)
 class SignUpWithEmailUseCase {
   SignUpWithEmailUseCase(this._repository);
   final AuthRepository _repository;
@@ -19,12 +20,10 @@ class SignUpWithEmailUseCase {
   Future<AuthResult> call(
     String email,
     String password,
-    String username,
   ) async {
     // Validações de negócio
     final trimmedEmail = email.trim();
     final trimmedPassword = password.trim();
-    final normalizedUsername = _normalizeUsername(username);
 
     if (trimmedEmail.isEmpty) {
       return const AuthFailure(
@@ -64,40 +63,11 @@ class SignUpWithEmailUseCase {
       );
     }
 
-    if (normalizedUsername.isEmpty) {
-      return const AuthFailure(
-        message: 'Nome de usuário é obrigatório',
-        code: 'empty-username',
-      );
-    }
-
-    if (normalizedUsername.length < 3) {
-      return const AuthFailure(
-        message: 'Nome de usuário deve ter pelo menos 3 caracteres',
-        code: 'invalid-username-length',
-      );
-    }
-
-    if (!_isValidUsername(normalizedUsername)) {
-      return const AuthFailure(
-        message:
-            'Nome de usuário inválido. Use apenas letras, números, ponto ou underline',
-        code: 'invalid-username-format',
-      );
-    }
-
     // Delegar para repository
     return _repository.signUpWithEmail(
       trimmedEmail,
       trimmedPassword,
-      normalizedUsername,
     );
-  }
-
-  String _normalizeUsername(String username) {
-    final trimmed = username.trim();
-    final withoutAt = trimmed.startsWith('@') ? trimmed.substring(1) : trimmed;
-    return withoutAt.replaceAll(RegExp(r'\s+'), '');
   }
 
   /// Validação básica de formato de email
@@ -120,9 +90,5 @@ class SignUpWithEmailUseCase {
     final hasSpecialChar = password.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'));
 
     return hasUppercase && hasLowercase && hasDigit && hasSpecialChar;
-  }
-
-  bool _isValidUsername(String username) {
-    return RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(username);
   }
 }

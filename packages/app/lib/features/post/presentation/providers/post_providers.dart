@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/post_result.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
+import 'package:core_ui/utils/objectionable_content_filter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -240,6 +241,14 @@ class PostNotifier extends _$PostNotifier {
   Future<PostResult> savePost(PostFormInput input) async {
     try {
       debugPrint('📝 PostNotifier.savePost: Iniciando - type=${input.type}, isEditing=${input.isEditing}');
+      final contentError = ObjectionableContentFilter.validate('mensagem', input.content);
+      if (contentError != null) {
+        return PostFailure(message: contentError);
+      }
+      final titleError = ObjectionableContentFilter.validate('título', input.title);
+      if (titleError != null) {
+        return PostFailure(message: titleError);
+      }
       
       final profile = _activeProfile();
       if (profile == null) {
@@ -283,6 +292,15 @@ class PostNotifier extends _$PostNotifier {
         }
       }
       
+      // ✅ CORREÇÃO: Para posts "sales", expiresAt deve usar promoEndDate
+      // Isso garante que queries Firestore com expiresAt funcionem corretamente
+      final DateTime effectiveExpiresAt;
+      if (input.type == 'sales' && input.promoEndDate != null) {
+        effectiveExpiresAt = input.promoEndDate!;
+      } else {
+        effectiveExpiresAt = input.expiresAt ?? now.add(const Duration(days: 30));
+      }
+      
       final post = PostEntity(
         id: postId,
         authorProfileId: profile.profileId,
@@ -294,18 +312,29 @@ class PostNotifier extends _$PostNotifier {
         state: input.state,
         photoUrls: photoUrls,
         youtubeLink: input.youtubeLink?.isEmpty == true ? null : input.youtubeLink,
+        spotifyLink: input.spotifyLink?.isEmpty == true ? null : input.spotifyLink,
+        deezerLink: input.deezerLink?.isEmpty == true ? null : input.deezerLink,
         type: input.type,
         level: input.level ?? '',
-        instruments: input.type == 'musician'
-            ? input.selectedInstruments
-            : <String>[],
+        instruments: (input.type == 'musician' || input.type == 'hiring')
+          ? input.selectedInstruments
+          : <String>[],
         genres: input.genres,
         seekingMusicians: input.type == 'band'
             ? input.selectedInstruments
             : <String>[],
         availableFor: input.availableFor,
+        eventDate: input.eventDate,
+        eventType: input.eventType,
+        gigFormat: input.gigFormat,
+        venueSetup: input.venueSetup,
+        budgetRange: input.budgetRange,
+        eventStartTime: input.eventStartTime,
+        eventEndTime: input.eventEndTime,
+        eventDurationMinutes: input.eventDurationMinutes,
+        guestCount: input.guestCount,
         createdAt: input.createdAt ?? now,
-        expiresAt: input.expiresAt ?? now.add(const Duration(days: 30)),
+        expiresAt: effectiveExpiresAt,
         authorName: profile.name,
         authorPhotoUrl: profile.photoUrl,
         activeProfileName: profile.name,

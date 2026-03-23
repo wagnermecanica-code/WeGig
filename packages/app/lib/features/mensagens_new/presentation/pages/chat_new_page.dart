@@ -111,30 +111,41 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
     // Marcar como lida ao abrir
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      
+      final activeProfile = ref.read(activeProfileProvider);
+      if (activeProfile == null) return;
+      
+      // Para grupos, marcar como received primeiro (implica que chegou no dispositivo)
+      if (widget.isGroup) {
+        _markGroupMessagesAsReceived(activeProfile.profileId);
+      }
+      
       _markAsRead();
 
-      // ✅ Marcar como lida sempre que chegar nova mensagem do outro participante enquanto o chat está aberto (somente 1:1)
-      if (!widget.isGroup) {
-        _chatStateSubscription = ref.listenManual(
-          chatNewControllerProvider(widget.conversationId),
-          (prev, next) {
-            if (!mounted) return;
+      // ✅ Marcar como lida sempre que chegar nova mensagem enquanto o chat está aberto
+      _chatStateSubscription = ref.listenManual(
+        chatNewControllerProvider(widget.conversationId),
+        (prev, next) {
+          if (!mounted) return;
 
-            final activeProfile = ref.read(activeProfileProvider);
-            if (activeProfile == null) return;
+          final currentProfile = ref.read(activeProfileProvider);
+          if (currentProfile == null) return;
 
-            final hasUnreadIncoming = next.messages.any(
-              (msg) =>
-                  msg.senderProfileId != activeProfile.profileId &&
-                  msg.status != MessageDeliveryStatus.read,
-            );
+          final hasUnreadIncoming = next.messages.any(
+            (msg) =>
+                msg.senderProfileId != currentProfile.profileId &&
+                msg.status != MessageDeliveryStatus.read,
+          );
 
-            if (hasUnreadIncoming) {
-              _markAsRead();
+          if (hasUnreadIncoming) {
+            // Para grupos, marcar received também
+            if (widget.isGroup) {
+              _markGroupMessagesAsReceived(currentProfile.profileId);
             }
-          },
-        );
-      }
+            _markAsRead();
+          }
+        },
+      );
     });
 
     // ✅ Carregar participantes se for grupo
@@ -380,21 +391,64 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
     final activeProfile = ref.read(activeProfileProvider);
     if (activeProfile == null) return;
 
-    // Marcar como lida e só então recalcular o badge.
-    // Se atualizarmos o badge antes do write no Firestore, ele pode manter o valor antigo.
+    if (widget.isGroup) {
+      // Para grupos, usar método específico que atualiza readBy/receivedBy
+      _markGroupMessagesAsRead(activeProfile.profileId);
+    } else {
+      // Para 1:1, usa método padrão
+      unawaited(
+        ref
+            .read(markAsReadNewUseCaseProvider)
+            .call(
+              conversationId: widget.conversationId,
+              profileId: activeProfile.profileId,
+            )
+            .then((_) => PushNotificationService().updateAppBadge(
+                  activeProfile.profileId,
+                  activeProfile.uid,
+                ))
+            .catchError((e, _) {
+          debugPrint('Erro ao marcar conversa como lida (chat): $e');
+        }),
+      );
+    }
+  }
+
+  /// Marca mensagens como lidas em grupo (atualiza readBy de cada mensagem)
+  void _markGroupMessagesAsRead(String profileId) {
     unawaited(
       ref
-          .read(markAsReadNewUseCaseProvider)
-          .call(
+          .read(mensagensNewRepositoryProvider)
+          .markGroupMessagesAsRead(
             conversationId: widget.conversationId,
-            profileId: activeProfile.profileId,
+            profileId: profileId,
           )
-          .then((_) => PushNotificationService().updateAppBadge(
+          .then((_) {
+            final activeProfile = ref.read(activeProfileProvider);
+            if (activeProfile != null) {
+              PushNotificationService().updateAppBadge(
                 activeProfile.profileId,
                 activeProfile.uid,
-              ))
+              );
+            }
+          })
           .catchError((e, _) {
-        debugPrint('Erro ao marcar conversa como lida (chat): $e');
+        debugPrint('Erro ao marcar mensagens do grupo como lidas: $e');
+      }),
+    );
+  }
+
+  /// Marca mensagens como recebidas em grupo (atualiza receivedBy de cada mensagem)
+  void _markGroupMessagesAsReceived(String profileId) {
+    unawaited(
+      ref
+          .read(mensagensNewRepositoryProvider)
+          .markGroupMessagesAsReceived(
+            conversationId: widget.conversationId,
+            profileId: profileId,
+          )
+          .catchError((e, _) {
+        debugPrint('Erro ao marcar mensagens do grupo como recebidas: $e');
       }),
     );
   }
@@ -1257,6 +1311,9 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
             isMine: isMine,
             currentProfileId: currentProfileId,
             isGroup: widget.isGroup,
+            otherParticipantIds: widget.isGroup 
+                ? _participantsCache.keys.where((id) => id != message.senderProfileId).toList()
+                : [],
             showAvatar: showAvatar,
             showSenderName: showSenderName,
             senderName: senderName,

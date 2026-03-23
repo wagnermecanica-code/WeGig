@@ -26,13 +26,14 @@ abstract class AuthRepository {
 
   /// Cadastro com email e senha
   ///
+  /// Username será definido posteriormente na criação do perfil (EditProfilePage)
+  ///
   /// Returns:
   /// - AuthSuccess(requiresEmailVerification: true, requiresProfileCreation: true)
   /// - AuthFailure se erro (email já existe, senha fraca, etc)
   Future<AuthResult> signUpWithEmail(
     String email,
     String password,
-    String username,
   );
 
   /// Login com Google

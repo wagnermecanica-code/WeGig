@@ -3,9 +3,12 @@ import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
@@ -14,6 +17,7 @@ import 'package:wegig_app/features/profile/presentation/providers/profile_provid
 import 'package:wegig_app/features/settings/presentation/providers/settings_providers.dart';
 import 'package:wegig_app/features/settings/presentation/widgets/settings_section.dart';
 import 'package:wegig_app/features/settings/presentation/widgets/settings_tile.dart';
+import 'package:wegig_app/features/settings/presentation/pages/blocked_users_page.dart';
 import 'package:iconsax/iconsax.dart';
 
 /// Tela de Configurações do perfil ativo
@@ -149,6 +153,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const SizedBox(height: 12),
           _buildNotificationSettings(),
 
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 24),
+
+            // Seção: Bloqueios
+            const SettingsSection(title: 'Bloqueios', icon: Iconsax.shield_tick),
+            const SizedBox(height: 12),
+            SettingsTile(
+              icon: Iconsax.user_remove,
+              title: 'Perfis bloqueados',
+              subtitle: 'Gerencie quem você bloqueou',
+              onTap: () {
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const BlockedUsersPage(),
+                  ),
+                );
+              },
+            ),
+
           const SizedBox(height: 32),
           const Divider(),
           const SizedBox(height: 24),
@@ -181,6 +205,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     ),
     );
   }
+
+
 
   Widget _buildNearbyPostsCard() {
     final settingsAsync = ref.watch(userSettingsProvider);
@@ -653,6 +679,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             onPressed: () async {
               Navigator.pop(context);
+
+              if (!mounted) return;
+              final confirmed = await _showDeleteAccountFinalConfirmDialog();
+              if (!confirmed) return;
+
               await _performDeleteAccount();
             },
             child: const Text('Excluir'),
@@ -662,12 +693,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  Future<bool> _showDeleteAccountFinalConfirmDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const _DeleteAccountFinalConfirmDialog(),
+    );
+
+    return result ?? false;
+  }
+
   Future<void> _performDeleteAccount() async {
     if (!mounted) return;
 
     // Capturar referências ANTES de operações async
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final profileNotifier = ref.read(profileProvider.notifier);
+    final navigator = Navigator.of(context, rootNavigator: true);
     final profiles = ref.read(profileProvider).value?.profiles ?? [];
     final profileIds = profiles.map((p) => p.profileId).toList();
     final user = ref.read(currentUserProvider);
@@ -706,35 +747,116 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         );
       }
 
-      // 1. Remover tokens FCM de todos os perfis
+      // 1. Remover tokens FCM de todos os perfis (antes de deletar)
       if (profileIds.isNotEmpty) {
         debugPrint('🗑️ SettingsPage: Removendo tokens FCM de ${profileIds.length} perfis...');
         await PushNotificationService().removeTokenFromAllProfiles(profileIds);
       }
 
-      // 2. Deletar todos os perfis (Cloud Function limpará posts e storage)
-      for (final profileId in profileIds) {
-        debugPrint('🗑️ SettingsPage: Deletando perfil $profileId...');
-        await profileNotifier.deleteProfile(profileId);
-      }
-
-      // 3. Deletar documento users/{uid} no Firestore
-      debugPrint('🗑️ SettingsPage: Deletando documento do usuário...');
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).delete();
-
-      // 4. Deletar usuário do Firebase Auth
+      // 2. ✅ DELETAR USUÁRIO DO FIREBASE AUTH
+      // A Cloud Function `onUserDelete` será acionada automaticamente e limpará:
+      // - Documento users/{uid}
+      // - Todos os perfis do usuário (que por sua vez acionam onProfileDelete)
+      // - Conversas, interesses, rate limits órfãos
       debugPrint('🗑️ SettingsPage: Deletando usuário do Firebase Auth...');
-      await user.delete();
-
+      
+      try {
+        await user.delete();
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'requires-recent-login') {
+          debugPrint('⚠️ SettingsPage: Reautenticação necessária');
+          
+          // Fechar loading dialog
+          if (mounted) navigator.pop();
+          
+          // Tentar reautenticar
+          final reauthed = await _reauthenticateUser(user);
+          if (!reauthed) {
+            debugPrint('❌ SettingsPage: Reautenticação falhou ou cancelada');
+            return;
+          }
+          
+          // Mostrar loading novamente
+          if (mounted) {
+            showDialog<void>(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => const PopScope(
+                canPop: false,
+                child: Center(
+                  child: Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text('Excluindo conta...'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+          
+          // Tentar deletar novamente após reautenticação
+          await user.delete();
+        } else {
+          rethrow;
+        }
+      }
+      
+      debugPrint('✅ SettingsPage: Usuário deletado - Cloud Function onUserDelete cuidará da limpeza');
+      
       debugPrint('✅ SettingsPage: Conta excluída com sucesso');
 
-      // ✅ O router detectará authState == null e redirecionará para /auth
+      // ✅ Fechar dialog de loading - o router detectará authState == null
+      // e redirecionará automaticamente para /auth
+      if (mounted) {
+        navigator.pop();
+      }
+
+    } on FirebaseAuthException catch (e) {
+      debugPrint('❌ SettingsPage: FirebaseAuthException ao excluir conta: ${e.code} - ${e.message}');
+
+      // Fechar loading dialog se ainda estiver aberto
+      if (mounted) {
+        navigator.pop();
+      }
+
+      String errorMessage;
+      if (e.code == 'requires-recent-login') {
+        errorMessage = 'Para excluir sua conta, faça login novamente e tente de novo.';
+      } else {
+        errorMessage = 'Erro ao excluir conta: ${e.message ?? e.code}';
+      }
+
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Iconsax.danger, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(child: Text(errorMessage)),
+            ],
+          ),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
     } catch (e) {
       debugPrint('❌ SettingsPage: Erro ao excluir conta: $e');
 
       // Fechar loading dialog se ainda estiver aberto
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
+        navigator.pop();
       }
 
       scaffoldMessenger.showSnackBar(
@@ -744,11 +866,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               const Icon(Iconsax.danger, color: Colors.white),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  e.toString().contains('requires-recent-login')
-                      ? 'Para excluir sua conta, faça login novamente e tente de novo.'
-                      : 'Erro ao excluir conta: $e',
-                ),
+                child: Text('Erro ao excluir conta: $e'),
               ),
             ],
           ),
@@ -761,6 +879,148 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
       );
     }
+  }
+
+  /// Reautentica o usuário com base no provedor usado
+  Future<bool> _reauthenticateUser(User user) async {
+    final providerData = user.providerData;
+    
+    if (providerData.isEmpty) {
+      debugPrint('❌ SettingsPage: Nenhum provedor de autenticação encontrado');
+      _showReauthError('Não foi possível identificar o método de login.');
+      return false;
+    }
+    
+    final providerId = providerData.first.providerId;
+    debugPrint('🔐 SettingsPage: Provedor de autenticação: $providerId');
+    
+    try {
+      if (providerId == 'google.com') {
+        return await _reauthenticateWithGoogle(user);
+      } else if (providerId == 'apple.com') {
+        return await _reauthenticateWithApple(user);
+      } else if (providerId == 'password') {
+        return await _reauthenticateWithPassword(user);
+      } else {
+        debugPrint('❌ SettingsPage: Provedor não suportado: $providerId');
+        _showReauthError('Método de login não suportado para reautenticação.');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('❌ SettingsPage: Erro na reautenticação: $e');
+      _showReauthError('Erro ao reautenticar: $e');
+      return false;
+    }
+  }
+  
+  Future<bool> _reauthenticateWithGoogle(User user) async {
+    try {
+      debugPrint('🔐 SettingsPage: Reautenticando com Google...');
+      
+      final googleSignIn = GoogleSignIn();
+      final googleUser = await googleSignIn.signIn();
+      
+      if (googleUser == null) {
+        debugPrint('⚠️ SettingsPage: Usuário cancelou Google Sign-In');
+        return false;
+      }
+      
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      
+      await user.reauthenticateWithCredential(credential);
+      debugPrint('✅ SettingsPage: Reautenticação Google bem-sucedida');
+      return true;
+    } catch (e) {
+      debugPrint('❌ SettingsPage: Erro na reautenticação Google: $e');
+      rethrow;
+    }
+  }
+  
+  Future<bool> _reauthenticateWithApple(User user) async {
+    try {
+      debugPrint('🔐 SettingsPage: Reautenticando com Apple...');
+      
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+      
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
+      
+      await user.reauthenticateWithCredential(oauthCredential);
+      debugPrint('✅ SettingsPage: Reautenticação Apple bem-sucedida');
+      return true;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        debugPrint('⚠️ SettingsPage: Usuário cancelou Apple Sign-In');
+        return false;
+      }
+      rethrow;
+    } catch (e) {
+      debugPrint('❌ SettingsPage: Erro na reautenticação Apple: $e');
+      rethrow;
+    }
+  }
+  
+  Future<bool> _reauthenticateWithPassword(User user) async {
+    // Mostrar dialog para digitar a senha
+    final password = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _PasswordReauthDialog(email: user.email ?? ''),
+    );
+    
+    if (password == null || password.isEmpty) {
+      debugPrint('⚠️ SettingsPage: Usuário cancelou entrada de senha');
+      return false;
+    }
+    
+    try {
+      debugPrint('🔐 SettingsPage: Reautenticando com senha...');
+      
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+      
+      await user.reauthenticateWithCredential(credential);
+      debugPrint('✅ SettingsPage: Reautenticação com senha bem-sucedida');
+      return true;
+    } catch (e) {
+      debugPrint('❌ SettingsPage: Erro na reautenticação com senha: $e');
+      rethrow;
+    }
+  }
+  
+  void _showReauthError(String message) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Iconsax.danger, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        duration: const Duration(seconds: 5),
+      ),
+    );
   }
 
   void _showSnackBar(String message) {
@@ -803,6 +1063,214 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           borderRadius: BorderRadius.circular(12),
         ),
       ),
+    );
+  }
+}
+
+/// Dialog para reautenticação com senha
+class _PasswordReauthDialog extends StatefulWidget {
+  const _PasswordReauthDialog({required this.email});
+  
+  final String email;
+
+  @override
+  State<_PasswordReauthDialog> createState() => _PasswordReauthDialogState();
+}
+
+class _PasswordReauthDialogState extends State<_PasswordReauthDialog> {
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: const Row(
+        children: [
+          Icon(Iconsax.lock, color: AppColors.primary),
+          SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              'Confirme sua senha',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Para excluir sua conta, confirme sua senha:',
+            style: AppTypography.bodyLight.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            widget.email,
+            style: AppTypography.captionLight.copyWith(
+              color: AppColors.textHint,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Senha',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              prefixIcon: const Icon(Iconsax.lock),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Iconsax.eye : Iconsax.eye_slash,
+                ),
+                onPressed: () {
+                  setState(() => _obscurePassword = !_obscurePassword);
+                },
+              ),
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _isLoading ? null : _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.error,
+          ),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Confirmar'),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    if (_passwordController.text.isEmpty) return;
+    Navigator.pop(context, _passwordController.text);
+  }
+}
+
+class _DeleteAccountFinalConfirmDialog extends StatefulWidget {
+  const _DeleteAccountFinalConfirmDialog();
+
+  @override
+  State<_DeleteAccountFinalConfirmDialog> createState() =>
+      _DeleteAccountFinalConfirmDialogState();
+}
+
+class _DeleteAccountFinalConfirmDialogState
+    extends State<_DeleteAccountFinalConfirmDialog> {
+  static const String _requiredText = 'EXCLUIR';
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  bool get _isValid => _controller.text.trim().toUpperCase() == _requiredText;
+
+  @override
+  Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final maxDialogHeight = screenHeight * 0.7; // Máximo 70% da tela
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: const Row(
+        children: [
+          Icon(Iconsax.warning_2, color: AppColors.error),
+          SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              'Confirmação final',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: maxDialogHeight,
+          minWidth: 280,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Para confirmar a exclusão permanente da sua conta, digite "$_requiredText" abaixo.',
+                style: AppTypography.bodyLight.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  labelText: 'Digite $_requiredText',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) {
+                  if (_isValid) {
+                    Navigator.pop(context, true);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _isValid ? () => Navigator.pop(context, true) : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.error,
+          ),
+          child: const Text('Excluir conta'),
+        ),
+      ],
     );
   }
 }

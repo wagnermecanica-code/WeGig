@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:flutter/foundation.dart';
+import 'package:wegig_app/core/firebase/blocked_profiles.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 
 class InterestService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -12,6 +14,16 @@ class InterestService {
     required ProfileEntity activeProfile,
     String? message,
   }) async {
+    // 🔒 Bloqueios: não envia interesse para autor bloqueado
+    final excluded = await BlockedRelations.getExcludedProfileIds(
+      firestore: _firestore,
+      profileId: activeProfile.profileId,
+      uid: activeProfile.uid,
+    );
+    if (excluded.contains(post.authorProfileId)) {
+      throw StateError('Você não pode interagir com este post');
+    }
+
     // ✅ VERIFICAÇÃO: Evitar duplicatas antes de criar
     final existingInterest = await _firestore
         .collection('interests')
@@ -21,8 +33,10 @@ class InterestService {
         .get();
 
     if (existingInterest.docs.isNotEmpty) {
-      debugPrint('⚠️ InterestService: Interesse já existe, pulando criação...');
-      return;
+      debugPrint('⚠️ InterestService: Interesse já existe. Limpando stale docs e recriando...');
+      for (final doc in existingInterest.docs) {
+        await doc.reference.delete();
+      }
     }
 
     final interestData = {

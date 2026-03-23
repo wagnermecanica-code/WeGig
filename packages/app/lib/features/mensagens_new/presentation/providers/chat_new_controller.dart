@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/utils/debouncer.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,6 +66,9 @@ class ChatNewController extends _$ChatNewController {
   final Debouncer _typingDebouncer = Debouncer(milliseconds: 2000);
   Timer? _typingTimer;
   bool _isTyping = false;
+  String? _currentProfileId;
+  int _initVersion = 0;
+  bool _isGroup = false;
   
   /// Timestamp para filtrar histórico de mensagens
   /// Se o usuário deletou a conversa anteriormente, não mostra mensagens antigas
@@ -80,6 +84,20 @@ class ChatNewController extends _$ChatNewController {
       _typingTimer?.cancel();
     });
 
+    // Reagir a troca de perfil: re-inicializa streams e filtros de histórico.
+    ref.listen<ProfileEntity?>(activeProfileProvider, (previous, next) {
+      final nextProfileId = next?.profileId;
+      if (nextProfileId == _currentProfileId) return;
+
+      debugPrint(
+          '🔄 ChatNewController: Perfil ativo mudou (${_currentProfileId ?? "null"} -> ${nextProfileId ?? "null"}), reinicializando chat');
+      _currentProfileId = nextProfileId;
+      _restartForProfileChange();
+    });
+
+    // Setup inicial
+    _currentProfileId = ref.read(activeProfileProvider)?.profileId;
+
     // Iniciar carregamento com busca de clearHistoryTimestamp
     _initializeChat();
 
@@ -88,6 +106,7 @@ class ChatNewController extends _$ChatNewController {
 
   /// Inicializa o chat buscando o clearHistoryTimestamp antes de iniciar streams
   Future<void> _initializeChat() async {
+    final localVersion = ++_initVersion;
     try {
       // Obter profileId do perfil ativo
       final activeProfile = ref.read(activeProfileProvider);
@@ -95,18 +114,23 @@ class ChatNewController extends _$ChatNewController {
       
       if (currentProfileId == null) {
         debugPrint('⚠️ ChatNewController: Perfil ativo não encontrado');
-        _startMessagesStream();
-        _startTypingStream();
+        if (localVersion == _initVersion) {
+          _startMessagesStream();
+          _startTypingStream();
+        }
         return;
       }
 
       // Buscar conversa para obter clearHistoryTimestamp do perfil atual
       final repository = ref.read(mensagensNewRepositoryProvider);
       final conversation = await repository.getConversationById(conversationId);
+
+      if (localVersion != _initVersion) return;
       
       if (conversation != null) {
         // Obter clearHistoryTimestamp específico do perfil atual
         _clearHistoryAfter = conversation.getClearHistoryTimestampForProfile(currentProfileId);
+        _isGroup = conversation.isGroup || conversation.participantProfiles.length > 2;
         
         if (_clearHistoryAfter != null) {
           debugPrint('📅 ChatNewController: clearHistoryAfter para $currentProfileId = $_clearHistoryAfter');
@@ -117,8 +141,23 @@ class ChatNewController extends _$ChatNewController {
     }
 
     // Iniciar streams (mesmo se falhar buscar conversa)
-    _startMessagesStream();
-    _startTypingStream();
+    if (localVersion == _initVersion) {
+      _startMessagesStream();
+      _startTypingStream();
+    }
+  }
+
+  void _restartForProfileChange() {
+    // Cancela streams anteriores para evitar vazamento entre perfis.
+    _messagesSubscription?.cancel();
+    _typingSubscription?.cancel();
+    _messagesSubscription = null;
+    _typingSubscription = null;
+
+    // Limpa estado e reinicializa.
+    state = const ChatNewState();
+    _clearHistoryAfter = null;
+    _initializeChat();
   }
 
   /// Inicia stream de mensagens (com filtro de clearHistoryAfter e deletedForProfiles)
@@ -129,12 +168,19 @@ class ChatNewController extends _$ChatNewController {
       clearHistoryAfter: _clearHistoryAfter,
     );
 
-    // Obter profileId do perfil ativo para filtrar mensagens deletadas
-    final activeProfile = ref.read(activeProfileProvider);
-    final currentProfileId = activeProfile?.profileId;
-
     _messagesSubscription = messagesStream.listen(
       (messages) {
+        debugPrint('📥 ChatNewController: Stream emitiu ${messages.length} mensagens');
+        
+        // Log dos status das primeiras 3 mensagens para debug
+        for (var i = 0; i < messages.length && i < 3; i++) {
+          final msg = messages[i];
+          debugPrint('   📨 msg[${msg.id.substring(0, 8)}...] status=${msg.status}');
+        }
+        
+        // Obter profileId atual para filtrar mensagens deletadas (pode mudar após troca de perfil)
+        final currentProfileId = ref.read(activeProfileProvider)?.profileId;
+
         // Filtrar mensagens que foram deletadas para o perfil atual
         final filteredMessages = currentProfileId != null
             ? messages
@@ -147,6 +193,25 @@ class ChatNewController extends _$ChatNewController {
           isInitialLoading: false, // ✅ PRIMEIRA EMISSÃO: Não está mais carregando inicialmente
           error: null,
         );
+
+        // ✅ Marcar como lidas mensagens novas recebidas enquanto o chat está aberto (apenas 1:1)
+        if (!_isGroup && currentProfileId != null) {
+          final hasUnreadIncoming = filteredMessages.any(
+            (msg) =>
+                msg.senderProfileId != currentProfileId &&
+                msg.status != MessageDeliveryStatus.read,
+          );
+
+          if (hasUnreadIncoming) {
+            unawaited(
+              ref.read(markAsReadNewUseCaseProvider).call(
+                    conversationId: conversationId,
+                    profileId: currentProfileId,
+                  )
+                  .catchError((e, _) => debugPrint('⚠️ ChatNewController: markAsRead dentro do stream falhou - $e')),
+            );
+          }
+        }
       },
       onError: (error) {
         debugPrint('❌ ChatNewController: Erro no stream - $error');
@@ -165,9 +230,8 @@ class ChatNewController extends _$ChatNewController {
 
     _typingSubscription = typingStream.listen(
       (indicators) {
-        // Obter profileId do usuário atual para filtrar
-        final activeProfile = ref.read(activeProfileProvider);
-        final currentProfileId = activeProfile?.profileId;
+        // Obter profileId atual para filtrar (pode mudar após troca de perfil)
+        final currentProfileId = ref.read(activeProfileProvider)?.profileId;
 
         // Verificar se alguém está digitando (exceto o próprio usuário)
         final now = DateTime.now();

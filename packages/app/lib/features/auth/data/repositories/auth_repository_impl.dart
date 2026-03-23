@@ -56,7 +56,6 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<AuthResult> signUpWithEmail(
     String email,
     String password,
-    String username,
   ) async {
     try {
       debugPrint('🔐 AuthRepository: signUpWithEmail');
@@ -64,7 +63,6 @@ class AuthRepositoryImpl implements AuthRepository {
       final user = await _remoteDataSource.signUpWithEmail(
         email,
         password,
-        username,
       );
 
       debugPrint('✅ AuthRepository: signUpWithEmail success');
@@ -72,12 +70,6 @@ class AuthRepositoryImpl implements AuthRepository {
         user: user,
         requiresEmailVerification: true,
         requiresProfileCreation: true,
-      );
-    } on UsernameAlreadyTakenException catch (e) {
-      debugPrint('❌ AuthRepository: Username already taken');
-      return AuthFailure(
-        message: e.message,
-        code: 'username-taken',
       );
     } on FirebaseAuthException catch (e) {
       debugPrint('❌ AuthRepository: FirebaseAuthException - ${e.code}');

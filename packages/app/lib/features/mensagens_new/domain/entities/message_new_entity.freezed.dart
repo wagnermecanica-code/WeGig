@@ -77,6 +77,14 @@ mixin _$MessageNewEntity {
   /// Metadados extras (extensível)
   Map<String, dynamic> get metadata => throw _privateConstructorUsedError;
 
+  /// [GRUPOS] Lista de profileIds que receberam a mensagem (delivered)
+  /// Em grupos, a mensagem só mostra "delivered" quando TODOS receberam
+  List<String> get receivedBy => throw _privateConstructorUsedError;
+
+  /// [GRUPOS] Lista de profileIds que leram a mensagem (read)
+  /// Em grupos, a mensagem só mostra "read" quando TODOS leram
+  List<String> get readBy => throw _privateConstructorUsedError;
+
   /// Serializes this MessageNewEntity to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -112,7 +120,9 @@ abstract class $MessageNewEntityCopyWith<$Res> {
       List<String> deletedForProfiles,
       bool deletedForEveryone,
       String? originalText,
-      Map<String, dynamic> metadata});
+      Map<String, dynamic> metadata,
+      List<String> receivedBy,
+      List<String> readBy});
 
   $MessageReplyDataCopyWith<$Res>? get replyTo;
 }
@@ -151,6 +161,8 @@ class _$MessageNewEntityCopyWithImpl<$Res, $Val extends MessageNewEntity>
     Object? deletedForEveryone = null,
     Object? originalText = freezed,
     Object? metadata = null,
+    Object? receivedBy = null,
+    Object? readBy = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -229,6 +241,14 @@ class _$MessageNewEntityCopyWithImpl<$Res, $Val extends MessageNewEntity>
           ? _value.metadata
           : metadata // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>,
+      receivedBy: null == receivedBy
+          ? _value.receivedBy
+          : receivedBy // ignore: cast_nullable_to_non_nullable
+              as List<String>,
+      readBy: null == readBy
+          ? _value.readBy
+          : readBy // ignore: cast_nullable_to_non_nullable
+              as List<String>,
     ) as $Val);
   }
 
@@ -274,7 +294,9 @@ abstract class _$$MessageNewEntityImplCopyWith<$Res>
       List<String> deletedForProfiles,
       bool deletedForEveryone,
       String? originalText,
-      Map<String, dynamic> metadata});
+      Map<String, dynamic> metadata,
+      List<String> receivedBy,
+      List<String> readBy});
 
   @override
   $MessageReplyDataCopyWith<$Res>? get replyTo;
@@ -312,6 +334,8 @@ class __$$MessageNewEntityImplCopyWithImpl<$Res>
     Object? deletedForEveryone = null,
     Object? originalText = freezed,
     Object? metadata = null,
+    Object? receivedBy = null,
+    Object? readBy = null,
   }) {
     return _then(_$MessageNewEntityImpl(
       id: null == id
@@ -390,6 +414,14 @@ class __$$MessageNewEntityImplCopyWithImpl<$Res>
           ? _value._metadata
           : metadata // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>,
+      receivedBy: null == receivedBy
+          ? _value._receivedBy
+          : receivedBy // ignore: cast_nullable_to_non_nullable
+              as List<String>,
+      readBy: null == readBy
+          ? _value._readBy
+          : readBy // ignore: cast_nullable_to_non_nullable
+              as List<String>,
     ));
   }
 }
@@ -416,10 +448,14 @@ class _$MessageNewEntityImpl extends _MessageNewEntity {
       final List<String> deletedForProfiles = const [],
       this.deletedForEveryone = false,
       this.originalText,
-      final Map<String, dynamic> metadata = const {}})
+      final Map<String, dynamic> metadata = const {},
+      final List<String> receivedBy = const [],
+      final List<String> readBy = const []})
       : _reactions = reactions,
         _deletedForProfiles = deletedForProfiles,
         _metadata = metadata,
+        _receivedBy = receivedBy,
+        _readBy = readBy,
         super._();
 
   factory _$MessageNewEntityImpl.fromJson(Map<String, dynamic> json) =>
@@ -530,9 +566,37 @@ class _$MessageNewEntityImpl extends _MessageNewEntity {
     return EqualUnmodifiableMapView(_metadata);
   }
 
+  /// [GRUPOS] Lista de profileIds que receberam a mensagem (delivered)
+  /// Em grupos, a mensagem só mostra "delivered" quando TODOS receberam
+  final List<String> _receivedBy;
+
+  /// [GRUPOS] Lista de profileIds que receberam a mensagem (delivered)
+  /// Em grupos, a mensagem só mostra "delivered" quando TODOS receberam
+  @override
+  @JsonKey()
+  List<String> get receivedBy {
+    if (_receivedBy is EqualUnmodifiableListView) return _receivedBy;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_receivedBy);
+  }
+
+  /// [GRUPOS] Lista de profileIds que leram a mensagem (read)
+  /// Em grupos, a mensagem só mostra "read" quando TODOS leram
+  final List<String> _readBy;
+
+  /// [GRUPOS] Lista de profileIds que leram a mensagem (read)
+  /// Em grupos, a mensagem só mostra "read" quando TODOS leram
+  @override
+  @JsonKey()
+  List<String> get readBy {
+    if (_readBy is EqualUnmodifiableListView) return _readBy;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_readBy);
+  }
+
   @override
   String toString() {
-    return 'MessageNewEntity(id: $id, conversationId: $conversationId, senderId: $senderId, senderProfileId: $senderProfileId, senderName: $senderName, senderPhotoUrl: $senderPhotoUrl, text: $text, imageUrl: $imageUrl, type: $type, status: $status, createdAt: $createdAt, editedAt: $editedAt, isEdited: $isEdited, reactions: $reactions, replyTo: $replyTo, deletedForProfiles: $deletedForProfiles, deletedForEveryone: $deletedForEveryone, originalText: $originalText, metadata: $metadata)';
+    return 'MessageNewEntity(id: $id, conversationId: $conversationId, senderId: $senderId, senderProfileId: $senderProfileId, senderName: $senderName, senderPhotoUrl: $senderPhotoUrl, text: $text, imageUrl: $imageUrl, type: $type, status: $status, createdAt: $createdAt, editedAt: $editedAt, isEdited: $isEdited, reactions: $reactions, replyTo: $replyTo, deletedForProfiles: $deletedForProfiles, deletedForEveryone: $deletedForEveryone, originalText: $originalText, metadata: $metadata, receivedBy: $receivedBy, readBy: $readBy)';
   }
 
   @override
@@ -571,7 +635,10 @@ class _$MessageNewEntityImpl extends _MessageNewEntity {
                 other.deletedForEveryone == deletedForEveryone) &&
             (identical(other.originalText, originalText) ||
                 other.originalText == originalText) &&
-            const DeepCollectionEquality().equals(other._metadata, _metadata));
+            const DeepCollectionEquality().equals(other._metadata, _metadata) &&
+            const DeepCollectionEquality()
+                .equals(other._receivedBy, _receivedBy) &&
+            const DeepCollectionEquality().equals(other._readBy, _readBy));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -596,7 +663,9 @@ class _$MessageNewEntityImpl extends _MessageNewEntity {
         const DeepCollectionEquality().hash(_deletedForProfiles),
         deletedForEveryone,
         originalText,
-        const DeepCollectionEquality().hash(_metadata)
+        const DeepCollectionEquality().hash(_metadata),
+        const DeepCollectionEquality().hash(_receivedBy),
+        const DeepCollectionEquality().hash(_readBy)
       ]);
 
   /// Create a copy of MessageNewEntity
@@ -636,7 +705,9 @@ abstract class _MessageNewEntity extends MessageNewEntity {
       final List<String> deletedForProfiles,
       final bool deletedForEveryone,
       final String? originalText,
-      final Map<String, dynamic> metadata}) = _$MessageNewEntityImpl;
+      final Map<String, dynamic> metadata,
+      final List<String> receivedBy,
+      final List<String> readBy}) = _$MessageNewEntityImpl;
   const _MessageNewEntity._() : super._();
 
   factory _MessageNewEntity.fromJson(Map<String, dynamic> json) =
@@ -717,6 +788,16 @@ abstract class _MessageNewEntity extends MessageNewEntity {
   /// Metadados extras (extensível)
   @override
   Map<String, dynamic> get metadata;
+
+  /// [GRUPOS] Lista de profileIds que receberam a mensagem (delivered)
+  /// Em grupos, a mensagem só mostra "delivered" quando TODOS receberam
+  @override
+  List<String> get receivedBy;
+
+  /// [GRUPOS] Lista de profileIds que leram a mensagem (read)
+  /// Em grupos, a mensagem só mostra "read" quando TODOS leram
+  @override
+  List<String> get readBy;
 
   /// Create a copy of MessageNewEntity
   /// with the given fields replaced by the non-null parameter values.

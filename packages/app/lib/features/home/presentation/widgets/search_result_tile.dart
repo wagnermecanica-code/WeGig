@@ -17,7 +17,7 @@ class SearchResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = profile.isBand ? AppColors.accent : AppColors.primary;
+    final primaryColor = profile.isBand ? AppColors.accent : AppColors.musicianColor;
     final locationText = formatCleanLocation(
       neighborhood: profile.neighborhood,
       city: profile.city,

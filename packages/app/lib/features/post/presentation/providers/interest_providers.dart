@@ -14,28 +14,71 @@ class InterestNotifier extends _$InterestNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  String? _lastLoadedProfileId;
+  String? _lastLoadedProfileUid;
+
   @override
   Set<String> build() {
-    // Estado inicial vazio - será populado por _loadInterests()
-    _loadInterests();
-    return <String>{};
+    // ✅ Dependência reativa: quando o perfil ativo muda, este provider rebuilda.
+    final activeProfileId = ref.watch(
+      profileProvider.select((value) => value.value?.activeProfile?.profileId),
+    );
+    final activeProfileUid = ref.watch(
+      profileProvider.select((value) => value.value?.activeProfile?.uid),
+    );
+
+    // Sem perfil ativo: estado vazio
+    if (activeProfileId == null || activeProfileId.isEmpty) {
+      _lastLoadedProfileId = null;
+      _lastLoadedProfileUid = null;
+      return <String>{};
+    }
+
+    // Perfil sem uid carregado ainda: estado vazio
+    if (activeProfileUid == null || activeProfileUid.isEmpty) {
+      _lastLoadedProfileId = activeProfileId;
+      _lastLoadedProfileUid = null;
+      return <String>{};
+    }
+
+    // Troca de perfil: limpar estado imediatamente para evitar "leak" visual
+    final didProfileChange =
+        _lastLoadedProfileId != activeProfileId || _lastLoadedProfileUid != activeProfileUid;
+    if (didProfileChange) {
+      _lastLoadedProfileId = activeProfileId;
+      _lastLoadedProfileUid = activeProfileUid;
+
+      // Recarrega em background (build não pode ser async)
+      Future.microtask(() => _loadInterestsFor(
+            profileId: activeProfileId,
+        profileUid: activeProfileUid,
+          ));
+
+      return <String>{};
+    }
+
+    // Mesmo perfil: mantém estado atual
+    return state;
   }
 
   /// Carrega interesses do Firestore para o perfil ativo
-  Future<void> _loadInterests() async {
+  Future<void> _loadInterestsFor({
+    required String profileId,
+    required String profileUid,
+  }) async {
     try {
-      final activeProfile = ref.read(profileProvider).value?.activeProfile;
-      if (activeProfile == null) {
-        debugPrint('⚠️ InterestNotifier: Perfil ativo não encontrado');
+      if (profileId.isEmpty || profileUid.isEmpty) {
+        debugPrint('⚠️ InterestNotifier: Perfil inválido para carregar interesses');
+        state = <String>{};
         return;
       }
 
-      debugPrint('🔍 InterestNotifier: Carregando interesses para ${activeProfile.profileId}');
+      debugPrint('🔍 InterestNotifier: Carregando interesses para $profileId');
 
       final snapshot = await _firestore
           .collection('interests')
-          .where('interestedProfileId', isEqualTo: activeProfile.profileId)
-          .where('profileUid', isEqualTo: activeProfile.uid)
+          .where('interestedProfileId', isEqualTo: profileId)
+          .where('profileUid', isEqualTo: profileUid)
           .get();
 
       final postIds = snapshot.docs
@@ -98,8 +141,10 @@ class InterestNotifier extends _$InterestNotifier {
           .get();
 
       if (existingInterest.docs.isNotEmpty) {
-        debugPrint('⚠️ InterestNotifier: Interesse já existe no Firestore, pulando criação...');
-        return;
+        debugPrint('⚠️ InterestNotifier: Interesse já existe no Firestore. Limpando stale docs e recriando...');
+        for (final doc in existingInterest.docs) {
+          await doc.reference.delete();
+        }
       }
 
       // 2. Criar documento no Firestore
@@ -150,7 +195,6 @@ class InterestNotifier extends _$InterestNotifier {
           .collection('interests')
           .where('postId', isEqualTo: postId)
           .where('interestedProfileId', isEqualTo: activeProfile.profileId)
-          .where('profileUid', isEqualTo: activeProfile.uid)
           .limit(1)
           .get();
 
@@ -175,6 +219,14 @@ class InterestNotifier extends _$InterestNotifier {
 
   /// Recarrega interesses do Firestore (útil após trocar perfil)
   Future<void> refresh() async {
-    await _loadInterests();
+    final activeProfile = ref.read(profileProvider).value?.activeProfile;
+    if (activeProfile == null) {
+      state = <String>{};
+      return;
+    }
+    await _loadInterestsFor(
+      profileId: activeProfile.profileId,
+      profileUid: activeProfile.uid,
+    );
   }
 }

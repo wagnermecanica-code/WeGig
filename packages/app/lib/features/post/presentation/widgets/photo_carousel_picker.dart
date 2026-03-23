@@ -171,23 +171,37 @@ class _PhotoCarouselPickerState extends State<PhotoCarouselPicker> {
   /// Processa e adiciona uma foto (crop + compressão)
   Future<void> _processAndAddPhoto(File photo) async {
     try {
-      // Crop da imagem
+      // Crop da imagem com presets flexíveis (não trava em 1:1)
       final cropped = await ImageCropper().cropImage(
         sourcePath: photo.path,
-        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
         compressQuality: 100,
         uiSettings: [
           AndroidUiSettings(
             toolbarTitle: 'Ajustar foto',
             toolbarColor: AppColors.primary,
             toolbarWidgetColor: Colors.white,
-            initAspectRatio: CropAspectRatioPreset.square,
-            lockAspectRatio: true,
+            initAspectRatio: CropAspectRatioPreset.original,
+            aspectRatioPresets: const [
+              CropAspectRatioPreset.original,
+              CropAspectRatioPreset.square,
+              CropAspectRatioPreset.ratio4x3,
+              CropAspectRatioPreset.ratio3x2,
+              CropAspectRatioPreset.ratio16x9,
+            ],
+            lockAspectRatio: false,
+            hideBottomControls: false,
           ),
           IOSUiSettings(
             title: 'Ajustar foto',
-            aspectRatioLockEnabled: true,
-            resetAspectRatioEnabled: false,
+            aspectRatioPresets: const [
+              CropAspectRatioPreset.original,
+              CropAspectRatioPreset.square,
+              CropAspectRatioPreset.ratio4x3,
+              CropAspectRatioPreset.ratio3x2,
+              CropAspectRatioPreset.ratio16x9,
+            ],
+            aspectRatioLockEnabled: false,
+            resetAspectRatioEnabled: true,
           ),
         ],
       );

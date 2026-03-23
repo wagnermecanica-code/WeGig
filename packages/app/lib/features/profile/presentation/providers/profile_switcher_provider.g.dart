@@ -7,7 +7,7 @@ part of 'profile_switcher_provider.dart';
 // **************************************************************************
 
 String _$profileSwitcherNotifierHash() =>
-    r'6e5c34ebf3901322290a7922d9ee4ab71aaf1023';
+    r'0e2d16c9e569b3321650e6747d767ae8351772f3';
 
 /// Gerenciador centralizado de troca de perfil
 ///

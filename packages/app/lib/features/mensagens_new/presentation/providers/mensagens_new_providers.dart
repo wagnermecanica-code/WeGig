@@ -31,7 +31,11 @@ IMensagensNewRemoteDataSource mensagensNewRemoteDataSource(Ref ref) {
 @riverpod
 MensagensNewRepository mensagensNewRepository(Ref ref) {
   final dataSource = ref.watch(mensagensNewRemoteDataSourceProvider);
-  return MensagensNewRepositoryImpl(remoteDataSource: dataSource);
+  final firestore = ref.watch(mensagensNewFirestoreProvider);
+  return MensagensNewRepositoryImpl(
+    remoteDataSource: dataSource,
+    firestore: firestore,
+  );
 }
 
 // ============================================================================
@@ -130,6 +134,12 @@ SendMessageNewUseCase sendMessageNewUseCase(Ref ref) {
 SendImageMessageNewUseCase sendImageMessageNewUseCase(Ref ref) {
   final repository = ref.watch(mensagensNewRepositoryProvider);
   return SendImageMessageNewUseCase(repository);
+}
+
+@riverpod
+SendSharedPostMessageNewUseCase sendSharedPostMessageNewUseCase(Ref ref) {
+  final repository = ref.watch(mensagensNewRepositoryProvider);
+  return SendSharedPostMessageNewUseCase(repository);
 }
 
 @riverpod

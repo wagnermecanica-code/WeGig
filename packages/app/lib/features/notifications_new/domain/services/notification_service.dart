@@ -4,6 +4,7 @@ import 'package:core_ui/features/notifications/domain/entities/notification_enti
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 final notificationServiceProvider = Provider<NotificationService>((ref) {
@@ -120,6 +121,15 @@ class NotificationService {
       // Invalidar cache do badge counter
       invalidateUnreadCountCache();
 
+      // Atualizar badge do ícone do app
+      final activeProfile = _profileState.activeProfile;
+      if (activeProfile != null) {
+        await PushNotificationService().updateAppBadge(
+          activeProfile.profileId,
+          activeProfile.uid,
+        );
+      }
+
       debugPrint(
           'NotificationService: Notificação marcada como lida: $notificationId');
     } catch (e) {
@@ -162,6 +172,9 @@ class NotificationService {
 
       // Invalidar cache do badge counter
       invalidateUnreadCountCache();
+
+      // Zerar badge do ícone do app (todas lidas)
+      await PushNotificationService().clearAppBadge();
 
       debugPrint(
           'NotificationService: ${notifications.docs.length} notificações marcadas como lidas');

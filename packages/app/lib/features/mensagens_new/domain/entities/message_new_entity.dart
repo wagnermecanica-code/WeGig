@@ -35,6 +35,9 @@ enum MessageType {
 
   /// Mensagem deletada
   deleted,
+
+  /// Post compartilhado (encaminhado de outra tela)
+  sharedPost,
 }
 
 /// Domain entity para Mensagem individual - Nova implementação
@@ -109,6 +112,14 @@ class MessageNewEntity with _$MessageNewEntity {
 
     /// Metadados extras (extensível)
     @Default({}) Map<String, dynamic> metadata,
+
+    /// [GRUPOS] Lista de profileIds que receberam a mensagem (delivered)
+    /// Em grupos, a mensagem só mostra "delivered" quando TODOS receberam
+    @Default([]) List<String> receivedBy,
+
+    /// [GRUPOS] Lista de profileIds que leram a mensagem (read)
+    /// Em grupos, a mensagem só mostra "read" quando TODOS leram
+    @Default([]) List<String> readBy,
   }) = _MessageNewEntity;
 
   /// From Firestore Document
@@ -144,6 +155,8 @@ class MessageNewEntity with _$MessageNewEntity {
       deletedForEveryone: data['deletedForEveryone'] as bool? ?? false,
       originalText: data['originalText'] as String?,
       metadata: (data['metadata'] as Map<String, dynamic>?) ?? {},
+      receivedBy: (data['receivedBy'] as List<dynamic>?)?.cast<String>() ?? [],
+      readBy: (data['readBy'] as List<dynamic>?)?.cast<String>() ?? [],
     );
   }
 
@@ -203,6 +216,9 @@ class MessageNewEntity with _$MessageNewEntity {
   /// Verifica se é mensagem de sistema
   bool get isSystemMessage => type == MessageType.system;
 
+  /// Verifica se é post compartilhado
+  bool get isSharedPost => type == MessageType.sharedPost;
+
   /// Verifica se está deletada para todos
   bool get isDeletedForEveryone => deletedForEveryone || type == MessageType.deleted;
 
@@ -220,6 +236,7 @@ class MessageNewEntity with _$MessageNewEntity {
   String get preview {
     if (isDeletedForEveryone) return '🚫 Mensagem apagada';
     if (type == MessageType.system) return text;
+    if (isSharedPost) return '📌 Compartilhou um post';
     if (hasImage && !hasText) return '📷 Foto';
     if (hasText) {
       final trimmed = text.trim();
@@ -332,7 +349,43 @@ class MessageNewEntity with _$MessageNewEntity {
       'deletedForEveryone': deletedForEveryone,
       if (originalText != null) 'originalText': originalText,
       if (metadata.isNotEmpty) 'metadata': metadata,
+      if (receivedBy.isNotEmpty) 'receivedBy': receivedBy,
+      if (readBy.isNotEmpty) 'readBy': readBy,
     };
+  }
+
+  // ============================================
+  // GETTERS PARA GRUPOS
+  // ============================================
+
+  /// [GRUPOS] Calcula status de delivery baseado em receivedBy/readBy
+  /// Para exibir corretamente em grupos, considerando todos os participantes
+  MessageDeliveryStatus getGroupStatus(List<String> otherParticipantIds) {
+    // Se não há outros participantes, usa status padrão
+    if (otherParticipantIds.isEmpty) return status;
+    
+    // Verifica se TODOS leram
+    final allRead = otherParticipantIds.every((id) => readBy.contains(id));
+    if (allRead) return MessageDeliveryStatus.read;
+    
+    // Verifica se TODOS receberam
+    final allReceived = otherParticipantIds.every((id) => receivedBy.contains(id));
+    if (allReceived) return MessageDeliveryStatus.delivered;
+    
+    // Caso contrário, usa status padrão (sent)
+    return status == MessageDeliveryStatus.read || status == MessageDeliveryStatus.delivered
+        ? MessageDeliveryStatus.sent
+        : status;
+  }
+
+  /// [GRUPOS] Verifica se todos os participantes receberam
+  bool allReceivedBy(List<String> otherParticipantIds) {
+    return otherParticipantIds.every((id) => receivedBy.contains(id));
+  }
+
+  /// [GRUPOS] Verifica se todos os participantes leram
+  bool allReadBy(List<String> otherParticipantIds) {
+    return otherParticipantIds.every((id) => readBy.contains(id));
   }
 }
 

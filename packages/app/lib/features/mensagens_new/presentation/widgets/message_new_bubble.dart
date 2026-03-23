@@ -7,6 +7,7 @@ import 'package:wegig_app/widgets/full_screen_photo_viewer.dart';
 
 import '../../domain/entities/entities.dart';
 import 'linkified_text.dart';
+import 'shared_post_card_bubble.dart';
 
 /// Bubble de mensagem no chat
 ///
@@ -23,6 +24,7 @@ class MessageNewBubble extends StatelessWidget {
     required this.isMine,
     required this.currentProfileId,
     this.isGroup = false,
+    this.otherParticipantIds = const [],
     this.onReactionTap,
     this.onLongPress,
     this.onReplyTap,
@@ -45,8 +47,12 @@ class MessageNewBubble extends StatelessWidget {
   /// ProfileId do usuário atual
   final String currentProfileId;
 
-  /// Se a conversa é em grupo (esconde ícone de lido)
+  /// Se a conversa é em grupo
   final bool isGroup;
+
+  /// [GRUPOS] Lista de profileIds dos outros participantes (exceto o remetente)
+  /// Usado para calcular status de received/read para grupos
+  final List<String> otherParticipantIds;
 
   /// Callback ao tocar em uma reação
   final void Function(String emoji)? onReactionTap;
@@ -209,11 +215,42 @@ class MessageNewBubble extends StatelessWidget {
           // Reply preview
           if (message.isReply) _buildReplyPreview(),
 
+          // Post compartilhado
+          if (message.isSharedPost)
+            SharedPostCardBubble(
+              message: message,
+              isMine: isMine,
+              onPostTap: onPostTap,
+            ),
+
           // Imagem
-          if (message.hasImage) _buildImage(context),
+          if (message.hasImage && !message.isSharedPost) _buildImage(context),
 
           // Texto
-          if (message.hasText || message.isEdited) _buildTextContent(),
+          if ((message.hasText || message.isEdited) && !message.isSharedPost)
+            _buildTextContent(),
+
+          // Horário para shared post (já que _buildTextContent não é chamado)
+          if (message.isSharedPost)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _formatTime(message.createdAt),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isMine ? Colors.white54 : AppColors.textHint,
+                    ),
+                  ),
+                  if (isMine) ...[
+                    const SizedBox(width: 4),
+                    _buildStatusIcon(),
+                  ],
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -452,7 +489,7 @@ class MessageNewBubble extends StatelessWidget {
                   color: isMine ? Colors.white54 : AppColors.textHint,
                 ),
               ),
-              if (isMine && !isGroup) ...[
+              if (isMine) ...[
                 const SizedBox(width: 4),
                 _buildStatusIcon(),
               ],
@@ -464,12 +501,15 @@ class MessageNewBubble extends StatelessWidget {
   }
 
   Widget _buildStatusIcon() {
-    if (isGroup) return const SizedBox.shrink();
+    // Para grupos, calcula status baseado em receivedBy/readBy
+    final effectiveStatus = isGroup && otherParticipantIds.isNotEmpty
+        ? message.getGroupStatus(otherParticipantIds)
+        : message.status;
 
     IconData icon;
     Color color = Colors.white54;
 
-    switch (message.status) {
+    switch (effectiveStatus) {
       case MessageDeliveryStatus.sending:
         icon = Iconsax.clock;
         break;

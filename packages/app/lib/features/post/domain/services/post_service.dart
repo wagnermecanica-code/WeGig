@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:core_ui/utils/objectionable_content_filter.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
@@ -49,6 +50,11 @@ class PostService {
       throw ArgumentError('Conteúdo é obrigatório');
     }
 
+    final contentError = ObjectionableContentFilter.validate('mensagem', post.content);
+    if (contentError != null) {
+      throw ArgumentError(contentError);
+    }
+
     if (post.content.length > 600) {
       throw ArgumentError('Conteúdo deve ter no máximo 600 caracteres');
     }
@@ -61,7 +67,7 @@ class PostService {
       throw ArgumentError('Localização é obrigatória');
     }
 
-    if (!['musician', 'band', 'sales'].contains(post.type)) {
+    if (!['musician', 'band', 'sales', 'hiring'].contains(post.type)) {
       throw ArgumentError('Tipo inválido: ${post.type}');
     }
 
@@ -69,16 +75,10 @@ class PostService {
       throw ArgumentError('Post expirado');
     }
 
-    if (post.type == 'musician' && post.instruments.isEmpty) {
-      throw ArgumentError('Selecione pelo menos um instrumento');
-    }
-
-    if (post.type == 'band' && post.seekingMusicians.isEmpty) {
-      throw ArgumentError('Informe os músicos buscados');
-    }
-
-    // Validações comuns para musician e band
-    if (post.type != 'sales') {
+    if (post.type == 'musician') {
+      if (post.instruments.isEmpty) {
+        throw ArgumentError('Selecione pelo menos um instrumento');
+      }
       if (post.genres.isEmpty) {
         throw ArgumentError('Selecione pelo menos um gênero musical');
       }
@@ -87,16 +87,55 @@ class PostService {
       }
     }
 
+    if (post.type == 'band') {
+      if (post.seekingMusicians.isEmpty) {
+        throw ArgumentError('Informe os músicos buscados');
+      }
+      if (post.genres.isEmpty) {
+        throw ArgumentError('Selecione pelo menos um gênero musical');
+      }
+      if (post.level.trim().isEmpty) {
+        throw ArgumentError('Selecione o nível de experiência');
+      }
+    }
+
+    if (post.type == 'hiring') {
+      if (post.eventType == null || post.eventType!.trim().isEmpty) {
+        throw ArgumentError('Tipo de evento é obrigatório');
+      }
+      if (post.eventDate == null) {
+        throw ArgumentError('Data do evento é obrigatória');
+      }
+      if (post.eventStartTime == null || post.eventStartTime!.trim().isEmpty) {
+        throw ArgumentError('Horário de início é obrigatório');
+      }
+      if (post.eventEndTime == null || post.eventEndTime!.trim().isEmpty) {
+        throw ArgumentError('Horário de término é obrigatório');
+      }
+      if (post.budgetRange == null || post.budgetRange!.trim().isEmpty) {
+        throw ArgumentError('Orçamento é obrigatório');
+      }
+      if (post.guestCount == null || post.guestCount! <= 0) {
+        throw ArgumentError('Informe o público estimado');
+      }
+    }
+
     // Validações específicas para sales
     if (post.type == 'sales') {
       if (post.title == null || post.title!.trim().isEmpty) {
         throw ArgumentError('Título é obrigatório para anúncios');
       }
+
+      final titleError = ObjectionableContentFilter.validate('título', post.title);
+      if (titleError != null) {
+        throw ArgumentError(titleError);
+      }
       if (post.salesType == null || post.salesType!.trim().isEmpty) {
         throw ArgumentError('Tipo do anúncio é obrigatório');
       }
-      if (post.price == null || post.price! <= 0) {
-        throw ArgumentError('Preço deve ser maior que zero');
+      // ✅ Permitir price == 0 para produtos/serviços gratuitos
+      if (post.price == null || post.price! < 0) {
+        throw ArgumentError('Preço inválido');
       }
     }
   }

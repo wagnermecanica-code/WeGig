@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:flutter/material.dart';
@@ -5,12 +7,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
+import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 
 import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../domain/entities/entities.dart';
 import '../providers/mensagens_new_providers.dart';
 import '../widgets/widgets.dart';
 import 'chat_new_page.dart';
+import 'group_chat_new_page.dart';
 
 /// Página principal de mensagens - Lista de conversas
 ///
@@ -36,6 +41,7 @@ enum _ConversationSwipeAction {
 
 class _MensagensNewPageState extends ConsumerState<MensagensNewPage> {
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
   
   // Estado de seleção múltipla
   bool _isSelectionMode = false;
@@ -43,6 +49,7 @@ class _MensagensNewPageState extends ConsumerState<MensagensNewPage> {
 
   // ✅ Estado para mostrar conversas arquivadas
   bool _showArchived = false;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -53,31 +60,72 @@ class _MensagensNewPageState extends ConsumerState<MensagensNewPage> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  List<ConversationNewEntity> _applySearchFilter(
+    List<ConversationNewEntity> conversations,
+    String currentProfileId,
+  ) {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return conversations;
+
+    return conversations.where((conv) {
+      final isGroup = conv.isGroup || conv.participantProfiles.length > 2;
+      final groupName = conv.groupName ?? '';
+      final other = conv.getOtherParticipantData(currentProfileId);
+      final otherName = other?.name ?? '';
+      // Usa profileId como fallback para "username" (identificador curto)
+      final otherHandle = other?.profileId ?? '';
+      final target = isGroup ? groupName : '$otherName $otherHandle';
+      return target.toLowerCase().contains(query);
+    }).toList(growable: false);
   }
 
   void _openChat(ConversationNewEntity conversation) {
     final activeProfile = ref.read(activeProfileProvider);
     if (activeProfile == null) return;
 
-    // Marcar como lida
-    ref.read(markAsReadNewUseCaseProvider).call(
-      conversationId: conversation.id,
-      profileId: activeProfile.profileId,
+    // Marcar como lida e só então recalcular o badge.
+    // Se atualizarmos o badge antes do write no Firestore, ele pode manter o valor antigo.
+    unawaited(
+      ref
+          .read(markAsReadNewUseCaseProvider)
+          .call(
+            conversationId: conversation.id,
+            profileId: activeProfile.profileId,
+          )
+          .then((_) => PushNotificationService().updateAppBadge(
+                activeProfile.profileId,
+                activeProfile.uid,
+              ))
+          .catchError((e, _) {
+        debugPrint('Erro ao marcar conversa como lida (openChat): $e');
+      }),
     );
 
     // Obter dados do outro participante
     final otherParticipant =
         conversation.getOtherParticipantData(activeProfile.profileId);
 
+    final isGroup = conversation.isGroup || conversation.participantProfiles.length > 2;
+    final displayName = isGroup
+        ? (conversation.groupName?.isNotEmpty == true
+            ? conversation.groupName!
+            : 'Grupo')
+        : (otherParticipant?.name ?? 'Usuário');
+
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ChatNewPage(
           conversationId: conversation.id,
-          otherProfileId: otherParticipant?.profileId ?? '',
-          otherUid: otherParticipant?.uid ?? '',
-          otherName: otherParticipant?.name ?? 'Usuário',
-          otherPhotoUrl: otherParticipant?.photoUrl,
+          otherProfileId: isGroup ? '' : (otherParticipant?.profileId ?? ''),
+          otherUid: isGroup ? '' : (otherParticipant?.uid ?? ''),
+          otherName: displayName,
+          otherPhotoUrl: isGroup ? conversation.groupPhotoUrl : otherParticipant?.photoUrl,
+          isGroup: isGroup,
+          groupPhotoUrl: conversation.groupPhotoUrl,
         ),
       ),
     );
@@ -154,6 +202,14 @@ class _MensagensNewPageState extends ConsumerState<MensagensNewPage> {
         conversationId: conversationId,
         profileId: activeProfile.profileId,
       );
+
+      // Atualiza o badge do ícone após marcar como lida.
+      unawaited(
+        PushNotificationService().updateAppBadge(
+          activeProfile.profileId,
+          activeProfile.uid,
+        ),
+      );
     } catch (e) {
       debugPrint('Erro ao marcar como lida: $e');
     }
@@ -162,6 +218,9 @@ class _MensagensNewPageState extends ConsumerState<MensagensNewPage> {
   Future<void> _archiveSelected() async {
     final activeProfile = ref.read(activeProfileProvider);
     if (activeProfile == null) return;
+
+    // Captura quantidade antes de limpar seleção para exibir feedback correto
+    final archivedCount = _selectedConversations.length;
 
     for (final id in _selectedConversations) {
       await ref.read(archiveConversationNewUseCaseProvider).call(
@@ -175,7 +234,7 @@ class _MensagensNewPageState extends ConsumerState<MensagensNewPage> {
     if (mounted) {
       AppSnackBar.showSuccess(
         context,
-        '${_selectedConversations.length} conversas arquivadas',
+        '$archivedCount conversas arquivadas',
       );
     }
   }
@@ -213,9 +272,13 @@ class _MensagensNewPageState extends ConsumerState<MensagensNewPage> {
 
   @override
   Widget build(BuildContext context) {
+    final authUid = ref.watch(currentUserProvider)?.uid;
     final activeProfile = ref.watch(activeProfileProvider);
 
-    if (activeProfile == null) {
+    final isProfileReadyForQueries =
+        authUid != null && activeProfile != null && activeProfile.uid == authUid;
+
+    if (!isProfileReadyForQueries) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
@@ -232,69 +295,110 @@ class _MensagensNewPageState extends ConsumerState<MensagensNewPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(
-            conversationsNewStreamProvider(
-              profileId: activeProfile.profileId,
-              profileUid: activeProfile.uid,
-              includeArchived: _showArchived,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Buscar por nome ou @username',
+                prefixIcon: Icon(Iconsax.search_normal_1, color: AppColors.textSecondary),
+                suffixIcon: _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Limpar',
+                        icon: Icon(Icons.close, color: AppColors.textSecondary),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      ),
+                filled: true,
+                fillColor: AppColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.divider),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.divider),
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
             ),
-          );
-          // Aguarda um pouco para o stream reinicializar
-          await Future.delayed(const Duration(milliseconds: 300));
-        },
-        color: AppColors.accent,
-        child: conversationsAsync.when(
-          data: (conversations) {
-            if (conversations.isEmpty) {
-              // CustomScrollView permite pull-to-refresh mesmo com lista vazia
-              return CustomScrollView(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: EmptyConversationsNewState(
-                      showArchived: _showArchived,
-                      onToggleArchived: () {
-                        setState(() => _showArchived = !_showArchived);
-                      },
-                    ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(
+                  conversationsNewStreamProvider(
+                    profileId: activeProfile.profileId,
+                    profileUid: activeProfile.uid,
+                    includeArchived: _showArchived,
                   ),
-                ],
-              );
-            }
-
-            return ListView.builder(
-              controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: conversations.length,
-              itemBuilder: (context, index) {
-                final conversation = conversations[index];
-                return _buildConversationItem(conversation, activeProfile.profileId);
+                );
+                await Future.delayed(const Duration(milliseconds: 300));
               },
-            );
-          },
-          loading: () => const ConversationsNewSkeleton(),
-          error: (error, stack) => CustomScrollView(
-            controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: ErrorNewState(
-                  message: error.toString(),
-                  onRetry: () => ref.invalidate(
-                    conversationsNewStreamProvider(
-                      profileId: activeProfile.profileId,                        includeArchived: _showArchived,                      profileUid: activeProfile.uid,
+              color: AppColors.accent,
+              child: conversationsAsync.when(
+                data: (conversations) {
+                  final filtered = _applySearchFilter(
+                    conversations,
+                    activeProfile.profileId,
+                  );
+
+                  if (filtered.isEmpty) {
+                    return CustomScrollView(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: EmptyConversationsNewState(
+                            showArchived: _showArchived,
+                            onToggleArchived: () {
+                              setState(() => _showArchived = !_showArchived);
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return ListView.builder(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final conversation = filtered[index];
+                      return _buildConversationItem(conversation, activeProfile.profileId);
+                    },
+                  );
+                },
+                loading: () => const ConversationsNewSkeleton(),
+                error: (error, stack) => CustomScrollView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: ErrorNewState(
+                        message: error.toString(),
+                        onRetry: () => ref.invalidate(
+                          conversationsNewStreamProvider(
+                            profileId: activeProfile.profileId,                        includeArchived: _showArchived,                      profileUid: activeProfile.uid,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -351,6 +455,12 @@ class _MensagensNewPageState extends ConsumerState<MensagensNewPage> {
                 profileUid: activeProfile.uid,
                 includeArchived: _showArchived,
               ));
+            } else if (value == 'new_group_chat') {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const GroupChatNewPage(),
+                ),
+              );
             }
           },
           itemBuilder: (context) => [
@@ -365,6 +475,17 @@ class _MensagensNewPageState extends ConsumerState<MensagensNewPage> {
                   ),
                   const SizedBox(width: 12),
                   Text(_showArchived ? 'Ver conversas' : 'Ver arquivadas'),
+                ],
+              ),
+            ),
+            const PopupMenuDivider(),
+            const PopupMenuItem<String>(
+              value: 'new_group_chat',
+              child: Row(
+                children: [
+                  Icon(Iconsax.messages_3, size: 20),
+                  SizedBox(width: 12),
+                  Text('Novo chat em grupo'),
                 ],
               ),
             ),

@@ -38,8 +38,9 @@ class UpdatePost {
       if (post.title == null || post.title!.trim().isEmpty) {
         throw Exception('Título é obrigatório para anúncios');
       }
-      if (post.price == null || post.price! <= 0) {
-        throw Exception('Preço deve ser maior que zero');
+      // ✅ Permitir price == 0 para produtos/serviços gratuitos
+      if (post.price == null || post.price! < 0) {
+        throw Exception('Preço inválido');
       }
     } else {
       // Musician/Band: validar gêneros, instrumentos e nível
@@ -61,6 +62,28 @@ class UpdatePost {
       final link = post.youtubeLink!;
       if (!link.contains('youtube.com') && !link.contains('youtu.be')) {
         throw Exception('Link do YouTube inválido');
+      }
+    }
+
+    // Spotify validation (opcional)
+    if (post.spotifyLink != null && post.spotifyLink!.isNotEmpty) {
+      final link = post.spotifyLink!;
+      final isValid =
+          link.startsWith('https://open.spotify.com/') || link.startsWith('spotify:');
+      if (!isValid) {
+        throw Exception('Link do Spotify inválido');
+      }
+    }
+
+    // Deezer validation (opcional)
+    if (post.deezerLink != null && post.deezerLink!.isNotEmpty) {
+      final link = post.deezerLink!;
+      final isValid = link.startsWith('https://www.deezer.com/') ||
+          link.startsWith('https://deezer.com/') ||
+          link.startsWith('https://deezer.page.link/') ||
+          link.startsWith('deezer://');
+      if (!isValid) {
+        throw Exception('Link do Deezer inválido');
       }
     }
 

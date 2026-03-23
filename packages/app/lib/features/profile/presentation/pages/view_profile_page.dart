@@ -14,6 +14,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
@@ -23,9 +24,10 @@ import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
 import 'package:wegig_app/features/mensagens_new/presentation/providers/mensagens_new_providers.dart';
 import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
-import 'package:wegig_app/features/post/presentation/pages/post_page.dart';
 import 'package:wegig_app/features/post/presentation/widgets/interest_options_dialog.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:wegig_app/core/firebase/blocked_profiles.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/features/profile/presentation/widgets/profile_switcher_bottom_sheet.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
@@ -104,6 +106,11 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         // Para posts de vendas, usa o título do anúncio ou fallback
         final title = data['title'] as String?;
         return title?.isNotEmpty == true ? title! : 'Anúncio';
+      case 'hiring':
+        final eventType = data['eventType'] as String?;
+        return eventType?.isNotEmpty == true
+            ? 'Contratação • ${eventType!}'
+            : 'Contratação / Evento';
       default:
         return 'Post';
     }
@@ -124,6 +131,20 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       // Aguarda perfil carregar
       await Future.delayed(const Duration(milliseconds: 500));
       if (_profile == null) return;
+
+      // 🔒 Bloqueios (ambos os sentidos): não faz prefetch se a conversa é indisponível.
+      try {
+        final excluded = await BlockedRelations.getExcludedProfileIds(
+          firestore: FirebaseFirestore.instance,
+          profileId: activeProfile.profileId,
+          uid: currentUser.uid,
+        );
+        if (excluded.contains(_profile!.profileId)) {
+          return;
+        }
+      } catch (_) {
+        // Non-critical: se falhar, segue o prefetch (Chat/NewPage tem guards também).
+      }
       
       // Evita prefetch para si mesmo
       if (activeProfile.profileId == _profile!.profileId) return;
@@ -139,6 +160,20 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       for (final doc in query.docs) {
         final data = doc.data();
         final participantProfiles = (data['participantProfiles'] as List?)?.cast<String>() ?? [];
+
+        // CRÍTICO: prefetch deve pegar APENAS conversa 1:1.
+        // Caso contrário, se existir um grupo com os mesmos perfis,
+        // o botão de mensagem pode abrir o grupo "disfarçado" de 1:1.
+        final conversationType = data['conversationType'] as String?;
+        final explicitIsGroup = data['isGroup'] as bool?;
+        final groupName = data['groupName'] as String?;
+        final isDirect = conversationType == 'direct' ||
+            (conversationType == null &&
+                (explicitIsGroup != true) &&
+                participantProfiles.length == 2 &&
+                (groupName == null || groupName.trim().isEmpty));
+
+        if (!isDirect) continue;
         
         if (participantProfiles.contains(activeProfile.profileId) &&
             participantProfiles.contains(_profile!.profileId)) {
@@ -191,15 +226,29 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         debugPrint(
             '✅ ViewProfilePage: Carregando MEU perfil ativo: $profileId');
       } else {
-        // Visualizando perfil de outro usuário (buscar activeProfileId dele)
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.userId)
+        // Visualizando perfil de outro usuário.
+        // `users/{uid}` é privado por rules, então não podemos ler activeProfileId de terceiros.
+        // Fallback: busca um perfil público associado a esse UID.
+        final otherUid = (widget.userId ?? '').trim();
+        if (otherUid.isEmpty) {
+          if (mounted) setState(() => _loadingProfile = false);
+          return;
+        }
+
+        final otherProfiles = await FirebaseFirestore.instance
+            .collection('profiles')
+            .where('uid', isEqualTo: otherUid)
+            .orderBy('createdAt', descending: true)
+            .limit(1)
             .get();
-        final activeProfileId = userDoc.data()?['activeProfileId'] as String?;
-        profileId = activeProfileId ?? widget.userId;
-        debugPrint(
-            'ViewProfilePage: Carregando perfil de outro usuário: $profileId');
+
+        if (otherProfiles.docs.isEmpty) {
+          if (mounted) setState(() => _loadingProfile = false);
+          return;
+        }
+
+        profileId = otherProfiles.docs.first.id;
+        debugPrint('ViewProfilePage: Carregando perfil público do usuário: $profileId');
       }
 
       if (profileId == null) {
@@ -224,6 +273,32 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       profile = ProfileEntity.fromFirestore(doc);
       debugPrint(
           'ViewProfilePage: Perfil carregado: ${profile.name} (${profile.isBand ? 'Banda' : 'Músico'})');
+
+      // 🔒 Reverse visibility: se o usuário atual e o dono do perfil estiverem bloqueados em qualquer direção,
+      // não exibe dados.
+      try {
+        final currentUid = FirebaseAuth.instance.currentUser?.uid;
+        final activeProfile = ref.read(activeProfileProvider);
+        if (currentUid != null && currentUid.isNotEmpty && 
+            activeProfile != null && profile.profileId != activeProfile.profileId) {
+          final excluded = await BlockedRelations.getExcludedProfileIds(
+            firestore: FirebaseFirestore.instance,
+            profileId: activeProfile.profileId,
+            uid: currentUid,
+          );
+          if (excluded.contains(profile.profileId)) {
+            if (mounted) {
+              setState(() {
+                _profile = null;
+                _loadingProfile = false;
+              });
+            }
+            return;
+          }
+        }
+      } catch (_) {
+        // Se falhar, não bloqueia o carregamento.
+      }
 
       // Buscar galeria do perfil (armazenada no documento do perfil)
       final gallery =
@@ -280,6 +355,15 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       debugPrint('❌ ViewProfilePage: Erro ao carregar perfil: $e');
       if (mounted) setState(() => _loadingProfile = false);
     }
+  }
+
+  /// 🔄 Instagram-style refresh handler
+  /// Adiciona um leve delay para simular o comportamento "puxar e soltar"
+  /// característico do Instagram, proporcionando feedback visual mais suave.
+  Future<void> _handleRefresh() async {
+    // Delay sutil para UX mais polida (Instagram usa ~300ms)
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    await _loadProfileFromFirestore();
   }
 
   @override
@@ -388,6 +472,27 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       return;
     }
 
+    // 🔒 Bloqueios: impede abrir conversa com usuário bloqueado (ambos os sentidos)
+    try {
+      final activeProfile = ref.read(activeProfileProvider);
+      if (activeProfile == null) {
+        AppSnackBar.showError(context, 'Perfil ativo não encontrado');
+        return;
+      }
+      final excluded = await BlockedRelations.getExcludedProfileIds(
+        firestore: FirebaseFirestore.instance,
+        profileId: activeProfile.profileId,
+        uid: currentUser.uid,
+      );
+      if (!mounted) return;
+      if (excluded.contains(_profile!.profileId)) {
+        AppSnackBar.showError(context, 'Conversa indisponível');
+        return;
+      }
+    } catch (_) {
+      // Se falhar, continua (ChatNewPage também tem guard)
+    }
+
     // Obter perfil ativo do usuário atual
     final profileState = ref.read(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
@@ -410,8 +515,63 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       // Usar conversationId prefetched se disponível (economiza 1 query!)
       String conversationId;
       if (_prefetchedConversationId != null) {
-        conversationId = _prefetchedConversationId!;
-        debugPrint('⚡ ViewProfile: Usando conversation prefetched');
+        final candidateId = _prefetchedConversationId!;
+
+        // Validação defensiva: garante que o ID prefetched é 1:1 (direct)
+        // e contém exatamente os dois perfis esperados.
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('conversations')
+              .doc(candidateId)
+              .get();
+
+          final data = doc.data();
+          if (doc.exists && data != null) {
+            final participantProfiles =
+                (data['participantProfiles'] as List<dynamic>?)?.cast<String>() ?? [];
+            final conversationType = data['conversationType'] as String?;
+            final explicitIsGroup = data['isGroup'] as bool?;
+            final groupName = data['groupName'] as String?;
+
+            final isDirect = conversationType == 'direct' ||
+                (conversationType == null &&
+                    (explicitIsGroup != true) &&
+                    participantProfiles.length == 2 &&
+                    (groupName == null || groupName.trim().isEmpty));
+
+            final matchesProfiles = participantProfiles.contains(activeProfile.profileId) &&
+                participantProfiles.contains(_profile!.profileId) &&
+                participantProfiles.length == 2;
+
+            if (isDirect && matchesProfiles) {
+              conversationId = candidateId;
+              debugPrint('⚡ ViewProfile: Usando conversation prefetched (validada)');
+            } else {
+              _prefetchedConversationId = null;
+              throw Exception('Prefetch apontava para conversa não-1:1');
+            }
+          } else {
+            _prefetchedConversationId = null;
+            throw Exception('Prefetch apontava para conversa inexistente');
+          }
+        } catch (_) {
+          // Fallback: busca/cria conversa normalmente
+          final conversation = await ref.read(mensagensNewRepositoryProvider).getOrCreateConversation(
+            currentProfileId: activeProfile.profileId,
+            currentUid: currentUser.uid,
+            otherProfileId: _profile!.profileId,
+            otherUid: _profile!.uid,
+            currentProfileData: {
+              'name': activeProfile.name,
+              'photoUrl': activeProfile.photoUrl,
+            },
+            otherProfileData: {
+              'name': _profile!.name,
+              'photoUrl': _profile!.photoUrl,
+            },
+          );
+          conversationId = conversation.id;
+        }
       } else {
         // Fallback: busca/cria conversa normalmente
         final conversation = await ref.read(mensagensNewRepositoryProvider).getOrCreateConversation(
@@ -476,6 +636,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       profileName: _profile!.name,
       isBand: _profile!.isBand,
       city: _profile!.city,
+      username: _profile!.username,
+      photoUrl: _profile!.photoUrl,
       neighborhood: _profile!.neighborhood,
       state: _profile!.state,
       instruments: _profile!.instruments ?? <String>[],
@@ -695,26 +857,28 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
               final cropped = await ImageCropper().cropImage(
                 sourcePath: picked.path,
+                aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
                 uiSettings: [
                   AndroidUiSettings(
                     toolbarTitle: 'Editar foto',
                     toolbarColor: AppColors.primary,
                     toolbarWidgetColor: Colors.white,
-                    aspectRatioPresets: [
+                    initAspectRatio: CropAspectRatioPreset.square,
+                    aspectRatioPresets: const [
                       CropAspectRatioPreset.square,
-                      CropAspectRatioPreset.ratio3x2,
-                      CropAspectRatioPreset.ratio4x3,
-                      CropAspectRatioPreset.ratio16x9,
                     ],
+                    lockAspectRatio: true,
+                    hideBottomControls: true,
                   ),
                   IOSUiSettings(
                     title: 'Editar foto',
-                    aspectRatioPresets: [
+                    aspectRatioPresets: const [
                       CropAspectRatioPreset.square,
-                      CropAspectRatioPreset.ratio3x2,
-                      CropAspectRatioPreset.ratio4x3,
-                      CropAspectRatioPreset.ratio16x9,
                     ],
+                    aspectRatioLockEnabled: true,
+                    aspectRatioLockDimensionSwapEnabled: false,
+                    rotateButtonsHidden: true,
+                    resetButtonHidden: true,
                   ),
                 ],
               );
@@ -874,6 +1038,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final isOwnProfile = _isMyProfile();
     final theme = Theme.of(context);
 
+    final route = ModalRoute.of(context);
+    // Não usa Navigator.canPop() diretamente porque ele fica true quando há
+    // bottom sheets/dialogs abertos na mesma Navigator. Aqui queremos mostrar
+    // "voltar" apenas quando esta página não é a rota inicial.
+    final shouldShowBackButton = route != null ? !route.isFirst : Navigator.canPop(context);
+
     // ✅ FIX: Listener para detectar mudanças no perfil ativo
     // Após trocar de perfil, recarrega ViewProfilePage ao invés de ir para Home
     // SEMPRE escuta, mas só age se for visualização do próprio perfil
@@ -906,12 +1076,32 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       },
     );
 
+    final tabBar = TabBar(
+      controller: _tabController,
+      labelColor: Colors.black,
+      unselectedLabelColor: Colors.grey,
+      indicatorColor: Colors.black,
+      indicatorWeight: 1,
+      tabs: _profile?.isSpace == true
+          ? const [
+              Tab(icon: Icon(Iconsax.element_3, size: 26)), // Galeria
+              Tab(icon: Icon(Iconsax.video_play, size: 26)), // YouTube
+              Tab(icon: Icon(Iconsax.document_text, size: 26)), // Ofertas
+            ]
+          : const [
+              Tab(icon: Icon(Iconsax.element_3, size: 26)), // Galeria
+              Tab(icon: Icon(Iconsax.video_play, size: 26)), // YouTube
+              Tab(icon: Icon(Iconsax.document_text, size: 26)), // Posts
+              Tab(icon: Icon(Iconsax.heart, size: 26)), // Interesses
+            ],
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: Navigator.canPop(context)
+        leading: shouldShowBackButton
             ? IconButton(
                 icon: const Icon(Iconsax.arrow_left_2, color: Colors.black),
                 onPressed: () => Navigator.of(context).pop(),
@@ -972,323 +1162,456 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           : _profile == null
               ? const Center(child: Text('Perfil não encontrado'))
               : RefreshIndicator(
-                  onRefresh: _loadProfileFromFirestore,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        // Header: Avatar + Stats
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 16),
-                          child: Row(
-                            children: [
-                              // Avatar
-                              Hero(
-                                tag: 'profile-avatar-${_profile!.profileId}',
-                                child: CircleAvatar(
-                                  radius: 42,
-                                  backgroundColor: Colors.grey[300],
-                                  foregroundImage: _profile!.photoUrl != null &&
-                                          _profile!.photoUrl!.startsWith('http')
-                                      ? CachedNetworkImageProvider(
-                                          _profile!.photoUrl!)
-                                      : null,
-                                  child: _profile!.photoUrl == null
-                                      ? const Icon(Iconsax.user,
-                                          size: 42, color: Colors.grey)
-                                      : null,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              // Nome e Bio ao lado da foto - ALINHADO À ESQUERDA
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
+                  // Instagram-style: só aciona quando scroll está no topo absoluto
+                  onRefresh: _handleRefresh,
+                  notificationPredicate: (_) => true,
+                  // onEdge = só dispara do topo (comportamento Instagram)
+                  triggerMode: RefreshIndicatorTriggerMode.onEdge,
+                  color: AppColors.primary,
+                  backgroundColor: Colors.white,
+                  // edgeOffset: permite que o spinner apareça abaixo da AppBar fixa
+                  // sem interferir no layout, enquanto o conteúdo faz o bounce
+                  edgeOffset: 0,
+                  displacement: 40,
+                  strokeWidth: 2.5,
+                  child: NestedScrollView(
+                    // BouncingScrollPhysics: essencial para o efeito elástico iOS-style
+                    // AlwaysScrollableScrollPhysics: permite scroll mesmo com pouco conteúdo
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    // floatHeaderSlivers: false garante que o header não "flutue" 
+                    // e mantenha o comportamento de scroll natural
+                    floatHeaderSlivers: false,
+                    headerSliverBuilder: (context, innerBoxIsScrolled) {
+                      return <Widget>[
+                      SliverToBoxAdapter(
+                        child: Column(
+                          children: [
+                              // Header: Avatar + Stats
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 16),
+                                child: Row(
                                   children: [
-                                    Text(
-                                      _profile!.name,
-                                      style: theme.textTheme.headlineSmall
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 22,
-                                                height: 1.2,
-                                                color: Colors.black87,
-                                              ) ??
-                                          const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 22,
-                                          ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if ((_profile!.username ?? '').isNotEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 4),
-                                        child: Text(
-                                          '@${_profile!.username}',
-                                          style: theme.textTheme.bodyMedium
-                                                  ?.copyWith(
-                                                    fontSize: 16,
-                                                    color: Colors.grey[700],
-                                                  ) ??
-                                              TextStyle(
-                                                fontSize: 16,
-                                                color: Colors.grey[700],
-                                              ),
-                                        ),
+                                    // Avatar
+                                    Hero(
+                                      tag:
+                                          'profile-avatar-${_profile!.profileId}',
+                                      child: CircleAvatar(
+                                        radius: 42,
+                                        backgroundColor: Colors.grey[300],
+                                        foregroundImage: _profile!.photoUrl !=
+                                                    null &&
+                                                _profile!.photoUrl!
+                                                    .startsWith('http')
+                                            ? CachedNetworkImageProvider(
+                                                _profile!.photoUrl!)
+                                            : null,
+                                        child: _profile!.photoUrl == null
+                                            ? const Icon(Iconsax.user,
+                                                size: 42, color: Colors.grey)
+                                            : null,
                                       ),
-                                    if (_profile!.bio != null &&
-                                        _profile!.bio!.isNotEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 4),
-                                        child: Text(
-                                          _profile!.bio!,
-                                          style: theme.textTheme.bodyMedium
-                                                  ?.copyWith(
-                                                    fontSize: 15,
-                                                    height: 1.4,
-                                                    color: Colors.grey[800],
-                                                  ) ??
-                                              const TextStyle(fontSize: 15),
-                                          maxLines: 4,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Location and Social Links Section - ALINHADO À ESQUERDA
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
-                            children: [
-                              // Space Type subtitle (only for Space profiles)
-                              if (_profile!.isSpace && _profile!.spaceType != null) ...[
-                                Text(
-                                  SpaceType.fromString(_profile!.spaceType!).label,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                        fontSize: 15,
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.w600,
-                                      ) ??
-                                      TextStyle(
-                                        fontSize: 15,
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                ),
-                                const SizedBox(height: 8),
-                              ],
-
-                              // Location info
-                              Text(
-                                formatCleanLocation(
-                                  neighborhood: _profile!.neighborhood,
-                                  city: _profile!.city,
-                                  state: _profile!.state,
-                                ),
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                      fontSize: 14.5,
-                                      color: Colors.grey[700],
-                                      fontWeight: FontWeight.w500,
-                                    ) ??
-                                    TextStyle(
-                                      fontSize: 14.5,
-                                      color: Colors.grey[700],
                                     ),
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // ===== CAMPOS ESPECÍFICOS DE ESPAÇO =====
-                              if (_profile!.isSpace) ...[
-                                // Horário de funcionamento
-                                if (_profile!.operatingHours != null && _profile!.operatingHours!.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Icon(Iconsax.clock, size: 18, color: AppColors.primary),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            _profile!.operatingHours!,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[800],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                // Comodidades
-                                if (_profile!.amenities != null && _profile!.amenities!.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Icon(Iconsax.tick_circle, size: 18, color: Colors.grey[600]),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            _profile!.amenities!.join(' • '),
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[800],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                // Site/Linktree (shortlink)
-                                if (_profile!.website != null && _profile!.website!.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: InkWell(
-                                      onTap: () => _launchUrl(_profile!.website!),
-                                      child: Row(
+                                    const SizedBox(width: 16),
+                                    // Nome e Bio ao lado da foto - ALINHADO À ESQUERDA
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment
+                                            .start, // Alinhamento à esquerda
                                         children: [
-                                          const Icon(Iconsax.link, size: 18, color: AppColors.primary),
-                                          const SizedBox(width: 8),
-                                          Flexible(
-                                            child: Text(
-                                              _profile!.website!
-                                                  .replaceFirst(RegExp(r'^https?://'), '')
-                                                  .replaceFirst(RegExp(r'^www\.'), '')
-                                                  .split('/').first,
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                color: AppColors.primary,
-                                                decoration: TextDecoration.underline,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
+                                          Text(
+                                            _profile!.name,
+                                            style: theme
+                                                    .textTheme.headlineSmall
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      fontSize: 22,
+                                                      height: 1.2,
+                                                      color: Colors.black87,
+                                                    ) ??
+                                                const TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 22,
+                                                ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
+                                          if ((_profile!.username ?? '')
+                                              .isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                  top: 4),
+                                              child: Text(
+                                                '@${_profile!.username}',
+                                                style: theme
+                                                        .textTheme.bodyMedium
+                                                        ?.copyWith(
+                                                          fontSize: 16,
+                                                          color:
+                                                              Colors.grey[700],
+                                                        ) ??
+                                                    TextStyle(
+                                                      fontSize: 16,
+                                                      color: Colors.grey[700],
+                                                    ),
+                                              ),
+                                            ),
+                                          if (_profile!.bio != null &&
+                                              _profile!.bio!.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                  top: 4),
+                                              child: Text(
+                                                _profile!.bio!,
+                                                style: theme
+                                                        .textTheme.bodyMedium
+                                                        ?.copyWith(
+                                                          fontSize: 15,
+                                                          height: 1.4,
+                                                          color:
+                                                              Colors.grey[800],
+                                                        ) ??
+                                                    const TextStyle(
+                                                        fontSize: 15),
+                                                maxLines: 4,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
                                         ],
                                       ),
                                     ),
-                                  ),
-                              ],
-
-                              // Social Links Block (YouTube, TikTok, Instagram)
-                              if (_hasSocialLinks()) _buildSocialLinksBlock(),
-
-                              // Botões de ação alinhados: Mensagem, Ligar, WhatsApp
-                              if (!isOwnProfile || (_profile!.isSpace && _profile!.phone != null && _profile!.phone!.isNotEmpty)) ...[
-                                const SizedBox(height: 16),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  children: [
-                                    // Botão Mensagem (sempre visível para não-donos)
-                                    if (!isOwnProfile)
-                                      _buildActionButton(
-                                        label: 'Mensagem',
-                                        icon: Iconsax.message,
-                                        onPressed: _openOrCreateConversation,
-                                        isPrimary: true,
-                                        isLoading: _isOpeningConversation,
-                                      ),
-                                    // Botões de telefone (apenas para spaces com telefone)
-                                    if (_profile!.isSpace && _profile!.phone != null && _profile!.phone!.isNotEmpty) ...[
-                                      if (!isOwnProfile) const SizedBox(width: 8),
-                                      // Botão de ligar
-                                      _buildActionButton(
-                                        label: 'Ligar',
-                                        icon: Iconsax.call,
-                                        onPressed: () => _launchUrl('tel:${_profile!.phone}'),
-                                        isPrimary: isOwnProfile,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      // Botão WhatsApp
-                                      _buildActionButton(
-                                        label: 'WhatsApp',
-                                        icon: Icons.chat,
-                                        onPressed: () {
-                                          final phone = _profile!.phone!.replaceAll(RegExp(r'[^\d]'), '');
-                                          final phoneWithCountry = phone.startsWith('55') ? phone : '55$phone';
-                                          _launchUrl('https://wa.me/$phoneWithCountry');
-                                        },
-                                        isPrimary: false,
-                                      ),
-                                    ],
                                   ],
                                 ),
-                              ],
+                              ),
 
-                              // Seção "Sobre o Músico/Banda"
-                              if (_shouldShowProfileInfo())
-                                _buildProfileInfoSection(),
+                              // Location and Social Links Section - ALINHADO À ESQUERDA
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment
+                                      .start, // Alinhamento à esquerda
+                                  children: [
+                                    // Space Type subtitle (only for Space profiles)
+                                    if (_profile!.isSpace &&
+                                        _profile!.spaceType != null) ...[
+                                      Text(
+                                        SpaceType.fromString(
+                                                _profile!.spaceType!)
+                                            .label,
+                                        style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  fontSize: 15,
+                                                  color: AppColors.primary,
+                                                  fontWeight: FontWeight.w600,
+                                                ) ??
+                                            TextStyle(
+                                              fontSize: 15,
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                    ],
+
+                                    // Location info
+                                    Text(
+                                      formatCleanLocation(
+                                        neighborhood: _profile!.neighborhood,
+                                        city: _profile!.city,
+                                        state: _profile!.state,
+                                      ),
+                                      style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                fontSize: 14.5,
+                                                color: Colors.grey[700],
+                                                fontWeight: FontWeight.w500,
+                                              ) ??
+                                          TextStyle(
+                                            fontSize: 14.5,
+                                            color: Colors.grey[700],
+                                          ),
+                                    ),
+
+                                    const SizedBox(height: 12),
+
+                                    // ===== CAMPOS ESPECÍFICOS DE ESPAÇO =====
+                                    if (_profile!.isSpace) ...[
+                                      // Horário de funcionamento
+                                      if (_profile!.operatingHours != null &&
+                                          _profile!
+                                              .operatingHours!.isNotEmpty)
+                                        Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 8),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Icon(Iconsax.clock,
+                                                  size: 18,
+                                                  color: AppColors.primary),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  _profile!.operatingHours!,
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    color: Colors.grey[800],
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                      // Comodidades
+                                      if (_profile!.amenities != null &&
+                                          _profile!
+                                              .amenities!.isNotEmpty)
+                                        Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 8),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Icon(Iconsax.tick_circle,
+                                                  size: 18,
+                                                  color: Colors.grey[600]),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  _profile!.amenities!
+                                                      .join(' • '),
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    color: Colors.grey[800],
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                      // Site/Linktree (shortlink)
+                                      if (_profile!.website != null &&
+                                          _profile!
+                                              .website!.isNotEmpty)
+                                        Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 8),
+                                          child: InkWell(
+                                            onTap: () =>
+                                                _launchUrl(_profile!.website!),
+                                            child: Row(
+                                              children: [
+                                                const Icon(Iconsax.link,
+                                                    size: 18,
+                                                    color: AppColors.primary),
+                                                const SizedBox(width: 8),
+                                                Flexible(
+                                                  child: Text(
+                                                    _profile!.website!
+                                                        .replaceFirst(
+                                                            RegExp(
+                                                                r'^https?://'),
+                                                            '')
+                                                        .replaceFirst(
+                                                            RegExp(r'^www\.'),
+                                                            '')
+                                                        .split('/')
+                                                        .first,
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      color: AppColors.primary,
+                                                      decoration:
+                                                          TextDecoration.underline,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+
+                                    // Social Links Block (YouTube, TikTok, Instagram)
+                                    if (_hasSocialLinks())
+                                      _buildSocialLinksBlock(),
+
+                                    // Botões de ação alinhados: Mensagem, Ligar, WhatsApp
+                                    if (!isOwnProfile ||
+                                        (_profile!.isSpace &&
+                                            _profile!.phone != null &&
+                                            _profile!
+                                                .phone!.isNotEmpty)) ...[
+                                      const SizedBox(height: 16),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.start,
+                                        children: [
+                                          // Botão Mensagem (sempre visível para não-donos)
+                                          if (!isOwnProfile)
+                                            _buildActionButton(
+                                              label: 'Mensagem',
+                                              icon: Iconsax.message,
+                                              onPressed:
+                                                  _openOrCreateConversation,
+                                              isPrimary: true,
+                                              isLoading: _isOpeningConversation,
+                                            ),
+                                          // Botões de telefone (apenas para spaces com telefone)
+                                          if (_profile!.isSpace &&
+                                              _profile!.phone != null &&
+                                              _profile!
+                                                  .phone!.isNotEmpty) ...[
+                                            if (!isOwnProfile)
+                                              const SizedBox(width: 8),
+                                            // Botão de ligar
+                                            _buildActionButton(
+                                              label: 'Ligar',
+                                              icon: Iconsax.call,
+                                              onPressed: () => _launchUrl(
+                                                  'tel:${_profile!.phone}'),
+                                              isPrimary: isOwnProfile,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            // Botão WhatsApp
+                                            _buildActionButton(
+                                              label: 'WhatsApp',
+                                              icon: Icons.chat,
+                                              onPressed: () {
+                                                final phone = _profile!.phone!
+                                                    .replaceAll(
+                                                        RegExp(r'[^\d]'), '');
+                                                final phoneWithCountry =
+                                                    phone.startsWith('55')
+                                                        ? phone
+                                                        : '55$phone';
+                                                _launchUrl(
+                                                    'https://wa.me/$phoneWithCountry');
+                                              },
+                                              isPrimary: false,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
+
+                                    // Seção "Sobre o Músico/Banda"
+                                    if (_shouldShowProfileInfo())
+                                      _buildProfileInfoSection(),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 16),
                             ],
                           ),
                         ),
-
-                        const SizedBox(height: 16),
-
-                        // Tabs
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border(
-                              top: BorderSide(
-                                  color: Colors.grey[300]!, width: 0.5),
+                        SliverPersistentHeader(
+                          pinned: true,
+                          delegate: _SliverHeaderDelegate(
+                            height: tabBar.preferredSize.height,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border(
+                                  top: BorderSide(
+                                      color: Colors.grey[300]!, width: 0.5),
+                                ),
+                              ),
+                              child: tabBar,
                             ),
                           ),
-                          child: TabBar(
-                            controller: _tabController,
-                            labelColor: Colors.black,
-                            unselectedLabelColor: Colors.grey,
-                            indicatorColor: Colors.black,
-                            indicatorWeight: 1,
-                            tabs: _profile!.isSpace
-                                ? const [
-                                    Tab(icon: Icon(Iconsax.element_3, size: 26)), // Galeria
-                                    Tab(icon: Icon(Iconsax.video_play, size: 26)), // YouTube
-                                    Tab(icon: Icon(Iconsax.document_text, size: 26)), // Ofertas
-                                  ]
-                                : const [
-                                    Tab(icon: Icon(Iconsax.element_3, size: 26)), // Galeria
-                                    Tab(icon: Icon(Iconsax.video_play, size: 26)), // YouTube
-                                    Tab(icon: Icon(Iconsax.document_text, size: 26)), // Posts
-                                    Tab(icon: Icon(Iconsax.heart, size: 26)), // Interesses
-                                  ],
-                          ),
                         ),
-
-                        // Tab Content (altura fixa para funcionar dentro do SingleChildScrollView)
-                        SizedBox(
-                          height: 600, // Altura fixa para o TabBarView
-                          child: TabBarView(
+                      ];
+                    },
+                    body: Builder(
+                      builder: (context) {
+                        final primaryController = PrimaryScrollController.of(context);
+                          return TabBarView(
                             controller: _tabController,
                             children: _profile!.isSpace
                                 ? [
-                                    _buildGalleryTab(),
-                                    _buildYoutubeTab(),
-                                    _buildPostsTab(), // Ofertas (reaproveita a mesma função)
+                                    _wrapWithPrimaryScrollController(
+                                      primaryController,
+                                      KeyedSubtree(
+                                        key: const PageStorageKey<String>('viewProfile_gallery'),
+                                        child: _buildGalleryTab(),
+                                      ),
+                                    ),
+                                    _wrapWithPrimaryScrollController(
+                                      primaryController,
+                                      KeyedSubtree(
+                                        key: const PageStorageKey<String>('viewProfile_youtube'),
+                                        child: _buildYoutubeTab(),
+                                      ),
+                                    ),
+                                    _wrapWithPrimaryScrollController(
+                                      primaryController,
+                                      KeyedSubtree(
+                                        key: const PageStorageKey<String>('viewProfile_posts'),
+                                        child: _buildPostsTab(),
+                                      ),
+                                    ),
                                   ]
                                 : [
-                                    _buildGalleryTab(),
-                                    _buildYoutubeTab(),
-                                    _buildPostsTab(),
-                                    _buildInterestsTab(),
+                                    _wrapWithPrimaryScrollController(
+                                      primaryController,
+                                      KeyedSubtree(
+                                        key: const PageStorageKey<String>('viewProfile_gallery'),
+                                        child: _buildGalleryTab(),
+                                      ),
+                                    ),
+                                    _wrapWithPrimaryScrollController(
+                                      primaryController,
+                                      KeyedSubtree(
+                                        key: const PageStorageKey<String>('viewProfile_youtube'),
+                                        child: _buildYoutubeTab(),
+                                      ),
+                                    ),
+                                    _wrapWithPrimaryScrollController(
+                                      primaryController,
+                                      KeyedSubtree(
+                                        key: const PageStorageKey<String>('viewProfile_posts'),
+                                        child: _buildPostsTab(),
+                                      ),
+                                    ),
+                                    _wrapWithPrimaryScrollController(
+                                      primaryController,
+                                      KeyedSubtree(
+                                        key: const PageStorageKey<String>('viewProfile_interests'),
+                                        child: _buildInterestsTab(),
+                                      ),
+                                    ),
                                   ],
-                          ),
-                        ),
-                      ],
+                          );
+                      },
+                    ),
                     ),
                   ),
-                ),
+    );
+  }
+
+  Widget _wrapWithPrimaryScrollController(
+    ScrollController? primaryController,
+    Widget child,
+  ) {
+    if (primaryController == null) {
+      return child;
+    }
+
+    return PrimaryScrollController(
+      controller: primaryController,
+      child: child,
     );
   }
 
@@ -1296,7 +1619,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     return (_profile?.instagramLink != null &&
             _profile!.instagramLink!.isNotEmpty) ||
         (_profile?.tiktokLink != null && _profile!.tiktokLink!.isNotEmpty) ||
-        (_profile?.youtubeLink != null && _profile!.youtubeLink!.isNotEmpty);
+      (_profile?.youtubeLink != null && _profile!.youtubeLink!.isNotEmpty) ||
+      (_profile?.spotifyLink != null && _profile!.spotifyLink!.isNotEmpty) ||
+      (_profile?.deezerLink != null && _profile!.deezerLink!.isNotEmpty);
   }
 
   Widget _buildSocialLinksBlock() {
@@ -1325,6 +1650,20 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               icon: Iconsax.play_circle,
               label: 'YouTube',
               onTap: () => _launchUrl(_profile!.youtubeLink!),
+            ),
+          if (_profile?.spotifyLink != null &&
+              _profile!.spotifyLink!.isNotEmpty)
+            _buildSocialIcon(
+              icon: Iconsax.music,
+              label: 'Spotify',
+              onTap: () => _launchUrl(_profile!.spotifyLink!),
+            ),
+          if (_profile?.deezerLink != null &&
+              _profile!.deezerLink!.isNotEmpty)
+            _buildSocialIcon(
+              icon: Iconsax.music_square,
+              label: 'Deezer',
+              onTap: () => _launchUrl(_profile!.deezerLink!),
             ),
         ],
       ),
@@ -1732,52 +2071,68 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
     // Se galeria vazia e não é o próprio perfil
     if (_gallery.isEmpty && !isOwnProfile) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.photo_library_outlined,
-                size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'Nenhuma foto na galeria',
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+      return CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.photo_library_outlined,
+                      size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Nenhuma foto na galeria',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
     // Se galeria vazia e é o próprio perfil, mostrar apenas botão de adicionar
     if (_gallery.isEmpty && isOwnProfile) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.photo_library_outlined,
-                size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'Adicione fotos à sua galeria',
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _pickAndUploadGalleryPhoto,
-              icon: const Icon(Iconsax.camera),
-              label: const Text('Adicionar Foto'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+      return CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.photo_library_outlined,
+                      size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Adicione fotos à sua galeria',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: _pickAndUploadGalleryPhoto,
+                    icon: const Icon(Iconsax.camera),
+                    label: const Text('Adicionar Foto'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
@@ -1789,8 +2144,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
     return GridView.builder(
       padding: const EdgeInsets.all(1),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(),
+      // Cache infinito: mantém todos os widgets em memória (evita re-renderização)
+      cacheExtent: double.maxFinite,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         crossAxisSpacing: 2,
@@ -1905,7 +2261,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
       debugPrint('ViewProfile: Imagem selecionada: ${pickedFile.path}');
 
-      // Crop da imagem com opção square
+      // Crop da imagem com múltiplas proporções disponíveis
       final cropped = await ImageCropper().cropImage(
         sourcePath: pickedFile.path,
         compressQuality: 85,
@@ -1919,26 +2275,30 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             toolbarWidgetColor: Colors.white,
             backgroundColor: Colors.black,
             activeControlsWidgetColor: AppColors.primary,
-            initAspectRatio: CropAspectRatioPreset.square,
-            aspectRatioPresets: [
+            initAspectRatio: CropAspectRatioPreset.original,
+            aspectRatioPresets: const [
+              CropAspectRatioPreset.original,
               CropAspectRatioPreset.square,
               CropAspectRatioPreset.ratio3x2,
               CropAspectRatioPreset.ratio4x3,
               CropAspectRatioPreset.ratio16x9,
-              CropAspectRatioPreset.original,
             ],
             lockAspectRatio: false,
+            hideBottomControls: false,
           ),
           IOSUiSettings(
             title: 'Editar Foto',
-            minimumAspectRatio: 0.5,
+            minimumAspectRatio: 0.1,
+            aspectRatioLockEnabled: false,
             aspectRatioLockDimensionSwapEnabled: true,
-            aspectRatioPresets: [
+            rotateButtonsHidden: false,
+            resetButtonHidden: false,
+            aspectRatioPresets: const [
+              CropAspectRatioPreset.original,
               CropAspectRatioPreset.square,
               CropAspectRatioPreset.ratio3x2,
               CropAspectRatioPreset.ratio4x3,
               CropAspectRatioPreset.ratio16x9,
-              CropAspectRatioPreset.original,
             ],
           ),
         ],
@@ -2029,60 +2389,76 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
   Widget _buildYoutubeTab() {
     if (_youtubeController == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Iconsax.video_play,
-                size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'Nenhum vídeo do YouTube',
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
-            ),
-            if (_profile?.youtubeLink != null &&
-                _profile!.youtubeLink!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Link: ${_profile!.youtubeLink}',
-                style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                textAlign: TextAlign.center,
+      return CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Iconsax.video_play,
+                      size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Nenhum vídeo do YouTube',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                  ),
+                  if (_profile?.youtubeLink != null &&
+                      _profile!.youtubeLink!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Link: ${_profile!.youtubeLink}',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
               ),
-            ],
-          ],
-        ),
+            ),
+          ),
+        ],
       );
     }
 
-    return YoutubePlayerBuilder(
-      player: YoutubePlayer(
-        controller: _youtubeController!,
-        showVideoProgressIndicator: true,
-        progressIndicatorColor: AppColors.primary,
-        progressColors: const ProgressBarColors(
-          playedColor: AppColors.primary,
-          handleColor: AppColors.primary,
-        ),
-        onReady: () {
-          debugPrint('✅ YouTube player ready');
-        },
-        onEnded: (data) {
-          debugPrint('YouTube video ended');
-        },
-      ),
-      builder: (context, player) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: player,
+    // ⚠️ NÃO usar YoutubePlayerBuilder aqui!
+    // O YoutubePlayerBuilder gerencia fullscreen e muda a orientação para
+    // landscape, distorcendo todo o app. Usar YoutubePlayer diretamente
+    // com enableFullScreen: false nos flags do controller.
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: YoutubePlayer(
+              controller: _youtubeController!,
+              showVideoProgressIndicator: true,
+              progressIndicatorColor: AppColors.primary,
+              progressColors: const ProgressBarColors(
+                playedColor: AppColors.primary,
+                handleColor: AppColors.primary,
               ),
-            ],
+              bottomActions: const [
+                SizedBox(width: 14.0),
+                CurrentPosition(),
+                SizedBox(width: 8.0),
+                ProgressBar(isExpanded: true),
+                RemainingDuration(),
+                PlaybackSpeedButton(),
+              ],
+              onReady: () {
+                debugPrint('✅ YouTube player ready');
+              },
+              onEnded: (data) {
+                debugPrint('YouTube video ended');
+              },
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -2091,8 +2467,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       return const Center(child: Text('Perfil não encontrado'));
     }
 
-    final profileState = ref.read(profileProvider);
-    final activeProfile = profileState.value?.activeProfile;
+    // ✅ FIX: Usar activeProfileProvider diretamente (null-safe)
+    // ref.read(profileProvider).value pode ser null durante loading/error states
+    final activeProfile = ref.watch(activeProfileProvider);
     final isOwner =
         activeProfile != null && activeProfile.profileId == _profile!.profileId;
 
@@ -2104,49 +2481,76 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       future: _fetchPosts(isOwner),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-            ),
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: const [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+                  ),
+                ),
+              ),
+            ],
           );
         }
 
         if (snap.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-                const SizedBox(height: 16),
-                Text('Erro ao carregar posts',
-                    style: TextStyle(color: Colors.grey[600])),
-              ],
-            ),
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline,
+                          size: 64, color: Colors.red[300]),
+                      const SizedBox(height: 16),
+                      Text('Erro ao carregar posts',
+                          style: TextStyle(color: Colors.grey[600])),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           );
         }
 
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Iconsax.document_text, size: 68, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  'Nenhum post encontrado',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 16),
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Iconsax.document_text,
+                          size: 68, color: Colors.grey[400]),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Nenhum post encontrado',
+                        style:
+                            TextStyle(color: Colors.grey[600], fontSize: 16),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         }
 
         return ListView.builder(
-          shrinkWrap:
-              true, // ✅ Permite ListView dentro de SingleChildScrollView
-          physics:
-              const NeverScrollableScrollPhysics(), // ✅ Desabilita scroll próprio
+          // Cache infinito: mantém todos os widgets em memória (evita re-renderização)
+          cacheExtent: double.maxFinite,
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(vertical: 8),
           itemCount: docs.length,
           itemBuilder: (context, i) {
@@ -2154,7 +2558,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             final postId = docs[i].id;
             // ✅ Verificar se o usuário ativo demonstrou interesse neste post
             final isInterestSent = interestsAsync.contains(postId);
-            return _buildPostCard(postId, d, isOwner, isInterestSent: isInterestSent);
+            return _buildPostCard(postId, d, isOwner, 
+                isInterestSent: isInterestSent, allDocs: docs, docIndex: i);
           },
         );
       },
@@ -2162,6 +2567,36 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   }
 
   Future<QuerySnapshot<Map<String, dynamic>>> _fetchPosts(bool isOwner) async {
+    // 🔒 Reverse visibility: se houver bloqueio em qualquer direção, não retorna posts.
+    // (Evita bypass de filtro via query direta ao Firestore.)
+    if (!isOwner) {
+      final currentUid = FirebaseAuth.instance.currentUser?.uid;
+      final viewedProfileId = _profile?.profileId;
+      final activeProfile = ref.read(activeProfileProvider);
+      if (currentUid != null && currentUid.isNotEmpty &&
+          activeProfile != null &&
+          viewedProfileId != null && viewedProfileId.isNotEmpty &&
+          viewedProfileId != activeProfile.profileId) {
+        try {
+          final excluded = await BlockedRelations.getExcludedProfileIds(
+            firestore: FirebaseFirestore.instance,
+            profileId: activeProfile.profileId,
+            uid: currentUid,
+          );
+          if (excluded.contains(viewedProfileId)) {
+            // Query que não retorna nada (sem depender de índices especiais)
+            return FirebaseFirestore.instance
+                .collection('posts')
+                .where('authorProfileId', isEqualTo: '__blocked__')
+                .limit(1)
+                .get();
+          }
+        } catch (_) {
+          // Se falhar, não bloqueia o carregamento.
+        }
+      }
+    }
+
     Query<Map<String, dynamic>> postsQuery =
         FirebaseFirestore.instance.collection('posts');
 
@@ -2189,8 +2624,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       return const Center(child: Text('Perfil não encontrado'));
     }
 
-    final profileState = ref.read(profileProvider);
-    final activeProfile = profileState.value?.activeProfile;
+    // ✅ FIX: Usar activeProfileProvider diretamente (null-safe)
+    final activeProfile = ref.watch(activeProfileProvider);
     final isOwner =
         activeProfile != null && activeProfile.profileId == _profile!.profileId;
 
@@ -2199,18 +2634,26 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
     // Apenas mostra se for o próprio perfil
     if (!isOwner) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Iconsax.lock, size: 68, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'Conteúdo privado',
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+      return CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Iconsax.lock, size: 68, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Conteúdo privado',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
@@ -2218,49 +2661,76 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       future: _fetchInterests(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-            ),
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: const [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+                  ),
+                ),
+              ),
+            ],
           );
         }
 
         if (snap.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-                const SizedBox(height: 16),
-                Text('Erro ao carregar interesses',
-                    style: TextStyle(color: Colors.grey[600])),
-              ],
-            ),
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline,
+                          size: 64, color: Colors.red[300]),
+                      const SizedBox(height: 16),
+                      Text('Erro ao carregar interesses',
+                          style: TextStyle(color: Colors.grey[600])),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           );
         }
 
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.favorite_border, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  'Nenhum interesse enviado',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 16),
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.favorite_border,
+                          size: 64, color: Colors.grey[400]),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Nenhum interesse enviado',
+                        style:
+                            TextStyle(color: Colors.grey[600], fontSize: 16),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         }
 
         return ListView.builder(
-          shrinkWrap:
-              true, // ✅ Permite ListView dentro de SingleChildScrollView
-          physics:
-              const NeverScrollableScrollPhysics(), // ✅ Desabilita scroll próprio
+          // Cache infinito: mantém todos os widgets em memória (evita re-renderização)
+          cacheExtent: double.maxFinite,
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(vertical: 8),
           itemCount: docs.length,
           itemBuilder: (context, i) {
@@ -2340,7 +2810,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     if (!mounted) return;
 
     try {
-      final activeProfile = ref.read(profileProvider).value?.activeProfile;
+      final activeProfile = ref.read(activeProfileProvider);
       if (activeProfile == null) return;
 
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -2390,7 +2860,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     if (!mounted) return;
 
     try {
-      final activeProfile = ref.read(profileProvider).value?.activeProfile;
+      final activeProfile = ref.read(activeProfileProvider);
       if (activeProfile == null) return;
 
       // ✅ Usar provider global para optimistic update e remoção
@@ -2436,6 +2906,10 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     }
     
     // Criar PostEntity manualmente para evitar problemas de serialização
+    final createdAt = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+    final expiresAt = (data['expiresAt'] as Timestamp?)?.toDate() ??
+      createdAt.add(const Duration(days: 30));
+
     final post = PostEntity(
       id: postId,
       authorProfileId: authorProfileId,
@@ -2448,14 +2922,25 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       photoUrl: data['photoUrl'] as String?,
       photoUrls: (data['photoUrls'] as List<dynamic>?)?.cast<String>() ?? [],
       youtubeLink: data['youtubeLink'] as String?,
+      spotifyLink: data['spotifyLink'] as String?,
+      deezerLink: data['deezerLink'] as String?,
       type: type,
       level: (data['level'] as String?) ?? '',
       instruments: (data['instruments'] as List<dynamic>?)?.cast<String>() ?? [],
       genres: (data['genres'] as List<dynamic>?)?.cast<String>() ?? [],
       seekingMusicians: (data['seekingMusicians'] as List<dynamic>?)?.cast<String>() ?? [],
       availableFor: (data['availableFor'] as List<dynamic>?)?.cast<String>() ?? [],
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      expiresAt: (data['expiresAt'] as Timestamp?)?.toDate() ?? DateTime.now().add(const Duration(days: 30)),
+      eventDate: (data['eventDate'] as Timestamp?)?.toDate(),
+      eventType: data['eventType'] as String?,
+      gigFormat: data['gigFormat'] as String?,
+      venueSetup: (data['venueSetup'] as List<dynamic>?)?.cast<String>() ?? [],
+      budgetRange: data['budgetRange'] as String?,
+      eventStartTime: data['eventStartTime'] as String?,
+      eventEndTime: data['eventEndTime'] as String?,
+      eventDurationMinutes: (data['eventDurationMinutes'] as num?)?.toInt(),
+      guestCount: (data['guestCount'] as num?)?.toInt(),
+      createdAt: createdAt,
+      expiresAt: expiresAt,
       authorName: data['authorName'] as String?,
       authorPhotoUrl: data['authorPhotoUrl'] as String?,
       activeProfileName: data['activeProfileName'] as String?,
@@ -2487,6 +2972,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           });
         }
       },
+      onRepost: isOwner ? () => _handleRepost(post) : null,
     );
   }
 
@@ -2565,8 +3051,43 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     }
   }
 
+  /// Renova/reposta um post com +30 dias de validade
+  Future<void> _handleRepost(PostEntity post) async {
+    // Para hiring e sales, navegar para o post detail (precisa de editor de datas)
+    if (post.type == 'hiring' || post.type == 'sales') {
+      context.pushPostDetail(post.id);
+      return;
+    }
+
+    // Para musician e band, repostar direto com +30 dias
+    try {
+      final newExpiresAt = DateTime.now().add(const Duration(days: 30));
+
+      await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(post.id)
+          .update({
+        'expiresAt': Timestamp.fromDate(newExpiresAt),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        AppSnackBar.showSuccess(context, 'Post renovado! Válido por mais 30 dias.');
+        setState(() {
+          _postsKey++; // Força rebuild do FutureBuilder
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Erro ao renovar post: $e');
+      if (mounted) {
+        AppSnackBar.showError(context, 'Erro ao renovar. Tente novamente.');
+      }
+    }
+  }
+
   Widget _buildPostCard(String postId, Map<String, dynamic> data, bool isOwner,
-      {bool isInterestCard = false, bool isInterestSent = false}) {
+      {bool isInterestCard = false, bool isInterestSent = false,
+      List<QueryDocumentSnapshot<Map<String, dynamic>>>? allDocs, int? docIndex}) {
     // ✅ Priorizar photoUrls (carrossel) com fallback para photoUrl legado
     final photoUrls = (data['photoUrls'] as List<dynamic>?)?.cast<String>() ?? [];
     final photo = photoUrls.isNotEmpty 
@@ -2577,36 +3098,40 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final city = (data['city'] as String?) ?? '';
     final state = (data['state'] as String?) ?? '';
     // Se é um card de interesse, já foi enviado. Senão, verifica no Set ou parâmetro
-    final primaryColor = type == 'band' ? AppColors.accent : AppColors.primary;
+    final primaryColor = AppColors.primary;
+
+    final createdAt = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+    
+    // ✅ CORREÇÃO: Para posts "sales", usar promoEndDate como validade
+    final DateTime effectiveExpiry;
+    if (type == 'sales') {
+      final promoEndDate = (data['promoEndDate'] as Timestamp?)?.toDate();
+      effectiveExpiry = promoEndDate ?? 
+          (data['expiresAt'] as Timestamp?)?.toDate() ?? 
+          createdAt.add(const Duration(days: 30));
+    } else {
+      effectiveExpiry = (data['expiresAt'] as Timestamp?)?.toDate() ??
+          createdAt.add(const Duration(days: 30));
+    }
 
     // Time counter (apenas para posts do owner)
     String? timeAgo;
     String? daysLeft;
+    int? daysUntilExpiry;
     if (isOwner) {
-      final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
-      final expiresAt = (data['expiresAt'] as Timestamp?)?.toDate();
-
-      if (createdAt != null) {
-        final diff = DateTime.now().difference(createdAt);
-        if (diff.inDays > 0) {
-          timeAgo = '${diff.inDays}d';
-        } else if (diff.inHours > 0) {
-          timeAgo = '${diff.inHours}h';
-        } else if (diff.inMinutes > 0) {
-          timeAgo = '${diff.inMinutes}m';
-        } else {
-          timeAgo = 'agora';
-        }
+      final diff = DateTime.now().difference(createdAt);
+      if (diff.inDays > 0) {
+        timeAgo = '${diff.inDays}d';
+      } else if (diff.inHours > 0) {
+        timeAgo = '${diff.inHours}h';
+      } else if (diff.inMinutes > 0) {
+        timeAgo = '${diff.inMinutes}m';
+      } else {
+        timeAgo = 'agora';
       }
 
-      if (expiresAt != null) {
-        final daysUntilExpiry = expiresAt.difference(DateTime.now()).inDays;
-        if (daysUntilExpiry >= 0) {
-          daysLeft = '$daysUntilExpiry dias';
-        } else {
-          daysLeft = 'Expirado';
-        }
-      }
+      daysUntilExpiry = effectiveExpiry.difference(DateTime.now()).inDays;
+      daysLeft = daysUntilExpiry >= 0 ? '$daysUntilExpiry dias' : 'Expirado';
     }
 
     return Card(
@@ -2618,6 +3143,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       ),
       child: InkWell(
         onTap: () {
+          // Navegação direta para detalhes (carrossel vertical limitado à Home)
           context.pushPostDetail(postId);
         },
         child: Stack(
@@ -2720,6 +3246,23 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (type == 'hiring') ...[
+                      () {
+                        final meta = _buildHiringMeta(data);
+                        if (meta == null) return const SizedBox.shrink();
+                        return Text(
+                          meta,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      }(),
+                      const SizedBox(height: 2),
+                    ],
                     () {
                       final locationText = formatCleanLocation(
                         neighborhood: data['neighborhood'] as String?,
@@ -2742,17 +3285,55 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                     if (isOwner && daysLeft != null)
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Expira em: $daysLeft',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: daysLeft == 'Expirado'
-                                ? Colors.red
-                                : Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (daysUntilExpiry != null && daysUntilExpiry! < 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                margin: const EdgeInsets.only(right: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: Colors.red.shade200, width: 0.5),
+                                ),
+                                child: Text(
+                                  'EXPIRADO',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.red.shade700,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              )
+                            else if (daysUntilExpiry != null && daysUntilExpiry! <= 1)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                margin: const EdgeInsets.only(right: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.shade50,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: Colors.orange.shade200, width: 0.5),
+                                ),
+                                child: Text(
+                                  'EXPIRA HOJE',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.orange.shade800,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              )
+                            else
+                              Text(
+                                'Expira em: $daysLeft',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                   ],
@@ -2804,6 +3385,50 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         ),
       ),
     );
+  }
+
+  String? _buildHiringMeta(Map<String, dynamic> data) {
+    final eventType = (data['eventType'] as String?)?.trim();
+    final eventDate = (data['eventDate'] as Timestamp?)?.toDate();
+    final start = data['eventStartTime'] as String?;
+    final end = data['eventEndTime'] as String?;
+    final durationMinutes = (data['eventDurationMinutes'] as num?)?.toInt();
+    final timeLabel = _formatHiringTime(start, end, durationMinutes);
+    final dateLabel = eventDate != null ? DateFormat('dd/MM').format(eventDate) : null;
+    final budget = (data['budgetRange'] as String?)?.trim();
+
+    final parts = <String>[];
+    if (eventType != null && eventType.isNotEmpty) parts.add(eventType);
+    if (dateLabel != null) parts.add(dateLabel);
+    if (timeLabel != null && timeLabel.isNotEmpty) parts.add(timeLabel);
+    if (budget != null && budget.isNotEmpty) parts.add(budget);
+
+    if (parts.isEmpty) return null;
+    return parts.join(' • ');
+  }
+
+  String? _formatHiringTime(String? start, String? end, int? durationMinutes) {
+    if (start != null && start.isNotEmpty && end != null && end.isNotEmpty) {
+      final durationLabel = durationMinutes != null && durationMinutes > 0
+          ? ' (${_formatHiringDuration(durationMinutes)})'
+          : '';
+      return '$start - $end$durationLabel';
+    }
+    if (start != null && start.isNotEmpty) return 'a partir das $start';
+    if (durationMinutes != null && durationMinutes > 0) {
+      return _formatHiringDuration(durationMinutes);
+    }
+    return null;
+  }
+
+  String _formatHiringDuration(int minutes) {
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours > 0 && mins > 0) {
+      return '${hours}h${mins.toString().padLeft(2, '0')}min';
+    }
+    if (hours > 0) return '${hours}h';
+    return '${minutes}min';
   }
 }
 
@@ -2975,5 +3600,32 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
         ),
       ),
     );
+  }
+}
+
+class _SliverHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _SliverHeaderDelegate({required this.height, required this.child});
+
+  final double height;
+  final Widget child;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(covariant _SliverHeaderDelegate oldDelegate) {
+    return height != oldDelegate.height || child != oldDelegate.child;
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_cache_provider.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
+import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 part 'profile_switcher_provider.g.dart';
@@ -52,6 +53,8 @@ class ProfileSwitcherNotifier extends _$ProfileSwitcherNotifier {
       // 2. ✅ Invalidar cache de posts
       ref.read(postCacheNotifierProvider.notifier).invalidate();
       ref.invalidate(postNotifierProvider);
+      // 2.1 ✅ Invalidar interesses (depende do perfil ativo)
+      ref.invalidate(interestNotifierProvider);
       debugPrint('   ✅ Cache de posts invalidado');
       
       // 3. ✅ Invalidar providers de notificações e mensagens
@@ -126,6 +129,7 @@ class ProfileSwitcherNotifier extends _$ProfileSwitcherNotifier {
     
     ref.read(postCacheNotifierProvider.notifier).invalidate();
     ref.invalidate(postNotifierProvider);
+    ref.invalidate(interestNotifierProvider);
     
     debugPrint('✅ ProfileSwitcher: Todos os caches invalidados');
     

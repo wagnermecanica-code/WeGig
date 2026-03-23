@@ -19,9 +19,20 @@ class PostFormInput {
     this.selectedInstruments = const [],
     this.availableFor = const [],
     this.youtubeLink,
+    this.spotifyLink,
+    this.deezerLink,
     this.photoPaths = const [],
     this.createdAt,
     this.expiresAt,
+    this.eventDate,
+    this.eventType,
+    this.gigFormat,
+    this.venueSetup = const [],
+    this.budgetRange,
+    this.eventStartTime,
+    this.eventEndTime,
+    this.eventDurationMinutes,
+    this.guestCount,
     // Sales-specific fields
     this.title,
     this.salesType,
@@ -48,12 +59,23 @@ class PostFormInput {
   final List<String> selectedInstruments;
   final List<String> availableFor;
   final String? youtubeLink;
+  final String? spotifyLink;
+  final String? deezerLink;
   
   /// Lista de caminhos de fotos (locais ou URLs remotas).
   /// Paths que começam com 'http' são URLs existentes, outros são arquivos locais.
   final List<String> photoPaths;
   final DateTime? createdAt;
   final DateTime? expiresAt;
+  final DateTime? eventDate;
+  final String? eventType;
+  final String? gigFormat;
+  final List<String> venueSetup;
+  final String? budgetRange;
+  final String? eventStartTime;
+  final String? eventEndTime;
+  final int? eventDurationMinutes;
+  final int? guestCount;
 
   // Sales-specific fields
   final String? title;

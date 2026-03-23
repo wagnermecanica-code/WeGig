@@ -6,6 +6,7 @@ import 'package:core_ui/core_ui.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_switcher_provider.dart';
@@ -692,6 +693,11 @@ class _UnifiedBadgeCounter extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authUid = ref.watch(currentUserProvider)?.uid;
+    if (authUid == null || authUid != uid) {
+      return const SizedBox.shrink();
+    }
+
     // Soma de notificações + mensagens
     // ✅ FIX: Passar uid para match com Security Rules
     final notificationsAsync = ref.watch(unreadNotificationCountNewStreamProvider(profileId, uid));

@@ -35,8 +35,9 @@ class WeGigPinWidget extends StatelessWidget {
 
   Color get _primaryColor => switch (userType) {
     UserType.band => AppColors.accent,
-    UserType.sales => AppColors.salesBlue,
-    UserType.musician => AppColors.primary,
+    UserType.sales => AppColors.salesColor,
+    UserType.hiring => AppColors.hiringColor,
+    UserType.musician => AppColors.musicianColor,
   };
 
   @override

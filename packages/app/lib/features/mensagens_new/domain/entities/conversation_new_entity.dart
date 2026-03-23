@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'message_new_entity.dart';
+
 part 'conversation_new_entity.freezed.dart';
 part 'conversation_new_entity.g.dart';
 
@@ -38,6 +40,10 @@ class ConversationNewEntity with _$ConversationNewEntity {
 
     /// Preview da última mensagem
     required String lastMessage,
+
+    /// Status de entrega da última mensagem (para indicar leitura)
+    @Default(MessageDeliveryStatus.sent)
+    MessageDeliveryStatus lastMessageStatus,
 
     /// Timestamp da última mensagem
     required DateTime lastMessageTimestamp,
@@ -81,6 +87,15 @@ class ConversationNewEntity with _$ConversationNewEntity {
 
     /// Quem está digitando atualmente (profileId -> timestamp)
     @Default({}) Map<String, DateTime> typingIndicators,
+
+    /// Flag de grupo
+    @Default(false) bool isGroup,
+
+    /// Nome do grupo (se isGroup=true)
+    String? groupName,
+
+    /// Foto do grupo (se isGroup=true)
+    String? groupPhotoUrl,
   }) = _ConversationNewEntity;
 
   /// From Firestore Document
@@ -100,6 +115,7 @@ class ConversationNewEntity with _$ConversationNewEntity {
       participantProfiles:
           (data['participantProfiles'] as List<dynamic>?)?.cast<String>() ?? [],
       lastMessage: data['lastMessage'] as String? ?? '',
+        lastMessageStatus: _parseLastMessageStatus(data['lastMessageStatus']),
       lastMessageTimestamp:
           (data['lastMessageTimestamp'] as Timestamp?)?.toDate() ??
               DateTime.now(),
@@ -123,6 +139,15 @@ class ConversationNewEntity with _$ConversationNewEntity {
               const [],
       clearHistoryTimestamp: _parseClearHistoryTimestamp(data['clearHistoryTimestamp']),
       typingIndicators: _parseTypingIndicators(data['typingIndicators']),
+      // Inferir isGroup com lógica clara:
+      // 1. Se isGroup está explícito no Firestore, usar esse valor
+      // 2. Se não estiver, inferir baseado em:
+      //    - Mais de 2 participantes = grupo
+      //    - OU tem groupName preenchido = grupo
+      //    - OU conversationType == 'group' = grupo
+      isGroup: _inferIsGroup(data),
+      groupName: data['groupName'] as String?,
+      groupPhotoUrl: data['groupPhotoUrl'] as String?,
     );
   }
 
@@ -137,6 +162,18 @@ class ConversationNewEntity with _$ConversationNewEntity {
     return Map<String, int>.from(
       data.map((k, v) => MapEntry(k.toString(), (v as num?)?.toInt() ?? 0)),
     );
+  }
+
+  /// Parse lastMessageStatus safely with sensible default
+  static MessageDeliveryStatus _parseLastMessageStatus(dynamic data) {
+    if (data == null) return MessageDeliveryStatus.sent;
+    if (data is String) {
+      return MessageDeliveryStatus.values.firstWhere(
+        (e) => e.name == data,
+        orElse: () => MessageDeliveryStatus.sent,
+      );
+    }
+    return MessageDeliveryStatus.sent;
   }
 
   /// Parse typingIndicators map safely
@@ -161,6 +198,32 @@ class ConversationNewEntity with _$ConversationNewEntity {
         return MapEntry(k.toString(), timestamp);
       }),
     );
+  }
+
+  /// Inferir isGroup com lógica clara e sem ambiguidade
+  static bool _inferIsGroup(Map<String, dynamic> data) {
+    // 1. Campo canônico: conversationType (novo, mais confiável)
+    final conversationType = data['conversationType'] as String?;
+    if (conversationType == 'group') return true;
+    if (conversationType == 'direct') return false;
+
+    // 2. Campo explícito isGroup
+    final explicitIsGroup = data['isGroup'] as bool?;
+    if (explicitIsGroup != null) return explicitIsGroup;
+
+    // 3. Inferência por características (para dados legados)
+    final participantProfiles =
+        (data['participantProfiles'] as List<dynamic>?)?.cast<String>() ?? [];
+    final groupName = data['groupName'] as String?;
+
+    // Mais de 2 participantes = definitivamente grupo
+    if (participantProfiles.length > 2) return true;
+
+    // Tem nome de grupo preenchido = provavelmente grupo
+    if (groupName != null && groupName.trim().isNotEmpty) return true;
+
+    // 2 ou menos participantes e sem nome de grupo = 1:1
+    return false;
   }
 
   // ============================================
@@ -264,6 +327,7 @@ class ConversationNewEntity with _$ConversationNewEntity {
       'participants': participants,
       'participantProfiles': participantProfiles,
       'lastMessage': lastMessage,
+      'lastMessageStatus': lastMessageStatus.name,
       'lastMessageTimestamp': Timestamp.fromDate(lastMessageTimestamp),
       if (lastMessageSenderId != null) 'lastMessageSenderId': lastMessageSenderId,
       'unreadCount': unreadCount,
@@ -280,6 +344,11 @@ class ConversationNewEntity with _$ConversationNewEntity {
       ),
       'createdAt': Timestamp.fromDate(createdAt),
       if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
+      // CRÍTICO: Campos canônicos para distinguir tipo de conversa
+      'isGroup': isGroup,
+      'conversationType': isGroup ? 'group' : 'direct', // Campo canônico imutável
+      if (groupName != null) 'groupName': groupName,
+      if (groupPhotoUrl != null) 'groupPhotoUrl': groupPhotoUrl,
     };
   }
 }

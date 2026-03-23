@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/services.dart' show rootBundle;
@@ -12,9 +14,44 @@ import 'wegig_pin_widget.dart';
 
 class WeGigPinDescriptorBuilder {
   WeGigPinDescriptorBuilder({
-    this.logicalSize = const Size(46.9, 62.7),
-    this.pixelRatioMultiplier = 3.0,
-  });
+    Size? logicalSize,
+    double? pixelRatioMultiplier,
+  })  : logicalSize = logicalSize ?? _defaultLogicalSize,
+        pixelRatioMultiplier = pixelRatioMultiplier ?? _defaultPixelRatio;
+
+  /// Tamanho lógico padrão ajustado por densidade e tamanho de tela.
+  static Size get _defaultLogicalSize => _responsiveLogicalSize();
+
+  /// Aspect ratio do pin (altura / largura) alinhado ao widget.
+  static const double _pinHeightRatio = 1.28;
+
+  /// Fallback para casos sem view disponível.
+  static Size get _fallbackLogicalSize => Platform.isAndroid
+      ? const Size(32.0, 41.0)
+      : const Size(46.0, 59.0);
+
+  /// Calcula tamanho responsivo a partir do viewport lógico.
+  static Size _responsiveLogicalSize() {
+    final views = PlatformDispatcher.instance.views;
+    if (views.isEmpty) return _fallbackLogicalSize;
+
+    final view = views.first;
+    final pixelRatio = view.devicePixelRatio == 0 ? _defaultPixelRatio : view.devicePixelRatio;
+    final logicalWidth = view.physicalSize.width / pixelRatio;
+    final logicalHeight = view.physicalSize.height / pixelRatio;
+    final shortestSide = math.min(logicalWidth, logicalHeight);
+
+    // Usa ~8% do lado menor, com limites para telas pequenas/grandes.
+    final base = (shortestSide * 0.08).clamp(28.0, Platform.isAndroid ? 46.0 : 54.0);
+    // Android já está aumentado; iOS recebe +50% para visibilidade melhor no mapa.
+    final platformScale = Platform.isAndroid ? 1.33 : 1.5;
+    final width = base * platformScale;
+
+    return Size(width, width * _pinHeightRatio);
+  }
+
+  /// Pixel ratio padrão ajustado por plataforma
+  static double get _defaultPixelRatio => Platform.isAndroid ? 2.5 : 3.0;
 
   final Size logicalSize;
   final double pixelRatioMultiplier;
@@ -79,8 +116,9 @@ class WeGigPinDescriptorBuilder {
 
     final Color primaryColor = switch (userType) {
       UserType.band => AppColors.accent,
-      UserType.sales => AppColors.salesBlue,
-      UserType.musician => AppColors.primary,
+      UserType.sales => AppColors.salesColor,
+      UserType.hiring => AppColors.hiringColor,
+      UserType.musician => AppColors.musicianColor,
     };
 
     String tinted = _baseSvg!;

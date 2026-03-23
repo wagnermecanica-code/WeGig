@@ -83,6 +83,38 @@ class SendImageMessageNewUseCase {
   }
 }
 
+/// Use Case: Enviar post compartilhado
+///
+/// Encaminha um post para uma conversa como mensagem do tipo sharedPost.
+/// Os dados do post são armazenados no campo metadata da mensagem.
+class SendSharedPostMessageNewUseCase {
+  SendSharedPostMessageNewUseCase(this._repository);
+
+  final MensagensNewRepository _repository;
+
+  Future<MessageNewEntity> call({
+    required String conversationId,
+    required String senderId,
+    required String senderProfileId,
+    required Map<String, dynamic> postData,
+    String? senderName,
+    String? senderPhotoUrl,
+  }) async {
+    if (postData['postId'] == null || (postData['postId'] as String).isEmpty) {
+      throw ArgumentError('ID do post não pode ser vazio');
+    }
+
+    return _repository.sendSharedPostMessage(
+      conversationId: conversationId,
+      senderId: senderId,
+      senderProfileId: senderProfileId,
+      postData: postData,
+      senderName: senderName,
+      senderPhotoUrl: senderPhotoUrl,
+    );
+  }
+}
+
 /// Use Case: Editar mensagem
 ///
 /// Edita o conteúdo de uma mensagem existente.

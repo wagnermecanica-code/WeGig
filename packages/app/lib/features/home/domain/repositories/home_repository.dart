@@ -32,6 +32,7 @@ abstract class HomeRepository {
     String? instrument,
     String? city,
     int limit = 20,
+    String? currentProfileId,
   });
 
   /// Stream de posts próximos (tempo real)
@@ -40,5 +41,7 @@ abstract class HomeRepository {
     required double latitude,
     required double longitude,
     required double radiusKm,
+    String? currentProfileId,
+    String? currentUid,
   });
 }

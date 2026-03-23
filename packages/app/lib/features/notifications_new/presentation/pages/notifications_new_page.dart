@@ -25,6 +25,7 @@ import 'package:wegig_app/features/notifications_new/presentation/widgets/notifi
 import 'package:wegig_app/features/notifications_new/presentation/widgets/notification_new_error_state.dart';
 import 'package:wegig_app/features/notifications_new/presentation/widgets/notification_new_item.dart';
 import 'package:wegig_app/features/notifications_new/presentation/widgets/notification_new_skeleton_tile.dart';
+import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 /// Página principal de notificações
@@ -125,8 +126,14 @@ class _NotificationsNewPageState extends ConsumerState<NotificationsNewPage>
     final profileState = ref.watch(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
 
+    // Observa auth user para evitar queries durante troca de conta
+    final authUid = ref.watch(currentUserProvider)?.uid;
+
+    final isProfileReadyForQueries =
+        authUid != null && activeProfile != null && activeProfile.uid == authUid;
+
     // Loading se perfil não carregou
-    if (activeProfile == null) {
+    if (!isProfileReadyForQueries) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
@@ -135,7 +142,8 @@ class _NotificationsNewPageState extends ConsumerState<NotificationsNewPage>
     final currentProfileId = activeProfile.profileId;
 
     // DEBUG: Log para verificar profileId
-    debugPrint('📱 NotificationsNewPage: currentProfileId=$currentProfileId, uid=${activeProfile.uid}');
+    debugPrint(
+      '📱 NotificationsNewPage: currentProfileId=$currentProfileId, uid=${activeProfile.uid}');
 
     // Detecta troca de perfil
     if (_lastProfileId != null && _lastProfileId != currentProfileId) {

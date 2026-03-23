@@ -7,12 +7,17 @@
 library;
 
 import 'package:core_ui/core_ui.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
+import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 import 'package:wegig_app/features/notifications_new/domain/entities/notification_new_entity.dart';
 import 'package:wegig_app/features/notifications_new/presentation/providers/notifications_new_providers.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
 
 /// Handler centralizado para ações de notificações
@@ -45,8 +50,7 @@ class NotificationNewActionHandler {
   /// 1. Marca como lida (se ainda não estiver)
   /// 2. Navega para destino baseado em actionType
   Future<void> handle(NotificationEntity notification) async {
-    debugPrint(
-        '🔔 NotificationNewHandler: Handling ${notification.type.name}');
+    debugPrint('🔔 NotificationNewHandler: Handling ${notification.type.name}');
     debugPrint('   ActionType: ${notification.actionType?.name ?? 'null'}');
     debugPrint('   TargetId: ${notification.targetId ?? 'null'}');
 
@@ -95,10 +99,20 @@ class NotificationNewActionHandler {
   /// Marca como lida de forma assíncrona (fire-and-forget)
   void _markAsReadAsync(String notificationId) {
     try {
+      final activeProfile = ref.read(activeProfileProvider);
+      if (activeProfile == null) return;
+
       final useCase = ref.read(markNotificationAsReadNewUseCaseProvider);
       useCase(
         notificationId: notificationId,
-        profileId: '', // profileId não é usado no markAsRead atual
+        profileId: activeProfile.profileId,
+      );
+
+      // Mantém badge do ícone do app consistente com Firestore
+      // (iOS pode manter badge antigo vindo do APNS se não sincronizarmos).
+      PushNotificationService().updateAppBadge(
+        activeProfile.profileId,
+        activeProfile.uid,
       );
       debugPrint('✅ NotificationNewHandler: Marked as read');
     } catch (e) {
@@ -113,6 +127,14 @@ class NotificationNewActionHandler {
     if (profileId == null || profileId.isEmpty) {
       debugPrint('⚠️ NotificationNewHandler: No profileId for viewProfile');
       return false;
+    }
+
+    final allowed = await _canOpenProfile(profileId);
+    if (!allowed) {
+      if (context.mounted) {
+        AppSnackBar.showInfo(context, 'Perfil indisponível.');
+      }
+      return true;
     }
 
     if (!context.mounted) return false;
@@ -130,8 +152,9 @@ class NotificationNewActionHandler {
   /// Abre chat com o remetente
   Future<bool> _handleOpenChat(NotificationEntity notification) async {
     // Tenta obter conversationId de actionData ou data
-    final conversationId = notification.actionData?['conversationId'] as String? ??
-        notification.data['conversationId'] as String?;
+    final conversationId =
+        notification.actionData?['conversationId'] as String? ??
+            notification.data['conversationId'] as String?;
 
     if (conversationId == null || conversationId.isEmpty) {
       debugPrint('⚠️ NotificationNewHandler: No conversationId for openChat');
@@ -146,6 +169,16 @@ class NotificationNewActionHandler {
     final otherUserName = notification.senderName ?? '';
     final otherUserPhoto = notification.senderPhoto ?? '';
 
+    if (otherProfileId.trim().isNotEmpty) {
+      final allowed = await _canOpenProfile(otherProfileId);
+      if (!allowed) {
+        if (context.mounted) {
+          AppSnackBar.showInfo(context, 'Perfil indisponível.');
+        }
+        return true;
+      }
+    }
+
     Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => ChatNewPage(
@@ -158,8 +191,7 @@ class NotificationNewActionHandler {
       ),
     );
 
-    debugPrint(
-        '✅ NotificationNewHandler: Navigated to chat $conversationId');
+    debugPrint('✅ NotificationNewHandler: Navigated to chat $conversationId');
     return true;
   }
 
@@ -181,8 +213,8 @@ class NotificationNewActionHandler {
 
   /// Abre tela de renovação de post
   Future<bool> _handleRenewPost(NotificationEntity notification) async {
-    final postId = notification.targetId ??
-        notification.data['postId'] as String?;
+    final postId =
+        notification.targetId ?? notification.data['postId'] as String?;
 
     if (postId == null || postId.isEmpty) {
       debugPrint('⚠️ NotificationNewHandler: No postId for renewPost');
@@ -194,7 +226,8 @@ class NotificationNewActionHandler {
     if (!context.mounted) return false;
 
     GoRouter.of(context).push('/post/$postId');
-    debugPrint('✅ NotificationNewHandler: Navigated to post $postId (renewPost)');
+    debugPrint(
+        '✅ NotificationNewHandler: Navigated to post $postId (renewPost)');
     return true;
   }
 
@@ -229,18 +262,17 @@ class NotificationNewActionHandler {
           return true;
         }
         final profileId = notification.senderProfileId;
-        if (profileId != null && profileId.isNotEmpty && context.mounted) {
-          Navigator.of(context).push<void>(
-            MaterialPageRoute(
-              builder: (_) => ViewProfilePage(profileId: profileId),
-            ),
-          );
-          return true;
+        if (profileId != null && profileId.isNotEmpty) {
+          return _handleViewProfile(notification);
         }
 
       // Mensagens: abre chat
       case NotificationType.newMessage:
         return _handleOpenChat(notification);
+
+      // Comentários e curtidas de comentários: navega para post
+      case NotificationType.comment:
+      case NotificationType.commentLike:
 
       // Posts: navega para post
       case NotificationType.nearbyPost:
@@ -260,9 +292,35 @@ class NotificationNewActionHandler {
 
       // Sistema: sem ação padrão
       case NotificationType.system:
-        debugPrint('ℹ️ NotificationNewHandler: System notification - no action');
+        debugPrint(
+            'ℹ️ NotificationNewHandler: System notification - no action');
     }
 
     return false;
+  }
+
+  Future<bool> _canOpenProfile(String otherProfileId) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final activeProfile = ref.read(activeProfileProvider);
+
+    final uid = currentUser?.uid.trim() ?? '';
+    final me = activeProfile?.profileId.trim() ?? '';
+    final other = otherProfileId.trim();
+
+    if (uid.isEmpty || me.isEmpty || other.isEmpty) return true;
+    if (other == me) return true;
+
+    try {
+      final excluded = await BlockedRelations.getExcludedProfileIds(
+        firestore: FirebaseFirestore.instance,
+        profileId: me,
+        uid: uid,
+      );
+      return !excluded.contains(other);
+    } catch (e) {
+      debugPrint(
+          '⚠️ NotificationNewHandler: _canOpenProfile error (non-blocking): $e');
+      return true;
+    }
   }
 }

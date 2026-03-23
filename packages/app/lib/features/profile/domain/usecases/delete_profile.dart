@@ -5,8 +5,8 @@ import 'package:wegig_app/features/profile/domain/repositories/profile_repositor
 /// Validações:
 /// - Perfil existe
 /// - Usuário é dono do perfil
-/// - Se deletar perfil ativo, exigir newActiveProfileId
-/// - Não pode deletar último perfil
+/// - Se deletar perfil ativo, exigir newActiveProfileId (exceto se forceDelete)
+/// - Não pode deletar último perfil (exceto se forceDelete para exclusão de conta)
 class DeleteProfileUseCase {
   DeleteProfileUseCase(this._repository);
   final ProfileRepository _repository;
@@ -15,6 +15,7 @@ class DeleteProfileUseCase {
     String profileId,
     String uid, {
     String? newActiveProfileId,
+    bool forceDelete = false, // ✅ Permite deletar último perfil (para exclusão de conta)
   }) async {
     // Validação 1: Perfil existe
     final profile = await _repository.getProfileById(profileId);
@@ -28,16 +29,20 @@ class DeleteProfileUseCase {
       throw Exception('Você não tem permissão para deletar este perfil');
     }
 
-    // Validação 3: Não pode deletar último perfil
-    final allProfiles = await _repository.getAllProfiles(uid);
-    if (allProfiles.length <= 1) {
-      throw Exception('Você precisa ter pelo menos um perfil');
+    // Validação 3: Não pode deletar último perfil (exceto se forceDelete)
+    if (!forceDelete) {
+      final allProfiles = await _repository.getAllProfiles(uid);
+      if (allProfiles.length <= 1) {
+        throw Exception('Você precisa ter pelo menos um perfil');
+      }
     }
 
-    // Validação 4: Se deletar perfil ativo, exigir newActiveProfileId
-    final activeProfile = await _repository.getActiveProfile(uid);
-    if (activeProfile?.profileId == profileId && newActiveProfileId == null) {
-      throw Exception('Selecione outro perfil antes de deletar o ativo');
+    // Validação 4: Se deletar perfil ativo, exigir newActiveProfileId (exceto se forceDelete)
+    if (!forceDelete) {
+      final activeProfile = await _repository.getActiveProfile(uid);
+      if (activeProfile?.profileId == profileId && newActiveProfileId == null) {
+        throw Exception('Selecione outro perfil antes de deletar o ativo');
+      }
     }
 
     // Delete

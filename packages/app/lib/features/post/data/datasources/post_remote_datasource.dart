@@ -2,18 +2,22 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rxdart/rxdart.dart';
+
+import 'package:wegig_app/core/firebase/blocked_profiles.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 
 /// Interface para PostRemoteDataSource
 ///
 /// Define contratos para operações CRUD e queries de posts no Firestore.
 abstract class IPostRemoteDataSource {
   /// Retorna todos os posts ativos (não expirados)
-  Future<List<PostEntity>> getAllPosts(String uid);
+  Future<List<PostEntity>> getAllPosts(String uid, {String? profileId});
 
   /// Retorna posts criados por um perfil específico
-  Future<List<PostEntity>> getPostsByProfile(String profileId);
+  Future<List<PostEntity>> getPostsByProfile(String profileId, {String? currentProfileId});
 
   /// Busca um post por ID, retorna null se não encontrado
   Future<PostEntity?> getPostById(String postId);
@@ -46,13 +50,14 @@ abstract class IPostRemoteDataSource {
     required double longitude,
     required double radiusKm,
     int limit = 50,
+    String? currentProfileId,
   });
 
   /// Stream reativo de posts do usuário (atualiza automaticamente)
   Stream<List<PostEntity>> watchPosts(String uid);
 
   /// Stream reativo de posts de um perfil específico
-  Stream<List<PostEntity>> watchPostsByProfile(String profileId);
+  Stream<List<PostEntity>> watchPostsByProfile(String profileId, {String? currentProfileId});
 }
 
 /// DataSource para Posts - Firebase Firestore operations
@@ -70,15 +75,41 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
   /// Instância do FirebaseFirestore
   final FirebaseFirestore _firestore;
 
+  Future<List<String>> _getExcludedProfileIds({required String profileId, String? uid}) async {
+    final trimmedProfileId = profileId.trim();
+    if (trimmedProfileId.isEmpty) return const <String>[];
+    try {
+      return await BlockedRelations.getExcludedProfileIds(
+        firestore: _firestore,
+        profileId: trimmedProfileId,
+        uid: uid,
+      );
+    } catch (e) {
+      debugPrint('⚠️ PostDataSource: Falha ao carregar excludedProfileIds (non-critical): $e');
+      return const <String>[];
+    }
+  }
+
   @override
-  Future<List<PostEntity>> getAllPosts(String uid) async {
+  Future<List<PostEntity>> getAllPosts(String uid, {String? profileId}) async {
     try {
       if (uid.isEmpty) {
         debugPrint('❌ PostDataSource: UID vazio - usuário não autenticado');
         throw Exception('Usuário não autenticado');
       }
       
-      debugPrint('🔍 PostDataSource: getAllPosts - Buscando TODOS os posts ativos (uid=$uid)');
+      debugPrint('🔍 PostDataSource: getAllPosts - Buscando TODOS os posts ativos (uid=$uid, profileId=$profileId)');
+
+      // ⚡ Evita baixar um volume gigante em ambientes com muitos posts (prod/staging)
+      // e reduzir chance de timeout / refresh lento.
+      const int maxActivePostsToFetch = 500;
+
+      // Bloqueios do perfil atual (para filtrar feed)
+      final currentProfileId = (profileId ?? '').trim();
+      final excludedProfileIds = currentProfileId.isEmpty
+          ? const <String>[]
+          : await _getExcludedProfileIds(profileId: currentProfileId, uid: uid);
+      final excludedSet = excludedProfileIds.toSet();
 
       // ✅ Buscar TODOS os posts ativos, não apenas do próprio usuário
       // Removido o filtro .where('profileUid', isEqualTo: uid)
@@ -86,7 +117,9 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
       final snapshot = await _firestore
           .collection('posts')
           .where('expiresAt', isGreaterThan: Timestamp.now())
-          .orderBy('expiresAt')
+          // Descendente tende a priorizar posts mais recentes (quando expiresAt é derivado de createdAt).
+          .orderBy('expiresAt', descending: true)
+          .limit(maxActivePostsToFetch)
           .get()
           .timeout(
             const Duration(seconds: 10),
@@ -96,7 +129,12 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
             },
           );
 
-      final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
+    // ⚠️ Firestore: não é seguro adicionar `whereNotIn` aqui porque já existe
+    // inequality obrigatória em `expiresAt`.
+    final posts = snapshot.docs
+      .map(PostEntity.fromFirestore)
+      .where((post) => !excludedSet.contains(post.authorProfileId))
+      .toList();
 
       // Sort by createdAt descending in memory
       posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -110,9 +148,16 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
   }
 
   @override
-  Future<List<PostEntity>> getPostsByProfile(String profileId) async {
+  Future<List<PostEntity>> getPostsByProfile(String profileId, {String? currentProfileId}) async {
     try {
       debugPrint('🔍 PostDataSource: getPostsByProfile - profileId=$profileId');
+
+      // Use currentProfileId for blocking if provided, otherwise no filtering
+      final viewerProfileId = (currentProfileId ?? '').trim();
+      final excludedProfileIds = viewerProfileId.isEmpty
+          ? const <String>[]
+          : await _getExcludedProfileIds(profileId: viewerProfileId);
+      final excludedSet = excludedProfileIds.toSet();
 
       final snapshot = await _firestore
           .collection('posts')
@@ -121,7 +166,10 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
           .orderBy('expiresAt')
           .get();
 
-      final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
+        final posts = snapshot.docs
+          .map(PostEntity.fromFirestore)
+          .where((post) => !excludedSet.contains(post.authorProfileId))
+          .toList();
       
       // Sort by createdAt descending in memory to avoid composite index requirement
       posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -244,7 +292,7 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
 
       // Get profile data for notification
       final profileDoc = await _firestore.collection('profiles').doc(profileId).get();
-      final profileName = profileDoc.data()?['name'] as String? ?? 'Alguém';
+      final profileName = profileDoc.data()?['name'] as String? ?? 'WeGig';
       final profilePhoto = profileDoc.data()?['photoUrl'] as String?;
       final profileUid = profileDoc.data()?['uid'] as String? ?? '';
 
@@ -323,20 +371,30 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
     required double longitude,
     required double radiusKm,
     int limit = 50,
+    String? currentProfileId,
   }) async {
     try {
       debugPrint(
           '🔍 PostDataSource: getNearbyPosts - lat=$latitude, lng=$longitude, radius=$radiusKm');
 
+      final viewerProfileId = (currentProfileId ?? '').trim();
+      final excludedProfileIds = viewerProfileId.isEmpty
+          ? const <String>[]
+          : await _getExcludedProfileIds(profileId: viewerProfileId);
+      final excludedSet = excludedProfileIds.toSet();
+
       // Simple geosearch - get all non-expired posts and filter by distance
       final snapshot = await _firestore
           .collection('posts')
           .where('expiresAt', isGreaterThan: Timestamp.now())
-          .orderBy('expiresAt')
+          .orderBy('expiresAt', descending: true)
           .limit(limit)
           .get();
 
-      final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
+        final posts = snapshot.docs
+          .map(PostEntity.fromFirestore)
+          .where((post) => !excludedSet.contains(post.authorProfileId))
+          .toList();
       // Sort by createdAt descending in memory
       posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
@@ -374,24 +432,42 @@ class PostRemoteDataSource implements IPostRemoteDataSource {
   }
 
   @override
-  Stream<List<PostEntity>> watchPostsByProfile(String profileId) {
+  Stream<List<PostEntity>> watchPostsByProfile(String profileId, {String? currentProfileId}) {
     try {
       debugPrint(
           '👁️ PostDataSource: watchPostsByProfile - profileId=$profileId');
 
-      return _firestore
-          .collection('posts')
-          .where('authorProfileId', isEqualTo: profileId)
-          .where('expiresAt', isGreaterThan: Timestamp.now())
-          .orderBy('expiresAt')
-          .snapshots()
-          .debounceTime(const Duration(milliseconds: 300))  // ⚡ Debounce para reduzir rebuilds
-          .map((snapshot) {
-        final posts = snapshot.docs.map(PostEntity.fromFirestore).toList();
-        // Sort by createdAt descending in memory
-        posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        debugPrint('👁️ PostDataSource: Stream emitiu ${posts.length} posts (debounced)');
-        return posts;
+      final currentUid = FirebaseAuth.instance.currentUser?.uid;
+      final viewerProfileId = (currentProfileId ?? '').trim();
+      final excluded$ = (currentUid == null || currentUid.isEmpty || viewerProfileId.isEmpty)
+          ? Stream.value(const <String>[])
+          : BlockedRelations.watchExcludedProfileIds(
+              firestore: _firestore, 
+              profileId: viewerProfileId,
+              uid: currentUid,
+            ).onErrorReturn(const <String>[]);
+
+      return excluded$.switchMap((excludedProfileIds) {
+        final excludedSet = excludedProfileIds.toSet();
+        return _firestore
+            .collection('posts')
+            .where('authorProfileId', isEqualTo: profileId)
+            .where('expiresAt', isGreaterThan: Timestamp.now())
+            .orderBy('expiresAt')
+            .snapshots()
+            .debounceTime(
+              const Duration(milliseconds: 300),
+            ) // ⚡ Debounce para reduzir rebuilds
+            .map((snapshot) {
+          final posts = snapshot.docs
+              .map(PostEntity.fromFirestore)
+              .where((post) => !excludedSet.contains(post.authorProfileId))
+              .toList();
+          posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          debugPrint(
+              '👁️ PostDataSource: Stream emitiu ${posts.length} posts (debounced)');
+          return posts;
+        });
       });
     } catch (e) {
       debugPrint('❌ PostDataSource: Erro em watchPostsByProfile - $e');

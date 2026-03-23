@@ -6,7 +6,7 @@ part of 'report_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$reportNotifierHash() => r'7f9668d8940e1be409859b8774267b6ecfa741bc';
+String _$reportNotifierHash() => r'06a356fd6f90c7a0ac2a386eead0e2241553772e';
 
 /// Provider para gerenciar submissão de reports
 ///

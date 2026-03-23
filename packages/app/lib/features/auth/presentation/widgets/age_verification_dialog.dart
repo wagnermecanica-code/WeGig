@@ -243,7 +243,12 @@ class _AgeVerificationDialogState extends State<AgeVerificationDialog> {
             size: 28,
           ),
           const SizedBox(width: 12),
-          const Text('Verificação de Idade'),
+          const Flexible(
+            child: Text(
+              'Verificação de Idade',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
       content: SingleChildScrollView(
@@ -353,11 +358,14 @@ class _AgeVerificationDialogState extends State<AgeVerificationDialog> {
                 size: 20,
               ),
               const SizedBox(width: 8),
-              Text(
-                'Acesso não permitido',
-                style: AppTypography.bodyLight.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.error,
+              Flexible(
+                child: Text(
+                  'Acesso não permitido',
+                  style: AppTypography.bodyLight.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.error,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -392,11 +400,14 @@ class _AgeVerificationDialogState extends State<AgeVerificationDialog> {
             size: 20,
           ),
           const SizedBox(width: 8),
-          Text(
-            'Você tem $age anos ✓',
-            style: AppTypography.bodyLight.copyWith(
-              fontWeight: FontWeight.w600,
-              color: Colors.green[700],
+          Flexible(
+            child: Text(
+              'Você tem $age anos',
+              style: AppTypography.bodyLight.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.green[700],
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

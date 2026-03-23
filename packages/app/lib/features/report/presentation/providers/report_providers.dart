@@ -5,6 +5,17 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'report_providers.g.dart';
 
+/// Mensagens padronizadas para bloqueios intencionais no fluxo de denúncia.
+///
+/// Mantemos como constantes para a UI poder tratar como aviso (snackbar) e
+/// evitar comparação com strings soltas espalhadas pelo app.
+abstract final class ReportErrors {
+  static const notLoggedIn = 'Você precisa estar logado para reportar';
+  static const dailyLimitReached =
+      'Você atingiu o limite de denúncias diárias. Tente novamente amanhã.';
+  static const alreadyReported = 'Você já reportou este conteúdo anteriormente.';
+}
+
 /// Tipos de conteúdo reportável
 enum ReportTargetType {
   post,
@@ -76,21 +87,25 @@ class ReportState {
     this.isSubmitting = false,
     this.error,
     this.submitted = false,
+    this.wasDuplicate = false,
   });
 
   final bool isSubmitting;
   final String? error;
   final bool submitted;
+  final bool wasDuplicate;
 
   ReportState copyWith({
     bool? isSubmitting,
     String? error,
     bool? submitted,
+    bool? wasDuplicate,
   }) {
     return ReportState(
       isSubmitting: isSubmitting ?? this.isSubmitting,
       error: error,
       submitted: submitted ?? this.submitted,
+      wasDuplicate: wasDuplicate ?? this.wasDuplicate,
     );
   }
 }
@@ -108,16 +123,45 @@ class ReportNotifier extends _$ReportNotifier {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       state = state.copyWith(
-        error: 'Você precisa estar logado para reportar',
+        error: ReportErrors.notLoggedIn,
         isSubmitting: false,
       );
       return false;
     }
 
-    state = state.copyWith(isSubmitting: true, error: null);
+    state = state.copyWith(isSubmitting: true, error: null, wasDuplicate: false);
 
     try {
+      // Verificar se já reportou este item (idempotência).
+      // NOTA: A query DEVE incluir reporterUid para Security Rules permitirem
+      final targetField = reportData.targetType == ReportTargetType.post 
+          ? 'reportedPostId' 
+          : 'reportedProfileId';
+      
+      final existingReport = await FirebaseFirestore.instance
+          .collection('reports')
+          .where('reporterUid', isEqualTo: user.uid)
+          .where(targetField, isEqualTo: reportData.targetId)
+          .limit(1)
+          .get();
+
+      if (existingReport.docs.isNotEmpty) {
+        // Em vez de bloquear o fluxo com erro (o que frequentemente parece bug),
+        // tratamos como operação idempotente: não cria outro doc e retorna sucesso.
+        debugPrint(
+          'ℹ️ Report duplicado detectado (idempotente): ${reportData.targetType.name} ${reportData.targetId} (uid=${user.uid})',
+        );
+        state = state.copyWith(
+          isSubmitting: false,
+          submitted: true,
+          wasDuplicate: true,
+          error: null,
+        );
+        return true;
+      }
+
       // Verificar rate limiting (máximo 10 reports por dia)
+      // (executa APÓS o duplicate check para não penalizar tentativas idempotentes)
       final todayStart = DateTime.now().copyWith(
         hour: 0,
         minute: 0,
@@ -134,28 +178,7 @@ class ReportNotifier extends _$ReportNotifier {
 
       if (recentReports.count != null && recentReports.count! >= 10) {
         state = state.copyWith(
-          error: 'Você atingiu o limite de denúncias diárias. Tente novamente amanhã.',
-          isSubmitting: false,
-        );
-        return false;
-      }
-
-      // Verificar se já reportou este item
-      // NOTA: A query DEVE incluir reporterUid para Security Rules permitirem
-      final targetField = reportData.targetType == ReportTargetType.post 
-          ? 'reportedPostId' 
-          : 'reportedProfileId';
-      
-      final existingReport = await FirebaseFirestore.instance
-          .collection('reports')
-          .where('reporterUid', isEqualTo: user.uid)
-          .where(targetField, isEqualTo: reportData.targetId)
-          .limit(1)
-          .get();
-
-      if (existingReport.docs.isNotEmpty) {
-        state = state.copyWith(
-          error: 'Você já reportou este conteúdo anteriormente.',
+          error: ReportErrors.dailyLimitReached,
           isSubmitting: false,
         );
         return false;
@@ -171,6 +194,7 @@ class ReportNotifier extends _$ReportNotifier {
       state = state.copyWith(
         isSubmitting: false,
         submitted: true,
+        wasDuplicate: false,
       );
       return true;
     } on FirebaseException catch (e) {

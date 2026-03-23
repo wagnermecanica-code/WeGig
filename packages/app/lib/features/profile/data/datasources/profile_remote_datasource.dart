@@ -51,14 +51,121 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   CollectionReference get _profilesRef => _firestore.collection('profiles');
   CollectionReference get _usersRef => _firestore.collection('users');
 
+  /// Compat/Migration: some legacy builds stored profiles under `users/{uid}/profiles/{profileId}`
+  /// (or even a single profile doc at `profiles/{uid}` without `uid` set).
+  ///
+  /// New builds expect all profiles in the top-level `profiles` collection with a `uid` field.
+  /// This helper best-effort migrates legacy docs into the new structure.
+  Future<void> _migrateLegacyProfilesToGlobalCollection(String uid) async {
+    try {
+      final legacyProfilesRef = _usersRef.doc(uid).collection('profiles');
+      final legacySnap = await legacyProfilesRef.get();
+      if (legacySnap.docs.isEmpty) {
+        return;
+      }
+
+      debugPrint(
+        '🧩 ProfileRemoteDataSource: Encontrados ${legacySnap.docs.length} perfis legados em users/{uid}/profiles. Migrando...'
+      );
+
+      final now = Timestamp.now();
+
+      // Best-effort, do not use a transaction here to avoid read/write ordering issues
+      // across many docs; each profile is merged independently.
+      for (final doc in legacySnap.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final profileId = doc.id;
+
+        final migrated = <String, dynamic>{...data};
+        migrated['uid'] = uid;
+        migrated['updatedAt'] ??= now;
+        migrated['createdAt'] ??= now;
+
+        // Ensure `profileType` exists for newer clients (while keeping `isBand`).
+        if (!migrated.containsKey('profileType')) {
+          final isBand = (migrated['isBand'] as bool?) ?? false;
+          migrated['profileType'] = isBand ? 'band' : 'musician';
+        }
+
+        await _profilesRef.doc(profileId).set(
+              migrated,
+              SetOptions(merge: true),
+            );
+      }
+
+      debugPrint('✅ ProfileRemoteDataSource: Migração de perfis legados concluída');
+    } catch (e) {
+      debugPrint('⚠️ ProfileRemoteDataSource: Falha ao migrar perfis legados (non-critical): $e');
+    }
+  }
+
   @override
   Future<List<ProfileEntity>> getAllProfiles(String uid) async {
     debugPrint('🔍 ProfileRemoteDataSource: getAllProfiles - uid=$uid');
+    debugPrint('🔍 ProfileRemoteDataSource: uid.length=${uid.length}, uid.trim()=${uid.trim()}');
 
-    final snapshot = await _profilesRef
-        .where('uid', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
-        .get();
+    QuerySnapshot snapshot;
+    try {
+      debugPrint('🔍 ProfileRemoteDataSource: Executando query profiles.uid == $uid com orderBy (SERVIDOR)...');
+      // ⚠️ IMPORTANTE: Forçar leitura do servidor para evitar cache stale após reinstalar
+      snapshot = await _profilesRef
+          .where('uid', isEqualTo: uid)
+          .orderBy('createdAt', descending: true)
+          .get(const GetOptions(source: Source.server));
+      debugPrint('🔍 ProfileRemoteDataSource: Query SERVIDOR retornou ${snapshot.docs.length} docs');
+    } on FirebaseException catch (e) {
+      // If composite indexes are temporarily missing in some environments,
+      // or if server is unreachable, fall back to simpler query
+      debugPrint('⚠️ ProfileRemoteDataSource: Query com orderBy/servidor falhou (${e.code}). Tentando fallback...');
+      try {
+        snapshot = await _profilesRef
+            .where('uid', isEqualTo: uid)
+            .get(const GetOptions(source: Source.server));
+        debugPrint('🔍 ProfileRemoteDataSource: Fallback SERVIDOR retornou ${snapshot.docs.length} docs');
+      } catch (e2) {
+        debugPrint('⚠️ ProfileRemoteDataSource: Servidor falhou, usando cache: $e2');
+        snapshot = await _profilesRef.where('uid', isEqualTo: uid).get();
+        debugPrint('🔍 ProfileRemoteDataSource: Fallback CACHE retornou ${snapshot.docs.length} docs');
+      }
+    }
+
+    // Legacy migration path: if we didn't find any profiles, attempt to migrate
+    // from `users/{uid}/profiles` into global `profiles`.
+    if (snapshot.docs.isEmpty) {
+      await _migrateLegacyProfilesToGlobalCollection(uid);
+
+      // Fallback for very old accounts that used `profiles/{uid}` as the doc id.
+      try {
+        final legacySingle = await _profilesRef.doc(uid).get();
+        if (legacySingle.exists) {
+          final data = (legacySingle.data() as Map<String, dynamic>?) ?? <String, dynamic>{};
+          if ((data['uid'] as String?)?.isNotEmpty != true) {
+            final now = Timestamp.now();
+            final migrated = <String, dynamic>{...data};
+            migrated['uid'] = uid;
+            migrated['updatedAt'] ??= now;
+            migrated['createdAt'] ??= now;
+            if (!migrated.containsKey('profileType')) {
+              final isBand = (migrated['isBand'] as bool?) ?? false;
+              migrated['profileType'] = isBand ? 'band' : 'musician';
+            }
+            await _profilesRef.doc(uid).set(migrated, SetOptions(merge: true));
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ ProfileRemoteDataSource: Falha no fallback profiles/{uid} (non-critical): $e');
+      }
+
+      // Re-query after migration.
+      try {
+        snapshot = await _profilesRef
+            .where('uid', isEqualTo: uid)
+            .orderBy('createdAt', descending: true)
+            .get();
+      } on FirebaseException {
+        snapshot = await _profilesRef.where('uid', isEqualTo: uid).get();
+      }
+    }
 
     final profiles = snapshot.docs
         .map((doc) => ProfileEntity.fromFirestore(
@@ -95,8 +202,16 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   Future<ProfileEntity?> getActiveProfile(String uid) async {
     debugPrint('🔍 ProfileRemoteDataSource: getActiveProfile - uid=$uid');
 
-    // 1. Buscar activeProfileId em users/{uid}
-    final userDoc = await _usersRef.doc(uid).get();
+    // 1. Buscar activeProfileId em users/{uid} - forçar servidor para evitar cache stale
+    DocumentSnapshot userDoc;
+    try {
+      userDoc = await _usersRef.doc(uid).get(const GetOptions(source: Source.server));
+      debugPrint('🔍 ProfileRemoteDataSource: userDoc do SERVIDOR');
+    } catch (e) {
+      debugPrint('⚠️ ProfileRemoteDataSource: Servidor falhou, usando cache: $e');
+      userDoc = await _usersRef.doc(uid).get();
+    }
+    
     final activeId = (userDoc.data()
         as Map<String, dynamic>?)?['activeProfileId'] as String?;
 
@@ -105,8 +220,15 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       return null;
     }
 
-    // 2. Buscar perfil em profiles/{activeId}
-    final profileDoc = await _profilesRef.doc(activeId).get();
+    // 2. Buscar perfil em profiles/{activeId} - forçar servidor
+    DocumentSnapshot profileDoc;
+    try {
+      profileDoc = await _profilesRef.doc(activeId).get(const GetOptions(source: Source.server));
+      debugPrint('🔍 ProfileRemoteDataSource: profileDoc do SERVIDOR');
+    } catch (e) {
+      debugPrint('⚠️ ProfileRemoteDataSource: Servidor falhou, usando cache: $e');
+      profileDoc = await _profilesRef.doc(activeId).get();
+    }
 
     if (!profileDoc.exists) {
       debugPrint(
@@ -258,7 +380,16 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   Future<String?> getActiveProfileId(String uid) async {
     debugPrint('🔍 ProfileRemoteDataSource: getActiveProfileId - uid=$uid');
 
-    final userDoc = await _usersRef.doc(uid).get();
+    // Forçar leitura do servidor para evitar cache stale após reinstalar
+    DocumentSnapshot userDoc;
+    try {
+      userDoc = await _usersRef.doc(uid).get(const GetOptions(source: Source.server));
+      debugPrint('🔍 ProfileRemoteDataSource: userDoc do SERVIDOR');
+    } catch (e) {
+      debugPrint('⚠️ ProfileRemoteDataSource: Servidor falhou, usando cache: $e');
+      userDoc = await _usersRef.doc(uid).get();
+    }
+    
     final activeId = (userDoc.data()
         as Map<String, dynamic>?)?['activeProfileId'] as String?;
 
