@@ -150,6 +150,37 @@
       "collectionGroup": "notifications",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "recipientProfileId", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "actionData.postId", "order": "ASCENDING" },
+        { "fieldPath": "read", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "recipientProfileId", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "actionData.postId", "order": "ASCENDING" },
+        { "fieldPath": "actionData.interestedProfileId", "order": "ASCENDING" },
+        { "fieldPath": "read", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "recipientProfileId", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "data.conversationId", "order": "ASCENDING" },
+        { "fieldPath": "read", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "recipientUid", "order": "ASCENDING" },
         { "fieldPath": "recipientProfileId", "order": "ASCENDING" },
         { "fieldPath": "type", "order": "ASCENDING" },

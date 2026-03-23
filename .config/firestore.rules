@@ -25,16 +25,29 @@ service cloud.firestore {
 
     // Verifica se o profileId pertence ao usuário autenticado
     function ownsProfile(profileId) {
-      let profile = get(/databases/$(database)/documents/profiles/$(profileId));
-      return profile.exists() && profile.data.uid == request.auth.uid;
+      // Protege contra docs legados/malformados onde profileId pode estar ausente.
+      // Sem esse guard, get(/profiles/$(null)) pode falhar e derrubar a avaliação.
+      // Observação: as rules fazem short-circuit em &&, então get() só roda se for string.
+      return profileId is string && (
+        // Alguns fluxos legados podem usar uid como profileId.
+        profileId == request.auth.uid ||
+        (
+          get(/databases/$(database)/documents/profiles/$(profileId)).exists() &&
+          get(/databases/$(database)/documents/profiles/$(profileId)).data.uid == request.auth.uid
+        )
+      );
     }
 
     // ============================================
     // PROFILES - Perfis de usuários (multi-perfil)
     // ============================================
+    // ✅ Leitura pública permitida para:
+    // - Verificar disponibilidade de username no cadastro (antes de autenticar)
+    // - Exibir perfis públicos no site/app
+    // Escrita requer autenticação e ownership
 
     match /profiles/{profileId} {
-      allow read: if isSignedIn();
+      allow read: if true;  // Leitura pública para verificar username e perfis públicos
       // ✅ CORREÇÃO: Separar regras para create/update e delete
       // Para create/update: usa request.resource.data (dados que serão escritos)
       // Para delete: usa resource.data (dados existentes no documento)
@@ -44,11 +57,14 @@ service cloud.firestore {
       // ============================================
       // FCM TOKENS - Subcoleção para push notifications
       // ============================================
-      // Qualquer usuário autenticado pode gerenciar tokens em seus próprios perfis
-      // A validação de ownership do perfil já é feita pela lógica do app
-      // (o app só salva tokens para perfis que o usuário possui)
+      // Apenas o dono do perfil pode ler/escrever tokens.
+      // Isso evita vazamento de tokens e escrita indevida em perfis de terceiros.
       match /fcmTokens/{tokenId} {
-        allow read, write: if isSignedIn();
+        // Valida ownership diretamente no doc do perfil pai para evitar falsos negativos
+        // (ex.: profileId legados ou UID != profileId)
+        allow read, write: if isSignedIn()
+          && get(/databases/$(database)/documents/profiles/$(profileId)).data.uid
+            == request.auth.uid;
       }
     }
 
@@ -58,6 +74,11 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read, write: if isSignedIn() && isOwner(userId);
+
+      // Subcoleções privadas do usuário (ex.: blockedUsers)
+      match /{document=**} {
+        allow read, write: if isSignedIn() && isOwner(userId);
+      }
     }
 
     // ============================================
@@ -70,8 +91,34 @@ service cloud.firestore {
       allow read: if true;  // Leitura pública para site
       allow create: if isSignedIn()
         && request.resource.data.authorUid == request.auth.uid;
-      allow update, delete: if isSignedIn()
+      // Owner pode atualizar/deletar qualquer campo.
+      // Outros autenticados podem atualizar contadores (commentCount, forwardCount)
+      // desde que não alterem o authorUid (ownership imutável).
+      allow update: if isSignedIn() && (
+        resource.data.authorUid == request.auth.uid ||
+        request.resource.data.authorUid == resource.data.authorUid
+      );
+      allow delete: if isSignedIn()
         && resource.data.authorUid == request.auth.uid;
+
+      // ============================================
+      // COMMENTS - Subcoleção de comentários
+      // ============================================
+      // Leitura pública (comentários em posts públicos são públicos)
+      // Criação: autenticado e authorUid bate com auth
+      // Deleção: autor do comentário OU dono do post
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn()
+          && request.resource.data.authorUid == request.auth.uid;
+        allow delete: if isSignedIn() && (
+          resource.data.authorUid == request.auth.uid ||
+          get(/databases/$(database)/documents/posts/$(postId)).data.authorUid == request.auth.uid
+        );
+        // Permite update SOMENTE para curtidas (likeCount e likedBy)
+        allow update: if isSignedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount', 'likedBy']);
+      }
     }
 
     // ============================================
@@ -117,12 +164,35 @@ service cloud.firestore {
         allow create: if isSignedIn()
           && canAccessConversation()
           && request.resource.data.senderId == request.auth.uid;
+        
+        // Valida se apenas campos permitidos foram alterados
+        // Inclui receivedBy e readBy para read receipts em grupos
+        function onlyAllowedFieldsChanged() {
+          let keys = request.resource.data.diff(resource.data).affectedKeys();
+          return keys.hasOnly(['reactions', 'deletedForProfiles', 'status', 'receivedBy', 'readBy']);
+        }
+        
+        // Valida transição do campo `status` (read receipts).
+        // - Participantes podem marcar como 'delivered'/'read'.
+        // - Evita downgrade: uma mensagem 'read' não pode voltar.
+        function validStatusUpdate() {
+          let keys = request.resource.data.diff(resource.data).affectedKeys();
+          return !keys.hasAny(['status']) || (
+            request.resource.data.status in ['delivered', 'read']
+            && (resource.data.status != 'read' || request.resource.data.status == 'read')
+          );
+        }
+
         // ✅ FIX: Permitir update se:
         // 1. É o remetente da mensagem (pode editar/deletar), OU
-        // 2. É participante da conversa e está apenas modificando reactions ou deletedForProfiles
+        // 2. É participante da conversa e está apenas modificando reactions/deletedForProfiles/status/receivedBy/readBy
         allow update: if isSignedIn() && (
           resource.data.senderId == request.auth.uid ||
-          (canAccessConversation() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions', 'deletedForProfiles']))
+          (
+            canAccessConversation()
+            && onlyAllowedFieldsChanged()
+            && validStatusUpdate()
+          )
         );
         allow delete: if isSignedIn() && resource.data.senderId == request.auth.uid;
       }
@@ -162,12 +232,40 @@ service cloud.firestore {
     }
 
     // ============================================
-    // BLOCKS - Bloqueios de perfis/usuários
+    // BLOCKS - Bloqueios entre PERFIS
     // ============================================
+    // Bloqueio é por PERFIL, não por usuário.
+    // Campos: blockedByProfileId, blockedProfileId, blockedByUid (opcional), blockedUid (opcional)
     match /blocks/{blockId} {
-      allow read: if isSignedIn() && resource.data.blockedByUid == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.blockedByUid == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.blockedByUid == request.auth.uid;
+      // Read:
+      // - dono do perfil bloqueador (via blockedByUid) pode consultar seus bloqueios
+      // - dono do perfil bloqueado (via blockedUid) pode consultar quem o bloqueou (necessário para filtrar visibilidade)
+      // - Alternativamente, verifica ownership do perfil via ownsProfile()
+      allow read: if isSignedIn() && (
+        // Preferir validação por UID (sem get()) para suportar queries/listeners
+        // sem estourar limites de get() em listas grandes.
+        (resource.data.blockedByUid != null && resource.data.blockedByUid == request.auth.uid) ||
+        (resource.data.blockedUid != null && resource.data.blockedUid == request.auth.uid) ||
+
+        // Fallback para edges legados/malformados.
+        // Permite leitura via ownsProfile mesmo se apenas um dos UIDs existir.
+        // (Útil para reduzir permission-denied em docs antigos.)
+        ownsProfile(resource.data.blockedByProfileId) ||
+        ownsProfile(resource.data.blockedProfileId)
+      );
+
+      // Write: apenas o dono do perfil bloqueador pode criar/atualizar/remover.
+      allow create: if isSignedIn() && (
+        request.resource.data.blockedByUid == request.auth.uid ||
+        ownsProfile(request.resource.data.blockedByProfileId)
+      );
+
+      // Permite o dono do perfil bloqueado atualizar/remover para auto-corrigir edges sem blockedUid.
+      allow update, delete: if isSignedIn() && (
+        resource.data.blockedByUid == request.auth.uid ||
+        ownsProfile(resource.data.blockedByProfileId) ||
+        ownsProfile(resource.data.blockedProfileId)
+      );
     }
 
     // ============================================
@@ -211,6 +309,17 @@ service cloud.firestore {
     // Apenas Cloud Functions podem acessar (via Admin SDK)
     match /rateLimits/{limitId} {
       allow read, write: if false; // Apenas Admin SDK
+    }
+
+    // ============================================
+    // FEEDBACKS - Feedback enviado por usuários
+    // ============================================
+    // Criação: qualquer usuário autenticado
+    // Leitura: qualquer usuário autenticado (admin dashboard)
+    // Edição/exclusão: apenas Admin SDK
+    match /feedbacks/{feedbackId} {
+      allow create, read: if isSignedIn();
+      allow update, delete: if false;
     }
   }
 }
