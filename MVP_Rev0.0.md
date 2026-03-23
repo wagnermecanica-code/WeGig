@@ -1,6 +1,6 @@
 # WeGig - Minimum Viable Product (MVP)
 
-## Revisão 0.6 | 17 de Dezembro de 2025
+## Revisão 1.2 | 16 de Janeiro de 2026 — **LANÇAMENTO OFICIAL**
 
 ---
 
@@ -8,16 +8,26 @@
 
 **WeGig (18+)** é uma plataforma social móvel **exclusiva para maiores de 18 anos** que conecta músicos, bandas e espaços musicais através de busca geoespacial, posts efêmeros (30 dias de validade), mensagens em tempo real e notificações de proximidade. O sistema de múltiplos perfis (estilo Instagram) permite que um único usuário gerencie perfis de músico, banda e espaço (estúdios, escolas, luthierias, etc.) separadamente.
 
+### 🚀 Status de Lançamento
+
+| Plataforma          | Status                                    | Data de Lançamento |
+| ------------------- | ----------------------------------------- | ------------------ |
+| **Apple App Store** | ✅ **DISPONÍVEL**                         | 09/01/2026         |
+| **Google Play**     | ⏳ Em revisão (disponível em ~18/01/2026) | 18/01/2026         |
+
+> **Download iOS**: [App Store - WeGig](https://apps.apple.com/app/wegig/id6738976498)
+
 ### Métricas do MVP
 
-| Categoria               | Status                      |
-| ----------------------- | --------------------------- |
-| **Plataformas**         | iOS 15.0+ / Android API 24+ |
-| **Ambientes**           | DEV / STAGING / PROD        |
-| **Erros de Compilação** | 0 (packages/app)            |
-| **Cobertura de Testes** | 270+ testes passando        |
-| **Cloud Functions**     | 7 funções ativas            |
-| **Firestore Indexes**   | 13 indexes compostos        |
+| Categoria               | Status                            |
+| ----------------------- | --------------------------------- |
+| **Plataformas**         | iOS 15.0+ / Android API 24+       |
+| **Ambientes**           | DEV / STAGING / PROD              |
+| **Erros de Compilação** | 0 (packages/app)                  |
+| **Cobertura de Testes** | 270+ testes passando              |
+| **Cloud Functions**     | 10 funções ativas                 |
+| **Firestore Indexes**   | 13 indexes compostos              |
+| **Tipos de Post**       | 4 (musician, band, sales, hiring) |
 
 ---
 
@@ -36,7 +46,8 @@
 - **Posts Efêmeros**: Anúncios com validade de 30 dias (auto-limpeza)
 - **Multi-Perfil**: Gerencie perfis de músico, banda e espaço na mesma conta
 - **Anúncios de Serviços**: Espaços podem criar anúncios com preços, promoções e WhatsApp
-- **Chat em Tempo Real**: Comunicação instantânea entre usuários
+- **Contratação de Músicos**: Publique oportunidades de trabalho com detalhes completos
+- **Chat em Tempo Real**: Comunicação instantânea com suporte a grupos, reações e replies
 - **Notificações Inteligentes**: Alertas de novos posts na sua região
 
 ### 1.3 Público-Alvo
@@ -222,7 +233,7 @@ await ref.read(profileSwitcherNotifierProvider.notifier)
 #### Funcionalidades
 
 - ✅ Criar post com texto e imagens (até 9 fotos)
-- ✅ Selecionar tipo de post (3 categorias)
+- ✅ Selecionar tipo de post (**4 categorias**: músico, banda, anúncio, contratação)
 - ✅ Selecionar gêneros musicais
 - ✅ Selecionar instrumentos necessários
 - ✅ Definir localização do post
@@ -234,14 +245,77 @@ await ref.read(profileSwitcherNotifierProvider.notifier)
 - ✅ Visualizar detalhes do post
 - ✅ Sistema de interesses ("Tenho Interesse" / "Salvar Anúncio")
 - ✅ **Posts de Anúncio (sales)**: Título, preço, desconto, promoções, WhatsApp
+- ✅ **Posts de Contratação (hiring)**: Data, horário, orçamento, tipo de evento
+- ✅ **Post Feed TikTok-style**: Swipe vertical entre posts fullscreen
+- ✅ **Double-tap para curtir** com animação de coração
+- ✅ **Swipe-right para voltar** (gesture navigation)
+- ✅ **Links YouTube/Spotify/Deezer** nos posts
+- ✅ **Compartilhamento via Deep Link**
+
+#### Subtipos de Anúncio (Sales)
+
+| Subtipo           | Descrição                          |
+| ----------------- | ---------------------------------- |
+| Venda             | Venda de instrumentos/equipamentos |
+| Gravação          | Serviços de estúdio                |
+| Ensaios           | Locação de sala de ensaio          |
+| Aluguel           | Aluguel de equipamentos            |
+| Show/Evento       | Divulgação de shows                |
+| Open Mic          | Eventos de microfone aberto        |
+| Aula/Workshop     | Cursos e aulas de música           |
+| Freela            | Trabalhos freelancer               |
+| Promoção          | Promoções especiais                |
+| Manutenção/Reparo | Luthieria e reparos                |
+| Outro             | Outros tipos                       |
 
 #### Categorias de Post (PostType)
 
-| Tipo        | Valor      | Cor       | Descrição                             |
-| ----------- | ---------- | --------- | ------------------------------------- |
-| **Músico**  | `musician` | Primary   | Músico procurando banda/colaboradores |
-| **Banda**   | `band`     | Accent    | Banda procurando músicos              |
-| **Anúncio** | `sales`    | SalesBlue | Espaços divulgando serviços/promoções |
+| Tipo            | Valor      | Cor          | Descrição                                     |
+| --------------- | ---------- | ------------ | --------------------------------------------- |
+| **Músico**      | `musician` | Primary      | Músico procurando banda/colaboradores         |
+| **Banda**       | `band`     | Accent       | Banda procurando músicos                      |
+| **Anúncio**     | `sales`    | SalesBlue    | Espaços divulgando serviços/promoções         |
+| **Contratação** | `hiring`   | HiringPurple | Oportunidades de trabalho para músicos/bandas |
+
+#### Campos do Post de Contratação (Hiring)
+
+| Campo                  | Tipo         | Descrição                                    |
+| ---------------------- | ------------ | -------------------------------------------- |
+| `eventDate`            | DateTime     | Data da apresentação/contratação             |
+| `eventType`            | String       | Tipo de evento (casamento, corporativo, etc) |
+| `gigFormat`            | String       | Formato (solo, duo, trio, banda completa)    |
+| `budgetRange`          | String       | Faixa de orçamento                           |
+| `eventStartTime`       | String       | Horário de início (HH:mm)                    |
+| `eventEndTime`         | String       | Horário de término (HH:mm)                   |
+| `eventDurationMinutes` | int          | Duração calculada em minutos                 |
+| `guestCount`           | int          | Quantidade estimada de convidados            |
+| `venueSetup`           | List<String> | Estrutura disponível no local                |
+
+#### Tipos de Evento (Hiring)
+
+- Casamento, Aniversário, Corporativo, Formatura
+- Baile/Recepção, Festival, Bar/Restaurante
+- Condomínio/Clube, Religioso, Festa privada
+- Ação promocional, Outro
+
+#### Formatos de Contratação (Gig Format)
+
+- Solo, Duo, Trio, Quarteto, Banda completa
+- DJ, MC/Host, Banda + DJ, Pocket show, Outra formação
+
+#### Estrutura do Local (Venue Setup)
+
+- Som (PA) disponível, Iluminação de palco
+- Palco montado, Backline básico
+- Microfones e cabos, Mesa de som
+- Técnico de som/luz, Gerador de energia
+- Camarim, Sem estrutura (levar tudo)
+
+#### Faixas de Orçamento
+
+- A combinar, Até R$1.000
+- R$1.000 - R$3.000, R$3.000 - R$5.000
+- R$5.000 - R$10.000, Acima de R$10.000
 
 #### Modelo de Dados
 
@@ -252,7 +326,7 @@ await ref.read(profileSwitcherNotifierProvider.notifier)
   authorProfileId: "profile-id",
   authorName: "João Silva",
   authorPhotoUrl: "https://...",
-  type: "musician" | "band" | "sales",  // 3 categorias
+  type: "musician" | "band" | "sales" | "hiring",  // 4 categorias
   title: "Guitarrista procura banda",
   content: "Texto do post...",
   instruments: ["guitarra"],
@@ -262,6 +336,8 @@ await ref.read(profileSwitcherNotifierProvider.notifier)
   availableFor: ["gig", "rehearsal"],
   photoUrls: ["url1", "url2"],          // Até 9 fotos
   youtubeLink: "https://...",
+  spotifyLink: "https://...",
+  deezerLink: "https://...",
   location: GeoPoint(lat, lng),
   city: "São Paulo",
   neighborhood: "Centro",
@@ -292,6 +368,35 @@ await ref.read(profileSwitcherNotifierProvider.notifier)
   createdAt: Timestamp,
   expiresAt: Timestamp
 }
+
+// posts/{postId} - Contratação (hiring)
+{
+  authorUid: "firebase-auth-uid",
+  authorProfileId: "profile-id",
+  authorName: "Maria Santos",
+  authorPhotoUrl: "https://...",
+  type: "hiring",                       // Categoria de contratação
+  content: "Descrição da oportunidade...",
+  genres: ["rock", "pop"],              // Gêneros desejados
+  instruments: ["guitarra", "baixo"],   // Instrumentos/funções (opcional)
+  availableFor: ["Show ao vivo"],       // Formato da contratação
+  eventDate: Timestamp,                 // Data da apresentação
+  eventType: "Casamento",               // Tipo de evento
+  gigFormat: "Banda completa",          // Formato pretendido
+  budgetRange: "R$3.000 - R$5.000",     // Faixa de orçamento
+  eventStartTime: "20:00",              // Horário de início
+  eventEndTime: "00:00",                // Horário de término
+  eventDurationMinutes: 240,            // Duração calculada
+  guestCount: 150,                      // Quantidade de convidados
+  venueSetup: ["Som (PA) disponível", "Palco montado"],  // Estrutura do local
+  photoUrls: ["url1", "url2"],
+  location: GeoPoint(lat, lng),
+  city: "São Paulo",
+  neighborhood: "Jardins",
+  state: "SP",
+  createdAt: Timestamp,
+  expiresAt: Timestamp                  // eventDate + 1 dia
+}
 ```
 
 #### Query Obrigatória (Expiração)
@@ -307,10 +412,10 @@ await ref.read(profileSwitcherNotifierProvider.notifier)
 #### Funcionalidades
 
 - ✅ Mapa interativo com Google Maps
-- ✅ Markers customizados para posts (3 cores por tipo)
+- ✅ Markers customizados para posts (4 cores por tipo)
 - ✅ Clustering de markers (performance)
 - ✅ Filtro por raio de proximidade (5-100km)
-- ✅ Filtro por tipo (músico/banda/anúncio)
+- ✅ Filtro por tipo (músico/banda/anúncio/contratação)
 - ✅ Filtro por gêneros musicais
 - ✅ Filtro por instrumentos
 - ✅ **Filtros específicos de anúncios**:
@@ -318,6 +423,12 @@ await ref.read(profileSwitcherNotifierProvider.notifier)
   - Faixa de preço (minPrice/maxPrice)
   - Apenas com desconto (onlyWithDiscount)
   - Apenas promoções ativas (onlyActivePromos)
+- ✅ **Filtros específicos de contratação (hiring)**:
+  - Tipo de evento
+  - Formato pretendido (solo, duo, banda, etc)
+  - Faixa de orçamento
+  - Estrutura disponível no local
+- ✅ **Busca refinada com 5 abas** (músico, banda, contratação, anúncio, perfis)
 - ✅ Busca por @username
 - ✅ Lista de posts em formato de cards
 - ✅ Alternar entre visualização mapa/lista
@@ -345,12 +456,53 @@ if (distance <= selectedRadiusKm) {
 - ✅ Lista de conversas por perfil
 - ✅ Chat em tempo real (Firestore streams)
 - ✅ Enviar mensagens de texto
+- ✅ **Enviar mensagens com imagens** (upload com compressão)
+- ✅ **Grupos de até 32 participantes** (limite Instagram)
+- ✅ **Criar/editar grupos** (nome, foto, participantes)
+- ✅ **Reações com emojis** em mensagens (long press)
+- ✅ **Responder mensagens** (quote/reply)
+- ✅ **Editar mensagens** (autor apenas)
+- ✅ **Deletar para mim / Deletar para todos**
+- ✅ **Indicador de digitação** (typing indicator)
+- ✅ **Fixar conversas** (pin)
+- ✅ **Silenciar conversas** (mute)
+- ✅ **Arquivar conversas**
 - ✅ Contador de mensagens não lidas
 - ✅ Marcação automática como lida ao abrir
 - ✅ Ordenação por última mensagem
 - ✅ Iniciar conversa a partir de post
 - ✅ Iniciar conversa a partir de perfil
+- ✅ **Busca de conversas por nome**
+- ✅ **Swipe actions** (arquivar/deletar)
+- ✅ **Modo multi-seleção**
 - ✅ Lazy loading de streams
+- ✅ **Skeleton loading states**
+- ✅ **Blocking enforcement** (filtro de bloqueados)
+- ✅ **Cache de participantes** em grupos
+- ✅ **Scroll automático** para última mensagem
+- ✅ **Paginação de mensagens** (load more)
+
+#### Reações em Mensagens
+
+O sistema de reações permite que usuários expressem sentimentos rapidamente:
+
+- **Ação**: Long press na mensagem
+- **Emojis disponíveis**: 6 reações padrão + emoji picker
+- **Armazenamento**: `reactions: { emojiKey: [profileId1, profileId2] }`
+- **Visualização**: Badges abaixo da mensagem
+
+#### Funcionalidade de Reply (Responder)
+
+- **Ação**: Swipe ou botão de responder
+- **Exibição**: Preview da mensagem original acima da resposta
+- **Navegação**: Toque no preview para scroll até a mensagem original
+
+#### Upload de Imagens no Chat
+
+- **Compressão**: FlutterImageCompress (85% qualidade, max 1920px)
+- **Armazenamento**: Firebase Storage (`chat_images/conversationId/`)
+- **Preview**: Thumbnail com loading indicator
+- **Limite**: 1 imagem por mensagem
 
 #### Modelo de Dados
 
@@ -364,6 +516,12 @@ if (distance <= selectedRadiusKm) {
   lastMessageAt: Timestamp,
   lastMessageSenderId: "uid1",
   unreadCount: { "profile1": 0, "profile2": 2 },
+  pinnedBy: ["profile1"],                   // Fixado por
+  mutedBy: ["profile2"],                    // Silenciado por
+  archivedBy: [],                           // Arquivado por
+  isGroup: false,                           // Se é grupo
+  groupName: "Nome do Grupo",               // Para grupos
+  groupPhotoUrl: "https://...",             // Para grupos
   createdAt: Timestamp
 }
 
@@ -373,10 +531,20 @@ if (distance <= selectedRadiusKm) {
   senderProfileId: "profile-id",
   senderName: "João",
   text: "Mensagem aqui",
+  imageUrl: "https://...",                  // URL da imagem (se houver)
   createdAt: Timestamp,
+  editedAt: Timestamp,                      // Se foi editada
   readBy: ["profile1"],
-  reactions: {},
-  deletedForProfiles: []
+  reactions: {                              // Reações
+    "👍": ["profile1", "profile2"],
+    "❤️": ["profile3"]
+  },
+  replyTo: {                                // Se é resposta
+    messageId: "msg-id",
+    text: "Texto original...",
+    senderName: "Maria"
+  },
+  deletedForProfiles: ["profile4"]          // Deletado para
 }
 ```
 
@@ -426,6 +594,9 @@ if (distance <= selectedRadiusKm) {
 - ✅ Termos de uso
 - ✅ Política de privacidade
 - ✅ Sobre o app
+- ✅ **Gerenciar perfis bloqueados**
+- ✅ **Desbloquear perfis**
+- ✅ **Deletar conta** (com re-autenticação e cascade delete)
 
 ### 3.8 Sistema de Denúncias (report/)
 
@@ -433,11 +604,13 @@ if (distance <= selectedRadiusKm) {
 
 - ✅ Denunciar posts (conteúdo inadequado, spam, etc.)
 - ✅ Denunciar perfis (comportamento abusivo, fake, etc.)
-- ✅ 8 categorias de denúncia disponíveis
-- ✅ Campo de descrição adicional (obrigatório)
+- ✅ 6 categorias de denúncia disponíveis
+- ✅ Campo de descrição adicional (200 caracteres)
+- ✅ **Opção de bloquear após denúncia**
 - ✅ Prevenção de denúncias duplicadas
 - ✅ Feedback visual ao usuário
-- ✅ Notificação automática para administradores via email (SendGrid)
+- ✅ Notificação automática para administradores via email (SMTP/GoDaddy)
+- ✅ **Escalação de prioridade** (3+ denúncias = alta, 5+ = urgente)
 - ✅ Dashboard administrativo web para gerenciamento
 
 #### Categorias de Denúncia
@@ -478,7 +651,7 @@ if (distance <= selectedRadiusKm) {
 O sistema inclui um dashboard web para administradores gerenciarem denúncias:
 
 - **Tecnologia**: React + Vite + Firebase
-- **Localização**: `.config/admin-dashboard/`
+- **Localização**: `admin-dashboard/`
 - **Funcionalidades**:
   - Lista de denúncias com filtros por status e categoria
   - Visualização de detalhes da denúncia
@@ -486,15 +659,65 @@ O sistema inclui um dashboard web para administradores gerenciarem denúncias:
   - Campo de notas do administrador
   - Estatísticas de denúncias
 
-#### Notificações para Admins (SendGrid)
+#### Notificações para Admins
 
-Quando uma denúncia é criada, uma notificação por email é enviada automaticamente para os administradores via Cloud Function integrada com SendGrid.
+Quando uma denúncia é criada, uma notificação por email é enviada automaticamente para os administradores via Cloud Function integrada com SMTP (GoDaddy).
 
 ```javascript
-// Cloud Function: sendReportNotification
+// Cloud Function: onReportCreated
 // Trigger: reports.onCreate
-// Ação: Envia email para admins com detalhes da denúncia
+// Ação: Envia email para contato@wegig.com.br com detalhes da denúncia
 ```
+
+### 3.9 Sistema de Bloqueio (blocking/)
+
+#### Funcionalidades
+
+- ✅ **Bloqueio por perfil** (não por usuário)
+- ✅ **Bloqueio bidirecional** (bloqueador e bloqueado não se veem)
+- ✅ Bloquear a partir do perfil
+- ✅ Bloquear após denúncia
+- ✅ Listar perfis bloqueados
+- ✅ Desbloquear perfis
+- ✅ **Índice reverso** (saber quem me bloqueou)
+- ✅ **Enforcement em todas as áreas**:
+  - Posts não aparecem no feed
+  - Não pode enviar mensagens
+  - Não recebe notificações
+  - Não pode demonstrar interesse
+  - Perfil não aparece na busca
+
+#### Arquitetura de Bloqueio
+
+```
+Firestore Structure:
+├── profiles/{profileId}.blockedProfileIds[]     → Quem EU bloqueei
+├── profiles/{profileId}.blockedByProfileIds[]   → Quem ME bloqueou (Cloud Function sync)
+└── blocks/{blockerProfileId}_{blockedProfileId} → Edge document para lookups O(1)
+```
+
+#### Por que Client-Side?
+
+Firestore Security Rules não conseguem filtrar queries públicas (posts/perfis). O enforcement é feito no código do app usando `BlockedRelations.getExcludedProfileIds()`.
+
+### 3.10 Moderação Automática de Conteúdo
+
+#### Funcionalidades
+
+- ✅ **Auto-detecção de conteúdo impróprio** (Cloud Functions)
+- ✅ **Filtro de palavras** (36 palavras PT-BR: profanidades + insultos)
+- ✅ **Normalização de leetspeak** (0→o, 1→i, 3→e, 4→a, 5→s, 7→t, @→a)
+- ✅ **Detecção de ofuscação** (remoção de caracteres não-alfanuméricos)
+- ✅ **Auto-expiração de posts** com conteúdo detectado
+- ✅ **Limpeza automática de bios** com conteúdo ofensivo
+
+#### Rate Limiting
+
+| Ação       | Limite  | Janela     |
+| ---------- | ------- | ---------- |
+| Posts      | 20/dia  | Por UID    |
+| Mensagens  | 500/dia | Por perfil |
+| Interesses | 50/dia  | Por perfil |
 
 ---
 
@@ -502,15 +725,18 @@ Quando uma denúncia é criada, uma notificação por email é enviada automatic
 
 ### 4.1 Funções Implementadas
 
-| Função                        | Trigger              | Descrição                                           |
-| ----------------------------- | -------------------- | --------------------------------------------------- |
-| `notifyNearbyPosts`           | `posts.onCreate`     | Notifica perfis quando novo post é criado na região |
-| `sendInterestNotification`    | `interests.onCreate` | Notifica autor quando alguém demonstra interesse    |
-| `sendMessageNotification`     | `messages.onCreate`  | Notifica destinatário de nova mensagem              |
-| `cleanupExpiredNotifications` | Scheduled (daily)    | Limpa notificações expiradas                        |
-| `onProfileDelete`             | `profiles.onDelete`  | Cleanup de posts e Storage quando perfil é deletado |
-| `sendReportNotification`      | `reports.onCreate`   | Notifica admins via SendGrid sobre nova denúncia    |
-| `updateReportStatus`          | HTTP Callable        | Atualiza status de denúncia via dashboard admin     |
+| Função                            | Trigger               | Descrição                                           |
+| --------------------------------- | --------------------- | --------------------------------------------------- |
+| `notifyNearbyPosts`               | `posts.onCreate`      | Notifica perfis quando novo post é criado na região |
+| `sendInterestNotification`        | `interests.onCreate`  | Notifica autor quando alguém demonstra interesse    |
+| `sendMessageNotification`         | `messages.onCreate`   | Notifica destinatário de nova mensagem              |
+| `cleanupExpiredNotifications`     | Scheduled (daily 3am) | Limpa notificações expiradas                        |
+| `onProfileDelete`                 | `profiles.onDelete`   | Cleanup de posts e Storage quando perfil é deletado |
+| `onUserDelete`                    | Auth `onDelete`       | Cascade cleanup quando usuário Auth é deletado      |
+| `onReportCreated`                 | `reports.onCreate`    | Notifica admins via email (SMTP/GoDaddy)            |
+| `syncBlockedByProfileIndex`       | `blocks.onWrite`      | Mantém índice reverso de bloqueios nos perfis       |
+| `moderateObjectionablePosts`      | `posts.onWrite`       | Auto-expira posts com conteúdo impróprio            |
+| `sanitizeObjectionableProfileBio` | `profiles.onWrite`    | Limpa bios com conteúdo ofensivo                    |
 
 ### 4.2 Região de Deploy
 
@@ -518,8 +744,11 @@ Quando uma denúncia é criada, uma notificação por email é enviada automatic
 
 ### 4.3 Rate Limiting
 
-- 20 posts por usuário por dia (proteção contra spam)
-- Implementado via contadores no Firestore
+| Ação       | Limite  | Janela     | Implementação                      |
+| ---------- | ------- | ---------- | ---------------------------------- |
+| Posts      | 20/dia  | Por UID    | `rateLimits/{uid}_posts`           |
+| Mensagens  | 500/dia | Por perfil | `rateLimits/{profileId}_messages`  |
+| Interesses | 50/dia  | Por perfil | `rateLimits/{profileId}_interests` |
 
 ### 4.4 Notificações de Proximidade (Algoritmo)
 
@@ -596,23 +825,25 @@ allow update: if isSignedIn() && (
 
 ### 6.1 Cores
 
-| Token          | Hex     | Uso                              |
-| -------------- | ------- | -------------------------------- |
-| **Primary**    | #37475A | Elementos principais, músicos    |
-| **Accent**     | #E47911 | Destaques, bandas                |
-| **SalesBlue**  | #007EB9 | Espaços e anúncios (posts sales) |
-| **Badge**      | #FF2828 | Notificações, alertas            |
-| **Background** | #F5F5F5 | Fundo claro                      |
-| **Surface**    | #FFFFFF | Cards, modais                    |
-| **OnPrimary**  | #FFFFFF | Texto sobre primary              |
+| Token            | Hex     | Uso                              |
+| ---------------- | ------- | -------------------------------- |
+| **Primary**      | #37475A | Elementos principais, músicos    |
+| **Accent**       | #E47911 | Destaques, bandas                |
+| **SalesBlue**    | #007EB9 | Espaços e anúncios (posts sales) |
+| **HiringPurple** | #9C27B0 | Contratações (posts hiring)      |
+| **Badge**        | #FF2828 | Notificações, alertas            |
+| **Background**   | #F5F5F5 | Fundo claro                      |
+| **Surface**      | #FFFFFF | Cards, modais                    |
+| **OnPrimary**    | #FFFFFF | Texto sobre primary              |
 
 #### Cores por Tipo de Perfil/Post
 
-| Tipo   | Cor       | Hex     | Uso em Markers e UI   |
-| ------ | --------- | ------- | --------------------- |
-| Músico | Primary   | #37475A | Markers cinza-azulado |
-| Banda  | Accent    | #E47911 | Markers laranja       |
-| Espaço | SalesBlue | #007EB9 | Markers azul          |
+| Tipo        | Cor          | Hex     | Uso em Markers e UI   |
+| ----------- | ------------ | ------- | --------------------- |
+| Músico      | Primary      | #37475A | Markers cinza-azulado |
+| Banda       | Accent       | #E47911 | Markers laranja       |
+| Espaço      | SalesBlue    | #007EB9 | Markers azul          |
+| Contratação | HiringPurple | #9C27B0 | Markers roxo          |
 
 ### 6.2 Tipografia
 
@@ -777,23 +1008,47 @@ O site institucional do WeGig serve como landing page, documentação legal e fe
 | **Política de Privacidade** | [wegig.com.br/privacidade.html](https://wegig.com.br/privacidade.html) | LGPD, GDPR, CCPA compliance (v1.0 - Nov/2025)   |
 | **API Docs**                | [wegig.com.br/api](https://wegig.com.br/api)                           | Documentação técnica (dartdoc)                  |
 
-### 10.2 Hospedagem
+### 10.2 Infraestrutura de Hospedagem
 
-- **Plataforma**: Firebase Hosting (projeto `to-sem-banda-83e19` - PROD)
-- **Domínio**: wegig.com.br (CNAME configurado)
-- **SSL**: Gerenciado pelo Firebase
-- **CDN**: Global via Firebase
+#### Domínio e DNS
 
-### 10.3 Estrutura de Arquivos
+| Serviço     | Provedor    | Detalhes                                 |
+| ----------- | ----------- | ---------------------------------------- |
+| **Domínio** | Registro.br | wegig.com.br                             |
+| **DNS**     | Registro.br | Nameservers do Registro.br               |
+| **Hosting** | Registro.br | Hospedagem de sites compartilhada        |
+| **SSL**     | Registro.br | Certificado SSL gratuito (Let's Encrypt) |
+| **Email**   | Registro.br | Webmail integrado                        |
+
+#### Configuração DNS
 
 ```
-docs/                           → Pasta raiz do site (Firebase Hosting public)
+Tipo    Nome              Valor
+A       wegig.com.br      [IP Registro.br]
+A       www               [IP Registro.br]
+MX      wegig.com.br      mail.wegig.com.br (prioridade 10)
+```
+
+### 10.3 Email Corporativo
+
+| Email                        | Função                               |
+| ---------------------------- | ------------------------------------ |
+| **contato@wegig.com.br**     | Contato geral e suporte              |
+| **privacidade@wegig.com.br** | DPO / Questões de privacidade (LGPD) |
+
+- **Provedor**: Registro.br (Webmail)
+- **Protocolo**: IMAP/SMTP com SSL/TLS
+- **Acesso**: webmail.wegig.com.br ou cliente de email
+
+### 10.4 Estrutura de Arquivos do Site
+
+```
+public_html/                    → Pasta raiz do site (Registro.br)
 ├── index.html                  → Landing page principal
 ├── style.css                   → Estilos (Design System)
 ├── posts-feed.js               → Integração Firebase + Google Maps
 ├── termos.html                 → Termos de Uso
 ├── privacidade.html            → Política de Privacidade
-├── CNAME                       → wegig.com.br
 ├── favicon-16.png              → Ícones
 ├── favicon-32.png
 ├── app_icon.png                → App icon (192x192)
@@ -803,7 +1058,7 @@ docs/                           → Pasta raiz do site (Firebase Hosting public)
 └── api/                        → Documentação técnica gerada
 ```
 
-### 10.4 Funcionalidades do Site
+### 10.5 Funcionalidades do Site
 
 #### Feed de Posts em Tempo Real
 
@@ -834,7 +1089,7 @@ const COLORS = {
 | **Download**        | Badges App Store / Google Play                                         |
 | **Footer**          | Links, contato e copyright                                             |
 
-### 10.5 Documentação Legal
+### 10.6 Documentação Legal
 
 Os documentos legais estão em compliance com:
 
@@ -847,32 +1102,22 @@ Os documentos legais estão em compliance com:
 | Termos de Uso           | 1.0    | 27/11/2025 | ~638   |
 | Política de Privacidade | 1.0    | 27/11/2025 | ~1013  |
 
-#### Contatos Oficiais
-
-- **Geral**: contato@wegig.com.br
-- **Privacidade/DPO**: privacidade@wegig.com.br
-
-### 10.6 Deploy do Site
+### 10.7 Deploy do Site
 
 ```bash
-# Deploy via Firebase Hosting (da pasta .config/)
-cd .config
-firebase deploy --only hosting --project to-sem-banda-83e19
+# Upload via FTP/SFTP para Registro.br
+# Usar FileZilla ou cliente FTP de preferência
+# Host: ftp.wegig.com.br
+# Porta: 21 (FTP) ou 22 (SFTP)
+# Diretório: /public_html/
 ```
 
-### 10.7 Redirect Automático
+### 10.8 Contatos Oficiais
 
-O site redireciona automaticamente acessos via domínios Firebase para o domínio customizado:
-
-```javascript
-// Redirect Firebase domain to custom domain
-if (
-  window.location.hostname.includes("web.app") ||
-  window.location.hostname.includes("firebaseapp.com")
-) {
-  window.location.replace("https://wegig.com.br" + window.location.pathname);
-}
-```
+| Email                        | Função                               |
+| ---------------------------- | ------------------------------------ |
+| **contato@wegig.com.br**     | Contato geral, suporte e parcerias   |
+| **privacidade@wegig.com.br** | DPO / Questões de privacidade (LGPD) |
 
 ---
 
@@ -972,19 +1217,28 @@ rm -rf Pods Podfile.lock && pod install
 
 ---
 
-## 🗺️ 14. Roadmap Futuro (Pós-MVP)
+## 🗺️ 14. Roadmap (Pós-Lançamento)
 
-### Fase 2 - Enhancements
+### Fase 1 - Lançamento ✅ COMPLETA (Janeiro 2026)
 
-- [x] ~~Perfis de espaços/estúdios~~ ✅ **Implementado no MVP**
-- [x] ~~Posts de anúncio (sales)~~ ✅ **Implementado no MVP**
+- [x] ~~Perfis de espaços/estúdios~~ ✅ **Implementado**
+- [x] ~~Posts de anúncio (sales)~~ ✅ **Implementado**
+- [x] ~~Grupos de chat~~ ✅ **Implementado** (até 32 participantes)
+- [x] ~~Sistema de bloqueio~~ ✅ **Implementado** (bidirecional por perfil)
+- [x] ~~Moderação automática~~ ✅ **Implementado** (filtro de conteúdo + rate limiting)
+- [x] ~~Deep Links~~ ✅ **Implementado** (compartilhar perfis e posts)
+- [x] ~~Lançamento App Store~~ ✅ **DISPONÍVEL**
+- [x] ~~Lançamento Google Play~~ ⏳ **Em revisão** (~18/01/2026)
+
+### Fase 2 - Enhancements (Q1-Q2 2026)
+
 - [ ] Sistema de avaliações
-- [ ] Portfólio de mídia (áudio/vídeo)
+- [ ] Portfólio de mídia (áudio/vídeo nativos)
 - [ ] Integração com Spotify/SoundCloud
-- [ ] Deep Links (compartilhar posts via WhatsApp)
 - [ ] Dark Mode completo
+- [ ] Notificações por email
 
-### Fase 3 - Social Features
+### Fase 3 - Social Features (Q3-Q4 2026)
 
 - [ ] Grupos/comunidades por gênero
 - [ ] Eventos e shows
@@ -1028,32 +1282,36 @@ O WeGig opera em um modelo **Freemium + B2B SaaS**, com monetização planejada 
 
 | Fase               | Período   | Modelo                  | Status                       |
 | ------------------ | --------- | ----------------------- | ---------------------------- |
-| **1. Lançamento**  | Ano 1     | 100% Gratuito           | ✅ MVP Atual                 |
-| **2. PRO**         | Ano 2     | Assinatura R$ 19,90/mês | 🔮 Futuro                    |
-| **3. Business**    | Ano 2-3   | B2B R$ 99,90/mês        | 🔮 Futuro (estrutura pronta) |
-| **4. Marketplace** | Ano 3+    | Comissão 10-15%         | 🔮 Futuro                    |
+| **1. Lançamento**  | Jan 2026  | 100% Gratuito           | ✅ **EM ANDAMENTO**          |
+| **2. PRO**         | 2027      | Assinatura R$ 19,90/mês | 🔮 Futuro                    |
+| **3. Business**    | 2027-2028 | B2B R$ 99,90/mês        | 🔮 Futuro (estrutura pronta) |
+| **4. Marketplace** | 2028+     | Comissão 10-15%         | 🔮 Futuro                    |
 | **5. Ads**         | A definir | CPM R$ 10-30            | 🔮 Futuro                    |
 
-### 15.2 Lançamento Gratuito (MVP Atual)
+### 15.2 Lançamento Gratuito (Status Atual)
 
 **Estratégia:** Todas as features disponíveis gratuitamente para acelerar adoção e validar product-market fit.
 
-| Feature                     | Status        |
-| --------------------------- | ------------- |
-| Perfis ativos               | 5 (ilimitado) |
-| Posts por mês               | Ilimitado     |
-| Conversas por mês           | Ilimitado     |
-| Busca geoespacial           | Ilimitada     |
-| Notificações de proximidade | ✅ Ativas     |
-| Posts de anúncio (sales)    | ✅ Disponível |
-| Filtros avançados           | ✅ Todos      |
+| Feature                     | Status          |
+| --------------------------- | --------------- |
+| Perfis ativos               | Até 5 por conta |
+| Posts por mês               | Ilimitado       |
+| Conversas/grupos            | Ilimitado       |
+| Busca geoespacial           | Ilimitada       |
+| Notificações de proximidade | ✅ Ativas       |
+| Posts de anúncio (sales)    | ✅ Disponível   |
+| Filtros avançados           | ✅ Todos        |
+| Grupos de chat              | ✅ Até 32       |
+| Sistema de bloqueio         | ✅ Completo     |
+| Moderação automática        | ✅ Ativa        |
 
-**Objetivo do Lançamento Gratuito:**
+**Objetivos do Lançamento Gratuito:**
 
 - Construir base de usuários orgânica
-- Validar proposta de valor
+- Validar proposta de valor com usuários reais
 - Coletar feedback para evolução do produto
 - Criar network effects (quanto mais usuários, mais valor)
+- Iterar rapidamente com base em dados reais
 
 ### 15.3 Assinatura PRO (Fase Futura)
 
@@ -1155,24 +1413,38 @@ O WeGig opera em um modelo **Freemium + B2B SaaS**, com monetização planejada 
 
 **Contatos Oficiais WeGig:**
 
-- **Geral**: contato@wegig.com.br
-- **Privacidade/DPO**: privacidade@wegig.com.br
-- **Website**: [wegig.com.br](https://wegig.com.br)
+| Canal               | Contato                              |
+| ------------------- | ------------------------------------ |
+| **Email Geral**     | contato@wegig.com.br                 |
+| **Privacidade/DPO** | privacidade@wegig.com.br             |
+| **Website**         | [wegig.com.br](https://wegig.com.br) |
+
+**Infraestrutura:**
+
+| Serviço            | Provedor     |
+| ------------------ | ------------ |
+| Domínio + DNS      | Registro.br  |
+| Hospedagem Site    | Registro.br  |
+| Email Corporativo  | Registro.br  |
+| Backend (Firebase) | Google Cloud |
 
 ---
 
 ## 📄 17. Histórico de Revisões
 
-| Versão  | Data       | Descrição                                                                    |
-| ------- | ---------- | ---------------------------------------------------------------------------- |
-| **0.0** | 15/12/2025 | Documento inicial do MVP                                                     |
-| **0.1** | 15/12/2025 | Adicionado suporte a Espaços (profileType=space) e Anúncios (postType=sales) |
-| **0.2** | 15/12/2025 | Adicionado Business Plan (seção 15) e Roadmap expandido                      |
-| **0.3** | 15/12/2025 | Lançamento 100% gratuito; monetização movida para fase futura                |
-| **0.4** | 15/12/2025 | Adicionada seção Website wegig.com.br (seção 10)                             |
-| **0.5** | 15/12/2025 | Corrigidos package names e bundle IDs nos arquivos Firebase                  |
-| **0.6** | 17/12/2025 | Sistema de Denúncias (reports) com SendGrid e Dashboard Admin                |
+| Versão  | Data       | Descrição                                                                                                                                                                                                                                                                                                                                                                          |
+| ------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **0.0** | 15/12/2025 | Documento inicial do MVP                                                                                                                                                                                                                                                                                                                                                           |
+| **0.1** | 15/12/2025 | Adicionado suporte a Espaços (profileType=space) e Anúncios (postType=sales)                                                                                                                                                                                                                                                                                                       |
+| **0.2** | 15/12/2025 | Adicionado Business Plan (seção 15) e Roadmap expandido                                                                                                                                                                                                                                                                                                                            |
+| **0.3** | 15/12/2025 | Lançamento 100% gratuito; monetização movida para fase futura                                                                                                                                                                                                                                                                                                                      |
+| **0.4** | 15/12/2025 | Adicionada seção Website wegig.com.br (seção 10)                                                                                                                                                                                                                                                                                                                                   |
+| **0.5** | 15/12/2025 | Corrigidos package names e bundle IDs nos arquivos Firebase                                                                                                                                                                                                                                                                                                                        |
+| **0.6** | 17/12/2025 | Sistema de Denúncias (reports) com SendGrid e Dashboard Admin                                                                                                                                                                                                                                                                                                                      |
+| **1.0** | 09/01/2026 | **LANÇAMENTO OFICIAL**: App Store disponível, Google Play em 9 dias. Atualizado: Cloud Functions (10), Grupos de Chat, Sistema de Bloqueio, Moderação Automática, Rate Limiting, Post Feed TikTok-style                                                                                                                                                                            |
+| **1.1** | 09/01/2026 | Atualizada infraestrutura: Site e email migrados para Registro.br                                                                                                                                                                                                                                                                                                                  |
+| **1.2** | 16/01/2026 | **NOVAS FEATURES**: Posts de Contratação (hiring) com campos completos: data, horário, orçamento, tipo de evento, formato, estrutura do local. Mensagens: upload de imagens, reações com emojis, reply/responder, cache de participantes em grupos. Busca refinada com 5 abas. 4 tipos de post (musician, band, sales, hiring). Nova cor HiringPurple para markers de contratação. |
 
 ---
 
-_Este documento representa o estado do MVP do WeGig na data de sua criação. Para informações atualizadas, consulte o README.md e a documentação em docs/._
+_Este documento representa o estado do WeGig na data de lançamento oficial. Para informações atualizadas, consulte o README.md e a documentação em docs/._

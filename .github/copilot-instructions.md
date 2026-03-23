@@ -1,172 +1,152 @@
-# WeGig – AI Agent Cheatsheet
+# WeGig – Copilot Instructions
 
-## Architecture Overview
+## Repo shape (Melos monorepo)
 
-**Product**: Multi-profile social network for musicians, bands, and musical spaces with expiring posts (30 days), geospatial search, realtime chat, and proximity push notifications. Profile switching works like Instagram.
+| Path                             | Purpose                                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------------------------- |
+| `packages/app/`                  | Flutter app (SDK ≥3.6.0, Flutter 3.27.1 via FVM)                                            |
+| `packages/core_ui/`              | Shared widgets, theme, domain entities, `Result<T,E>`/`UIState<T>` (barrel: `core_ui.dart`) |
+| `.config/functions/`             | Firebase Cloud Functions (Node 20, region `southamerica-east1`)                             |
+| `.config/firestore.rules`        | Security rules                                                                              |
+| `.config/firestore.indexes.json` | Composite indexes — update when adding Firestore queries                                    |
+| `admin-dashboard/`               | Vite + React + Tailwind admin for moderating reports                                        |
+| `.tools/scripts/`                | Build, deploy, and migration helpers                                                        |
 
-**Tech Stack**: Flutter 3.27+ (Dart 3.6+) | Firebase (Firestore, Auth, Storage, FCM) | Riverpod 2.x + Freezed | GoRouter
-
-**Monorepo Structure** (Melos-managed):
-
-```
-packages/app/           → Main Flutter app (Feature-First Clean Architecture)
-packages/core_ui/       → Shared entities, theme, widgets (import: core_ui → app ONLY)
-.config/functions/      → Cloud Functions (Node.js 20) - region: southamerica-east1
-.config/                → Firestore rules, indexes, Firebase configs
-.tools/third_party/     → Forked dependencies (google_maps_cluster_manager)
-```
-
-**Profile Types** (`ProfileType` enum in `core_ui`):
-
-- `musician` — Primary color `#37475A`
-- `band` — Accent color `#E47911`
-- `space` — SalesBlue `#007EB9` (9 subtypes via `SpaceType`)
-
-**Cloud Functions** (5 active in `.config/functions/index.js`):
-
-- `notifyNearbyPosts` — Trigger: posts.onCreate → Push to profiles in radius
-- `sendInterestNotification` / `sendMessageNotification` — Trigger on subcollection writes
-- `cleanupExpiredNotifications` — Scheduled daily
-- `onProfileDelete` — Cascade delete posts/storage
-
-**Key Entry Points**:
-
-- [packages/app/lib/app/router/app_router.dart](packages/app/lib/app/router/app_router.dart) — `AppRoutes` typed routes + GoRouter auth guards
-- [packages/app/lib/bootstrap/bootstrap_core.dart](packages/app/lib/bootstrap/bootstrap_core.dart) — Firebase init with environment validation
-- [packages/core_ui/lib/core_ui.dart](packages/core_ui/lib/core_ui.dart) — Barrel export for all shared resources
-
-## Developer Workflow
-
-**IMPORTANT**: Flutter commands MUST run from `packages/app/`, not repo root.
+## Critical workflows
 
 ```bash
-# Setup (repo root)
+# Bootstrap (from repo root — NEVER run flutter pub get directly)
 melos bootstrap
 
-# Run app (packages/app/)
-cd packages/app && flutter run --flavor dev -t lib/main_dev.dart
+# Run app (from packages/app)
+flutter run --flavor dev -t lib/main_dev.dart
 
-# Code generation after Freezed/model changes (repo root)
+# Codegen after Freezed/Riverpod changes
 melos run build_runner
 
-# Tests (packages/app/)
+# Clean rebuild
+flutter clean && melos bootstrap && melos run build_runner
+
+# Tests (from packages/app)
 flutter test --coverage
 
-# Clean rebuild when generated files are stale
-flutter clean && melos bootstrap && melos run build_runner
+# Deploy Firebase (order matters)
+firebase deploy --only firestore:indexes
+firebase deploy --only firestore:rules
+firebase deploy --only functions
 ```
 
-**Flavors**: `dev` (wegig-dev), `staging` (wegig-staging), `prod` (to-sem-banda-83e19) — each has Firebase project + entry point `main_<flavor>.dart`
+`.env` at repo root (copy `.env.example`). Key vars: `FIREBASE_PROJECT_ID`, `GOOGLE_MAPS_API_KEY_*`, `APP_ENV`, feature flags. Loaded by `EnvService.init()` at bootstrap. Flavors: `dev` (wegig-dev), `staging`, `prod` (to-sem-banda-83e19). Entry points: `lib/main_<flavor>.dart`. Lint: `very_good_analysis` with `prefer_single_quotes`, `require_trailing_commas`.
 
-## Critical Patterns
+## Architecture: Clean Architecture per feature
 
-### Feature Architecture (Clean Architecture per Feature)
+Path: `packages/app/lib/features/<feature>/{data,domain,presentation}`
 
-```
-packages/app/lib/features/<feature>/
-├── data/
-│   ├── datasources/    → Firestore/Hive data sources
-│   ├── models/         → DTOs with JSON serialization
-│   └── repositories/   → Repository implementations
-├── domain/
-│   ├── entities/       → Business models (shared in core_ui)
-│   ├── repositories/   → Abstract interfaces
-│   └── usecases/       → Single-responsibility use cases
-└── presentation/
-    ├── pages/          → Full-screen widgets
-    ├── widgets/        → Reusable UI components
-    └── providers/      → Riverpod @riverpod + Freezed state
-```
+Features: `auth`, `post`, `profile`, `mensagens_new` (chat v2), `notifications_new`, `comment`, `report`, `settings`, `home`.
 
-### Firestore Query Convention (MANDATORY)
+### Provider DI chain (follow this pattern exactly)
 
-**ALL posts queries MUST include expiration filter** — missing this breaks composite indexes:
-
-```dart
-.where('expiresAt', isGreaterThan: Timestamp.now())
-.orderBy('expiresAt')  // Required for composite index
-```
-
-### Multi-Profile State Management
-
-Use `profileSwitcherNotifierProvider` for profile switching (centralizes cache invalidation):
-
-```dart
-// Switch profile (invalidates posts, notifications, messages caches)
-await ref.read(profileSwitcherNotifierProvider.notifier).switchToProfile(profileId);
-
-// Read active profile
-final profile = ref.read(profileProvider).value?.activeProfile;
-```
-
-**Ownership Model**: Firestore uses `authorUid` (Firebase Auth UID) for security rules; app uses `profileId` for data isolation.
-
-### Riverpod Pattern
+In `presentation/providers/<feature>_providers.dart`, wire the full chain:
 
 ```dart
 @riverpod
-class FeatureNotifier extends _$FeatureNotifier {
-  @override
-  FutureOr<FeatureState> build() async {
-    ref.onDispose(() {
-      _subscription?.cancel();  // CRITICAL: prevent memory leaks
-    });
-    return _loadInitialData();
-  }
+IPostRemoteDataSource postRemoteDataSource(Ref ref) => PostRemoteDataSource();
+
+@riverpod
+PostRepository postRepositoryNew(Ref ref) {
+  return PostRepositoryImpl(remoteDataSource: ref.read(postRemoteDataSourceProvider));
 }
+
+@riverpod
+CreatePost createPostUseCase(Ref ref) => CreatePost(ref.read(postRepositoryNewProvider));
+
+// Notifier consumes use cases via ref.read inside methods
+@riverpod
+class PostNotifier extends _$PostNotifier { ... }
 ```
 
-### Code Conventions
+- Datasource: abstract interface (`IFooDataSource`) + impl in **same file**; constructor accepts optional `FirebaseFirestore` for test injection.
+- Repository: thin wrapper, currently rethrows exceptions.
+- Use case: single-responsibility `call()` method with domain validation.
+- Notifier: `@riverpod class` with Freezed state union (`posts`, `isLoading`, `error`).
 
-- **Images**: Always `CachedNetworkImage`, never `Image.network`
-- **Uploads**: Compress with `FlutterImageCompress.compressAndGetFile()` at ~85 quality
-- **Debouncing**: Use `Debouncer` from `core_ui/utils/debouncer.dart`
-- **Routes**: Use `AppRoutes.profile(id)` not string literals
-- **Colors**: Use `AppColors.getProfileTypeColor(type)` for profile-based theming
+### Riverpod conventions
 
-## Routing & Navigation
+- `@riverpod` codegen for all new providers. `@Riverpod(keepAlive: true)` only for long-lived state in `packages/app/lib/core/providers/` (badge counts, cache config, connectivity, GPS cache).
+- Always `ref.onDispose` to cancel `StreamSubscription`s — see `badge_count_provider.dart`.
+- `UIState<T>` barrel **hides `Success`** to avoid conflict with `Result<T,E>`. Use `Result.success()` for domain results.
+- Run `melos run build_runner` after any Freezed/Riverpod annotation change.
 
-- **Auth guard flow**: not logged → `/auth` → no profile → `/profiles/new` → `/home`
-- **Typed routes**: Use `AppRoutes.profile(id)` not string literals
-- **Bottom nav**: `IndexedStack` + `ValueNotifier<int>` preserves tab state
+### Navigation
 
-## Firebase Deployment
+GoRouter with type-safe `BuildContext` extensions — **never use string routes**:
 
-**Deploy sequence matters** (from `.config/`):
-
-```bash
-firebase deploy --only firestore:indexes --project <env>  # wait 5-10min for build
-firebase deploy --only firestore:rules --project <env>
-firebase deploy --only functions --project <env>
+```dart
+context.goToHome();            context.goToAuth();
+context.pushPostDetail(id);    context.pushProfile(id);
+context.pushConversation(conversationId, otherUserId: ..., otherProfileId: ...);
 ```
 
-**Project IDs**: `wegig-dev`, `wegig-staging`, `to-sem-banda-83e19` (prod)
+Auth guard flow: auth-in-progress → splash → auth page → create-profile → home. All navigation logs to Firebase Analytics.
 
-## Troubleshooting
+### Firestore patterns
 
-| Issue                     | Fix                                                                      |
-| ------------------------- | ------------------------------------------------------------------------ |
-| Wrong directory error     | Flutter commands MUST run from `packages/app/`, not repo root            |
-| Stale generated files     | `flutter clean && melos bootstrap && melos run build_runner`             |
-| iOS DerivedData issues    | `rm -rf ~/Library/Developer/Xcode/DerivedData/Runner-*`                  |
-| Pod problems              | `cd packages/app/ios && rm -rf Pods Podfile.lock && pod install`         |
-| Firestore index missing   | Deploy indexes first, wait for completion before rules                   |
-| Profile data not updating | Use `profileSwitcherNotifierProvider` to invalidate all dependent caches |
+Posts always filter expired then order (must match indexes in `.config/firestore.indexes.json`):
 
-## Features Quick Reference
+```dart
+.where('expiresAt', isGreaterThan: Timestamp.now())
+.orderBy('expiresAt', descending: true)
+```
 
-| Feature                | Key Points                                                             |
-| ---------------------- | ---------------------------------------------------------------------- |
-| **auth/**              | Email/password, Google, Apple; session persistence                     |
-| **profile/**           | Multi-profile (limit 5); location required; photo compression          |
-| **post/**              | 9 images max; 30-day expiration; sales posts with price/discount/promo |
-| **home/**              | Map clustering; filters by type/genre/radius; @username search         |
-| **mensagens_new/**     | Real-time chat; unread counters; lazy loading                          |
-| **notifications_new/** | FCM push; proximity alerts; auto-cleanup                               |
+Key collections: `posts`, `profiles`, `interests`, `blocks`, `conversations`, `conversations/{id}/messages`, `users`, `fcmTokens`, `notifications`, `reports`, `adminNotifications`.
 
-## Geospatial & Real-time
+### Block filtering
 
-- Google Maps with custom `google_maps_cluster_manager` fork (in `.tools/third_party/`)
-- Marker cache: 6 types (musician/band/sales × normal/active) for performance
-- Firestore streams with `distinctUntilChanged` to prevent rebuilds
-- Proximity notifications via Cloud Function (configurable 5-100km radius)
+`BlockedRelations.getExcludedProfileIds()` (static, no DI) — returns "I blocked" + "blocked me" combined. Server reverse index via `syncBlockedByProfileIndex` Cloud Function. Client-side enforcement required. Methods never throw — return empty list on error.
+
+### Profile switching
+
+`profileSwitcherNotifierProvider.notifier.switchToProfile(id)` — invalidates post/interest caches, updates Analytics. FCM tokens **kept across all profiles**.
+
+### Post caching
+
+`PostCacheNotifier` — manual TTL-based. `PostNotifier` checks `isCacheValid` before Firestore, falls back to stale cache on timeout/error. Granular: `removePost(id)`, `updatePost(entity)`.
+
+### UGC filtering
+
+`ObjectionableContentFilter.validate(fieldLabel, input)` — client-side before writes. Leetspeak normalization, diacritic stripping, ~30 PT-BR terms. Returns error string or `null`. Server-side backstop in Cloud Functions.
+
+### Bootstrap sequence
+
+`bootstrapCoreServices()`: WidgetsBinding → Hive → EnvService → Firebase (duplicate-app guard) → `FirebaseCacheConfig.validateEnvironment()` (throws in debug if project ID mismatches) → Firestore cache (50/75/100MB by flavor) → push notifications → Crashlytics (staging/prod) → portrait lock.
+
+## UI rules
+
+- **Never** `Image.network` — always `CachedNetworkImage` with placeholder + errorWidget.
+- Image compression: `FlutterImageCompress.compressAndGetFile(path, target, quality: 85, minWidth: 800, minHeight: 800)`.
+- Profile-type colors: `AppColors.getProfileTypeColor(type)`.
+- Domain constants: `MusicConstants.instrumentOptions`, `genreOptions`, etc. in `core_ui/lib/utils/music_constants.dart`.
+
+## Cloud Functions
+
+All in `southamerica-east1`. `syncBlockedByProfileIndex` (onWrite blocks), `notifyNearbyPosts` (onCreate posts), `sendInterestNotification` (onCreate interests), `sendMessageNotification` (onCreate messages), `cleanupExpiredNotifications` (daily 3AM BRT), `onProfileDelete` (cascading cleanup).
+
+## Testing
+
+Tests at `packages/app/test/features/`, mirroring feature structure. **Manual mocks** (Mockito incompatible with Dart 3.6.0): implement repository interface with `setupSuccessResponse()`/`setupFailureResponse()` helpers, track calls via boolean flags. AAA pattern with `group()`. Focus on domain logic isolated from Firebase.
+
+## Key files
+
+| What                | Where                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| Bootstrap           | `packages/app/lib/bootstrap/bootstrap_core.dart`                                          |
+| Router + auth guard | `packages/app/lib/app/router/app_router.dart`                                             |
+| Block filtering     | `packages/app/lib/core/firebase/blocked_relations.dart`                                   |
+| Cache config        | `packages/app/lib/core/firebase/firebase_cache_config.dart`                               |
+| Profile switcher    | `packages/app/lib/features/profile/presentation/providers/profile_switcher_provider.dart` |
+| Env service         | `packages/core_ui/lib/services/env_service.dart`                                          |
+| core_ui barrel      | `packages/core_ui/lib/core_ui.dart`                                                       |
+| Security rules      | `.config/firestore.rules`                                                                 |
+| Cloud Functions     | `.config/functions/index.js`                                                              |
+| Content filter      | `packages/core_ui/lib/utils/objectionable_content_filter.dart`                            |
+| Post provider DI    | `packages/app/lib/features/post/presentation/providers/post_providers.dart`               |

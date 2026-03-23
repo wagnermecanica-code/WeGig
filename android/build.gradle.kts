@@ -1,3 +1,5 @@
+import com.android.build.gradle.LibraryExtension
+
 allprojects {
     repositories {
         google()
@@ -17,6 +19,17 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+// Define namespace for plugins that do not ship one (AGP 8+ requirement)
+subprojects {
+    if (name == "flutter_app_badger") {
+        plugins.withId("com.android.library") {
+            extensions.configure<LibraryExtension> {
+                namespace = "fr.g123k.flutterappbadger"
+            }
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {
