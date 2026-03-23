@@ -6,6 +6,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:wegig_app/core/cache/image_cache_manager.dart';
@@ -14,6 +15,7 @@ import 'package:core_ui/core_ui.dart';
 import 'package:core_ui/utils/debouncer.dart';
 import 'package:core_ui/utils/geo_utils.dart';
 import 'package:core_ui/utils/price_calculator.dart';
+import 'package:core_ui/utils/deep_link_generator.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -21,10 +23,13 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/config/app_config.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/features/home/data/datasources/gps_cache_service.dart';
 import 'package:wegig_app/features/home/presentation/providers/map_center_provider.dart';
 import 'package:wegig_app/features/home/presentation/widgets/feed/interest_service.dart';
@@ -36,6 +41,9 @@ import 'package:wegig_app/features/post/presentation/providers/interest_provider
 import 'package:wegig_app/features/post/presentation/widgets/interest_options_dialog.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:wegig_app/features/report/presentation/providers/report_providers.dart';
+import 'package:wegig_app/features/report/presentation/widgets/report_dialog.dart';
+import 'package:wegig_app/features/home/presentation/widgets/feedback/feedback_bottom_sheet.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({
@@ -53,7 +61,7 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage>
-  with AutomaticKeepAliveClientMixin<HomePage>, TickerProviderStateMixin {
+  with AutomaticKeepAliveClientMixin<HomePage>, TickerProviderStateMixin, WidgetsBindingObserver {
   // Controllers
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -68,21 +76,47 @@ class _HomePageState extends ConsumerState<HomePage>
   
   // State
   List<PostEntity> _visiblePosts = [];
+  Set<String> _excludedProfileIds = <String>{};
+  StreamSubscription<List<String>>? _excludedProfileIdsSub;
   Set<Marker> _markers = {};
   String? _activePostId;
   bool _isCenteringLocation = false;
   bool _isRebuildingMarkers = false;
   DateTime? _lastMarkerRebuild;
   ProviderSubscription<AsyncValue<PostState>>? _postsSubscription;
-  ProviderSubscription<AsyncValue<ProfileState>>? _profileSubscription;
+  ProviderSubscription<ProfileEntity?>? _profileSubscription;
   Completer<GoogleMapController>? _mapControllerCompleter;
   List<PostEntity> _cachedPosts = <PostEntity>[];
+  LatLng? _currentMapCenter;
+  double? _currentVisibleRadiusKm;
+  String? _mapAreaLabel;
   bool _isDisposed = false;
   bool _isRequestingLocationPermission = false; // ✅ FIX: Evita race condition de GPS
   
   // PageView Controller para carrossel horizontal
   late final PageController _pageController;
   bool _isProgrammaticScroll = false; // Evita loops de sync
+  bool _isUserScrolling = false; // ✅ Detecta interação manual do usuário
+  DateTime? _lastCarouselInteraction; // ✅ Timestamp da última interação
+  DateTime? _lastProgrammaticScrollEnd; // ✅ Timestamp do fim do último scroll programático
+  Map<String, PostEntity> _pendingPostsBuffer = {}; // ✅ Buffer com unicidade por ID
+  bool _hasPendingUpdate = false; // ✅ Flag de update pendente
+  Timer? _pendingUpdateTimer; // ✅ Timer para debounce de updates pendentes
+  ScrollDirection _lastUserScrollDirection = ScrollDirection.idle; // ✅ Direção do scroll do usuário
+
+  // ✅ Auto-refresh ao voltar para o app (evita feed “travado” em cache)
+  DateTime? _lastAutoRefreshAt;
+  
+  // ✅ Debouncing refinado para scroll programático (500ms após drag manual)
+  static const _programmaticScrollDebounceMs = 500;
+  
+  // ✅ Debounce para atualização de pins durante arrasto do carrossel (150ms)
+  DateTime? _lastPinUpdateDuringScroll;
+  static const _pinUpdateDebounceMs = 150;
+  
+  // ✅ NOVO: Throttle para onMapIdle (evita chamadas excessivas durante movimento)
+  DateTime? _lastMapIdleCall;
+  static const _mapIdleThrottleMs = 200; // Throttle de 200ms
   
     ProfileEntity? get _activeProfile =>
       ref.read(profileProvider).value?.activeProfile;
@@ -140,12 +174,51 @@ class _HomePageState extends ConsumerState<HomePage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pageController = PageController(viewportFraction: 0.88);
+    // ✅ Listener refinado para detectar scroll do usuário via position
+    _pageController.addListener(_onPageControllerUpdate);
     _markerBuilder = MarkerBuilder();
     _initializePage();
     widget.refreshNotifier?.addListener(_onExternalRefresh);
     _initializePostListener();
     _initializeProfileListener();
+    _initializeExcludedProfileIdsListener();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted || _isDisposed) return;
+    if (state != AppLifecycleState.resumed) return;
+
+    // Evita invalidar em loop quando o app alterna rapidamente entre foreground/background.
+    final now = DateTime.now();
+    final last = _lastAutoRefreshAt;
+    if (last != null && now.difference(last) < const Duration(seconds: 20)) {
+      return;
+    }
+    _lastAutoRefreshAt = now;
+
+    ref.invalidate(postNotifierProvider);
+    _scheduleVisiblePostsRefresh();
+  }
+  
+  /// ✅ Listener do PageController para detecção refinada de scroll
+  void _onPageControllerUpdate() {
+    if (!mounted || !_pageController.hasClients) return;
+    
+    final position = _pageController.position;
+    
+    // Detecta direção do scroll do usuário
+    if (position.userScrollDirection != ScrollDirection.idle) {
+      _lastUserScrollDirection = position.userScrollDirection;
+      
+      // Se não é scroll programático, marca como interação do usuário
+      if (!_isProgrammaticScroll) {
+        _isUserScrolling = true;
+        _lastCarouselInteraction = DateTime.now();
+      }
+    }
   }
 
   @override
@@ -161,6 +234,7 @@ class _HomePageState extends ConsumerState<HomePage>
   void dispose() {
     // ✅ FIX: Dispose all controllers to prevent memory leaks
     // NOTA: Não usar ref.read() no dispose - causa "Cannot use ref after disposed"
+    WidgetsBinding.instance.removeObserver(this);
     _postsSubscription?.close();
     _profileSubscription?.close();
     _searchController.dispose();
@@ -168,11 +242,88 @@ class _HomePageState extends ConsumerState<HomePage>
     _mapControllerWrapper.dispose();
     _searchDebouncer.dispose(); // ✅ Cancela Timer pendente
     _markerBuilder.dispose();
+    _pendingUpdateTimer?.cancel(); // ✅ Cancela timer de updates pendentes
+    _excludedProfileIdsSub?.cancel();
+    _pageController.removeListener(_onPageControllerUpdate); // ✅ Remove listener antes do dispose
     _pageController.dispose(); // ✅ Dispose do PageController
     widget.searchNotifier?.removeListener(_onSearchChanged);
     widget.refreshNotifier?.removeListener(_onExternalRefresh);
     _isDisposed = true;
     super.dispose();
+  }
+
+  void _initializeExcludedProfileIdsListener() {
+    _excludedProfileIdsSub?.cancel();
+    final activeProfile = ref.read(activeProfileProvider);
+    final profileId = activeProfile?.profileId?.trim();
+    final uid = activeProfile?.uid?.trim();
+
+    if (profileId == null || profileId.isEmpty) {
+      _excludedProfileIds = <String>{};
+      return;
+    }
+
+    // Seed quickly to avoid briefly showing excluded content.
+    unawaited(_refreshExcludedProfileIdsOnce(profileId, uid: uid));
+
+    _excludedProfileIdsSub = BlockedRelations.watchExcludedProfileIds(
+      firestore: FirebaseFirestore.instance,
+      profileId: profileId,
+      uid: uid,
+    ).listen(
+      (excluded) {
+        if (!mounted || _isDisposed) return;
+        final next = excluded.toSet();
+        if (const SetEquality<String>().equals(_excludedProfileIds, next)) return;
+
+        setState(() {
+          _excludedProfileIds = next;
+        });
+        _scheduleVisiblePostsRefresh();
+      },
+      onError: (e, _) {
+        debugPrint('⚠️ HomePage: Falha ao observar excludedProfileIds (non-critical): $e');
+      },
+    );
+  }
+
+  Future<void> _refreshExcludedProfileIdsOnce(String profileId, {String? uid}) async {
+    try {
+      final excluded = await BlockedRelations.getExcludedProfileIds(
+        firestore: FirebaseFirestore.instance,
+        profileId: profileId,
+        uid: uid,
+      );
+      if (!mounted || _isDisposed) return;
+      setState(() {
+        _excludedProfileIds = excluded.toSet();
+      });
+      _scheduleVisiblePostsRefresh();
+    } catch (e) {
+      debugPrint('⚠️ HomePage: Falha ao carregar excludedProfileIds (non-critical): $e');
+    }
+  }
+
+  List<PostEntity> _filterExcludedPosts(List<PostEntity> posts) {
+    if (_excludedProfileIds.isEmpty || posts.isEmpty) return posts;
+    return posts.where((p) => !_excludedProfileIds.contains(p.authorProfileId)).toList();
+  }
+
+  List<PostEntity> _filterExpiredPosts(List<PostEntity> posts) {
+    if (posts.isEmpty) return posts;
+    final now = DateTime.now();
+
+    return posts.where((post) {
+      // Para posts "sales", a validade é promoEndDate; para outros, expiresAt
+      // Fallback: se ausente, assume 30 dias após createdAt
+      final DateTime effectiveExpiry;
+      if (post.type == 'sales') {
+        effectiveExpiry = post.promoEndDate ?? post.expiresAt ?? post.createdAt.add(const Duration(days: 30));
+      } else {
+        effectiveExpiry = post.expiresAt ?? post.createdAt.add(const Duration(days: 30));
+      }
+      return effectiveExpiry.isAfter(now);
+    }).toList();
   }
 
   void _initializePostListener() {
@@ -181,7 +332,7 @@ class _HomePageState extends ConsumerState<HomePage>
       postNotifierProvider,
       (previous, next) {
         if (next.hasValue) {
-          _cachedPosts = next.value?.posts ?? const <PostEntity>[];
+          _cachedPosts = _filterExpiredPosts(next.value?.posts ?? const <PostEntity>[]);
           _scheduleVisiblePostsRefresh();
         } else if (next.hasError) {
           _cachedPosts = <PostEntity>[];
@@ -191,7 +342,7 @@ class _HomePageState extends ConsumerState<HomePage>
 
     final initialState = ref.read(postNotifierProvider);
     if (initialState.hasValue) {
-      _cachedPosts = initialState.value?.posts ?? const <PostEntity>[];
+      _cachedPosts = _filterExpiredPosts(initialState.value?.posts ?? const <PostEntity>[]);
       _scheduleVisiblePostsRefresh();
     } else if (initialState.hasError) {
       _cachedPosts = <PostEntity>[];
@@ -200,21 +351,40 @@ class _HomePageState extends ConsumerState<HomePage>
 
   void _initializeProfileListener() {
     _profileSubscription?.close();
-    _profileSubscription = ref.listenManual(
-      profileProvider,
-      (previous, next) {
-        final previousId = previous?.valueOrNull?.activeProfile?.profileId;
-        final nextProfile = next.valueOrNull?.activeProfile;
+    _profileSubscription = ref.listenManual<ProfileEntity?>(
+      activeProfileProvider,
+      (previous, nextProfile) {
+        final previousId = previous?.profileId;
         final nextId = nextProfile?.profileId;
 
         if (nextId == null || nextId == previousId) return;
 
+        // ✅ Blocking is per-profile.
+        // HomePage is kept alive (IndexedStack), so we must re-subscribe when
+        // the active profile changes; otherwise exclusions from the previous
+        // profile would incorrectly affect the new one.
+        _initializeExcludedProfileIdsListener();
+
         ref.read(mapCenterProvider.notifier).reset(nextId);
         _primeInitialCameraTarget(nextProfile);
+
+        // ✅ IMPORTANT: HomePage keeps state alive (IndexedStack + keepAlive).
+        // When the active profile changes but the visible posts list (ids/order)
+        // stays the same, the page would not refresh derived UI (distances,
+        // "is my post" flags, etc) because updates were only triggered on
+        // posts list changes.
+        if (!mounted || _isDisposed) return;
+
+        setState(() {
+          _updatePostDistances();
+        });
+
+        // Re-run map filtering logic in case profile-dependent filters apply.
+        _scheduleVisiblePostsRefresh();
       },
     );
 
-    final initialProfile = ref.read(profileProvider).valueOrNull?.activeProfile;
+    final initialProfile = ref.read(activeProfileProvider);
     if (initialProfile != null) {
       _primeInitialCameraTarget(initialProfile);
     }
@@ -244,16 +414,62 @@ class _HomePageState extends ConsumerState<HomePage>
 
   // ========================= MÉTODOS DE LÓGICA =========================
 
+  /// Conta quantos filtros estão ativos no momento
+  int _getActiveFiltersCount() {
+    final params = widget.searchNotifier?.value;
+    if (params == null) return 0;
+
+    int count = 0;
+
+    // Filtros de músicos/bandas
+    if (params.level != null) count++;
+    if (params.instruments.isNotEmpty) count++;
+    if (params.genres.isNotEmpty) count++;
+    if (params.availableFor.isNotEmpty) count++;
+    if (params.eventTypes.isNotEmpty) count++;
+    if (params.gigFormats.isNotEmpty) count++;
+    if (params.venueSetups.isNotEmpty) count++;
+    if (params.budgetRanges.isNotEmpty) count++;
+    if (params.hasYoutube == true) count++;
+    if (params.hasSpotify == true) count++;
+    if (params.hasDeezer == true) count++;
+    // postType só é definido quando o toggle "Filtrar apenas" está ativo
+    if (params.postType != null && params.postType!.isNotEmpty) count++;
+
+    // Filtros de anúncios
+    if (params.salesTypes.isNotEmpty) count++;
+    if (params.minPrice != null) count++;
+    if (params.maxPrice != null) count++;
+    if (params.onlyWithDiscount == true) count++;
+
+    // Filtro de username
+    if (params.searchUsername != null && params.searchUsername!.isNotEmpty) count++;
+
+    return count;
+  }
+
   void _onSearchChanged() {
     debugPrint('🔍 HomePage._onSearchChanged: searchNotifier.value = ${widget.searchNotifier?.value}');
     if (mounted) {
-      setState(_onMapIdle);
+      _onMapIdle();
     }
   }
 
   void _onExternalRefresh() {
     if (!mounted) return;
     ref.invalidate(postNotifierProvider);
+    if (_pageController.hasClients && _visiblePosts.isNotEmpty) {
+      // Scroll suave para o primeiro card antes do refresh
+      _isProgrammaticScroll = true;
+      _pageController
+          .animateToPage(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          )
+          .whenComplete(() => _isProgrammaticScroll = false);
+    }
+    _scheduleVisiblePostsRefresh();
     unawaited(_centerOnUserLocation());
   }
 
@@ -279,11 +495,11 @@ class _HomePageState extends ConsumerState<HomePage>
   Future<void> _rebuildMarkers({bool force = false}) async {
     if (!mounted || _isRebuildingMarkers) return;
 
-    // Debounce: evitar rebuilds mais frequentes que 500ms
+    // ✅ OTIMIZAÇÃO: Debounce reduzido para 300ms (era 500ms)
     final now = DateTime.now();
     if (!force &&
         _lastMarkerRebuild != null &&
-        now.difference(_lastMarkerRebuild!).inMilliseconds < 500) {
+        now.difference(_lastMarkerRebuild!).inMilliseconds < 300) {
       debugPrint('🗺️ _rebuildMarkers: Pulando rebuild (debounce ${now.difference(_lastMarkerRebuild!).inMilliseconds}ms)');
       return;
     }
@@ -292,6 +508,7 @@ class _HomePageState extends ConsumerState<HomePage>
     _isRebuildingMarkers = true;
     _lastMarkerRebuild = now;
 
+    // ✅ OTIMIZAÇÃO: Cache inteligente no MarkerBuilder evita reconstruções
     final markers = await _markerBuilder.buildMarkersForPosts(
       _visiblePosts,
       _activePostId,
@@ -299,8 +516,13 @@ class _HomePageState extends ConsumerState<HomePage>
     );
 
     if (mounted) {
-      setState(() => _markers = markers);
-      debugPrint('🗺️ _rebuildMarkers: Marcadores atualizados (${markers.length})');
+      // ✅ OTIMIZAÇÃO: Usa Future.microtask para agendar rebuild pós-frame
+      Future.microtask(() {
+        if (mounted && !_isDisposed) {
+          setState(() => _markers = markers);
+          debugPrint('🗺️ _rebuildMarkers: Marcadores atualizados (${markers.length}) [cache: ${_markerBuilder.cacheStats}]');
+        }
+      });
     }
 
     _isRebuildingMarkers = false;
@@ -345,6 +567,9 @@ class _HomePageState extends ConsumerState<HomePage>
     if (index < 0 || index >= _visiblePosts.length) return;
     
     final post = _visiblePosts[index];
+    
+    // ✅ Registra interação do usuário
+    _lastCarouselInteraction = DateTime.now();
     
     setState(() {
       _activePostId = post.id;
@@ -660,21 +885,42 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   void _showInterestOptionsDialog(PostEntity post) {
-    final isInterestSent = ref.read(interestNotifierProvider).contains(post.id);
-    final isOwner = post.authorProfileId.isNotEmpty &&
-        post.authorProfileId == _activeProfile?.profileId;
+    HapticFeedback.mediumImpact();
+    final hasInterest = ref.read(interestNotifierProvider).contains(post.id);
+    final isOwner = post.authorProfileId == _activeProfile?.profileId;
 
     showInterestOptionsDialog(
       context: context,
       post: post,
-      isInterestSent: isInterestSent,
+      isInterestSent: hasInterest,
       isOwner: isOwner,
       onSendInterest: () => _sendInterestOptimistically(post),
       onRemoveInterest: () => _removeInterestOptimistically(post),
       onDeletePost: () => _confirmDeletePost(post),
       onViewProfile: () => context.pushProfile(post.authorProfileId),
-      onPostEdited: () => ref.invalidate(postNotifierProvider),
     );
+  }
+
+  /// Compartilha post usando deep link (mesmo padrão do PostFeed)
+  void _sharePostWithDeepLink(PostEntity post) {
+    HapticFeedback.lightImpact();
+    final text = DeepLinkGenerator.generatePostShareMessage(
+      postId: post.id,
+      authorName: post.authorName ?? 'Anônimo',
+      postType: post.type,
+      city: post.city,
+      neighborhood: post.neighborhood,
+      state: post.state,
+      content: post.content,
+      instruments: post.instruments,
+      genres: post.genres,
+      title: post.title,
+      salesType: post.salesType,
+      price: post.price,
+      discountMode: post.discountMode,
+      discountValue: post.discountValue,
+    );
+    SharePlus.instance.share(ShareParams(text: text));
   }
 
   void _confirmDeletePost(PostEntity post) {
@@ -737,8 +983,29 @@ class _HomePageState extends ConsumerState<HomePage>
           .doc(post.id)
           .delete();
 
-      // Recarregar posts
       if (mounted) {
+        // Remover imediatamente das listas locais para refletir no carrossel/mapa
+        setState(() {
+          _cachedPosts = _cachedPosts.where((p) => p.id != post.id).toList();
+          _visiblePosts = _visiblePosts.where((p) => p.id != post.id).toList();
+          _pendingPostsBuffer.remove(post.id);
+          _hasPendingUpdate = _pendingPostsBuffer.isNotEmpty;
+
+          if (_activePostId == post.id) {
+            _activePostId = _visiblePosts.isNotEmpty ? _visiblePosts.first.id : null;
+          }
+
+          _updatePostDistances();
+        });
+
+        // Garantir que o PageView fique em um índice válido após a remoção
+        if (_pageController.hasClients && _visiblePosts.isNotEmpty) {
+          final targetIndex = _visiblePosts.indexWhere((p) => p.id == _activePostId);
+          _pageController.jumpToPage(targetIndex >= 0 ? targetIndex : 0);
+        }
+
+        // Atualiza marcadores e provedor para sincronizar demais assinantes
+        _rebuildMarkers(force: true);
         ref.invalidate(postNotifierProvider);
         AppSnackBar.showSuccess(context, 'Post deletado com sucesso');
       }
@@ -760,12 +1027,12 @@ class _HomePageState extends ConsumerState<HomePage>
       data: AppTheme.light,
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: const Color(0xFFE47911), // Brand Orange
-          foregroundColor: const Color(0xFFFAFAFA), // Off-white
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
           elevation: 2,
           title: Image.asset(
-            'assets/Logo/WeGig.png',
-            height: 53.6, // 46.6 * 1.15 = 53.59 (arredondado para 53.6)
+            'assets/Logo/LogoWeGig.png',
+            height: 53.6,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) {
               debugPrint('⚠️ Erro ao carregar logo WeGig: $error');
@@ -774,10 +1041,43 @@ class _HomePageState extends ConsumerState<HomePage>
           ),
           centerTitle: true,
           actions: [
-            IconButton(
-              icon: const Icon(Iconsax.filter),
-              tooltip: 'Filtros de busca',
-              onPressed: widget.onOpenSearch,
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Iconsax.filter),
+                  tooltip: 'Filtros de busca',
+                  onPressed: widget.onOpenSearch,
+                ),
+                // Badge counter - só aparece se houver filtros ativos
+                // ✅ FIX: IgnorePointer para não interceptar toques no IconButton
+                if (_getActiveFiltersCount() > 0)
+                  Positioned(
+                    left: 4,
+                    top: 4,
+                    child: IgnorePointer(
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppColors.salesColor,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        child: Text(
+                          '${_getActiveFiltersCount()}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
@@ -941,6 +1241,34 @@ class _HomePageState extends ConsumerState<HomePage>
                     ),
                   ),
                 ),
+                // Botão de feedback discreto abaixo do campo de busca
+                Positioned(
+                  top: 88,
+                  left: 16,
+                  child: Material(
+                    elevation: 2,
+                    borderRadius: BorderRadius.circular(16),
+                    color: AppColors.primary.withAlpha(180),
+                    child: InkWell(
+                      onTap: () => FeedbackBottomSheet.show(context),
+                      borderRadius: BorderRadius.circular(16),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        child: Text(
+                          'Feedback',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 // Botão de centralizar na localização do usuário (alinhado com card)
                 Positioned(
                   right: 16,
@@ -1039,8 +1367,16 @@ class _HomePageState extends ConsumerState<HomePage>
           _mapControllerWrapper.setCurrentZoom(pos.zoom);
         },
         onCameraIdle: () async {
-          // Debounce para evitar chamadas excessivas
-          await Future<void>.delayed(const Duration(milliseconds: 300));
+          // ✅ OTIMIZAÇÃO: Throttle de 200ms para limitar chamadas durante movimentos
+          final now = DateTime.now();
+          if (_lastMapIdleCall != null &&
+              now.difference(_lastMapIdleCall!).inMilliseconds < _mapIdleThrottleMs) {
+            return; // Ignora se chamado muito rapidamente
+          }
+          _lastMapIdleCall = now;
+          
+          // Pequeno delay para aguardar estabilização
+          await Future<void>.delayed(const Duration(milliseconds: 150));
           if (mounted && _mapControllerWrapper.controller != null) {
             try {
               await _onMapIdle();
@@ -1060,7 +1396,9 @@ class _HomePageState extends ConsumerState<HomePage>
     final controller = _mapControllerWrapper.controller;
     if (controller == null) return;
 
-    final allPosts = List<PostEntity>.from(_cachedPosts);
+    final allPosts = _filterExcludedPosts(
+      _filterExpiredPosts(List<PostEntity>.from(_cachedPosts)),
+    );
     debugPrint('🗺️ _onMapIdle: Total de posts disponíveis: ${allPosts.length}');
 
     try {
@@ -1069,42 +1407,79 @@ class _HomePageState extends ConsumerState<HomePage>
       debugPrint(
           '🗺️ Bounds do mapa: NE=${bounds.northeast}, SW=${bounds.southwest}');
 
-      final visible = allPosts.where(
+      final center = LatLng(
+        (bounds.northeast.latitude + bounds.southwest.latitude) / 2,
+        (bounds.northeast.longitude + bounds.southwest.longitude) / 2,
+      );
+      final radiusKm = calculateDistance(
+        center,
+        LatLng(bounds.northeast.latitude, bounds.northeast.longitude),
+      );
+      final mapAreaLabel = _formatMapAreaLabel(center);
+
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _currentMapCenter = center;
+          _currentVisibleRadiusKm = radiusKm.isFinite ? radiusKm : null;
+          _mapAreaLabel = mapAreaLabel;
+          _mapControllerWrapper.setLastSearchBounds(bounds);
+        });
+      }
+
+      final visibleRaw = allPosts.where(
         (post) {
+          if (_excludedProfileIds.contains(post.authorProfileId)) return false;
           final postLocation = post.location;
           if (postLocation == null) return false;
           return _latLngInBounds(geoPointToLatLng(postLocation), bounds) &&
               _matchesFilters(post);
         },
       ).toList();
+      
+      // ✅ ORDENAÇÃO POR POSIÇÃO NA TELA: Ordena posts pela coordenada X real na viewport
+      // Isso garante sincronia perfeita entre carrossel (esquerda→direita) e marcadores visuais
+      final visible = await _sortPostsByScreenPosition(visibleRaw, controller);
 
       debugPrint('🗺️ Posts visíveis após filtros: ${visible.length}');
 
-      final visibleIds = visible.map((p) => p.id).toSet();
-      final currentVisibleIds = _visiblePosts.map((p) => p.id).toSet();
+      final visibleIds = visible.map((p) => p.id).toList();
+      final currentVisibleIds = _visiblePosts.map((p) => p.id).toList();
 
-      if (!const SetEquality<String>().equals(visibleIds, currentVisibleIds)) {
+      // ✅ Compara ORDEM e IDs (não apenas IDs) - a ordem pode mudar mesmo com os mesmos posts
+      final hasChanges = !const ListEquality<String>().equals(visibleIds, currentVisibleIds);
+      
+      if (hasChanges) {
         if (_isDisposed || !mounted) return;
 
-        setState(() {
-          _visiblePosts = visible;
-          _updatePostDistances();
-          // ✅ Auto-seleciona o primeiro post quando a lista muda
-          if (visible.isNotEmpty) {
-            _activePostId = visible.first.id;
-          } else {
-            _activePostId = null;
-          }
-        });
+        // ✅ CORREÇÃO CRÍTICA: Preserva o POST ATIVO (não o índice!)
+        // Obtém o ID do post atualmente exibido no carrossel
+        final currentPageIndex = _pageController.hasClients 
+            ? (_pageController.page?.round() ?? 0).clamp(0, _visiblePosts.length - 1)
+            : 0;
         
-        // ✅ Reseta o PageController para a primeira página
-        if (_pageController.hasClients && visible.isNotEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _pageController.hasClients) {
-              _pageController.jumpToPage(0);
-            }
-          });
+        // Identifica o post que ESTÁ sendo exibido no carrossel agora
+        final currentlyDisplayedPost = _visiblePosts.isNotEmpty && currentPageIndex < _visiblePosts.length
+            ? _visiblePosts[currentPageIndex]
+            : null;
+        final currentlyDisplayedId = currentlyDisplayedPost?.id;
+        
+        // Verifica se o post atualmente exibido ainda está na nova lista
+        final currentPostStillVisible = currentlyDisplayedId != null && 
+            visible.any((p) => p.id == currentlyDisplayedId);
+        
+        // ✅ Se o post atual ainda está visível, mantém ele; senão, escolhe o mais próximo
+        String? preservedPostId;
+        if (currentPostStillVisible) {
+          preservedPostId = currentlyDisplayedId;
+          debugPrint('🎠 _onMapIdle: Post atual $currentlyDisplayedId permanece visível');
+        } else if (visible.isNotEmpty) {
+          // Post atual saiu da área - escolhe o primeiro da lista ordenada
+          preservedPostId = visible.first.id;
+          debugPrint('🎠 _onMapIdle: Post anterior saiu, novo post: $preservedPostId');
         }
+
+        // ✅ Atualiza lista preservando o POST específico (não o índice)
+        _updateVisiblePostsSmoothly(visible, preservedPostId);
         
         await _rebuildMarkers();
       }
@@ -1112,29 +1487,255 @@ class _HomePageState extends ConsumerState<HomePage>
       debugPrint('Erro ao obter bounds do mapa: $e');
       if (!mounted || _isDisposed) return;
       if (_visiblePosts.isEmpty) {
-        setState(() {
-          _visiblePosts = allPosts;
-          _updatePostDistances();
-          // ✅ Auto-seleciona o primeiro post quando a lista muda
-          if (allPosts.isNotEmpty) {
-            _activePostId = allPosts.first.id;
-          } else {
-            _activePostId = null;
-          }
-        });
+        // ✅ Fallback: ordena por longitude quando não há controller
+        final visible = _sortPostsByLongitude(_filterExcludedPosts(allPosts));
         
-        // ✅ Reseta o PageController para a primeira página
-        if (_pageController.hasClients && allPosts.isNotEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _pageController.hasClients) {
-              _pageController.jumpToPage(0);
-            }
-          });
+        // ✅ CORREÇÃO: Preserva o POST ativo (não o índice)
+        final currentPageIndex = _pageController.hasClients 
+            ? (_pageController.page?.round() ?? 0).clamp(0, _visiblePosts.length - 1)
+            : 0;
+        
+        final currentlyDisplayedPost = _visiblePosts.isNotEmpty && currentPageIndex < _visiblePosts.length
+            ? _visiblePosts[currentPageIndex]
+            : null;
+        final currentlyDisplayedId = currentlyDisplayedPost?.id;
+        
+        final currentPostStillVisible = currentlyDisplayedId != null && 
+            visible.any((p) => p.id == currentlyDisplayedId);
+        
+        String? preservedPostId;
+        if (currentPostStillVisible) {
+          preservedPostId = currentlyDisplayedId;
+        } else if (visible.isNotEmpty) {
+          preservedPostId = visible.first.id;
         }
+
+        _updateVisiblePostsSmoothly(visible, preservedPostId);
         
         await _rebuildMarkers();
       }
     }
+  }
+
+  /// ✅ Ordena posts pela coordenada X real na tela usando projeção do mapa
+  /// Garante que o carrossel reflita exatamente a ordem esquerda → direita visual dos marcadores
+  Future<List<PostEntity>> _sortPostsByScreenPosition(
+    List<PostEntity> posts,
+    GoogleMapController controller,
+  ) async {
+    if (posts.isEmpty) return posts;
+    if (posts.length == 1) return posts;
+    
+    try {
+      // Projeta cada post para coordenadas de tela
+      final List<({PostEntity post, double screenX})> postsWithScreenX = [];
+      
+      for (final post in posts) {
+        final location = post.location;
+        if (location == null) continue;
+        
+        final latLng = geoPointToLatLng(location);
+        final screenCoord = await controller.getScreenCoordinate(latLng);
+        postsWithScreenX.add((post: post, screenX: screenCoord.x.toDouble()));
+      }
+      
+      // Ordena por coordenada X crescente (esquerda → direita)
+      postsWithScreenX.sort((a, b) => a.screenX.compareTo(b.screenX));
+      
+      final sorted = postsWithScreenX.map((e) => e.post).toList();
+      debugPrint('🎠 _sortPostsByScreenPosition: ${sorted.length} posts ordenados por posição X na tela');
+      return sorted;
+      
+    } catch (e) {
+      debugPrint('⚠️ _sortPostsByScreenPosition: Erro na projeção, usando fallback por longitude: $e');
+      // Fallback: ordena por longitude se a projeção falhar
+      return _sortPostsByLongitude(posts);
+    }
+  }
+  
+  /// ✅ Fallback: ordena posts por longitude (oeste → leste)
+  List<PostEntity> _sortPostsByLongitude(List<PostEntity> posts) {
+    final sorted = List<PostEntity>.from(posts)
+      ..sort((a, b) {
+        final aLng = a.location?.longitude ?? 0;
+        final bLng = b.location?.longitude ?? 0;
+        return aLng.compareTo(bLng);
+      });
+    debugPrint('🎠 _sortPostsByLongitude: ${sorted.length} posts ordenados por longitude');
+    return sorted;
+  }
+
+  /// ✅ Verifica se houve interação recente com o carrossel (últimos 800ms)
+  bool _isRecentCarouselInteraction() {
+    if (_lastCarouselInteraction == null) return false;
+    return DateTime.now().difference(_lastCarouselInteraction!).inMilliseconds < 800;
+  }
+  
+  /// ✅ Verifica se está em período de debounce após scroll programático
+  bool _isInProgrammaticDebounce() {
+    if (_lastProgrammaticScrollEnd == null) return false;
+    return DateTime.now().difference(_lastProgrammaticScrollEnd!).inMilliseconds < _programmaticScrollDebounceMs;
+  }
+  
+  /// ✅ Adiciona posts ao buffer pendente com unicidade por ID
+  void _addToPendingBuffer(List<PostEntity> posts) {
+    for (final post in posts) {
+      _pendingPostsBuffer[post.id] = post;
+    }
+    _hasPendingUpdate = true;
+    
+    // Cancela timer anterior e agenda novo
+    _pendingUpdateTimer?.cancel();
+    _pendingUpdateTimer = Timer(const Duration(milliseconds: 300), () async {
+      if (mounted && !_isUserScrolling && !_isInProgrammaticDebounce()) {
+        await _applyPendingUpdates();
+      }
+    });
+  }
+
+  /// ✅ Atualiza lista de posts visíveis de forma suave, PRESERVANDO o post ativo SEM FLICK
+  void _updateVisiblePostsSmoothly(List<PostEntity> newPosts, String? preservedPostId) {
+    if (!mounted) return;
+
+    newPosts = _filterExcludedPosts(newPosts);
+    
+    // ✅ Se usuário está scrollando ou em debounce, adiciona ao buffer
+    if (_isUserScrolling || _isInProgrammaticDebounce()) {
+      debugPrint('🎠 _updateVisiblePostsSmoothly: Usuário scrollando ou debounce ativo, adicionando ao buffer');
+      _addToPendingBuffer(newPosts);
+      return;
+    }
+    
+    // ✅ Usa diffing otimizado para verificar se precisa atualizar
+    final currentIds = _visiblePosts.map((p) => p.id).toList();
+    final newIds = newPosts.map((p) => p.id).toList();
+    
+    // Verifica se a lista é idêntica
+    if (const ListEquality<String>().equals(currentIds, newIds) && _activePostId == preservedPostId) {
+      debugPrint('🎠 _updateVisiblePostsSmoothly: Lista idêntica, pulando rebuild');
+      return;
+    }
+    
+    final currentPageIndex = _pageController.hasClients ? (_pageController.page?.round() ?? 0) : 0;
+    
+    // ✅ Encontra o novo índice do post preservado na lista ORDENADA (mantém ordenação por X)
+    int targetPageIndex = 0;
+    String? finalActiveId = preservedPostId;
+    
+    if (preservedPostId != null && newPosts.isNotEmpty) {
+      final preservedIndex = newPosts.indexWhere((p) => p.id == preservedPostId);
+      if (preservedIndex >= 0) {
+        targetPageIndex = preservedIndex;
+      } else {
+        // Post não encontrado - usa o post no índice atual ou o mais próximo
+        targetPageIndex = currentPageIndex.clamp(0, newPosts.length - 1);
+        finalActiveId = newPosts[targetPageIndex].id;
+      }
+    } else if (newPosts.isNotEmpty) {
+      targetPageIndex = currentPageIndex.clamp(0, newPosts.length - 1);
+      finalActiveId = newPosts[targetPageIndex].id;
+    }
+    
+    final needsNavigation = currentPageIndex != targetPageIndex && newPosts.isNotEmpty;
+    
+    debugPrint('🎠 _updateVisiblePostsSmoothly: Atualizando (${currentIds.length}→${newIds.length} posts), activeId=$finalActiveId, índice $currentPageIndex→$targetPageIndex, navegar=$needsNavigation');
+    
+    // ✅ ESTRATÉGIA ANTI-FLICK DEFINITIVA:
+    // 1. Se NÃO precisa navegar: apenas atualiza a lista (sem flick)
+    // 2. Se PRECISA navegar: usa animação suave ao invés de jumpToPage
+    
+    if (!needsNavigation) {
+      // ✅ Caso simples: apenas atualiza a lista, sem navegação
+      setState(() {
+        _visiblePosts = newPosts;
+        _updatePostDistances();
+        _activePostId = finalActiveId;
+      });
+    } else if (_pageController.hasClients) {
+      // ✅ Precisa navegar: usa animação curta para suavizar a transição
+      _isProgrammaticScroll = true;
+      
+      setState(() {
+        _visiblePosts = newPosts;
+        _updatePostDistances();
+        _activePostId = finalActiveId;
+      });
+      
+      // ✅ Usa animateToPage com duração muito curta para transição suave
+      // Isso evita o "salto" visual do jumpToPage
+      _pageController.animateToPage(
+        targetPageIndex,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+      ).then((_) {
+        _isProgrammaticScroll = false;
+        _lastProgrammaticScrollEnd = DateTime.now();
+        debugPrint('🎠 _updateVisiblePostsSmoothly: Animou para índice $targetPageIndex');
+      });
+    }
+  }
+
+  /// ✅ Aplica updates pendentes após o usuário parar de scrollar
+  Future<void> _applyPendingUpdates() async {
+    if (!_hasPendingUpdate || _pendingPostsBuffer.isEmpty) return;
+    if (!mounted || _isUserScrolling || _isInProgrammaticDebounce()) return;
+    
+    final controller = _mapControllerWrapper.controller;
+    final rawPosts = _filterExcludedPosts(_pendingPostsBuffer.values.toList());
+    
+    // ✅ Ordenação por posição na tela
+    List<PostEntity> sortedPosts;
+    if (controller != null) {
+      sortedPosts = await _sortPostsByScreenPosition(rawPosts, controller);
+      debugPrint('🎠 _applyPendingUpdates: ${sortedPosts.length} posts ordenados por posição na tela');
+    } else {
+      sortedPosts = _sortPostsByLongitude(rawPosts);
+      debugPrint('🎠 _applyPendingUpdates: ${sortedPosts.length} posts ordenados por longitude (fallback)');
+    }
+    
+    // ✅ Verifica se a nova lista é idêntica
+    final currentIds = _visiblePosts.map((p) => p.id).toList();
+    final newIds = sortedPosts.map((p) => p.id).toList();
+    
+    if (const ListEquality<String>().equals(currentIds, newIds)) {
+      debugPrint('🎠 _applyPendingUpdates: Lista idêntica, ignorando');
+      _hasPendingUpdate = false;
+      _pendingPostsBuffer.clear();
+      return;
+    }
+    
+    // ✅ CORREÇÃO CRÍTICA: Preserva o POST atualmente visível (não o índice!)
+    final currentPageIndex = _pageController.hasClients 
+        ? (_pageController.page?.round() ?? 0).clamp(0, _visiblePosts.length - 1)
+        : 0;
+    
+    final currentlyDisplayedPost = _visiblePosts.isNotEmpty && currentPageIndex < _visiblePosts.length
+        ? _visiblePosts[currentPageIndex]
+        : null;
+    final currentlyDisplayedId = currentlyDisplayedPost?.id;
+    
+    // Verifica se o post atualmente exibido ainda está na nova lista
+    final currentPostStillVisible = currentlyDisplayedId != null && 
+        sortedPosts.any((p) => p.id == currentlyDisplayedId);
+    
+    String? preservedPostId;
+    if (currentPostStillVisible) {
+      preservedPostId = currentlyDisplayedId;
+      debugPrint('🎠 _applyPendingUpdates: Preservando post $currentlyDisplayedId');
+    } else if (sortedPosts.isNotEmpty) {
+      preservedPostId = sortedPosts.first.id;
+      debugPrint('🎠 _applyPendingUpdates: Post anterior saiu, novo: $preservedPostId');
+    }
+    
+    // ✅ Limpa buffer ANTES de aplicar
+    _hasPendingUpdate = false;
+    _pendingPostsBuffer.clear();
+    
+    // ✅ Chama _updateVisiblePostsSmoothly que já lida com navegação
+    _updateVisiblePostsSmoothly(sortedPosts, preservedPostId);
+    
+    // ✅ Reconstrói marcadores para refletir o novo estado ativo
+    _rebuildMarkers(force: true);
   }
 
   bool _latLngInBounds(LatLng p, LatLngBounds b) {
@@ -1142,6 +1743,65 @@ class _HomePageState extends ConsumerState<HomePage>
             p.latitude <= b.northeast.latitude) &&
         (p.longitude >= b.southwest.longitude &&
             p.longitude <= b.northeast.longitude);
+  }
+
+  String _formatMapAreaLabel(LatLng center) {
+    final searchText = _searchController.text.trim();
+    if (searchText.isNotEmpty) {
+      return searchText;
+    }
+
+    // Usa o post mais próximo para inferir um nome real (bairro ou cidade)
+    final nearestPost = _findNearestPost(center);
+    final radiusKm = _currentVisibleRadiusKm;
+    final currentZoom = _mapControllerWrapper.currentZoom;
+
+    if (nearestPost != null) {
+      final neighborhood = nearestPost.neighborhood?.trim();
+      final city = nearestPost.city.trim();
+      final state = abbreviateState(nearestPost.state);
+
+      // Preferir bairro em zooms mais próximos ou raios pequenos
+      final preferNeighborhood =
+          (radiusKm != null && radiusKm <= 5) || currentZoom >= 14;
+
+      if (preferNeighborhood && neighborhood != null && neighborhood.isNotEmpty) {
+        final parts = <String>[neighborhood];
+        if (city.isNotEmpty) parts.add(city);
+        if (state.isNotEmpty) parts.add(state);
+        final label = parts.join(' · ');
+        if (label.isNotEmpty) return label;
+      }
+
+      final cityParts = <String>[];
+      if (city.isNotEmpty) cityParts.add(city);
+      if (state.isNotEmpty) cityParts.add(state);
+      if (cityParts.isNotEmpty) {
+        return cityParts.join(' · ');
+      }
+    }
+
+    final lat = center.latitude.toStringAsFixed(3);
+    final lng = center.longitude.toStringAsFixed(3);
+    return 'Centro do mapa ($lat, $lng)';
+  }
+
+  PostEntity? _findNearestPost(LatLng target) {
+    PostEntity? nearest;
+    var bestDistance = double.infinity;
+    final candidates = _visiblePosts.isNotEmpty ? _visiblePosts : _cachedPosts;
+
+    for (final post in candidates) {
+      final loc = post.location;
+      if (loc == null) continue;
+      final dist = calculateDistance(target, geoPointToLatLng(loc));
+      if (dist < bestDistance) {
+        bestDistance = dist;
+        nearest = post;
+      }
+    }
+
+    return nearest;
   }
 
   Widget _buildFloatingCard() {
@@ -1156,26 +1816,102 @@ class _HomePageState extends ConsumerState<HomePage>
         padding: const EdgeInsets.only(bottom: 24),
         child: SizedBox(
           height: 200, // Altura fixa do card original
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: _visiblePosts.length,
-            onPageChanged: _onPageChanged,
-            itemBuilder: (context, index) {
-              final post = _visiblePosts[index];
-              final isActive = post.id == _activePostId;
-              
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: PostCard(
-                  post: post,
-                  isActive: isActive,
-                  currentActiveProfileId: _activeProfile?.profileId,
-                  isInterestSent: ref.watch(interestNotifierProvider).contains(post.id),
-                  onOpenOptions: () => _showInterestOptionsDialog(post),
-                  onClose: _closeCard,
-                ),
-              );
+          // ✅ NotificationListener para detectar scroll manual do usuário
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is ScrollStartNotification) {
+                // ✅ Só marca como interação do usuário se não for programático
+                if (!_isProgrammaticScroll && !_isInProgrammaticDebounce()) {
+                  _isUserScrolling = true;
+                  _lastCarouselInteraction = DateTime.now();
+                  debugPrint('🎠 ScrollStart: Usuário iniciou scroll manual');
+                }
+              } else if (notification is ScrollEndNotification) {
+                // ✅ Verifica se era scroll do usuário antes de resetar
+                if (_isUserScrolling) {
+                  _lastCarouselInteraction = DateTime.now();
+                  debugPrint('🎠 ScrollEnd: Usuário finalizou scroll manual');
+                  
+                  // ✅ Sincroniza _activePostId com a página visível atual
+                  final currentPage = _pageController.page?.round() ?? 0;
+                  if (currentPage >= 0 && currentPage < _visiblePosts.length) {
+                    final visiblePost = _visiblePosts[currentPage];
+                    if (_activePostId != visiblePost.id) {
+                      setState(() {
+                        _activePostId = visiblePost.id;
+                      });
+                      _rebuildMarkers(force: true);
+                    }
+                  }
+                  
+                  // ✅ Agenda aplicação de updates pendentes com debounce maior
+                  // para garantir que o scroll terminou completamente
+                  _pendingUpdateTimer?.cancel();
+                  _pendingUpdateTimer = Timer(const Duration(milliseconds: 600), () async {
+                    if (mounted && !_isProgrammaticScroll) {
+                      _isUserScrolling = false;
+                      _lastProgrammaticScrollEnd = DateTime.now();
+                      await _applyPendingUpdates();
+                    }
+                  });
+                } else {
+                  _isUserScrolling = false;
+                }
+              } else if (notification is ScrollUpdateNotification) {
+                // ✅ Atualiza timestamp e sincroniza pin em tempo real durante o arrasto
+                if (_isUserScrolling) {
+                  _lastCarouselInteraction = DateTime.now();
+                  
+                  // ✅ SYNC EM TEMPO REAL: Card → Pin - atualiza o pin destacado durante o arrasto
+                  // Com debounce de 150ms para evitar rebuilds excessivos
+                  final now = DateTime.now();
+                  final shouldUpdate = _lastPinUpdateDuringScroll == null ||
+                      now.difference(_lastPinUpdateDuringScroll!).inMilliseconds >= _pinUpdateDebounceMs;
+                  
+                  if (shouldUpdate) {
+                    final currentPage = _pageController.page?.round() ?? 0;
+                    if (currentPage >= 0 && currentPage < _visiblePosts.length) {
+                      final visiblePost = _visiblePosts[currentPage];
+                      if (_activePostId != visiblePost.id) {
+                        _lastPinUpdateDuringScroll = now;
+                        setState(() {
+                          _activePostId = visiblePost.id;
+                        });
+                        // ✅ Reconstrói marcadores para destacar o pin correspondente ao card visível
+                        _rebuildMarkers(force: true);
+                      }
+                    }
+                  }
+                }
+              }
+              return false; // Permite que a notificação continue propagando
             },
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: _visiblePosts.length,
+              onPageChanged: _onPageChanged,
+              itemBuilder: (context, index) {
+                final post = _visiblePosts[index];
+                final isActive = post.id == _activePostId;
+                
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: PostCard(
+                    key: ValueKey('post_card_${post.id}'), // ✅ Key estável para evitar rebuilds
+                    post: post,
+                    isActive: isActive,
+                    currentActiveProfileId: _activeProfile?.profileId,
+                    isInterestSent: ref.watch(interestNotifierProvider).contains(post.id),
+                    onOpenOptions: () => _showInterestOptionsDialog(post),
+                    onClose: _closeCard,
+                    allPosts: _visiblePosts,
+                    postIndex: index,
+                    mapCenterLabel: _mapAreaLabel,
+                    visibleRadiusKm: _currentVisibleRadiusKm,
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -1289,8 +2025,20 @@ class _HomePageState extends ConsumerState<HomePage>
     debugPrint('🔍 HomePage._matchesFilters: Checking post ${post.id} (type: ${post.type})');
     debugPrint('🔍 Params: postType=${params.postType}, salesTypes=${params.salesTypes}, minPrice=${params.minPrice}, maxPrice=${params.maxPrice}');
 
+    final hasSalesFilters = params.salesTypes.isNotEmpty ||
+      params.minPrice != null ||
+      params.maxPrice != null ||
+      params.onlyWithDiscount == true;
+    final hasHiringFilters = params.eventTypes.isNotEmpty ||
+      params.gigFormats.isNotEmpty ||
+      params.venueSetups.isNotEmpty ||
+      params.budgetRanges.isNotEmpty;
+
+    final isSalesContext = params.postType == 'sales' || hasSalesFilters;
+    final isHiringContext = params.postType == 'hiring' || hasHiringFilters;
+
     // ✅ FILTROS DE SALES (Anúncios)
-    if (params.postType == 'sales') {
+    if (isSalesContext) {
       debugPrint('🔍 Applying SALES filters');
       
       // Tipo deve ser 'sales'
@@ -1336,24 +2084,91 @@ class _HomePageState extends ConsumerState<HomePage>
         }
       }
       
-      // Apenas promoções ativas (não expiradas)
-      if (params.onlyActivePromos == true) {
-        final now = DateTime.now();
-        final hasActivePromo = post.promoStartDate != null && 
-                              post.promoEndDate != null && 
-                              post.promoStartDate!.isBefore(now) && 
-                              post.promoEndDate!.isAfter(now);
-        if (!hasActivePromo) {
-          debugPrint('🔍 Post rejected: promo not active (start: ${post.promoStartDate}, end: ${post.promoEndDate}, now: $now)');
-          return false;
-        }
-      }
-      
       debugPrint('🔍 Post ${post.id} PASSED sales filters');
       return true;
     }
 
-    // ✅ FILTROS DE MÚSICOS/BANDAS (existente)
+    // ✅ FILTROS DE CONTRATAÇÃO (Hiring)
+    if (isHiringContext) {
+      debugPrint('🔍 Applying HIRING filters');
+      if (post.type != 'hiring') {
+        debugPrint('🔍 Post rejected: type is ${post.type}, expected hiring');
+        return false;
+      }
+
+      if (params.eventTypes.isNotEmpty) {
+        if (post.eventType == null || !params.eventTypes.contains(post.eventType)) {
+          debugPrint('🔍 Post rejected: eventType mismatch');
+          return false;
+        }
+      }
+
+      if (params.gigFormats.isNotEmpty) {
+        if (post.gigFormat == null || !params.gigFormats.contains(post.gigFormat)) {
+          debugPrint('🔍 Post rejected: gigFormat mismatch');
+          return false;
+        }
+      }
+
+      if (params.instruments.isNotEmpty) {
+        final hasInstrumentMatch = post.instruments.any(params.instruments.contains);
+        if (!hasInstrumentMatch) {
+          debugPrint('🔍 Post rejected: instrument mismatch');
+          return false;
+        }
+      }
+
+      if (params.genres.isNotEmpty) {
+        final hasGenreMatch = post.genres.any(params.genres.contains);
+        if (!hasGenreMatch) {
+          debugPrint('🔍 Post rejected: genre mismatch');
+          return false;
+        }
+      }
+
+      if (params.venueSetups.isNotEmpty) {
+        final hasVenueMatch = post.venueSetup.any(params.venueSetups.contains);
+        if (!hasVenueMatch) {
+          debugPrint('🔍 Post rejected: venueSetup mismatch');
+          return false;
+        }
+      }
+
+      if (params.budgetRanges.isNotEmpty) {
+        if (post.budgetRange == null || !params.budgetRanges.contains(post.budgetRange)) {
+          debugPrint('🔍 Post rejected: budgetRange mismatch');
+          return false;
+        }
+      }
+
+      if (params.availableFor.isNotEmpty) {
+        final hasAvailableForMatch = post.availableFor.any(params.availableFor.contains);
+        if (!hasAvailableForMatch) {
+          debugPrint('🔍 Post rejected: availableFor mismatch');
+          return false;
+        }
+      }
+
+      if (params.hasYoutube == true && (post.youtubeLink == null || post.youtubeLink!.isEmpty)) {
+        debugPrint('🔍 Post rejected: no YouTube link');
+        return false;
+      }
+
+      if (params.hasSpotify == true && (post.spotifyLink == null || post.spotifyLink!.isEmpty)) {
+        debugPrint('🔍 Post rejected: no Spotify link');
+        return false;
+      }
+
+      if (params.hasDeezer == true && (post.deezerLink == null || post.deezerLink!.isEmpty)) {
+        debugPrint('🔍 Post rejected: no Deezer link');
+        return false;
+      }
+
+      debugPrint('🔍 Post ${post.id} PASSED hiring filters');
+      return true;
+    }
+
+    // ✅ FILTROS DE MÚSICOS/BANDAS
     debugPrint('🔍 Applying MUSICIAN/BAND filters');
     
     // Filtro: tipo de post (Banda ou Músico)
@@ -1376,6 +2191,20 @@ class _HomePageState extends ConsumerState<HomePage>
     if (params.hasYoutube ?? false) {
       if (post.youtubeLink == null || post.youtubeLink!.isEmpty) {
         debugPrint('🔍 Post rejected: no YouTube link');
+        return false;
+      }
+    }
+
+    if (params.hasSpotify ?? false) {
+      if (post.spotifyLink == null || post.spotifyLink!.isEmpty) {
+        debugPrint('🔍 Post rejected: no Spotify link');
+        return false;
+      }
+    }
+
+    if (params.hasDeezer ?? false) {
+      if (post.deezerLink == null || post.deezerLink!.isEmpty) {
+        debugPrint('🔍 Post rejected: no Deezer link');
         return false;
       }
     }
@@ -1405,12 +2234,12 @@ class _HomePageState extends ConsumerState<HomePage>
     }
 
     // Filtro: availableFor (disponível para)
-    if (params.availableFor != null && params.availableFor!.isNotEmpty) {
+    if (params.availableFor.isNotEmpty) {
       if (post.availableFor.isEmpty) {
         debugPrint('🔍 Post rejected: empty availableFor');
         return false;
       }
-      final hasAvailableForMatch = post.availableFor.contains(params.availableFor);
+      final hasAvailableForMatch = post.availableFor.any(params.availableFor.contains);
       if (!hasAvailableForMatch) {
         debugPrint('🔍 Post rejected: availableFor mismatch');
         return false;
@@ -1431,9 +2260,13 @@ class PostCard extends StatelessWidget {
     required this.isActive,
     required this.isInterestSent,
     required this.onOpenOptions,
+    required this.allPosts,
+    required this.postIndex,
     super.key,
     this.currentActiveProfileId,
     this.onClose,
+    this.mapCenterLabel,
+    this.visibleRadiusKm,
   });
   final PostEntity post;
   final bool isActive;
@@ -1441,10 +2274,21 @@ class PostCard extends StatelessWidget {
   final bool isInterestSent;
   final VoidCallback onOpenOptions;
   final VoidCallback? onClose;
+  /// Lista completa de posts para navegação no carrossel vertical
+  final List<PostEntity> allPosts;
+  /// Índice do post atual na lista
+  final int postIndex;
+  final String? mapCenterLabel;
+  final double? visibleRadiusKm;
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = post.type == 'band' ? AppColors.accent : AppColors.primary;
+    final primaryColor = switch (post.type) {
+      'band' => AppColors.accent,
+      'sales' => AppColors.salesColor,
+      'hiring' => AppColors.hiringColor,
+      _ => AppColors.musicianColor,
+    };
     final lightColor = primaryColor.withValues(alpha: 0.1);
     const textSecondary = AppColors.textSecondary;
 
@@ -1491,7 +2335,12 @@ class PostCard extends StatelessWidget {
                     behavior: HitTestBehavior.opaque,
                     onTap: () {
                       debugPrint('📍 PostCard: Tap na foto do post ${post.id}');
-                      context.pushPostDetail(post.id);
+                      context.pushPostFeed(
+                        allPosts,
+                        initialIndex: postIndex,
+                        mapCenterLabel: mapCenterLabel,
+                        visibleRadiusKm: visibleRadiusKm,
+                      );
                     },
                     child: ClipRRect(
                       borderRadius: const BorderRadius.only(
@@ -1515,9 +2364,13 @@ class PostCard extends StatelessWidget {
                                         child: Icon(
                                           post.type == 'band'
                                               ? Iconsax.people
-                                              : (post.type == 'sales' ? Iconsax.bookmark : Iconsax.user),
+                                              : (post.type == 'sales'
+                                                  ? Iconsax.bookmark
+                                                  : (post.type == 'hiring'
+                                                      ? Iconsax.briefcase
+                                                      : Iconsax.user)),
                                           size: 40,
-                                          color: AppColors.primary,
+                                          color: primaryColor,
                                         ),
                                       ),
                                     ),
@@ -1528,9 +2381,13 @@ class PostCard extends StatelessWidget {
                                       child: Icon(
                                         post.type == 'band'
                                             ? Iconsax.people
-                                            : (post.type == 'sales' ? Iconsax.bookmark : Iconsax.user),
+                                            : (post.type == 'sales'
+                                                ? Iconsax.bookmark
+                                                : (post.type == 'hiring'
+                                                    ? Iconsax.briefcase
+                                                    : Iconsax.user)),
                                         size: 40,
-                                        color: AppColors.primary,
+                                        color: primaryColor,
                                       ),
                                     ),
                                   ),
@@ -1615,14 +2472,18 @@ class PostCard extends StatelessWidget {
                     behavior: HitTestBehavior.opaque,
                     onTap: () {
                       debugPrint('📍 PostCard: Tap no header do post ${post.id}');
-                      context.pushPostDetail(post.id);
+                      context.pushPostFeed(allPosts, initialIndex: postIndex);
                     },
                     child: Row(
                       children: [
                         Icon(
-                          post.type == 'sales' 
-                              ? Iconsax.tag 
-                              : (post.type == 'band' ? Iconsax.search_favorite : Iconsax.musicnote),
+                          post.type == 'sales'
+                            ? Iconsax.tag
+                            : (post.type == 'band'
+                              ? Iconsax.search_favorite
+                              : (post.type == 'hiring'
+                                ? Iconsax.briefcase
+                                : Iconsax.musicnote)),
                           size: 14,
                           color: AppColors.primary,
                         ),
@@ -1631,7 +2492,13 @@ class PostCard extends StatelessWidget {
                           child: Text(
                             post.type == 'sales'
                                 ? (post.title ?? 'Anúncio')
-                                : (post.type == 'band' ? 'Busca músico' : 'Busca banda'),
+                                : (post.type == 'band'
+                                    ? 'Busca músico'
+                                    : (post.type == 'hiring'
+                                        ? (post.eventType?.isNotEmpty == true
+                                          ? 'Contratação ${post.eventType}'
+                                          : 'Contratação')
+                                        : 'Busca banda')),
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -1645,9 +2512,15 @@ class PostCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // ✅ Conteúdo condicional: Sales vs Musician/Band
+                  // ✅ Conteúdo condicional: Sales vs Hiring vs Musician/Band
                   if (post.type == 'sales')
                     _buildSalesContent()
+                  else if (post.type == 'hiring')
+                    _buildHiringSummary(
+                      primaryColor: primaryColor,
+                      textSecondary: textSecondary,
+                      context: context,
+                    )
                   else ...[
                     // Instrumentos em scroll horizontal
                     if (post.type == 'musician' && post.instruments.isNotEmpty)
@@ -1806,6 +2679,57 @@ class PostCard extends StatelessWidget {
     return '${diff.inMinutes}m';
   }
 
+  Widget _buildHiringSummary({
+    required Color primaryColor,
+    required Color textSecondary,
+    required BuildContext context,
+  }) {
+    final dateLabel = _formatEventDate(post.eventDate);
+    final eventChips = [
+      if (post.eventType?.isNotEmpty == true) post.eventType!,
+      if (post.gigFormat?.isNotEmpty == true) post.gigFormat!,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildInfoRow(Iconsax.calendar, dateLabel, primaryColor, textSecondary),
+        if (eventChips.isNotEmpty) ...[
+          const SizedBox(height: 3),
+          _buildHorizontalChips(
+            icon: Iconsax.briefcase,
+            items: eventChips,
+            color: AppColors.primary,
+          ),
+        ],
+        if (post.content.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(Iconsax.message, size: 16, color: textSecondary),
+              const SizedBox(width: 4),
+              Expanded(
+                child: MentionText(
+                  text: post.content,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: textSecondary,
+                    height: 1.35,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  onMentionTap: (username) {
+                    context.pushProfileByUsername(username);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   // ✅ Conteúdo específico para Sales
   Widget _buildSalesContent() {
     // ✅ USAR PriceCalculator PARA CALCULOS CONSISTENTES
@@ -1863,15 +2787,21 @@ class PostCard extends StatelessWidget {
         // ✅ CORREÇÃO: Preço FINAL destacado (calculado aplicando desconto)
         Row(
           children: [
-            const Icon(Iconsax.dollar_circle, size: 16, color: AppColors.primary),
+            Icon(
+              priceData.isFree ? Iconsax.gift : Iconsax.dollar_circle, 
+              size: 16, 
+              color: Colors.green,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                _truncatePrice(NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ').format(priceData.finalPrice)),
-                style: const TextStyle(
+                priceData.isFree 
+                    ? 'Grátis'
+                    : _truncatePrice(NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ').format(priceData.finalPrice)),
+                style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
+                  color: Colors.green,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1896,6 +2826,11 @@ class PostCard extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  String _formatEventDate(DateTime? date) {
+    if (date == null) return 'Data a combinar';
+    return DateFormat('dd/MM/yyyy').format(date);
   }
 
   // ✅ Função para truncar preço se for muito longo
