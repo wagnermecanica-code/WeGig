@@ -1,9 +1,9 @@
-# Release Notes - WeGig v1.0.11 (Build 14)
+# Release Notes - WeGig v1.0.12 (Build 17)
 
 **Data:** 23 de Março de 2026
-**Versão:** 1.0.11
-**Build:** 14
-**Versão Anterior:** 1.0.9 (Build 12)
+**Versão:** 1.0.12
+**Build:** 17
+**Versão Anterior:** 1.0.11 (Build 14)
 
 ---
 
@@ -12,7 +12,7 @@
 ### 🇧🇷 Português (Brasil) - Google Play Store
 
 ```
-🎸 Novidades da versão 1.0.11
+🎸 Novidades da versão 1.0.12
 
 ✨ Novidades
 • Comentários nos posts — comente, responda e curta comentários de outros músicos
@@ -61,7 +61,7 @@ Encontre músicos e bandas na sua região! 🎵
 ### 🇺🇸 English (US) - Google Play Store
 
 ```
-🎸 What's New in 1.0.11
+🎸 What's New in 1.0.12
 
 ✨ New Features
 • Post comments — comment, reply, and like other musicians' comments
@@ -134,6 +134,24 @@ Find musicians and bands in your area! 🎵
 | Push iOS navegação    | Delays específicos de plataforma para deep linking confiável | `push_notification_router.dart` |
 | Tokens não-mobile     | Filtragem de tokens web/desktop nas Cloud Functions          | `index.js`                      |
 
+### 🔧 Build & Otimização (Build 16-17)
+
+| Mudança                     | Descrição                                                                          | Arquivo                |
+| --------------------------- | ---------------------------------------------------------------------------------- | ---------------------- |
+| R8 Minificação              | Habilitado `isMinifyEnabled` e `isShrinkResources` para builds release             | `build.gradle.kts`     |
+| Debug Symbols               | NDK `debugSymbolLevel = FULL` — .so.dbg auto-incluídos no AAB                      | `build.gradle.kts`     |
+| Deobfuscation               | mapping.txt auto-incluído no AAB via R8                                            | `build.gradle.kts`     |
+| ProGuard Rules              | Regras abrangentes para Facebook SDK, UCrop, Geolocator, OkHttp, Glide, etc.       | `proguard-rules.pro`   |
+| Remoção keepDebugSymbols    | Removido bloco `packaging.jniLibs.keepDebugSymbols` (substituído por ndk config)   | `build.gradle.kts`     |
+
+### 🌐 Site (wegig.com.br)
+
+| Mudança                     | Descrição                                                                          |
+| --------------------------- | ---------------------------------------------------------------------------------- |
+| Ícones Iconsax SVG          | Adicionados ícones inline SVG (Iconsax Linear) em todos os 9 feature cards         |
+| Ícones nos stat cards       | Adicionados ícones nos 6 stat cards da seção Sobre                                 |
+| Remoção CSS CDN quebrado    | Removido link `iconsax@1.0.0/dist/css/iconsax.css` que retornava 404               |
+
 ### 🔒 Segurança & Infraestrutura
 
 | Melhoria                    | Descrição                                                      |
@@ -204,7 +222,7 @@ flutter build ipa --flavor prod -t lib/main_prod.dart --release
 - [ ] Cloud Functions deployadas (15 funções)
 - [ ] Build Android AAB sem erros
 - [ ] Build iOS IPA sem erros
-- [ ] Versão no pubspec.yaml: `1.0.11+14`
+- [ ] Versão no pubspec.yaml: `1.0.12+17`
 - [ ] Release notes colados no Google Play Console (PT-BR)
 - [ ] Release notes colados no App Store Connect (PT-BR)
 - [ ] TestFlight: build processado e testado
