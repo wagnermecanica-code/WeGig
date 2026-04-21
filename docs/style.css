@@ -327,6 +327,7 @@ nav a:hover {
   border-radius: 16px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
   transition: all 0.3s;
+  position: relative;
 }
 
 .feature:hover {
@@ -366,6 +367,26 @@ nav a:hover {
 .feature p {
   color: rgba(255, 255, 255, 0.85);
   line-height: 1.6;
+}
+
+.feature-highlight {
+  background: linear-gradient(160deg, rgba(103, 61, 253, 0.26), #4a4a4a 58%);
+  border: 1px solid rgba(103, 61, 253, 0.38);
+}
+
+.feature-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* Download Section */
