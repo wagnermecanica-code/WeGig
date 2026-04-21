@@ -386,21 +386,6 @@ nav a:hover {
   border: 1px solid rgba(103, 61, 253, 0.38);
 }
 
-.feature-badge {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  padding: 0.35rem 0.7rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  color: #ffffff;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
 /* Download Section */
 .download {
   padding: 4rem 0;
