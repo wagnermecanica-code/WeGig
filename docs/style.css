@@ -102,10 +102,26 @@ nav a:hover {
   color: #fff;
 }
 
+.mobile-menu {
+  display: none;
+}
+
+.mobile-menu-summary {
+  list-style: none;
+}
+
+.mobile-menu-summary::-webkit-details-marker {
+  display: none;
+}
+
 .header-download-cta {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.hero-store-cta {
+  display: none;
 }
 
 .header-store-btn {
@@ -987,12 +1003,13 @@ footer {
   }
 
   header {
-    padding: 0.6rem 0;
+    padding: 0.45rem 0;
   }
 
   header .container {
-    flex-direction: column;
-    gap: 0.65rem;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 0.6rem;
   }
 
   .header-icon {
@@ -1000,48 +1017,76 @@ footer {
   }
 
   .logo {
-    width: 100%;
     display: flex;
-    justify-content: center;
+    align-items: center;
   }
 
   .logo img {
-    height: 84px;
+    height: 72px;
   }
 
   nav {
-    width: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.55rem 0.85rem;
-    justify-content: center;
+    display: none;
   }
 
-  nav a {
-    font-size: 0.82rem;
-    line-height: 1.2;
+  .mobile-menu {
+    display: block;
+    position: relative;
   }
 
-  .header-download-cta {
-    width: 100%;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 0.65rem;
-    margin-top: 0.15rem;
-  }
-
-  .header-store-btn {
-    min-width: 0;
-    padding: 0.33rem 0.39rem;
-    border-radius: 10px;
-  }
-
-  .store-btn-icon {
+  .mobile-menu-summary {
+    width: 44px;
     height: 44px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.18);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    padding: 0 11px;
+    cursor: pointer;
+  }
+
+  .mobile-menu-summary span {
+    width: 100%;
+    height: 2px;
+    border-radius: 999px;
+    background: #fff;
+  }
+
+  .mobile-menu-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: min(82vw, 280px);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.75rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(33, 22, 87, 0.98);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
+    z-index: 1001;
+  }
+
+  .mobile-menu-panel a {
+    color: rgba(255, 255, 255, 0.92);
+    text-decoration: none;
+    font-size: 0.84rem;
+    line-height: 1.25;
+    padding: 0.42rem 0.5rem;
+    border-radius: 8px;
+  }
+
+  .mobile-menu-panel a:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
   }
 
   .hero {
-    padding: 2rem 0 2.2rem;
+    padding: 1.7rem 0 2rem;
   }
 
   .hero .container {
@@ -1063,14 +1108,31 @@ footer {
     opacity: 0.9;
   }
 
-  .cta-buttons {
-    gap: 0.75rem;
-    margin-top: 0.2rem;
+  .header-download-cta {
+    display: none;
   }
 
-  .btn {
-    padding: 0.9rem 1.3rem;
-    min-width: 144px;
+  .hero-store-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.78rem;
+    margin: 0 auto 1.15rem;
+  }
+
+  .hero-store-cta .header-store-btn {
+    min-width: 0;
+    padding: 0.41rem 0.49rem;
+    border-radius: 10px;
+  }
+
+  .hero-store-cta .store-btn-icon {
+    height: 48px;
+  }
+
+  .cta-buttons {
+    display: none;
   }
 
   .stats {
@@ -1123,19 +1185,24 @@ footer {
   }
 
   .logo img {
-    height: 74px;
+    height: 64px;
   }
 
-  nav a {
-    font-size: 0.78rem;
+  .mobile-menu-panel a {
+    font-size: 0.8rem;
   }
 
-  .header-store-btn {
+  .hero-store-cta {
+    gap: 0.62rem;
+    margin-bottom: 1rem;
+  }
+
+  .hero-store-cta .header-store-btn {
     padding: 0.3rem 0.34rem;
   }
 
-  .store-btn-icon {
-    height: 40px;
+  .hero-store-cta .store-btn-icon {
+    height: 42px;
   }
 
   .hero {
@@ -1150,10 +1217,6 @@ footer {
     font-size: 0.89rem;
   }
 
-  .btn {
-    width: 100%;
-    max-width: 280px;
-  }
 }
 
 /* Legal Pages Specific Styles */
