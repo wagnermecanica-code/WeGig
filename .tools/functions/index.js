@@ -897,6 +897,25 @@ exports.sendMessageNotification = functions
 
     const conversation = conversationDoc.data();
     const participantProfiles = conversation.participantProfiles || [];
+    const groupNameRaw = (conversation.groupName || "").toString().trim();
+    const isGroupConversation =
+      conversation.isGroup === true ||
+      participantProfiles.length > 2 ||
+      groupNameRaw.length > 0;
+    const groupName = groupNameRaw || "Grupo";
+    const groupPhotoUrl = conversation.groupPhotoUrl || "";
+
+    const inAppTitle = isGroupConversation
+      ? `Nova mensagem em ${groupName}`
+      : "Nova mensagem";
+    const inAppBody = isGroupConversation
+      ? `${senderName} no grupo ${groupName}: ${messageText}`
+      : `${senderName}: ${messageText}`;
+
+    const pushTitle = isGroupConversation ? groupName : senderName;
+    const pushBody = isGroupConversation
+      ? `${senderName} no grupo ${groupName}: ${messageText}`
+      : messageText;
 
     // Encontrar destinatário (não é o sender)
     const recipientProfileId = participantProfiles.find(
@@ -980,9 +999,13 @@ exports.sendMessageNotification = functions
       // Atualizar notificação existente (agregar)
       const notificationDoc = existingNotifications.docs[0];
       await notificationDoc.ref.update({
-        body: `${senderName}: ${messageText}`,
+        title: inAppTitle,
+        body: inAppBody,
         "data.messagePreview": messageText,
         "data.messageCount": admin.firestore.FieldValue.increment(1),
+        "data.isGroup": isGroupConversation,
+        "data.groupName": isGroupConversation ? groupName : "",
+        "data.groupPhotoUrl": isGroupConversation ? groupPhotoUrl : "",
         "data.otherProfileId": senderProfileId,
         "data.otherUid": senderUid,
         "data.otherName": senderName,
@@ -998,12 +1021,15 @@ exports.sendMessageNotification = functions
         recipientUid: recipientUid, // ✅ FIX: Auth UID para Security Rules
         type: "newMessage",
         priority: "high",
-        title: "Nova mensagem",
-        body: `${senderName}: ${messageText}`,
+        title: inAppTitle,
+        body: inAppBody,
         data: {
           conversationId: conversationId,
           messagePreview: messageText,
           messageCount: 1,
+          isGroup: isGroupConversation,
+          groupName: isGroupConversation ? groupName : "",
+          groupPhotoUrl: isGroupConversation ? groupPhotoUrl : "",
           senderName: senderName,
           senderProfileId: senderProfileId,
           // Padronizar payload para navegação no app (chat)
@@ -1027,12 +1053,15 @@ exports.sendMessageNotification = functions
       recipientProfileId,
       recipientUid, // 🔒 SECURITY: passar UID para validação
       {
-        title: senderName,
-        body: messageText,
+        title: pushTitle,
+        body: pushBody,
       },
       {
         type: "newMessage",
         conversationId: conversationId,
+        isGroup: isGroupConversation,
+        groupName: isGroupConversation ? groupName : "",
+        groupPhotoUrl: isGroupConversation ? groupPhotoUrl : "",
         // Compat: manter senderProfileId (já usado em algumas telas)
         senderProfileId: senderProfileId,
         // Novo: padronizado para navegação direta sem reads adicionais
