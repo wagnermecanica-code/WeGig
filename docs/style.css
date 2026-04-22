@@ -113,6 +113,7 @@ nav a:hover {
   align-items: center;
   justify-content: center;
   text-decoration: none;
+  line-height: 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -125,7 +126,8 @@ nav a:hover {
 .store-btn-icon {
   height: 31px;
   width: auto;
-  object-fit: contain;
+  max-width: none;
+  max-height: none;
   display: block;
   flex-shrink: 0;
 }
