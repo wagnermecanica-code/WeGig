@@ -109,6 +109,10 @@ nav a:hover {
 }
 
 .header-store-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   text-decoration: none;
   color: #fff;
   font-weight: 700;
@@ -125,6 +129,18 @@ nav a:hover {
     box-shadow 0.2s ease,
     background 0.2s ease,
     border-color 0.2s ease;
+}
+
+.store-btn-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.store-btn-label {
+  line-height: 1;
 }
 
 .header-store-btn:hover {
@@ -1022,6 +1038,11 @@ footer {
     font-size: 0.76rem;
   }
 
+  .store-btn-icon {
+    width: 13px;
+    height: 13px;
+  }
+
   .hero h2 {
     font-size: 1.8rem;
   }
@@ -1078,6 +1099,11 @@ footer {
   .header-store-btn {
     min-width: 126px;
     padding: 0.48rem 0.65rem;
+  }
+
+  .store-btn-icon {
+    width: 12px;
+    height: 12px;
   }
 }
 
