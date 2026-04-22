@@ -123,19 +123,11 @@ nav a:hover {
 }
 
 .store-btn-icon {
-  height: 36px;
+  height: 31px;
   width: auto;
   object-fit: contain;
   display: block;
   flex-shrink: 0;
-}
-
-.header-store-btn-ios .store-btn-icon {
-  height: 28px;
-}
-
-.header-store-btn-android .store-btn-icon {
-  height: 31px;
 }
 
 .header-store-btn:hover {
@@ -1016,14 +1008,6 @@ footer {
     height: 29px;
   }
 
-  .header-store-btn-ios .store-btn-icon {
-    height: 26px;
-  }
-
-  .header-store-btn-android .store-btn-icon {
-    height: 29px;
-  }
-
   .hero h2 {
     font-size: 1.8rem;
   }
@@ -1078,14 +1062,6 @@ footer {
 
 @media (max-width: 480px) {
   .store-btn-icon {
-    height: 26px;
-  }
-
-  .header-store-btn-ios .store-btn-icon {
-    height: 23px;
-  }
-
-  .header-store-btn-android .store-btn-icon {
     height: 26px;
   }
 }
