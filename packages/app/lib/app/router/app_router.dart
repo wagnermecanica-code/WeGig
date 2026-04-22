@@ -405,9 +405,16 @@ GoRouter goRouter(Ref ref) {
         pageBuilder: (context, state) {
           final conversationId = state.pathParameters['conversationId']!;
           final otherUid = state.uri.queryParameters['otherUid'] ?? '';
-          final otherProfileId = state.uri.queryParameters['otherProfileId'] ?? '';
-          final otherName = state.uri.queryParameters['otherName'] ?? '';
+          final otherProfileId =
+              state.uri.queryParameters['otherProfileId'] ?? '';
+          final isGroup =
+              (state.uri.queryParameters['isGroup'] ?? '').trim() == 'true';
+          final groupName = state.uri.queryParameters['groupName'] ?? '';
+          final otherName =
+              (isGroup ? groupName : state.uri.queryParameters['otherName']) ??
+                  '';
           final otherPhotoUrl = state.uri.queryParameters['otherPhotoUrl'];
+          final groupPhotoUrl = state.uri.queryParameters['groupPhotoUrl'];
           return _slideLeftPage(
             state,
             ChatNewPage(
@@ -416,6 +423,8 @@ GoRouter goRouter(Ref ref) {
               otherProfileId: otherProfileId,
               otherName: otherName,
               otherPhotoUrl: otherPhotoUrl,
+              isGroup: isGroup,
+              groupPhotoUrl: groupPhotoUrl,
             ),
           );
         },

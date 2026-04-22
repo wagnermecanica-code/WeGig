@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
@@ -43,6 +44,16 @@ Future<void> handlePushNotificationTap({
     return '';
   }
 
+  bool _toBool(Object? value) {
+    if (value is bool) return value;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' || normalized == '1' || normalized == 'yes';
+    }
+    if (value is num) return value != 0;
+    return false;
+  }
+
   switch (type) {
     case 'nearbyPost':
     case 'interest':
@@ -66,6 +77,10 @@ Future<void> handlePushNotificationTap({
         return;
       }
 
+      var isGroup = _toBool(data['isGroup']);
+      var groupName = _trimString(data['groupName']);
+      var groupPhotoUrl = _trimString(data['groupPhotoUrl']);
+
       // Se o payload incluir metadados do outro participante, passe via query params.
       // Isso evita leituras extras e permite UI/guard mais imediatos.
       final otherProfileId = _trimString(data['otherProfileId'])
@@ -76,9 +91,46 @@ Future<void> handlePushNotificationTap({
       final otherName = _trimString(data['otherName']);
       final otherPhotoUrl = _trimString(data['otherPhotoUrl']);
 
+      // Fallback robusto: quando push não traz metadados de grupo,
+      // consulta a conversa para determinar se é grupo e preencher nome/foto.
+      if (!isGroup || groupName.isEmpty) {
+        try {
+          final conversationSnap = await FirebaseFirestore.instance
+              .collection('conversations')
+              .doc(conversationId)
+              .get();
+          final conversation = conversationSnap.data();
+          if (conversation != null) {
+            final participants =
+                (conversation['participantProfiles'] as List<dynamic>? ??
+                        const <dynamic>[])
+                    .cast<String>();
+            final isGroupFromConversation =
+                (conversation['isGroup'] == true) || participants.length > 2;
+            if (isGroupFromConversation) {
+              isGroup = true;
+              if (groupName.isEmpty) {
+                groupName = _trimString(conversation['groupName']);
+              }
+              if (groupPhotoUrl.isEmpty) {
+                groupPhotoUrl = _trimString(conversation['groupPhotoUrl']);
+              }
+            }
+          }
+        } catch (error) {
+          debugPrint(
+            '⚠️ PushDeepLink: failed to resolve conversation metadata '
+            'for $conversationId: $error',
+          );
+        }
+      }
+
       final uri = Uri(
         path: '/chat-new/$conversationId',
         queryParameters: <String, String>{
+          if (isGroup) 'isGroup': 'true',
+          if (groupName.isNotEmpty) 'groupName': groupName,
+          if (groupPhotoUrl.isNotEmpty) 'groupPhotoUrl': groupPhotoUrl,
           if (otherProfileId.isNotEmpty) 'otherProfileId': otherProfileId,
           if (otherUid.isNotEmpty) 'otherUid': otherUid,
           if (otherName.isNotEmpty) 'otherName': otherName,

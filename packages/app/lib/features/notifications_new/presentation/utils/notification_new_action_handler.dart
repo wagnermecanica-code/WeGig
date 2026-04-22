@@ -168,8 +168,19 @@ class NotificationNewActionHandler {
     final otherProfileId = notification.senderProfileId ?? '';
     final otherUserName = notification.senderName ?? '';
     final otherUserPhoto = notification.senderPhoto ?? '';
+    final isGroup =
+        (notification.actionData?['isGroup'] as bool?) ??
+            (notification.data['isGroup'] as bool?) ??
+            false;
+    final groupName =
+        notification.actionData?['groupName'] as String? ??
+            notification.data['groupName'] as String? ??
+            '';
+    final groupPhotoUrl =
+        notification.actionData?['groupPhotoUrl'] as String? ??
+            notification.data['groupPhotoUrl'] as String?;
 
-    if (otherProfileId.trim().isNotEmpty) {
+    if (!isGroup && otherProfileId.trim().isNotEmpty) {
       final allowed = await _canOpenProfile(otherProfileId);
       if (!allowed) {
         if (context.mounted) {
@@ -185,8 +196,12 @@ class NotificationNewActionHandler {
           conversationId: conversationId,
           otherUid: otherUserId,
           otherProfileId: otherProfileId,
-          otherName: otherUserName,
+          otherName: isGroup && groupName.trim().isNotEmpty
+              ? groupName
+              : otherUserName,
           otherPhotoUrl: otherUserPhoto,
+          isGroup: isGroup,
+          groupPhotoUrl: groupPhotoUrl,
         ),
       ),
     );
