@@ -105,7 +105,7 @@ nav a:hover {
 .header-download-cta {
   display: flex;
   align-items: center;
-  gap: 0.72rem;
+  gap: 0.94rem;
 }
 
 .header-store-btn {
@@ -114,9 +114,9 @@ nav a:hover {
   justify-content: center;
   text-decoration: none;
   line-height: 0;
-  padding: 0.36rem 0.42rem;
+  padding: 0.47rem 0.55rem;
   border: 1px solid rgba(255, 255, 255, 0.32);
-  border-radius: 12px;
+  border-radius: 16px;
   background: rgba(0, 0, 0, 0.24);
   transition:
     transform 0.2s ease,
@@ -127,7 +127,7 @@ nav a:hover {
 }
 
 .store-btn-icon {
-  height: 37px;
+  height: 48px;
   width: auto;
   max-width: none;
   max-height: none;
@@ -1005,16 +1005,16 @@ footer {
     width: 100%;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 0.6rem;
+    gap: 0.78rem;
   }
 
   .header-store-btn {
     min-width: 0;
-    padding: 0.3rem 0.36rem;
+    padding: 0.39rem 0.47rem;
   }
 
   .store-btn-icon {
-    height: 35px;
+    height: 46px;
   }
 
   .hero h2 {
@@ -1071,7 +1071,7 @@ footer {
 
 @media (max-width: 480px) {
   .store-btn-icon {
-    height: 31px;
+    height: 40px;
   }
 }
 
