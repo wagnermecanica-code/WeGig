@@ -1059,6 +1059,7 @@ exports.sendMessageNotification = functions
       {
         type: "newMessage",
         conversationId: conversationId,
+        recipientProfileId: recipientProfileId,
         isGroup: isGroupConversation ? "true" : "false",
         groupName: isGroupConversation ? groupName : "",
         groupPhotoUrl: isGroupConversation ? groupPhotoUrl : "",
@@ -1230,7 +1231,6 @@ exports.sendCommentLikeNotification = functions
 
     return null;
   });
-
 
 /**
  * Helper: Envia push notification para um perfil específico

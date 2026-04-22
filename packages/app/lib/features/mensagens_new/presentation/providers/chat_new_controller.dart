@@ -128,6 +128,23 @@ class ChatNewController extends _$ChatNewController {
       if (localVersion != _initVersion) return;
       
       if (conversation != null) {
+        final participantProfiles = conversation.participantProfiles;
+        if (!participantProfiles.contains(currentProfileId)) {
+          debugPrint(
+            '🚫 ChatNewController: Perfil $currentProfileId não pertence à '
+            'conversa $conversationId',
+          );
+          if (localVersion == _initVersion) {
+            state = state.copyWith(
+              isInitialLoading: false,
+              hasMore: false,
+              error:
+                  'Esta conversa não pertence ao perfil ativo. Troque de perfil para acessar.',
+            );
+          }
+          return;
+        }
+
         // Obter clearHistoryTimestamp específico do perfil atual
         _clearHistoryAfter = conversation.getClearHistoryTimestampForProfile(currentProfileId);
         _isGroup = conversation.isGroup || conversation.participantProfiles.length > 2;

@@ -60,6 +60,36 @@ class _WeGigAppState extends ConsumerState<WeGigApp>
   /// estabilizar em /home.
   RemoteMessage? _deferredPushMessage;
 
+  bool _canHandlePushForActiveProfile(
+    RemoteMessage message,
+    String activeProfileId,
+  ) {
+    final type = (message.data['type'] as String?)?.trim();
+
+    // Restrição de perfil é crítica para mensagens.
+    if (type != 'newMessage') {
+      return true;
+    }
+
+    final payloadRecipientProfileId =
+        (message.data['recipientProfileId'] as String?)?.trim();
+
+    // Compat com pushes legados sem recipientProfileId explícito.
+    if (payloadRecipientProfileId == null ||
+        payloadRecipientProfileId.isEmpty) {
+      return true;
+    }
+
+    final allowed = payloadRecipientProfileId == activeProfileId;
+    if (!allowed) {
+      debugPrint(
+        '🚫 WeGigApp: Push newMessage ignorada por mismatch de perfil '
+        '(active=$activeProfileId, recipient=$payloadRecipientProfileId)',
+      );
+    }
+    return allowed;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -79,10 +109,17 @@ class _WeGigAppState extends ConsumerState<WeGigApp>
         final service = PushNotificationService();
         service.attachOnNotificationTapped((RemoteMessage message) {
           final profileState = ref.read(profileProvider);
-          final hasActiveProfile =
-              profileState.valueOrNull?.activeProfile != null;
+          final activeProfile = profileState.valueOrNull?.activeProfile;
+          final hasActiveProfile = activeProfile != null;
 
           if (hasActiveProfile) {
+            if (!_canHandlePushForActiveProfile(
+              message,
+              activeProfile.profileId,
+            )) {
+              return;
+            }
+
             // Profile pronto → router já estabilizou em /home → navegar direto
             unawaited(
               handlePushNotificationTap(router: router, message: message),
@@ -122,6 +159,14 @@ class _WeGigAppState extends ConsumerState<WeGigApp>
         // podemos empilhar a tela destino com segurança.
         final deferred = _deferredPushMessage;
         if (deferred != null) {
+          if (!_canHandlePushForActiveProfile(
+            deferred,
+            activeProfile.profileId,
+          )) {
+            _deferredPushMessage = null;
+            return;
+          }
+
           _deferredPushMessage = null;
           debugPrint(
             '🔔 WeGigApp: Profile loaded, processing deferred push '
@@ -144,9 +189,38 @@ class _WeGigAppState extends ConsumerState<WeGigApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    // Sincronizar badge quando app volta do background
     if (state == AppLifecycleState.resumed) {
       _syncAppBadge();
+      return;
+    }
+
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _releaseMemoryCaches(reason: 'background');
+    }
+  }
+
+  /// Chamado pelo Flutter quando o sistema operacional sinaliza pressão de
+  /// memória (iOS `applicationDidReceiveMemoryWarning`, Android `onTrimMemory`).
+  /// Libera caches voláteis para tentar evitar o kill do processo.
+  @override
+  void didHaveMemoryPressure() {
+    super.didHaveMemoryPressure();
+    _releaseMemoryCaches(reason: 'memory-warning');
+  }
+
+  void _releaseMemoryCaches({required String reason}) {
+    try {
+      final imageCache = PaintingBinding.instance.imageCache;
+      final beforeBytes = imageCache.currentSizeBytes;
+      final beforeCount = imageCache.currentSize;
+      imageCache.clear();
+      imageCache.clearLiveImages();
+      debugPrint(
+        '🧹 WeGigApp: imageCache cleared ($reason) — freed ~${beforeBytes ~/ 1024} KB, $beforeCount images',
+      );
+    } catch (e) {
+      debugPrint('⚠️ WeGigApp: Error releasing caches ($reason): $e');
     }
   }
 
