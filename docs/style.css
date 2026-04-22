@@ -1005,16 +1005,16 @@ footer {
     width: 100%;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 1.01rem;
+    gap: 0.81rem;
   }
 
   .header-store-btn {
     min-width: 0;
-    padding: 0.51rem 0.61rem;
+    padding: 0.41rem 0.49rem;
   }
 
   .store-btn-icon {
-    height: 60px;
+    height: 48px;
   }
 
   .hero h2 {
@@ -1071,7 +1071,7 @@ footer {
 
 @media (max-width: 480px) {
   .store-btn-icon {
-    height: 52px;
+    height: 42px;
   }
 }
 
