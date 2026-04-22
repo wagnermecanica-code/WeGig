@@ -1059,7 +1059,7 @@ exports.sendMessageNotification = functions
       {
         type: "newMessage",
         conversationId: conversationId,
-        isGroup: isGroupConversation,
+        isGroup: isGroupConversation ? "true" : "false",
         groupName: isGroupConversation ? groupName : "",
         groupPhotoUrl: isGroupConversation ? groupPhotoUrl : "",
         // Compat: manter senderProfileId (já usado em algumas telas)
