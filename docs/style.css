@@ -114,13 +114,16 @@ nav a:hover {
   justify-content: center;
   text-decoration: none;
   line-height: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  padding: 0.3rem 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.24);
   transition:
     transform 0.2s ease,
     filter 0.2s ease,
-    box-shadow 0.2s ease;
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 .store-btn-icon {
@@ -134,7 +137,10 @@ nav a:hover {
 
 .header-store-btn:hover {
   transform: translateY(-1px);
-  filter: brightness(1.06);
+  filter: brightness(1.03);
+  border-color: rgba(255, 255, 255, 0.58);
+  background: rgba(0, 0, 0, 0.34);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.26);
 }
 
 /* Hero Section */
@@ -1004,6 +1010,7 @@ footer {
 
   .header-store-btn {
     min-width: 0;
+    padding: 0.25rem 0.3rem;
   }
 
   .store-btn-icon {
