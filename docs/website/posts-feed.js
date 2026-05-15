@@ -11,7 +11,8 @@
 // Configurações
 const CONFIG = {
   MAP_ID: "b7134f9dc59c2ad97d5b292e", // WeGigProdMapWeb
-  MAX_POSTS: 20,
+  MAX_VISIBLE_POSTS: 250,
+  FETCH_DOC_LIMIT: 1000,
   DEFAULT_CENTER: { lat: -23.5505, lng: -46.6333 }, // São Paulo
   DEFAULT_ZOOM: 11,
   COLORS: {
@@ -158,46 +159,49 @@ async function loadPosts() {
   const db = window.firebaseDb;
   const q = window.firebaseQuery;
   const coll = window.firebaseCollection;
-  const whereClause = window.firebaseWhere;
   const orderByClause = window.firebaseOrderBy;
   const limitClause = window.firebaseLimit;
   const getDocs = window.firebaseGetDocs;
-  const Timestamp = window.firebaseTimestamp;
 
   console.log("Firebase refs:", {
     db: !!db,
     q: !!q,
     coll: !!coll,
     getDocs: !!getDocs,
-    Timestamp: !!Timestamp,
   });
 
-  if (!db || !q || !coll || !getDocs || !Timestamp) {
+  if (!db || !q || !coll || !getDocs) {
     throw new Error("Firebase não inicializado corretamente");
   }
-
-  const now = Timestamp.now();
-  console.log("Timestamp now:", now.toDate());
 
   const postsRef = coll(db, "posts");
   const postsQuery = q(
     postsRef,
-    whereClause("expiresAt", ">", now),
-    orderByClause("expiresAt", "asc"), // REQUIRED: must orderBy the inequality field first
     orderByClause("createdAt", "desc"),
-    limitClause(CONFIG.MAX_POSTS),
+    limitClause(CONFIG.FETCH_DOC_LIMIT),
   );
 
   console.log("Executando query...");
   const snapshot = await getDocs(postsQuery);
   console.log("Query retornou:", snapshot.size, "documentos");
 
-  posts = snapshot.docs.map((doc) => ({
+  const rawPosts = snapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
   }));
 
-  console.log(`${posts.length} posts carregados`);
+  posts = rawPosts
+    .map((post) => ({
+      ...post,
+      type: normalizePostType(post.type),
+    }))
+    .filter((post) => isPostActive(post))
+    .slice(0, CONFIG.MAX_VISIBLE_POSTS);
+
+  console.log(
+    `${posts.length} posts ativos carregados (de ${rawPosts.length} consultados)`,
+  );
+  console.log("Distribuição por tipo:", getTypeDistribution(posts));
   if (posts.length > 0) {
     console.log(
       "Primeiro post:",
@@ -243,7 +247,7 @@ function renderPosts() {
 
 // Criar HTML do card de post - Layout horizontal (estilo lista)
 function createPostCard(post) {
-  const type = post.type || "musician";
+  const type = normalizePostType(post.type);
   const color = CONFIG.COLORS[type];
   const typeLabel = CONFIG.TYPE_LABELS[type];
   const typeIcon = CONFIG.TYPE_ICONS[type];
@@ -325,9 +329,7 @@ function createPostCard(post) {
                 )}</span>`
           }
         </div>
-        <div class="pc-subtitle">${escapeHtml(
-          subtitle,
-        )}</div>
+        <div class="pc-subtitle">${escapeHtml(subtitle)}</div>
         ${extraInfo}
         ${
           truncatedContent
@@ -382,13 +384,13 @@ function addMarkersToMap() {
 
     console.log(`Post ${index}:`, post.id, "lat=", lat, "lng=", lng);
 
-    if (!lat || !lng) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       console.log(`⚠️ Post ${index} com lat/lng inválidos`);
       return;
     }
 
     const position = { lat, lng };
-    const type = post.type || "musician";
+    const type = normalizePostType(post.type);
     const color = CONFIG.COLORS[type];
 
     // Criar marker customizado usando AdvancedMarkerElement
@@ -428,7 +430,7 @@ function addMarkersToMap() {
 // Criar conteúdo do marker - SVG idêntico ao pin_template.svg do App Flutter
 // NOTA: O app NÃO usa fotos nos markers, apenas cores sólidas com círculo branco
 function createMarkerContent(post, isActive) {
-  const type = post.type || "musician";
+  const type = normalizePostType(post.type);
   const color = CONFIG.COLORS[type];
 
   // Cores de highlight (reflexo) baseadas na cor principal
@@ -616,6 +618,94 @@ function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+function normalizePostType(type) {
+  const raw = String(type || "")
+    .trim()
+    .toLowerCase();
+  const normalized = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  if (normalized === "musician" || normalized === "musico") {
+    return "musician";
+  }
+
+  if (normalized === "band" || normalized === "banda") {
+    return "band";
+  }
+
+  if (
+    normalized === "sales" ||
+    normalized === "sale" ||
+    normalized === "anuncio" ||
+    normalized === "announcement"
+  ) {
+    return "sales";
+  }
+
+  if (
+    normalized === "hiring" ||
+    normalized === "contratacao" ||
+    normalized === "job" ||
+    normalized === "oportunidade"
+  ) {
+    return "hiring";
+  }
+
+  return "musician";
+}
+
+function timestampToDate(value) {
+  if (!value) return null;
+  if (typeof value?.toDate === "function") {
+    const date = value.toDate();
+    return date instanceof Date && !isNaN(date.getTime()) ? date : null;
+  }
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return value;
+  }
+  if (typeof value === "number") {
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function resolvePostExpiryDate(post) {
+  const type = normalizePostType(post.type);
+  const createdAt = timestampToDate(post.createdAt) || new Date();
+  const expiresAt = timestampToDate(post.expiresAt);
+  const promoEndDate = timestampToDate(post.promoEndDate);
+
+  if (type === "sales") {
+    if (promoEndDate) return promoEndDate;
+    if (expiresAt) return expiresAt;
+    return new Date(createdAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+  }
+
+  if (expiresAt) {
+    return expiresAt;
+  }
+
+  return new Date(createdAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+}
+
+function isPostActive(post) {
+  const now = Date.now();
+  const expiresAt = resolvePostExpiryDate(post);
+  return expiresAt.getTime() > now;
+}
+
+function getTypeDistribution(items) {
+  return items.reduce((acc, post) => {
+    const type = normalizePostType(post.type);
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {});
 }
 
 // Iniciar quando DOM estiver pronto

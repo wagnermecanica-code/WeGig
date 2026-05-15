@@ -11,7 +11,8 @@
 // Configurações
 const CONFIG = {
   MAP_ID: "b7134f9dc59c2ad97d5b292e", // WeGigProdMapWeb
-  MAX_POSTS: 20,
+  MAX_VISIBLE_POSTS: 250,
+  FETCH_DOC_LIMIT: 1000,
   DEFAULT_CENTER: { lat: -23.5505, lng: -46.6333 }, // São Paulo
   DEFAULT_ZOOM: 11,
   COLORS: {
@@ -177,7 +178,7 @@ async function loadPosts() {
   const postsQuery = q(
     postsRef,
     orderByClause("createdAt", "desc"),
-    limitClause(CONFIG.MAX_POSTS * 4),
+    limitClause(CONFIG.FETCH_DOC_LIMIT),
   );
 
   console.log("Executando query...");
@@ -195,9 +196,11 @@ async function loadPosts() {
       type: normalizePostType(post.type),
     }))
     .filter((post) => isPostActive(post))
-    .slice(0, CONFIG.MAX_POSTS);
+    .slice(0, CONFIG.MAX_VISIBLE_POSTS);
 
-  console.log(`${posts.length} posts carregados`);
+  console.log(
+    `${posts.length} posts ativos carregados (de ${rawPosts.length} consultados)`,
+  );
   console.log("Distribuição por tipo:", getTypeDistribution(posts));
   if (posts.length > 0) {
     console.log(
@@ -621,9 +624,7 @@ function normalizePostType(type) {
   const raw = String(type || "")
     .trim()
     .toLowerCase();
-  const normalized = raw
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+  const normalized = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
   if (normalized === "musician" || normalized === "musico") {
     return "musician";
