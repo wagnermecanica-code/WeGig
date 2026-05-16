@@ -57,12 +57,12 @@ flavors:
       name: "WeGig"
 
     android:
-      applicationId: "com.tosembanda.wegig"
+      applicationId: "com.wegig.wegig"
       firebase:
         config: "firebase/prod/google-services.json"
 
     ios:
-      bundleId: "com.tosembanda.wegig"
+      bundleId: "com.wegig.wegig"
       firebase:
         config: "firebase/prod/GoogleService-Info.plist"
 

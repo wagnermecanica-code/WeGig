@@ -1,6 +1,6 @@
 "use strict";
 
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 
 if (!admin.apps.length) {
@@ -359,7 +359,6 @@ exports.notifyNearbyPosts = functions
                   body: notification.body,
                 },
                 sound: "default",
-                badge: 1,
                 "mutable-content": 1,
                 "content-available": 1,
               },

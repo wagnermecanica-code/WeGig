@@ -1,6 +1,6 @@
 "use strict";
 
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 
 if (!admin.apps.length) {
@@ -142,12 +142,12 @@ function findObjectionableMatches(input) {
     try {
       boundary = new RegExp(
         `(^|[^\\p{L}\\p{N}])${escapeRegExp(w)}($|[^\\p{L}\\p{N}])`,
-        "iu"
+        "iu",
       );
     } catch (_) {
       boundary = new RegExp(
         `(^|[^a-z0-9])${escapeRegExp(w)}($|[^a-z0-9])`,
-        "i"
+        "i",
       );
     }
 
@@ -191,7 +191,7 @@ exports.moderateObjectionablePosts = functions
     console.log(
       `🧹 [MODERATION] posts/${
         context.params.postId
-      } flagged objectionable: ${matches.join(", ")}`
+      } flagged objectionable: ${matches.join(", ")}`,
     );
 
     try {
@@ -205,7 +205,7 @@ exports.moderateObjectionablePosts = functions
       });
     } catch (error) {
       console.error(
-        `❌ [MODERATION] posts/${context.params.postId} update failed: ${error}`
+        `❌ [MODERATION] posts/${context.params.postId} update failed: ${error}`,
       );
     }
 
@@ -232,7 +232,7 @@ exports.sanitizeObjectionableProfileBio = functions
     console.log(
       `🧹 [MODERATION] profiles/${
         context.params.profileId
-      } bio sanitized objectionable: ${matches.join(", ")}`
+      } bio sanitized objectionable: ${matches.join(", ")}`,
     );
 
     try {
@@ -245,7 +245,7 @@ exports.sanitizeObjectionableProfileBio = functions
       });
     } catch (error) {
       console.error(
-        `❌ [MODERATION] profiles/${context.params.profileId} update failed: ${error}`
+        `❌ [MODERATION] profiles/${context.params.profileId} update failed: ${error}`,
       );
     }
 

@@ -1,7 +1,7 @@
 name: wegig_app
 description: WeGig - Conectando músicos e bandas
 publish_to: none
-version: 1.0.12+17
+version: 1.0.16+22
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
@@ -22,6 +22,7 @@ dependencies:
   firebase_storage: ^13.0.4
   firebase_messaging: ^16.0.4
   firebase_analytics: ^12.0.4
+  firebase_app_check: ^0.4.1+2
   flutter_local_notifications: ^19.5.0 # Notificações locais para foreground
   flutter_app_badger: ^1.5.0 # Badge counter no ícone do app (iOS/Android)
 
@@ -109,6 +110,8 @@ dev_dependencies:
   very_good_analysis: ^6.0.0
 
 dependency_overrides:
+  google_maps_flutter:
+    path: /Users/wagneroliveira/to_sem_banda/.tools/third_party/google_maps_flutter
   image_cropper_platform_interface:
     path: /Users/wagneroliveira/to_sem_banda/.tools/third_party/image_cropper_platform_interface
 
@@ -120,6 +123,13 @@ flutter_launcher_icons:
   adaptive_icon_background: "#37475A" # Cor Primary (Design Minimalista)
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
 
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/SplashEstática.png
+  ios: true
+  android: false
+  web: false
+
 flutter:
   uses-material-design: true
 
@@ -127,7 +137,6 @@ flutter:
     - .env
     - assets/Logo/
     - assets/avatar_placeholder.png
-    - assets/maps_style.json
     - assets/icon/app_icon.png
     - assets/icon/app_icon_foreground.png
     - assets/pin_template.svg

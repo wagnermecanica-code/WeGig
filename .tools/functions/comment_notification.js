@@ -1,6 +1,6 @@
 "use strict";
 
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 
 if (!admin.apps.length) {
@@ -8,6 +8,57 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
+
+function parseFirestoreDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === "function") return value.toDate();
+  if (value instanceof Date) return value;
+  return null;
+}
+
+async function getProfileBadgeContext(profileId) {
+  try {
+    const profileDoc = await db.collection("profiles").doc(profileId).get();
+    if (!profileDoc.exists) {
+      return {
+        seenAt: null,
+        blockedProfileIds: new Set(),
+        excludedProfileIds: new Set(),
+      };
+    }
+
+    const data = profileDoc.data() || {};
+    const blockedProfileIds = Array.isArray(data.blockedProfileIds)
+      ? data.blockedProfileIds
+      : [];
+    const blockedByProfileIds = Array.isArray(data.blockedByProfileIds)
+      ? data.blockedByProfileIds
+      : [];
+
+    return {
+      seenAt: parseFirestoreDate(data.myNetworkBadgeSeenAt),
+      blockedProfileIds: new Set(
+        blockedProfileIds
+          .map((value) => String(value || "").trim())
+          .filter(Boolean),
+      ),
+      excludedProfileIds: new Set(
+        [...blockedProfileIds, ...blockedByProfileIds]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean),
+      ),
+    };
+  } catch (error) {
+    console.log(
+      `⚠️ [BADGE] Erro ao carregar contexto do perfil ${profileId}: ${error}`,
+    );
+    return {
+      seenAt: null,
+      blockedProfileIds: new Set(),
+      excludedProfileIds: new Set(),
+    };
+  }
+}
 
 // ─── Helper Functions (copied from index.js) ───
 
@@ -112,7 +163,84 @@ async function getValidTokensForProfile(profileId, expectedUid) {
 /**
  * Calcula o badge count (notificações não lidas)
  */
-async function getUnreadNotificationCount(recipientProfileId) {
+function getNotificationCandidateProfileIds(notificationData) {
+  const candidateProfileIds = new Set();
+  const actionData =
+    notificationData.actionData &&
+    typeof notificationData.actionData === "object"
+      ? notificationData.actionData
+      : {};
+  const data =
+    notificationData.data && typeof notificationData.data === "object"
+      ? notificationData.data
+      : {};
+
+  const addCandidate = (value) => {
+    const normalized = String(value || "").trim();
+    if (normalized) {
+      candidateProfileIds.add(normalized);
+    }
+  };
+
+  addCandidate(notificationData.senderProfileId);
+  addCandidate(actionData.authorProfileId);
+  addCandidate(actionData.interestedProfileId);
+  addCandidate(actionData.senderProfileId);
+  addCandidate(actionData.commenterProfileId);
+  addCandidate(data.actionProfileId);
+  addCandidate(data.authorProfileId);
+  addCandidate(data.interestedProfileId);
+  addCandidate(data.senderProfileId);
+
+  return candidateProfileIds;
+}
+
+function isConnectionActivityNotificationData(notificationData) {
+  const actionData =
+    notificationData.actionData &&
+    typeof notificationData.actionData === "object"
+      ? notificationData.actionData
+      : {};
+  const data =
+    notificationData.data && typeof notificationData.data === "object"
+      ? notificationData.data
+      : {};
+  const eventType = String(actionData.eventType || data.eventType || "").trim();
+  return eventType.startsWith("connection");
+}
+
+function shouldIncludeNotificationInBadge(notificationData, blockedProfileIds) {
+  const type = String(notificationData.type || "").trim();
+  if (type === "newMessage") {
+    return false;
+  }
+
+  if (isConnectionActivityNotificationData(notificationData)) {
+    return false;
+  }
+
+  const expiresAt = parseFirestoreDate(notificationData.expiresAt);
+  if (expiresAt && expiresAt < new Date()) {
+    return false;
+  }
+
+  if (blockedProfileIds && blockedProfileIds.size > 0) {
+    const candidateProfileIds =
+      getNotificationCandidateProfileIds(notificationData);
+    for (const profileId of candidateProfileIds) {
+      if (blockedProfileIds.has(profileId)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+async function getUnreadNotificationCount(
+  recipientProfileId,
+  blockedProfileIds,
+) {
   try {
     const unreadSnap = await db
       .collection("notifications")
@@ -120,7 +248,9 @@ async function getUnreadNotificationCount(recipientProfileId) {
       .where("read", "==", false)
       .get();
 
-    const total = unreadSnap.size;
+    const total = unreadSnap.docs.filter((doc) =>
+      shouldIncludeNotificationInBadge(doc.data() || {}, blockedProfileIds),
+    ).length;
     console.log(
       `📱 [BADGE] Perfil ${recipientProfileId.substring(0, 8)}... unread=${total}`,
     );
@@ -129,6 +259,145 @@ async function getUnreadNotificationCount(recipientProfileId) {
     console.error(`⚠️ [BADGE] Erro ao contar não lidas: ${error}`);
     return 0;
   }
+}
+
+async function getUnreadMessageBadgeCount(
+  profileId,
+  recipientUid,
+  excludedProfileIds,
+) {
+  try {
+    const conversationsSnap = await db
+      .collection("conversations")
+      .where("participants", "array-contains", recipientUid)
+      .get();
+
+    let unreadConversations = 0;
+    for (const doc of conversationsSnap.docs) {
+      const data = doc.data() || {};
+      const participantProfiles = Array.isArray(data.participantProfiles)
+        ? data.participantProfiles
+        : [];
+      if (!participantProfiles.includes(profileId)) continue;
+
+      const deletedByProfiles = Array.isArray(data.deletedByProfiles)
+        ? data.deletedByProfiles
+        : [];
+      if (deletedByProfiles.includes(profileId)) continue;
+
+      const archivedByProfiles = Array.isArray(data.archivedByProfiles)
+        ? data.archivedByProfiles
+        : [];
+      if (archivedByProfiles.includes(profileId)) continue;
+
+      const otherProfileId =
+        participantProfiles.find((value) => value !== profileId) || "";
+      if (otherProfileId && excludedProfileIds.has(otherProfileId)) continue;
+
+      const unreadCount = data.unreadCount || {};
+      const countForProfile = Number(unreadCount[profileId] || 0);
+      if (countForProfile > 0) {
+        unreadConversations++;
+      }
+    }
+
+    return unreadConversations;
+  } catch (error) {
+    console.error(`⚠️ [BADGE] Erro ao contar conversas não lidas: ${error}`);
+    return 0;
+  }
+}
+
+async function getMyNetworkBadgeCount(
+  profileId,
+  recipientUid,
+  seenAt,
+  excludedProfileIds,
+) {
+  try {
+    const [pendingRequestsSnap, connectionsSnap] = await Promise.all([
+      db
+        .collection("connectionRequests")
+        .where("recipientProfileId", "==", profileId)
+        .where("recipientUid", "==", recipientUid)
+        .where("status", "==", "pending")
+        .get(),
+      db
+        .collection("connections")
+        .where("profileUids", "array-contains", recipientUid)
+        .orderBy("createdAt", "desc")
+        .get(),
+    ]);
+
+    const pendingReceivedCount = pendingRequestsSnap.docs.filter((doc) => {
+      const data = doc.data() || {};
+      const requesterProfileId = String(data.requesterProfileId || "").trim();
+      const requesterUid = String(data.requesterUid || "").trim();
+      const requesterName = String(data.requesterName || "").trim();
+      const createdAt = parseFirestoreDate(data.createdAt);
+
+      return (
+        requesterProfileId &&
+        requesterUid &&
+        requesterName &&
+        (!seenAt || (createdAt && createdAt > seenAt)) &&
+        !excludedProfileIds.has(requesterProfileId)
+      );
+    }).length;
+
+    const newlyAcceptedOutgoingCount = connectionsSnap.docs.filter((doc) => {
+      const data = doc.data() || {};
+      const profileIds = Array.isArray(data.profileIds) ? data.profileIds : [];
+      if (!profileIds.includes(profileId)) return false;
+
+      const initiatedByProfileId = String(
+        data.initiatedByProfileId || "",
+      ).trim();
+      if (initiatedByProfileId !== profileId) return false;
+
+      const createdAt = parseFirestoreDate(data.createdAt);
+      if (seenAt && (!createdAt || createdAt <= seenAt)) return false;
+
+      const otherProfileId =
+        profileIds.find((candidate) => candidate !== profileId) || "";
+      if (!otherProfileId || excludedProfileIds.has(otherProfileId))
+        return false;
+
+      const profileUids = Array.isArray(data.profileUids)
+        ? data.profileUids
+        : [];
+      const profileNames = data.profileNames || {};
+      const otherIndex = profileIds.indexOf(otherProfileId);
+      const otherUid =
+        otherIndex >= 0 && otherIndex < profileUids.length
+          ? String(profileUids[otherIndex] || "").trim()
+          : "";
+      const otherName = String(profileNames[otherProfileId] || "").trim();
+
+      return Boolean(otherUid && otherName);
+    }).length;
+
+    return pendingReceivedCount + newlyAcceptedOutgoingCount;
+  } catch (error) {
+    console.error(`⚠️ [BADGE] Erro ao contar Minha Rede: ${error}`);
+    return 0;
+  }
+}
+
+async function getUnifiedBadgeCount(profileId, recipientUid) {
+  const { seenAt, blockedProfileIds, excludedProfileIds } =
+    await getProfileBadgeContext(profileId);
+  const [notifications, messages, myNetwork] = await Promise.all([
+    getUnreadNotificationCount(profileId, blockedProfileIds),
+    getUnreadMessageBadgeCount(profileId, recipientUid, excludedProfileIds),
+    getMyNetworkBadgeCount(profileId, recipientUid, seenAt, excludedProfileIds),
+  ]);
+
+  const total = notifications + messages + myNetwork;
+  console.log(
+    `📱 [BADGE] profile=${profileId} notifications=${notifications} messages=${messages} myNetwork=${myNetwork} total=${total}`,
+  );
+  return total;
 }
 
 /**
@@ -142,7 +411,7 @@ async function sendPushToProfile(profileId, expectedUid, notification, data) {
     return;
   }
 
-  const badgeCount = await getUnreadNotificationCount(profileId);
+  const badgeCount = await getUnifiedBadgeCount(profileId, expectedUid);
   const messaging = admin.messaging();
 
   const message = {
@@ -164,6 +433,8 @@ async function sendPushToProfile(profileId, expectedUid, notification, data) {
         priority: "high",
         defaultSound: true,
         defaultVibrateTimings: true,
+        // Badge count no ícone do launcher (Android 8+).
+        notificationCount: badgeCount,
       },
     },
     apns: {
@@ -176,7 +447,7 @@ async function sendPushToProfile(profileId, expectedUid, notification, data) {
             title: notification.title,
             body: notification.body,
           },
-          badge: badgeCount + 1,
+          badge: badgeCount,
           sound: "default",
           "content-available": 1,
         },

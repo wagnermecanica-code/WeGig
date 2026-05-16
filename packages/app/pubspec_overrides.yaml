@@ -1,6 +1,8 @@
-# melos_managed_dependency_overrides: core_ui,image_cropper_platform_interface
+# melos_managed_dependency_overrides: core_ui,image_cropper_platform_interface,google_maps_flutter
 dependency_overrides:
   core_ui:
     path: ../core_ui
+  google_maps_flutter:
+    path: /Users/wagneroliveira/to_sem_banda/.tools/third_party/google_maps_flutter
   image_cropper_platform_interface:
     path: /Users/wagneroliveira/to_sem_banda/.tools/third_party/image_cropper_platform_interface

@@ -52,6 +52,14 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
     end
+
+    target.shell_script_build_phases.each do |phase|
+      next unless phase.name == 'Create Symlinks to Header Folders'
+
+      phase.output_paths = [
+        '${CONFIGURATION_BUILD_DIR}/${WRAPPER_NAME}/Headers',
+      ]
+    end
   end
 
   # Patch the generated resources script so flutter_inappwebview_ios copies the storyboard from the plugin source

@@ -11,7 +11,7 @@
  * Região: southamerica-east1 (São Paulo)
  */
 
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
@@ -155,6 +155,270 @@ async function isBlockedByProfile(profileId1, profileId2, context = "") {
     // Fail-closed: em caso de erro, NÃO enviar notificação para evitar vazamento
     return true;
   }
+}
+
+function parseFirestoreDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === "function") return value.toDate();
+  if (value instanceof Date) return value;
+  return null;
+}
+
+async function getProfileBadgeContext(profileId) {
+  try {
+    const profileDoc = await db.collection("profiles").doc(profileId).get();
+    if (!profileDoc.exists) {
+      return { seenAt: null, excludedProfileIds: new Set() };
+    }
+
+    const data = profileDoc.data() || {};
+    const blockedProfileIds = Array.isArray(data.blockedProfileIds)
+      ? data.blockedProfileIds
+      : [];
+    const blockedByProfileIds = Array.isArray(data.blockedByProfileIds)
+      ? data.blockedByProfileIds
+      : [];
+
+    return {
+      seenAt: parseFirestoreDate(data.myNetworkBadgeSeenAt),
+      excludedProfileIds: new Set(
+        [...blockedProfileIds, ...blockedByProfileIds]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean),
+      ),
+    };
+  } catch (error) {
+    console.log(
+      `⚠️ [BADGE] Erro ao carregar contexto do perfil ${profileId}: ${error}`,
+    );
+    return { seenAt: null, excludedProfileIds: new Set() };
+  }
+}
+
+function coerceObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+}
+
+function isNotificationTypeExcludedFromBadge(data) {
+  const type = String(data.type || "").trim();
+  return type === "newMessage";
+}
+
+function isConnectionActivityNotification(data) {
+  const actionData = coerceObject(data.actionData);
+  const payload = coerceObject(data.data);
+  const eventType = String(
+    actionData.eventType || payload.eventType || "",
+  ).trim();
+  return eventType.startsWith("connection");
+}
+
+function isNotificationExpired(data, now) {
+  const expiresAt = parseFirestoreDate(data.expiresAt);
+  return expiresAt instanceof Date && expiresAt.getTime() < now.getTime();
+}
+
+function notificationMatchesBlockedProfile(data, excludedProfileIds) {
+  if (!excludedProfileIds || excludedProfileIds.size === 0) return false;
+  const actionData = coerceObject(data.actionData);
+  const payload = coerceObject(data.data);
+  const candidates = [
+    data.senderProfileId,
+    data.actorProfileId,
+    data.requesterProfileId,
+    data.fromProfileId,
+    actionData.senderProfileId,
+    actionData.actorProfileId,
+    actionData.requesterProfileId,
+    actionData.fromProfileId,
+    actionData.profileId,
+    payload.senderProfileId,
+    payload.actorProfileId,
+    payload.requesterProfileId,
+    payload.fromProfileId,
+    payload.profileId,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") continue;
+    const normalized = candidate.trim();
+    if (normalized && excludedProfileIds.has(normalized)) return true;
+  }
+  return false;
+}
+
+async function getUnreadNotificationBadgeCount(
+  profileId,
+  recipientUid,
+  excludedProfileIds,
+) {
+  try {
+    const unreadSnap = await db
+      .collection("notifications")
+      .where("recipientProfileId", "==", profileId)
+      .where("recipientUid", "==", recipientUid)
+      .where("read", "==", false)
+      .get();
+
+    const now = new Date();
+    let count = 0;
+    for (const doc of unreadSnap.docs) {
+      const data = doc.data() || {};
+      if (isNotificationTypeExcludedFromBadge(data)) continue;
+      if (isConnectionActivityNotification(data)) continue;
+      if (isNotificationExpired(data, now)) continue;
+      if (notificationMatchesBlockedProfile(data, excludedProfileIds)) continue;
+      count++;
+    }
+    return count;
+  } catch (error) {
+    console.log(`⚠️ [BADGE] Erro ao contar notificações não lidas: ${error}`);
+    return 0;
+  }
+}
+
+async function getUnreadMessageBadgeCount(
+  profileId,
+  recipientUid,
+  excludedProfileIds,
+) {
+  try {
+    const conversationsSnap = await db
+      .collection("conversations")
+      .where("participants", "array-contains", recipientUid)
+      .get();
+
+    let unreadConversations = 0;
+    for (const doc of conversationsSnap.docs) {
+      const data = doc.data() || {};
+      const participantProfiles = Array.isArray(data.participantProfiles)
+        ? data.participantProfiles
+        : [];
+      if (!participantProfiles.includes(profileId)) continue;
+
+      const deletedByProfiles = Array.isArray(data.deletedByProfiles)
+        ? data.deletedByProfiles
+        : [];
+      if (deletedByProfiles.includes(profileId)) continue;
+
+      const archivedByProfiles = Array.isArray(data.archivedByProfiles)
+        ? data.archivedByProfiles
+        : [];
+      if (archivedByProfiles.includes(profileId)) continue;
+
+      const otherProfileId =
+        participantProfiles.find((value) => value !== profileId) || "";
+      if (otherProfileId && excludedProfileIds.has(otherProfileId)) continue;
+
+      const unreadCount = data.unreadCount || {};
+      const countForProfile = Number(unreadCount[profileId] || 0);
+      if (countForProfile > 0) {
+        unreadConversations++;
+      }
+    }
+
+    return unreadConversations;
+  } catch (error) {
+    console.log(`⚠️ [BADGE] Erro ao contar conversas não lidas: ${error}`);
+    return 0;
+  }
+}
+
+async function getMyNetworkBadgeCount(
+  profileId,
+  recipientUid,
+  seenAt,
+  excludedProfileIds,
+) {
+  try {
+    const [pendingRequestsSnap, connectionsSnap] = await Promise.all([
+      db
+        .collection("connectionRequests")
+        .where("recipientProfileId", "==", profileId)
+        .where("recipientUid", "==", recipientUid)
+        .where("status", "==", "pending")
+        .get(),
+      db
+        .collection("connections")
+        .where("profileUids", "array-contains", recipientUid)
+        .orderBy("createdAt", "desc")
+        .get(),
+    ]);
+
+    const pendingReceivedCount = pendingRequestsSnap.docs.filter((doc) => {
+      const data = doc.data() || {};
+      const requesterProfileId = String(data.requesterProfileId || "").trim();
+      const requesterUid = String(data.requesterUid || "").trim();
+      const requesterName = String(data.requesterName || "").trim();
+      const createdAt = parseFirestoreDate(data.createdAt);
+
+      return (
+        requesterProfileId &&
+        requesterUid &&
+        requesterName &&
+        (!seenAt || (createdAt && createdAt > seenAt)) &&
+        !excludedProfileIds.has(requesterProfileId)
+      );
+    }).length;
+
+    const newlyAcceptedOutgoingCount = connectionsSnap.docs.filter((doc) => {
+      const data = doc.data() || {};
+      const profileIds = Array.isArray(data.profileIds) ? data.profileIds : [];
+      if (!profileIds.includes(profileId)) return false;
+
+      const initiatedByProfileId = String(
+        data.initiatedByProfileId || "",
+      ).trim();
+      if (initiatedByProfileId !== profileId) return false;
+
+      const createdAt = parseFirestoreDate(data.createdAt);
+      if (seenAt && (!createdAt || createdAt <= seenAt)) return false;
+
+      const otherProfileId =
+        profileIds.find((candidate) => candidate !== profileId) || "";
+      if (!otherProfileId || excludedProfileIds.has(otherProfileId))
+        return false;
+
+      const profileUids = Array.isArray(data.profileUids)
+        ? data.profileUids
+        : [];
+      const profileNames = data.profileNames || {};
+      const otherIndex = profileIds.indexOf(otherProfileId);
+      const otherUid =
+        otherIndex >= 0 && otherIndex < profileUids.length
+          ? String(profileUids[otherIndex] || "").trim()
+          : "";
+      const otherName = String(profileNames[otherProfileId] || "").trim();
+
+      return Boolean(otherUid && otherName);
+    }).length;
+
+    return pendingReceivedCount + newlyAcceptedOutgoingCount;
+  } catch (error) {
+    console.log(`⚠️ [BADGE] Erro ao contar Minha Rede: ${error}`);
+    return 0;
+  }
+}
+
+async function getUnifiedBadgeCount(profileId, recipientUid) {
+  const { seenAt, excludedProfileIds } =
+    await getProfileBadgeContext(profileId);
+  const [notifications, messages, myNetwork] = await Promise.all([
+    getUnreadNotificationBadgeCount(
+      profileId,
+      recipientUid,
+      excludedProfileIds,
+    ),
+    getUnreadMessageBadgeCount(profileId, recipientUid, excludedProfileIds),
+    getMyNetworkBadgeCount(profileId, recipientUid, seenAt, excludedProfileIds),
+  ]);
+
+  const total = notifications + messages + myNetwork;
+  console.log(
+    `📱 [BADGE] profile=${profileId} notifications=${notifications} messages=${messages} myNetwork=${myNetwork} total=${total}`,
+  );
+  return total;
 }
 
 /**
@@ -516,7 +780,6 @@ async function sendPushNotificationsForNearbyPost(
                 body: payload.notification.body,
               },
               sound: "default",
-              badge: 1,
             },
           },
         },
@@ -542,7 +805,8 @@ async function sendPushNotificationsForNearbyPost(
             // Tokens inválidos ou desinstalados
             if (
               errorCode === "messaging/registration-token-not-registered" ||
-              errorCode === "messaging/invalid-registration-token"
+              errorCode === "messaging/invalid-registration-token" ||
+              errorCode === "messaging/invalid-argument"
             ) {
               tokensToRemove.push(batchTokens[idx]);
             }
@@ -598,6 +862,7 @@ async function getValidTokensForProfile(profileId, expectedUid) {
     // NOTA: NÃO expiramos tokens por idade - FCM reporta tokens inválidos no envio
     const validTokens = [];
     let skippedNonMobileTokens = 0;
+    let skippedUnknownPlatformTokens = 0;
 
     tokensSnap.docs.forEach((tokenDoc) => {
       const tokenData = tokenDoc.data();
@@ -617,6 +882,13 @@ async function getValidTokensForProfile(profileId, expectedUid) {
         return;
       }
 
+      // Manter apenas plataformas mobile conhecidas para evitar tokens
+      // legados inconsistentes (geram invalid-argument no FCM).
+      if (platform !== "ios" && platform !== "android") {
+        skippedUnknownPlatformTokens++;
+        return;
+      }
+
       const updatedAt =
         tokenData.updatedAt?.toMillis() || tokenData.createdAt?.toMillis() || 0;
 
@@ -631,19 +903,51 @@ async function getValidTokensForProfile(profileId, expectedUid) {
       );
     }
 
+    if (skippedUnknownPlatformTokens > 0) {
+      console.log(
+        `⏭️ Ignorados ${skippedUnknownPlatformTokens} tokens com platform ausente/inesperada`,
+      );
+    }
+
     validTokens.sort((a, b) => b.updatedAt - a.updatedAt);
-    const tokensToUse = validTokens.slice(0, 5).map((t) => t.token); // Até 5 tokens mais recentes
+
+    // Estratégia balanceada:
+    // 1) prioriza 1 token mais recente de Android e iOS
+    // 2) completa com os próximos mais recentes até 5 tokens no total
+    // Isso preserva entrega em multi-dispositivo sem exagerar fan-out.
+    const selectedTokens = [];
+    const selectedTokenSet = new Set();
+
+    const latestAndroid = validTokens.find((t) => t.platform === "android");
+    if (latestAndroid) {
+      selectedTokens.push(latestAndroid);
+      selectedTokenSet.add(latestAndroid.token);
+    }
+
+    const latestIos = validTokens.find((t) => t.platform === "ios");
+    if (latestIos && !selectedTokenSet.has(latestIos.token)) {
+      selectedTokens.push(latestIos);
+      selectedTokenSet.add(latestIos.token);
+    }
+
+    for (const tokenData of validTokens) {
+      if (selectedTokens.length >= 5) break;
+      if (selectedTokenSet.has(tokenData.token)) continue;
+      selectedTokens.push(tokenData);
+      selectedTokenSet.add(tokenData.token);
+    }
+
+    const tokensToUse = selectedTokens.map((t) => t.token);
 
     console.log(
       `✅ ${tokensToUse.length} token(s) válido(s) para perfil ` +
         `${profileId} (${validTokens.length} tokens válidos)`,
     );
     // Debug: log platforms for troubleshooting
-    const platformSummary = validTokens
-      .slice(0, 5)
+    const platformSummary = selectedTokens
       .map((t) => t.platform || "NO_PLATFORM")
       .join(", ");
-    console.log(`📱 Platforms dos 5 tokens mais recentes: ${platformSummary}`);
+    console.log(`📱 Platforms selecionadas para envio: ${platformSummary}`);
     // Debug: log platforms for troubleshooting
     return tokensToUse;
   } catch (error) {
@@ -1059,7 +1363,6 @@ exports.sendMessageNotification = functions
       {
         type: "newMessage",
         conversationId: conversationId,
-        recipientProfileId: recipientProfileId,
         isGroup: isGroupConversation ? "true" : "false",
         groupName: isGroupConversation ? groupName : "",
         groupPhotoUrl: isGroupConversation ? groupPhotoUrl : "",
@@ -1255,6 +1558,7 @@ async function sendPushToProfile(profileId, recipientUid, notification, data) {
 
     // Adicionar click_action para navegação no app
     data.click_action = "FLUTTER_NOTIFICATION_CLICK";
+    const badgeCount = await getUnifiedBadgeCount(profileId, recipientUid);
 
     const response = await messaging.sendEachForMulticast({
       tokens: tokens,
@@ -1267,6 +1571,11 @@ async function sendPushToProfile(profileId, recipientUid, notification, data) {
           priority: "high",
           color: "#E47911",
           sound: "default",
+          // Badge count no ícone do launcher (Android 8+).
+          // Renderizado via NotificationCompat.setNumber(count) — quando o
+          // launcher suporta badges numéricos (Samsung One UI, Pixel, etc.),
+          // exibe o total de itens não lidos no ícone do app.
+          notificationCount: badgeCount,
         },
       },
       apns: {
@@ -1280,7 +1589,7 @@ async function sendPushToProfile(profileId, recipientUid, notification, data) {
               body: notification.body,
             },
             sound: "default",
-            badge: 1,
+            badge: badgeCount,
             "content-available": 1,
           },
         },
@@ -1306,7 +1615,8 @@ async function sendPushToProfile(profileId, recipientUid, notification, data) {
 
           if (
             errorCode === "messaging/registration-token-not-registered" ||
-            errorCode === "messaging/invalid-registration-token"
+            errorCode === "messaging/invalid-registration-token" ||
+            errorCode === "messaging/invalid-argument"
           ) {
             tokensToRemove.push(tokens[idx]);
           }
@@ -1748,6 +2058,10 @@ exports.onProfileDelete = functions
     let totalImagesDeleted = 0;
     let totalNotificationsDeleted = 0;
     let totalInterestsDeleted = 0;
+    let totalConnectionRequestsDeleted = 0;
+    let totalConnectionsDeleted = 0;
+    let totalConnectionSuggestionDocsDeleted = 0;
+    let totalConnectionStatsDocsDeleted = 0;
 
     try {
       // ========================================
@@ -1889,7 +2203,29 @@ exports.onProfileDelete = functions
       );
 
       // ========================================
-      // 4. LIMPAR FCM TOKENS (subcoleção)
+      // 4. LIMPAR GRAFO SOCIAL DE CONEXOES
+      // ========================================
+      console.log(
+        `🤝 Cleaning up connections graph for profile ${profileId}...`,
+      );
+
+      const connectionCleanup =
+        await cleanupConnectionArtifactsForDeletedProfile(
+          profileId,
+          `profileDelete:${profileId}`,
+        );
+      totalConnectionRequestsDeleted = connectionCleanup.deletedRequests;
+      totalConnectionsDeleted = connectionCleanup.deletedConnections;
+      totalConnectionSuggestionDocsDeleted =
+        connectionCleanup.deletedSuggestionDocs;
+      totalConnectionStatsDocsDeleted = connectionCleanup.deletedStatsDocs;
+
+      console.log(
+        `✅ Connections cleanup complete: ${totalConnectionRequestsDeleted} requests, ${totalConnectionsDeleted} connections`,
+      );
+
+      // ========================================
+      // 5. LIMPAR FCM TOKENS (subcoleção)
       // ========================================
       console.log(`🔔 Cleaning up FCM tokens for profile ${profileId}...`);
 
@@ -1914,6 +2250,16 @@ exports.onProfileDelete = functions
       console.log(`   🖼️ Imagens deletadas: ${totalImagesDeleted}`);
       console.log(`   🔔 Notificações deletadas: ${totalNotificationsDeleted}`);
       console.log(`   💚 Interesses deletados: ${totalInterestsDeleted}`);
+      console.log(
+        `   🤝 Convites deletados: ${totalConnectionRequestsDeleted}`,
+      );
+      console.log(`   🤝 Conexões deletadas: ${totalConnectionsDeleted}`);
+      console.log(
+        `   💡 Docs de sugestões deletados: ${totalConnectionSuggestionDocsDeleted}`,
+      );
+      console.log(
+        `   📊 Docs de stats deletados: ${totalConnectionStatsDocsDeleted}`,
+      );
       console.log(
         `   🔔 FCM tokens deletados: ${
           tokensSnapshot ? tokensSnapshot.size : 0
@@ -2031,7 +2377,7 @@ exports.onReportCreated = functions
       // Enviar email via SendGrid para contato@wegig.com.br
       try {
         const sgMail = require("@sendgrid/mail");
-        const sendgridKey = functions.config().sendgrid?.key;
+        const sendgridKey = process.env.SENDGRID_API_KEY;
 
         if (sendgridKey) {
           sgMail.setApiKey(sendgridKey);
@@ -2303,7 +2649,7 @@ exports.onReportCreated = functions
             "⚠️ SendGrid key não configurada - pulando envio de email",
           );
           console.log(
-            "   Para configurar: firebase functions:config:set sendgrid.key='SUA_API_KEY'",
+            "   Para configurar: defina SENDGRID_API_KEY no .env das functions",
           );
         }
       } catch (emailError) {
@@ -2492,4 +2838,758 @@ exports.onUserDelete = functions
       console.error(error.stack);
       return null;
     }
+  });
+
+function normalizeProfileId(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function uniqueProfileIds(values) {
+  return [...new Set(values.map(normalizeProfileId).filter(Boolean))];
+}
+
+function buildConnectionId(firstProfileId, secondProfileId) {
+  return uniqueProfileIds([firstProfileId, secondProfileId]).sort().join("__");
+}
+
+const CONNECTION_REQUEST_DAILY_LIMIT = 50;
+const CONNECTION_REQUEST_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
+
+async function rebuildConnectionStatsForProfile(profileId) {
+  const normalizedProfileId = normalizeProfileId(profileId);
+  if (!normalizedProfileId) {
+    return;
+  }
+
+  const [connectionsSnapshot, pendingReceivedSnapshot, pendingSentSnapshot] =
+    await Promise.all([
+      db
+        .collection("connections")
+        .where("profileIds", "array-contains", normalizedProfileId)
+        .get(),
+      db
+        .collection("connectionRequests")
+        .where("recipientProfileId", "==", normalizedProfileId)
+        .where("status", "==", "pending")
+        .get(),
+      db
+        .collection("connectionRequests")
+        .where("requesterProfileId", "==", normalizedProfileId)
+        .where("status", "==", "pending")
+        .get(),
+    ]);
+
+  await db.collection("connectionStats").doc(normalizedProfileId).set(
+    {
+      profileId: normalizedProfileId,
+      totalConnections: connectionsSnapshot.size,
+      pendingReceived: pendingReceivedSnapshot.size,
+      pendingSent: pendingSentSnapshot.size,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+async function rebuildConnectionStatsForProfiles(profileIds) {
+  const normalizedProfileIds = uniqueProfileIds(profileIds);
+  await Promise.all(
+    normalizedProfileIds.map((profileId) =>
+      rebuildConnectionStatsForProfile(profileId),
+    ),
+  );
+}
+
+async function removeProfileFromSuggestionsCache(
+  ownerProfileId,
+  removedProfileId,
+) {
+  const normalizedOwnerProfileId = normalizeProfileId(ownerProfileId);
+  const normalizedRemovedProfileId = normalizeProfileId(removedProfileId);
+  if (!normalizedOwnerProfileId || !normalizedRemovedProfileId) {
+    return;
+  }
+
+  const suggestionRef = db
+    .collection("connectionSuggestions")
+    .doc(normalizedOwnerProfileId);
+  const suggestionSnapshot = await suggestionRef.get();
+  if (!suggestionSnapshot.exists) {
+    return;
+  }
+
+  const data = suggestionSnapshot.data() || {};
+  const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+  const filteredSuggestions = suggestions.filter((entry) => {
+    if (!entry || typeof entry !== "object") {
+      return false;
+    }
+
+    return (
+      normalizeProfileId(entry.candidateProfileId) !==
+      normalizedRemovedProfileId
+    );
+  });
+
+  if (filteredSuggestions.length === suggestions.length) {
+    return;
+  }
+
+  await suggestionRef.set(
+    {
+      suggestions: filteredSuggestions,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+async function removeConnectionArtifactsBetweenProfiles(
+  firstProfileId,
+  secondProfileId,
+  context = "",
+) {
+  const profileId1 = normalizeProfileId(firstProfileId);
+  const profileId2 = normalizeProfileId(secondProfileId);
+  if (!profileId1 || !profileId2 || profileId1 === profileId2) {
+    return;
+  }
+
+  const logTag = context
+    ? `[CONNECTION_GUARD][${context}]`
+    : "[CONNECTION_GUARD]";
+  const batch = db.batch();
+
+  batch.delete(
+    db.collection("connectionRequests").doc(`${profileId1}_${profileId2}`),
+  );
+  batch.delete(
+    db.collection("connectionRequests").doc(`${profileId2}_${profileId1}`),
+  );
+  batch.delete(
+    db.collection("connections").doc(buildConnectionId(profileId1, profileId2)),
+  );
+
+  await batch.commit();
+
+  await Promise.all([
+    removeProfileFromSuggestionsCache(profileId1, profileId2),
+    removeProfileFromSuggestionsCache(profileId2, profileId1),
+    rebuildConnectionStatsForProfiles([profileId1, profileId2]),
+  ]);
+
+  console.log(
+    `${logTag} 🧹 artefatos de conexão reconciliados para ${profileId1} <-> ${profileId2}`,
+  );
+}
+
+async function cleanupConnectionArtifactsForDeletedProfile(
+  profileId,
+  context = "",
+) {
+  const normalizedProfileId = normalizeProfileId(profileId);
+  if (!normalizedProfileId) {
+    return {
+      deletedRequests: 0,
+      deletedConnections: 0,
+      deletedSuggestionDocs: 0,
+      deletedStatsDocs: 0,
+      affectedProfileIds: [],
+    };
+  }
+
+  const logTag = context
+    ? `[PROFILE_CONNECTION_CLEANUP][${context}]`
+    : "[PROFILE_CONNECTION_CLEANUP]";
+  const affectedProfileIds = new Set();
+  let deletedRequests = 0;
+  let deletedConnections = 0;
+
+  const requesterQuery = db
+    .collection("connectionRequests")
+    .where("requesterProfileId", "==", normalizedProfileId)
+    .limit(500);
+  let requesterSnapshot = await requesterQuery.get();
+  while (!requesterSnapshot.empty) {
+    const batch = db.batch();
+    requesterSnapshot.docs.forEach((doc) => {
+      const data = doc.data() || {};
+      const otherProfileId = normalizeProfileId(data.recipientProfileId);
+      if (otherProfileId) {
+        affectedProfileIds.add(otherProfileId);
+      }
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+    deletedRequests += requesterSnapshot.size;
+    requesterSnapshot = await requesterQuery.get();
+  }
+
+  const recipientQuery = db
+    .collection("connectionRequests")
+    .where("recipientProfileId", "==", normalizedProfileId)
+    .limit(500);
+  let recipientSnapshot = await recipientQuery.get();
+  while (!recipientSnapshot.empty) {
+    const batch = db.batch();
+    recipientSnapshot.docs.forEach((doc) => {
+      const data = doc.data() || {};
+      const otherProfileId = normalizeProfileId(data.requesterProfileId);
+      if (otherProfileId) {
+        affectedProfileIds.add(otherProfileId);
+      }
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+    deletedRequests += recipientSnapshot.size;
+    recipientSnapshot = await recipientQuery.get();
+  }
+
+  const connectionsQuery = db
+    .collection("connections")
+    .where("profileIds", "array-contains", normalizedProfileId)
+    .limit(500);
+  let connectionsSnapshot = await connectionsQuery.get();
+  while (!connectionsSnapshot.empty) {
+    const batch = db.batch();
+    connectionsSnapshot.docs.forEach((doc) => {
+      const data = doc.data() || {};
+      const profileIds = Array.isArray(data.profileIds) ? data.profileIds : [];
+      profileIds.forEach((candidateProfileId) => {
+        const normalizedCandidateProfileId =
+          normalizeProfileId(candidateProfileId);
+        if (
+          normalizedCandidateProfileId &&
+          normalizedCandidateProfileId !== normalizedProfileId
+        ) {
+          affectedProfileIds.add(normalizedCandidateProfileId);
+        }
+      });
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+    deletedConnections += connectionsSnapshot.size;
+    connectionsSnapshot = await connectionsQuery.get();
+  }
+
+  const suggestionsRef = db
+    .collection("connectionSuggestions")
+    .doc(normalizedProfileId);
+  const statsRef = db.collection("connectionStats").doc(normalizedProfileId);
+  const [suggestionsSnapshot, statsSnapshot] = await Promise.all([
+    suggestionsRef.get(),
+    statsRef.get(),
+  ]);
+
+  await Promise.all([
+    suggestionsSnapshot.exists ? suggestionsRef.delete() : Promise.resolve(),
+    statsSnapshot.exists ? statsRef.delete() : Promise.resolve(),
+    ...Array.from(affectedProfileIds).map((otherProfileId) =>
+      removeProfileFromSuggestionsCache(otherProfileId, normalizedProfileId),
+    ),
+  ]);
+
+  if (affectedProfileIds.size > 0) {
+    await rebuildConnectionStatsForProfiles(Array.from(affectedProfileIds));
+  }
+
+  console.log(
+    `${logTag} 🧹 cleanup de conexões concluído para ${normalizedProfileId}: requests=${deletedRequests}, connections=${deletedConnections}, affectedProfiles=${affectedProfileIds.size}`,
+  );
+
+  return {
+    deletedRequests,
+    deletedConnections,
+    deletedSuggestionDocs: suggestionsSnapshot.exists ? 1 : 0,
+    deletedStatsDocs: statsSnapshot.exists ? 1 : 0,
+    affectedProfileIds: Array.from(affectedProfileIds),
+  };
+}
+
+async function ensureConnectionDocumentFromRequest(requestId, requestData) {
+  const requesterProfileId = normalizeProfileId(requestData.requesterProfileId);
+  const recipientProfileId = normalizeProfileId(requestData.recipientProfileId);
+  if (!requesterProfileId || !recipientProfileId) {
+    return;
+  }
+
+  const connectionId = buildConnectionId(
+    requesterProfileId,
+    recipientProfileId,
+  );
+  const connectionRef = db.collection("connections").doc(connectionId);
+  const connectionSnapshot = await connectionRef.get();
+  if (connectionSnapshot.exists) {
+    return;
+  }
+
+  await connectionRef.set({
+    profileIds: [requesterProfileId, recipientProfileId].sort(),
+    profileUids: [
+      requestData.requesterUid || "",
+      requestData.recipientUid || "",
+    ],
+    profileNames: {
+      [requesterProfileId]: requestData.requesterName || "",
+      [recipientProfileId]: requestData.recipientName || "",
+    },
+    profilePhotoUrls: {
+      [requesterProfileId]: requestData.requesterPhotoUrl || "",
+      [recipientProfileId]: requestData.recipientPhotoUrl || "",
+    },
+    initiatedByProfileId: requesterProfileId,
+    requestId,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+function extractConnectionRequestActionDate(requestData) {
+  const rawValue =
+    requestData.respondedAt || requestData.updatedAt || requestData.createdAt;
+  if (!rawValue) return null;
+  if (typeof rawValue.toDate === "function") return rawValue.toDate();
+  if (rawValue instanceof Date) return rawValue;
+  return null;
+}
+
+async function hasRecentConnectionCooldown(requestData) {
+  const status = (requestData.status || "").trim();
+  if (!status || status === "pending") {
+    return false;
+  }
+
+  const actionDate = extractConnectionRequestActionDate(requestData);
+  if (!actionDate) {
+    return false;
+  }
+
+  return Date.now() - actionDate.getTime() < CONNECTION_REQUEST_COOLDOWN_MS;
+}
+
+function buildConnectionNotificationBody(senderName, eventType) {
+  if (eventType === "connectionAccepted") {
+    return `${senderName} aceitou seu convite de conexão`;
+  }
+
+  return `${senderName} quer se conectar com você`;
+}
+
+async function createConnectionNotification({
+  recipientProfileId,
+  recipientUid,
+  senderProfileId,
+  senderUid,
+  senderName,
+  senderUsername,
+  senderPhoto,
+  eventType,
+  title,
+  requestId,
+}) {
+  const normalizedRecipientProfileId = normalizeProfileId(recipientProfileId);
+  const normalizedRecipientUid =
+    typeof recipientUid === "string" ? recipientUid.trim() : "";
+  const normalizedSenderProfileId = normalizeProfileId(senderProfileId);
+  const normalizedSenderUid =
+    typeof senderUid === "string" ? senderUid.trim() : "";
+  const normalizedEventType =
+    typeof eventType === "string" ? eventType.trim() : "";
+  const normalizedTitle = typeof title === "string" ? title.trim() : "";
+  const normalizedSenderName =
+    typeof senderName === "string" && senderName.trim()
+      ? senderName.trim()
+      : "Alguém";
+
+  if (
+    !normalizedRecipientProfileId ||
+    !normalizedRecipientUid ||
+    !normalizedSenderProfileId ||
+    !normalizedEventType ||
+    !normalizedTitle
+  ) {
+    console.log(
+      "⚠️ createConnectionNotification: parâmetros obrigatórios ausentes",
+    );
+    return;
+  }
+
+  const body = buildConnectionNotificationBody(
+    normalizedSenderName,
+    normalizedEventType,
+  );
+
+  const notificationPayload = {
+    recipientProfileId: normalizedRecipientProfileId,
+    recipientUid: normalizedRecipientUid,
+    profileUid: normalizedRecipientUid,
+    type: "profileMatch",
+    priority: "high",
+    title: normalizedTitle,
+    body,
+    message: body,
+    actionType: "navigate",
+    actionData: {
+      route: "/home?index=1",
+      eventType: normalizedEventType,
+      connectionProfileId: normalizedSenderProfileId,
+      profileId: normalizedSenderProfileId,
+      targetId: normalizedSenderProfileId,
+      requestId: requestId || "",
+    },
+    data: {
+      eventType: normalizedEventType,
+      connectionProfileId: normalizedSenderProfileId,
+      targetProfileId: normalizedSenderProfileId,
+      targetId: normalizedSenderProfileId,
+      requestId: requestId || "",
+      route: "/home?index=1",
+    },
+    senderUid: normalizedSenderUid || null,
+    senderProfileId: normalizedSenderProfileId,
+    senderName: normalizedSenderName,
+    senderUsername:
+      typeof senderUsername === "string" && senderUsername.trim()
+        ? senderUsername.trim()
+        : null,
+    senderPhoto:
+      typeof senderPhoto === "string" && senderPhoto.trim()
+        ? senderPhoto.trim()
+        : null,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    read: false,
+    expiresAt: admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    ),
+  };
+
+  await db.collection("notifications").add(notificationPayload);
+
+  await sendPushToProfile(
+    normalizedRecipientProfileId,
+    normalizedRecipientUid,
+    {
+      title: normalizedTitle,
+      body,
+    },
+    {
+      type: normalizedEventType,
+      eventType: normalizedEventType,
+      connectionProfileId: normalizedSenderProfileId,
+      targetProfileId: normalizedSenderProfileId,
+      targetId: normalizedSenderProfileId,
+      senderProfileId: normalizedSenderProfileId,
+      senderUid: normalizedSenderUid,
+      senderName: normalizedSenderName,
+      senderUsername:
+        typeof senderUsername === "string" ? senderUsername.trim() : "",
+      senderPhoto: typeof senderPhoto === "string" ? senderPhoto.trim() : "",
+      requestId: requestId || "",
+      route: "/home?index=1",
+    },
+  );
+}
+
+exports.onConnectionRequestCreated = functions
+  .runWith({
+    memory: "256MB",
+    timeoutSeconds: 60,
+  })
+  .region("southamerica-east1")
+  .firestore.document("connectionRequests/{requestId}")
+  .onCreate(async (snap, context) => {
+    const requestData = snap.data() || {};
+    const requesterProfileId = normalizeProfileId(
+      requestData.requesterProfileId,
+    );
+    const recipientProfileId = normalizeProfileId(
+      requestData.recipientProfileId,
+    );
+
+    if (!requesterProfileId || !recipientProfileId) {
+      console.log(
+        `⚠️ onConnectionRequestCreated: request ${context.params.requestId} sem perfis válidos`,
+      );
+      return null;
+    }
+
+    const rateLimitCheck = await checkRateLimit(
+      requesterProfileId,
+      "connection_requests",
+      CONNECTION_REQUEST_DAILY_LIMIT,
+      24 * 60 * 60 * 1000,
+    );
+
+    if (!rateLimitCheck.allowed) {
+      console.log(
+        `🚫 onConnectionRequestCreated: rate limit excedido para ${requesterProfileId}`,
+      );
+      await snap.ref.delete();
+      await rebuildConnectionStatsForProfiles([
+        requesterProfileId,
+        recipientProfileId,
+      ]);
+      return null;
+    }
+
+    const inverseRequestSnapshot = await db
+      .collection("connectionRequests")
+      .doc(`${recipientProfileId}_${requesterProfileId}`)
+      .get();
+    if (
+      await hasRecentConnectionCooldown(inverseRequestSnapshot.data() || {})
+    ) {
+      console.log(
+        `🚫 onConnectionRequestCreated: cooldown ativo para ${requesterProfileId} -> ${recipientProfileId}`,
+      );
+      await snap.ref.delete();
+      await rebuildConnectionStatsForProfiles([
+        requesterProfileId,
+        recipientProfileId,
+      ]);
+      return null;
+    }
+
+    const blocked = await isBlockedByProfile(
+      requesterProfileId,
+      recipientProfileId,
+      `connectionRequestCreated:${context.params.requestId}`,
+    );
+
+    if (blocked) {
+      console.log(
+        `🚫 onConnectionRequestCreated: removendo convite bloqueado ${context.params.requestId}`,
+      );
+      await snap.ref.delete();
+      await rebuildConnectionStatsForProfiles([
+        requesterProfileId,
+        recipientProfileId,
+      ]);
+      return null;
+    }
+
+    await createConnectionNotification({
+      recipientProfileId,
+      recipientUid: requestData.recipientUid,
+      senderProfileId: requesterProfileId,
+      senderUid: requestData.requesterUid,
+      senderName: requestData.requesterName,
+      senderUsername: requestData.requesterUsername,
+      senderPhoto: requestData.requesterPhotoUrl,
+      eventType: "connectionRequest",
+      title: "Novo convite de conexão",
+      requestId: context.params.requestId,
+    });
+
+    await rebuildConnectionStatsForProfiles([
+      requesterProfileId,
+      recipientProfileId,
+    ]);
+    return null;
+  });
+
+exports.onConnectionRequestAccepted = functions
+  .runWith({
+    memory: "256MB",
+    timeoutSeconds: 60,
+  })
+  .region("southamerica-east1")
+  .firestore.document("connectionRequests/{requestId}")
+  .onUpdate(async (change, context) => {
+    const before = change.before.data() || {};
+    const after = change.after.data() || {};
+    if (before.status === after.status || after.status !== "accepted") {
+      return null;
+    }
+
+    const requesterProfileId = normalizeProfileId(after.requesterProfileId);
+    const recipientProfileId = normalizeProfileId(after.recipientProfileId);
+    if (!requesterProfileId || !recipientProfileId) {
+      return null;
+    }
+
+    const blocked = await isBlockedByProfile(
+      requesterProfileId,
+      recipientProfileId,
+      `connectionRequestAccepted:${context.params.requestId}`,
+    );
+
+    if (blocked) {
+      const connectionId = buildConnectionId(
+        requesterProfileId,
+        recipientProfileId,
+      );
+      await Promise.all([
+        db
+          .collection("connections")
+          .doc(connectionId)
+          .delete()
+          .catch(() => null),
+        change.after.ref.update({
+          status: "cancelled",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }),
+      ]);
+      await rebuildConnectionStatsForProfiles([
+        requesterProfileId,
+        recipientProfileId,
+      ]);
+      return null;
+    }
+
+    await ensureConnectionDocumentFromRequest(context.params.requestId, after);
+    await createConnectionNotification({
+      recipientProfileId: requesterProfileId,
+      recipientUid: after.requesterUid,
+      senderProfileId: recipientProfileId,
+      senderUid: after.recipientUid,
+      senderName: after.recipientName,
+      senderUsername: after.recipientUsername,
+      senderPhoto: after.recipientPhotoUrl,
+      eventType: "connectionAccepted",
+      title: "Convite aceito",
+      requestId: context.params.requestId,
+    });
+    await rebuildConnectionStatsForProfiles([
+      requesterProfileId,
+      recipientProfileId,
+    ]);
+    return null;
+  });
+
+exports.onConnectionRequestDeclined = functions
+  .runWith({
+    memory: "256MB",
+    timeoutSeconds: 60,
+  })
+  .region("southamerica-east1")
+  .firestore.document("connectionRequests/{requestId}")
+  .onUpdate(async (change) => {
+    const before = change.before.data() || {};
+    const after = change.after.data() || {};
+    if (before.status === after.status || after.status !== "declined") {
+      return null;
+    }
+
+    await rebuildConnectionStatsForProfiles([
+      after.requesterProfileId,
+      after.recipientProfileId,
+    ]);
+    return null;
+  });
+
+exports.onConnectionRequestCancelled = functions
+  .runWith({
+    memory: "256MB",
+    timeoutSeconds: 60,
+  })
+  .region("southamerica-east1")
+  .firestore.document("connectionRequests/{requestId}")
+  .onUpdate(async (change) => {
+    const before = change.before.data() || {};
+    const after = change.after.data() || {};
+    if (before.status === after.status || after.status !== "cancelled") {
+      return null;
+    }
+
+    await rebuildConnectionStatsForProfiles([
+      after.requesterProfileId,
+      after.recipientProfileId,
+    ]);
+    return null;
+  });
+
+exports.onConnectionRemoved = functions
+  .runWith({
+    memory: "256MB",
+    timeoutSeconds: 60,
+  })
+  .region("southamerica-east1")
+  .firestore.document("connections/{connectionId}")
+  .onDelete(async (snap) => {
+    const data = snap.data() || {};
+    await rebuildConnectionStatsForProfiles(data.profileIds || []);
+    return null;
+  });
+
+exports.onBlockCreated = functions
+  .runWith({
+    memory: "256MB",
+    timeoutSeconds: 60,
+  })
+  .region("southamerica-east1")
+  .firestore.document("blocks/{blockId}")
+  .onCreate(async (snap, context) => {
+    const data = snap.data() || {};
+    const blockedByProfileId = normalizeProfileId(data.blockedByProfileId);
+    const blockedProfileId = normalizeProfileId(data.blockedProfileId);
+
+    if (!blockedByProfileId || !blockedProfileId) {
+      console.log(
+        `⚠️ onBlockCreated: block ${context.params.blockId} sem perfis válidos`,
+      );
+      return null;
+    }
+
+    await removeConnectionArtifactsBetweenProfiles(
+      blockedByProfileId,
+      blockedProfileId,
+      `blockCreated:${context.params.blockId}`,
+    );
+    return null;
+  });
+
+exports.rebuildConnectionStats = functions
+  .runWith({
+    memory: "256MB",
+    timeoutSeconds: 120,
+  })
+  .region("southamerica-east1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth?.uid) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Autenticação obrigatória.",
+      );
+    }
+
+    const requestedProfileId = normalizeProfileId(data?.profileId);
+    let profileIds = [];
+
+    if (requestedProfileId) {
+      const profileSnapshot = await db
+        .collection("profiles")
+        .doc(requestedProfileId)
+        .get();
+
+      if (!profileSnapshot.exists) {
+        throw new functions.https.HttpsError(
+          "not-found",
+          "Perfil não encontrado.",
+        );
+      }
+
+      if ((profileSnapshot.data()?.uid || "") !== context.auth.uid) {
+        throw new functions.https.HttpsError(
+          "permission-denied",
+          "Você só pode reconstruir estatísticas dos seus perfis.",
+        );
+      }
+
+      profileIds = [requestedProfileId];
+    } else {
+      const profilesSnapshot = await db
+        .collection("profiles")
+        .where("uid", "==", context.auth.uid)
+        .get();
+
+      profileIds = profilesSnapshot.docs.map((doc) => doc.id);
+    }
+
+    await rebuildConnectionStatsForProfiles(profileIds);
+
+    return {
+      ok: true,
+      rebuiltProfiles: uniqueProfileIds(profileIds),
+    };
   });

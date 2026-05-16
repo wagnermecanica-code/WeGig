@@ -5,4 +5,4 @@ FLUTTER_TARGET=lib/main_staging.dart
 ASSET_PREFIX=staging
 BUNDLE_NAME=WeGig STAGING
 BUNDLE_DISPLAY_NAME=WeGig STAGING
-PRODUCT_BUNDLE_IDENTIFIER=com.wegig.wegig.staging
+PRODUCT_BUNDLE_IDENTIFIER=com.tosembanda.wegig.staging

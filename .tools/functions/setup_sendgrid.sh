@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Script para configurar SMTP GoDaddy no Firebase Functions
-# Execute: bash .config/functions/setup_smtp.sh
+# Script para configurar SendGrid no .env local das Cloud Functions
+# Execute: bash .config/functions/setup_sendgrid.sh
 
-echo "🔧 Configurando SMTP GoDaddy para notificações de denúncias..."
+echo "🔧 Configurando SendGrid para notificações de denúncias..."
 echo ""
 
 # Verificar se Firebase CLI está instalado
@@ -18,56 +18,32 @@ if ! firebase projects:list &> /dev/null; then
     exit 1
 fi
 
-echo "📧 Configuração SMTP GoDaddy para contato@wegig.com.br"
+echo "📧 Configuração SendGrid para contato@wegig.com.br"
 echo ""
-echo "📝 Você precisará das credenciais do email no GoDaddy:"
-echo "   - Email: contato@wegig.com.br"
-echo "   - Senha: A senha do email (não a senha da conta GoDaddy)"
-echo ""
-echo "🔒 Configurações SMTP do GoDaddy (já pré-configuradas):"
-echo "   - Host: smtpout.secureserver.net"
-echo "   - Porta: 465 (SSL)"
+echo "📝 Você precisará da API key do SendGrid com permissão de envio"
 echo ""
 
-read -p "📧 Email (contato@wegig.com.br): " SMTP_USER
-SMTP_USER=${SMTP_USER:-contato@wegig.com.br}
-
-read -sp "🔑 Senha do email: " SMTP_PASS
+read -sp "🔑 SendGrid API key: " SENDGRID_API_KEY
 echo ""
 
-if [ -z "$SMTP_PASS" ]; then
-    echo "❌ Senha não fornecida"
+if [ -z "$SENDGRID_API_KEY" ]; then
+    echo "❌ API key não fornecida"
     exit 1
 fi
 
 echo ""
-echo "🔄 Configurando SMTP no Firebase Functions para todos os ambientes..."
+echo "🔄 Atualizando .config/functions/.env..."
 echo ""
 
-# Configurar para todos os ambientes
-for ENV in dev staging prod; do
-    PROJECT_ID=""
-    case $ENV in
-        dev) PROJECT_ID="wegig-dev" ;;
-        staging) PROJECT_ID="wegig-staging" ;;
-        prod) PROJECT_ID="to-sem-banda-83e19" ;;
-    esac
+if grep -q '^SENDGRID_API_KEY=' .config/functions/.env; then
+    sed -i.bak "s|^SENDGRID_API_KEY=.*|SENDGRID_API_KEY=$SENDGRID_API_KEY|" .config/functions/.env
+else
+    printf '\nSENDGRID_API_KEY=%s\n' "$SENDGRID_API_KEY" >> .config/functions/.env
+fi
 
-    echo "  📤 Configurando para $ENV ($PROJECT_ID)..."
+rm -f .config/functions/.env.bak
 
-    firebase functions:config:set \
-        smtp.host="smtpout.secureserver.net" \
-        smtp.port="465" \
-        smtp.user="$SMTP_USER" \
-        smtp.pass="$SMTP_PASS" \
-        --project "$PROJECT_ID" 2>/dev/null
-
-    if [ $? -eq 0 ]; then
-        echo "  ✅ $ENV configurado com sucesso"
-    else
-        echo "  ❌ Erro ao configurar $ENV (verifique se você tem acesso ao projeto)"
-    fi
-done
+echo "  ✅ .env atualizado com sucesso"
 
 echo ""
 echo "🎉 Configuração completa!"
@@ -75,16 +51,11 @@ echo ""
 echo "📋 Próximos passos:"
 echo ""
 echo "   1. DEPLOY DAS FUNÇÕES:"
-echo "      cd .config"
-echo "      firebase deploy --only functions --project wegig-dev        # DEV"
-echo "      firebase deploy --only functions --project wegig-staging    # STAGING"  
-echo "      firebase deploy --only functions --project to-sem-banda-83e19  # PROD"
+echo "      firebase deploy --only functions --project wegig-dev"
+echo "      firebase deploy --only functions --project wegig-staging"
+echo "      firebase deploy --only functions --project to-sem-banda-83e19"
 echo ""
 echo "   2. OU USE O SCRIPT DE DEPLOY:"
 echo "      bash .config/functions/deploy_all_envs.sh"
 echo ""
 echo "📬 Teste: Crie uma denúncia no app para receber o primeiro email em contato@wegig.com.br"
-echo ""
-echo "⚠️  NOTA: Se encontrar problemas de autenticação, verifique:"
-echo "   - A senha está correta (senha do email, não da conta GoDaddy)"
-echo "   - O email permite envio via SMTP (configurações no painel GoDaddy)"

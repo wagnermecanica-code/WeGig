@@ -63,10 +63,12 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAca3GkAy6euZ0QeO55TZ71gFQlM1c0c5Y',
-    appId: '1:27906769066:ios:3cab867b012d4c72bcd0d3',
+    appId: '1:27906769066:ios:4c2d8c2392483486bcd0d3',
     messagingSenderId: '27906769066',
     projectId: 'wegig-staging',
     storageBucket: 'wegig-staging.firebasestorage.app',
-    iosBundleId: 'com.wegig.wegig.staging',
+    iosClientId:
+        '27906769066-5cglghj0fieot8tnqko4snjkf6i4htiq.apps.googleusercontent.com',
+    iosBundleId: 'com.tosembanda.wegig.staging',
   );
 }

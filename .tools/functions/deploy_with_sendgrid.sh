@@ -20,11 +20,10 @@ esac
 
 echo "🚀 Fazendo deploy das funções para $ENV ($PROJECT_ID)..."
 
-# Verificar se SendGrid está configurado
-echo "🔍 Verificando configuração do SendGrid..."
-firebase functions:config:get sendgrid --project $PROJECT_ID > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-    echo "⚠️  SendGrid não configurado para $ENV"
+# Verificar se SendGrid está configurado no .env local das functions
+echo "🔍 Verificando configuração do SendGrid no .env..."
+if ! grep -q '^SENDGRID_API_KEY=.' .config/functions/.env; then
+    echo "⚠️  SENDGRID_API_KEY não configurada em .config/functions/.env"
     echo "Execute: bash .config/functions/setup_sendgrid.sh"
     exit 1
 fi

@@ -1,6 +1,6 @@
 "use strict";
 
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 
 if (admin.apps.length === 0) {
@@ -43,13 +43,13 @@ exports.syncBlockedByProfileIndex = functions
       const profileSnap = await profileRef.get();
       if (!profileSnap.exists) {
         console.log(
-          `⚠️ [BLOCKS_INDEX] profiles/${blockedProfileId} não existe. Ignorando add blockedByProfileId=${blockedByProfileId}`
+          `⚠️ [BLOCKS_INDEX] profiles/${blockedProfileId} não existe. Ignorando add blockedByProfileId=${blockedByProfileId}`,
         );
         return;
       }
 
       console.log(
-        `🧩 [BLOCKS_INDEX] ADD profiles/${blockedProfileId}.blockedByProfileIds += ${blockedByProfileId} (blockId=${context.params.blockId})`
+        `🧩 [BLOCKS_INDEX] ADD profiles/${blockedProfileId}.blockedByProfileIds += ${blockedByProfileId} (blockId=${context.params.blockId})`,
       );
 
       await profileRef.set(
@@ -58,7 +58,7 @@ exports.syncBlockedByProfileIndex = functions
             admin.firestore.FieldValue.arrayUnion(blockedByProfileId),
           blockedByUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
-        { merge: true }
+        { merge: true },
       );
     };
 
@@ -69,13 +69,13 @@ exports.syncBlockedByProfileIndex = functions
       const profileSnap = await profileRef.get();
       if (!profileSnap.exists) {
         console.log(
-          `⚠️ [BLOCKS_INDEX] profiles/${blockedProfileId} não existe. Ignorando remove blockedByProfileId=${blockedByProfileId}`
+          `⚠️ [BLOCKS_INDEX] profiles/${blockedProfileId} não existe. Ignorando remove blockedByProfileId=${blockedByProfileId}`,
         );
         return;
       }
 
       console.log(
-        `🧩 [BLOCKS_INDEX] REMOVE profiles/${blockedProfileId}.blockedByProfileIds -= ${blockedByProfileId} (blockId=${context.params.blockId})`
+        `🧩 [BLOCKS_INDEX] REMOVE profiles/${blockedProfileId}.blockedByProfileIds -= ${blockedByProfileId} (blockId=${context.params.blockId})`,
       );
 
       await profileRef.set(
@@ -84,7 +84,7 @@ exports.syncBlockedByProfileIndex = functions
             admin.firestore.FieldValue.arrayRemove(blockedByProfileId),
           blockedByUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
-        { merge: true }
+        { merge: true },
       );
     };
 
@@ -160,7 +160,7 @@ exports.backfillBlockedByProfileIndex = functions
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
-        { merge: true }
+        { merge: true },
       );
       return null;
     }
@@ -213,7 +213,7 @@ exports.backfillBlockedByProfileIndex = functions
           blockedByProfileIds: admin.firestore.FieldValue.arrayUnion(...values),
           blockedByUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
-        { merge: true }
+        { merge: true },
       );
       writes++;
     }
@@ -224,7 +224,7 @@ exports.backfillBlockedByProfileIndex = functions
 
     const newLastDocId = snap.docs[snap.docs.length - 1].id;
     console.log(
-      `🧩 [BLOCKS_INDEX] Backfill page: blocks=${snap.size} profilesUpdated=${writes} lastDocId=${newLastDocId}`
+      `🧩 [BLOCKS_INDEX] Backfill page: blocks=${snap.size} profilesUpdated=${writes} lastDocId=${newLastDocId}`,
     );
 
     await stateRef.set(
@@ -234,7 +234,7 @@ exports.backfillBlockedByProfileIndex = functions
         processedBlocks: admin.firestore.FieldValue.increment(snap.size),
         processedPages: admin.firestore.FieldValue.increment(1),
       },
-      { merge: true }
+      { merge: true },
     );
 
     return null;

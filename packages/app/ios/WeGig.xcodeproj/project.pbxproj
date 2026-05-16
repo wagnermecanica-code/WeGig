@@ -376,6 +376,7 @@
 			files = (
 			);
 			inputFileListPaths = (
+				"${PODS_ROOT}/FirebaseCrashlytics/CrashlyticsInputFiles.xcfilelist",
 			);
 			inputPaths = (
 			);
@@ -383,10 +384,11 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(DERIVED_FILE_DIR)/flutterfire-crashlytics-upload-${CONFIGURATION}.log",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\n#!/bin/bash\nPATH=\"${PATH}:$FLUTTER_ROOT/bin:${PUB_CACHE}/bin:$HOME/.pub-cache/bin\"\n\nif [ -z \"$PODS_ROOT\" ] || [ ! -d \"$PODS_ROOT/FirebaseCrashlytics\" ]; then\n  # Cannot use \"BUILD_DIR%/Build/*\" as per Firebase documentation, it points to \"flutter-project/build/ios/*\" path which doesn't have run script\n  DERIVED_DATA_PATH=$(echo \"$BUILD_ROOT\" | sed -E 's|(.*DerivedData/[^/]+).*|\\1|')\n  PATH_TO_CRASHLYTICS_UPLOAD_SCRIPT=\"${DERIVED_DATA_PATH}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\nelse\n  PATH_TO_CRASHLYTICS_UPLOAD_SCRIPT=\"$PODS_ROOT/FirebaseCrashlytics/run\"\nfi\n\n# Command to upload symbols script used to upload symbols to Firebase server\nflutterfire upload-crashlytics-symbols --upload-symbols-script-path=\"$PATH_TO_CRASHLYTICS_UPLOAD_SCRIPT\" --platform=ios --apple-project-path=\"${SRCROOT}\" --env-platform-name=\"${PLATFORM_NAME}\" --env-configuration=\"${CONFIGURATION}\" --env-project-dir=\"${PROJECT_DIR}\" --env-built-products-dir=\"${BUILT_PRODUCTS_DIR}\" --env-dwarf-dsym-folder-path=\"${DWARF_DSYM_FOLDER_PATH}\" --env-dwarf-dsym-file-name=\"${DWARF_DSYM_FILE_NAME}\" --env-infoplist-path=\"${INFOPLIST_PATH}\" --default-config=default\n";
+			shellScript = "\n#!/bin/bash\nset -euo pipefail\nPUB_CACHE_DIR=\"${PUB_CACHE:-$HOME/.pub-cache}\"\nPATH=\"${PATH}:$FLUTTER_ROOT/bin:${PUB_CACHE_DIR}/bin:$HOME/.pub-cache/bin\"\nOUTPUT_MARKER=\"${SCRIPT_OUTPUT_FILE_0}\"\n\nif [[ \"${CONFIGURATION}\" == Debug* ]]; then\n  echo \"Skipping Crashlytics symbol upload for ${CONFIGURATION}\" > \"$OUTPUT_MARKER\"\n  exit 0\nfi\n\nif [ -z \"$PODS_ROOT\" ] || [ ! -d \"$PODS_ROOT/FirebaseCrashlytics\" ]; then\n  # Cannot use \"BUILD_DIR%/Build/*\" as per Firebase documentation, it points to \"flutter-project/build/ios/*\" path which doesn't have run script\n  DERIVED_DATA_PATH=$(echo \"$BUILD_ROOT\" | sed -E 's|(.*DerivedData/[^/]+).*|\\1|')\n  PATH_TO_CRASHLYTICS_UPLOAD_SCRIPT=\"${DERIVED_DATA_PATH}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\nelse\n  PATH_TO_CRASHLYTICS_UPLOAD_SCRIPT=\"$PODS_ROOT/FirebaseCrashlytics/run\"\nfi\n\nflutterfire upload-crashlytics-symbols --upload-symbols-script-path=\"$PATH_TO_CRASHLYTICS_UPLOAD_SCRIPT\" --platform=ios --apple-project-path=\"${SRCROOT}\" --env-platform-name=\"${PLATFORM_NAME}\" --env-configuration=\"${CONFIGURATION}\" --env-project-dir=\"${PROJECT_DIR}\" --env-built-products-dir=\"${BUILT_PRODUCTS_DIR}\" --env-dwarf-dsym-folder-path=\"${DWARF_DSYM_FOLDER_PATH}\" --env-dwarf-dsym-file-name=\"${DWARF_DSYM_FILE_NAME}\" --env-infoplist-path=\"${INFOPLIST_PATH}\" --default-config=default\n\necho \"Uploaded Crashlytics symbols for ${CONFIGURATION}\" > \"$OUTPUT_MARKER\"\n";
 		};
 		4C22FD28BB542CC9B84DE2A3 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -433,15 +435,20 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
+				"${SRCROOT}/Firebase/GoogleService-Info-dev.plist",
+				"${SRCROOT}/Firebase/GoogleService-Info-staging.plist",
+				"${SRCROOT}/Firebase/GoogleService-Info-prod.plist",
 			);
 			name = "[CP] Copy GoogleService-Info.plist";
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"${SRCROOT}/GoogleService-Info.plist",
+				"${SRCROOT}/Runner/Info.plist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nFIREBASE_DIR=\"${SRCROOT}/Firebase\"\nTARGET_PLIST=\"${SRCROOT}/GoogleService-Info.plist\"\nINFO_PLIST=\"${SRCROOT}/Runner/Info.plist\"\n\n# Selecionar plist baseado na configuração\ncase \"$CONFIGURATION\" in\n  *dev*) SOURCE_PLIST=\"$FIREBASE_DIR/GoogleService-Info-dev.plist\" ;;\n  *staging*) SOURCE_PLIST=\"$FIREBASE_DIR/GoogleService-Info-staging.plist\" ;;\n  *) SOURCE_PLIST=\"$FIREBASE_DIR/GoogleService-Info-prod.plist\" ;;\nesac\n\nif [ ! -f \"$SOURCE_PLIST\" ]; then\n  echo \"error: Missing Firebase plist for $CONFIGURATION ($SOURCE_PLIST)\" >&2\n  exit 1\nfi\n\n# Copiar GoogleService-Info.plist\nif [ -f \"$TARGET_PLIST\" ] && cmp -s \"$SOURCE_PLIST\" \"$TARGET_PLIST\"; then\n  echo \"GoogleService-Info.plist already up to date\"\nelse\n  cp \"$SOURCE_PLIST\" \"$TARGET_PLIST\"\n  echo \"Copied ${SOURCE_PLIST##*/} to GoogleService-Info.plist\"\nfi\n\n# Atualizar Info.plist com CLIENT_ID e REVERSED_CLIENT_ID do Google Sign-In\nCLIENT_ID=$(/usr/libexec/PlistBuddy -c \"Print :CLIENT_ID\" \"$SOURCE_PLIST\")\nREVERSED_CLIENT_ID=$(/usr/libexec/PlistBuddy -c \"Print :REVERSED_CLIENT_ID\" \"$SOURCE_PLIST\")\n\nif [ -n \"$CLIENT_ID\" ] && [ -n \"$REVERSED_CLIENT_ID\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :GIDClientID $CLIENT_ID\" \"$INFO_PLIST\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :GIDClientID string $CLIENT_ID\" \"$INFO_PLIST\"\n  /usr/libexec/PlistBuddy -c \"Set :CFBundleURLTypes:0:CFBundleURLSchemes:0 $REVERSED_CLIENT_ID\" \"$INFO_PLIST\"\n  echo \"Updated Info.plist with Google Sign-In config for $CONFIGURATION\"\n  echo \"  GIDClientID: $CLIENT_ID\"\n  echo \"  URL Scheme: $REVERSED_CLIENT_ID\"\nfi\n";
+			shellScript = "set -euo pipefail\nFIREBASE_DIR=\"${SRCROOT}/Firebase\"\nTARGET_PLIST=\"${SRCROOT}/GoogleService-Info.plist\"\nINFO_PLIST=\"${SRCROOT}/Runner/Info.plist\"\n\n# Selecionar plist baseado na configuração\ncase \"$CONFIGURATION\" in\n  *dev*) SOURCE_PLIST=\"$FIREBASE_DIR/GoogleService-Info-dev.plist\" ;;\n  *staging*) SOURCE_PLIST=\"$FIREBASE_DIR/GoogleService-Info-staging.plist\" ;;\n  *) SOURCE_PLIST=\"$FIREBASE_DIR/GoogleService-Info-prod.plist\" ;;\nesac\n\nif [ ! -f \"$SOURCE_PLIST\" ]; then\n  echo \"error: Missing Firebase plist for $CONFIGURATION ($SOURCE_PLIST)\" >&2\n  exit 1\nfi\n\nif [ -f \"$TARGET_PLIST\" ] && cmp -s \"$SOURCE_PLIST\" \"$TARGET_PLIST\"; then\n  echo \"GoogleService-Info.plist already up to date\"\nelse\n  cp \"$SOURCE_PLIST\" \"$TARGET_PLIST\"\n  echo \"Copied ${SOURCE_PLIST##*/} to GoogleService-Info.plist\"\nfi\n\nCLIENT_ID=$(/usr/libexec/PlistBuddy -c \"Print :CLIENT_ID\" \"$SOURCE_PLIST\")\nREVERSED_CLIENT_ID=$(/usr/libexec/PlistBuddy -c \"Print :REVERSED_CLIENT_ID\" \"$SOURCE_PLIST\")\nCURRENT_CLIENT_ID=$(/usr/libexec/PlistBuddy -c \"Print :GIDClientID\" \"$INFO_PLIST\" 2>/dev/null || echo \"\")\nCURRENT_REVERSED_CLIENT_ID=$(/usr/libexec/PlistBuddy -c \"Print :CFBundleURLTypes:0:CFBundleURLSchemes:0\" \"$INFO_PLIST\" 2>/dev/null || echo \"\")\n\nif [ -n \"$CLIENT_ID\" ] && [ -n \"$REVERSED_CLIENT_ID\" ]; then\n  if [ \"$CURRENT_CLIENT_ID\" = \"$CLIENT_ID\" ] && [ \"$CURRENT_REVERSED_CLIENT_ID\" = \"$REVERSED_CLIENT_ID\" ]; then\n    echo \"Info.plist already up to date\"\n  else\n    /usr/libexec/PlistBuddy -c \"Set :GIDClientID $CLIENT_ID\" \"$INFO_PLIST\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :GIDClientID string $CLIENT_ID\" \"$INFO_PLIST\"\n    /usr/libexec/PlistBuddy -c \"Set :CFBundleURLTypes:0:CFBundleURLSchemes:0 $REVERSED_CLIENT_ID\" \"$INFO_PLIST\"\n    echo \"Updated Info.plist with Google Sign-In config for $CONFIGURATION\"\n    echo \"  GIDClientID: $CLIENT_ID\"\n    echo \"  URL Scheme: $REVERSED_CLIENT_ID\"\n  fi\nfi\n";
 		};
 		D90856FE1CC90204DFAD95E7 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;

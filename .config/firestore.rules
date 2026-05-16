@@ -38,6 +38,27 @@ service cloud.firestore {
       );
     }
 
+    function isBlockedBetweenProfiles(profileId1, profileId2) {
+      return profileId1 is string && profileId2 is string && profileId1 != profileId2 && (
+        exists(/databases/$(database)/documents/blocks/$(profileId1 + '_' + profileId2)) ||
+        exists(/databases/$(database)/documents/blocks/$(profileId2 + '_' + profileId1)) ||
+        (
+          get(/databases/$(database)/documents/profiles/$(profileId1)).exists() &&
+          get(/databases/$(database)/documents/profiles/$(profileId2)).exists() &&
+          (
+            (get(/databases/$(database)/documents/profiles/$(profileId1)).data.blockedProfileIds != null &&
+              profileId2 in get(/databases/$(database)/documents/profiles/$(profileId1)).data.blockedProfileIds) ||
+            (get(/databases/$(database)/documents/profiles/$(profileId1)).data.blockedByProfileIds != null &&
+              profileId2 in get(/databases/$(database)/documents/profiles/$(profileId1)).data.blockedByProfileIds) ||
+            (get(/databases/$(database)/documents/profiles/$(profileId2)).data.blockedProfileIds != null &&
+              profileId1 in get(/databases/$(database)/documents/profiles/$(profileId2)).data.blockedProfileIds) ||
+            (get(/databases/$(database)/documents/profiles/$(profileId2)).data.blockedByProfileIds != null &&
+              profileId1 in get(/databases/$(database)/documents/profiles/$(profileId2)).data.blockedByProfileIds)
+          )
+        )
+      );
+    }
+
     // ============================================
     // PROFILES - Perfis de usuários (multi-perfil)
     // ============================================
@@ -132,8 +153,13 @@ service cloud.firestore {
     match /conversations/{conversationId} {
       // Para queries: verifica se o usuário está em participants ou profileUid do documento retornado
       // Para leitura de documento específico: usa isConversationMember
+      //
+      // `resource == null` cobre o caso de "get" em doc inexistente (ex:
+      // get-or-create com docId determinístico). Sem isso, Firestore
+      // retorna permission-denied quando o doc não existe, quebrando o
+      // fluxo idempotente de criação.
       allow read: if isSignedIn() && (
-        // Query support: verifica campos do documento retornado (resource.data)
+        resource == null ||
         (resource.data.participants != null && request.auth.uid in resource.data.participants) ||
         (resource.data.profileUid != null && request.auth.uid in resource.data.profileUid)
       );
@@ -206,6 +232,89 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn() && request.resource.data.profileUid == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.profileUid == request.auth.uid;
+    }
+
+    // ============================================
+    // CONNECTION REQUESTS - Convites entre perfis
+    // ============================================
+    // Queries client-side filtram por requesterUid/recipientUid == auth.uid,
+    // portanto a regra de leitura basta verificar esses campos UID.
+    // ownsProfile() removido de reads para evitar estourar limite de get() em queries.
+
+    match /connectionRequests/{requestId} {
+      allow read: if isSignedIn() && (
+        resource == null ||
+        resource.data.requesterUid == request.auth.uid ||
+        resource.data.recipientUid == request.auth.uid
+      );
+
+      allow create: if isSignedIn()
+        && request.resource.data.requesterUid == request.auth.uid
+        && request.resource.data.requesterProfileId is string
+        && request.resource.data.requesterProfileId.size() > 0
+        && request.resource.data.recipientProfileId is string
+        && request.resource.data.recipientProfileId.size() > 0
+        && request.resource.data.recipientUid is string
+        && request.resource.data.recipientUid.size() > 0
+        && request.resource.data.requesterProfileId != request.resource.data.recipientProfileId
+        && request.resource.data.status == 'pending';
+
+      allow update, delete: if isSignedIn() && (
+        resource.data.requesterUid == request.auth.uid ||
+        resource.data.recipientUid == request.auth.uid
+      );
+    }
+
+    // ============================================
+    // CONNECTIONS - Relacao consolidada entre perfis
+    // ============================================
+    // Query client-side usa .where('profileIds', arrayContains: profileId),
+    // mas a regra deve validar pelo campo UID para que o Firestore
+    // consiga garantir permissão sem get() em cada doc.
+
+    match /connections/{connectionId} {
+      // Leitura aberta para autenticados: loadCommonConnections precisa
+      // consultar conexões de OUTROS perfis para mostrar conexões em comum.
+      // Escrita continua restrita ao participante da conexão.
+      allow read: if isSignedIn();
+
+      allow create, update: if isSignedIn() && (
+        request.auth.uid in request.resource.data.profileUids
+      );
+
+      allow delete: if isSignedIn() && (
+        request.auth.uid in resource.data.profileUids
+      );
+    }
+
+    // ============================================
+    // CONNECTION STATS - Contadores por perfil
+    // ============================================
+    // Leitura é single-doc (doc(profileId).snapshots()), mas ownsProfile
+    // usa get() que pode falhar para docs inexistentes.
+    // Simplificado: qualquer usuário autenticado pode ler stats (dados não sensíveis).
+    // Escrita mantém ownsProfile para segurança.
+
+    match /connectionStats/{profileId} {
+      allow read: if isSignedIn();
+      // Write aberto para autenticados porque _applyStatsDelta (client-side)
+      // atualiza stats de AMBOS os perfis envolvidos em uma transação.
+      // Ex: requester incrementa pendingSent no próprio + pendingReceived no destinatário.
+      // ownsProfile() impediria a escrita no perfil do outro.
+      // O Cloud Function rebuildConnectionStats corrige discrepâncias.
+      allow write: if isSignedIn();
+    }
+
+    // ============================================
+    // CONNECTION SUGGESTIONS - Cache por perfil
+    // ============================================
+
+    match /connectionSuggestions/{profileId} {
+      allow read: if isSignedIn();
+      // Cache de sugestões escrito pelo client — ownsProfile usava get().exists()
+      // que não funciona (exists() é função standalone, não método de Resource).
+      // Dados não são sensíveis (cache de sugestões), então isSignedIn() basta.
+      allow write: if isSignedIn();
     }
 
     // ============================================
