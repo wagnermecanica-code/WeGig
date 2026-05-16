@@ -34,6 +34,8 @@ mixin _$ProfileEntity {
   DateTime get createdAt => throw _privateConstructorUsedError;
   double get notificationRadius => throw _privateConstructorUsedError;
   bool get notificationRadiusEnabled => throw _privateConstructorUsedError;
+  bool get allowConnectionSuggestions => throw _privateConstructorUsedError;
+  bool get allowConnectionRequests => throw _privateConstructorUsedError;
   String? get photoUrl => throw _privateConstructorUsedError;
   int? get birthYear => throw _privateConstructorUsedError;
   String? get bio => throw _privateConstructorUsedError;
@@ -53,7 +55,10 @@ mixin _$ProfileEntity {
   String? get phone => throw _privateConstructorUsedError;
   String? get operatingHours => throw _privateConstructorUsedError;
   String? get website => throw _privateConstructorUsedError;
-  List<String>? get amenities => throw _privateConstructorUsedError;
+  List<String>? get amenities =>
+      throw _privateConstructorUsedError; // Technician-specific fields
+  String? get technicianSpecialty => throw _privateConstructorUsedError;
+  String? get experienceRange => throw _privateConstructorUsedError;
   @NullableTimestampConverter()
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
@@ -85,6 +90,8 @@ abstract class $ProfileEntityCopyWith<$Res> {
       @TimestampConverter() DateTime createdAt,
       double notificationRadius,
       bool notificationRadiusEnabled,
+      bool allowConnectionSuggestions,
+      bool allowConnectionRequests,
       String? photoUrl,
       int? birthYear,
       String? bio,
@@ -104,6 +111,8 @@ abstract class $ProfileEntityCopyWith<$Res> {
       String? operatingHours,
       String? website,
       List<String>? amenities,
+      String? technicianSpecialty,
+      String? experienceRange,
       @NullableTimestampConverter() DateTime? updatedAt});
 }
 
@@ -133,6 +142,8 @@ class _$ProfileEntityCopyWithImpl<$Res, $Val extends ProfileEntity>
     Object? createdAt = null,
     Object? notificationRadius = null,
     Object? notificationRadiusEnabled = null,
+    Object? allowConnectionSuggestions = null,
+    Object? allowConnectionRequests = null,
     Object? photoUrl = freezed,
     Object? birthYear = freezed,
     Object? bio = freezed,
@@ -152,6 +163,8 @@ class _$ProfileEntityCopyWithImpl<$Res, $Val extends ProfileEntity>
     Object? operatingHours = freezed,
     Object? website = freezed,
     Object? amenities = freezed,
+    Object? technicianSpecialty = freezed,
+    Object? experienceRange = freezed,
     Object? updatedAt = freezed,
   }) {
     return _then(_value.copyWith(
@@ -198,6 +211,14 @@ class _$ProfileEntityCopyWithImpl<$Res, $Val extends ProfileEntity>
       notificationRadiusEnabled: null == notificationRadiusEnabled
           ? _value.notificationRadiusEnabled
           : notificationRadiusEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      allowConnectionSuggestions: null == allowConnectionSuggestions
+          ? _value.allowConnectionSuggestions
+          : allowConnectionSuggestions // ignore: cast_nullable_to_non_nullable
+              as bool,
+      allowConnectionRequests: null == allowConnectionRequests
+          ? _value.allowConnectionRequests
+          : allowConnectionRequests // ignore: cast_nullable_to_non_nullable
               as bool,
       photoUrl: freezed == photoUrl
           ? _value.photoUrl
@@ -275,6 +296,14 @@ class _$ProfileEntityCopyWithImpl<$Res, $Val extends ProfileEntity>
           ? _value.amenities
           : amenities // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      technicianSpecialty: freezed == technicianSpecialty
+          ? _value.technicianSpecialty
+          : technicianSpecialty // ignore: cast_nullable_to_non_nullable
+              as String?,
+      experienceRange: freezed == experienceRange
+          ? _value.experienceRange
+          : experienceRange // ignore: cast_nullable_to_non_nullable
+              as String?,
       updatedAt: freezed == updatedAt
           ? _value.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
@@ -303,6 +332,8 @@ abstract class _$$ProfileEntityImplCopyWith<$Res>
       @TimestampConverter() DateTime createdAt,
       double notificationRadius,
       bool notificationRadiusEnabled,
+      bool allowConnectionSuggestions,
+      bool allowConnectionRequests,
       String? photoUrl,
       int? birthYear,
       String? bio,
@@ -322,6 +353,8 @@ abstract class _$$ProfileEntityImplCopyWith<$Res>
       String? operatingHours,
       String? website,
       List<String>? amenities,
+      String? technicianSpecialty,
+      String? experienceRange,
       @NullableTimestampConverter() DateTime? updatedAt});
 }
 
@@ -349,6 +382,8 @@ class __$$ProfileEntityImplCopyWithImpl<$Res>
     Object? createdAt = null,
     Object? notificationRadius = null,
     Object? notificationRadiusEnabled = null,
+    Object? allowConnectionSuggestions = null,
+    Object? allowConnectionRequests = null,
     Object? photoUrl = freezed,
     Object? birthYear = freezed,
     Object? bio = freezed,
@@ -368,6 +403,8 @@ class __$$ProfileEntityImplCopyWithImpl<$Res>
     Object? operatingHours = freezed,
     Object? website = freezed,
     Object? amenities = freezed,
+    Object? technicianSpecialty = freezed,
+    Object? experienceRange = freezed,
     Object? updatedAt = freezed,
   }) {
     return _then(_$ProfileEntityImpl(
@@ -414,6 +451,14 @@ class __$$ProfileEntityImplCopyWithImpl<$Res>
       notificationRadiusEnabled: null == notificationRadiusEnabled
           ? _value.notificationRadiusEnabled
           : notificationRadiusEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      allowConnectionSuggestions: null == allowConnectionSuggestions
+          ? _value.allowConnectionSuggestions
+          : allowConnectionSuggestions // ignore: cast_nullable_to_non_nullable
+              as bool,
+      allowConnectionRequests: null == allowConnectionRequests
+          ? _value.allowConnectionRequests
+          : allowConnectionRequests // ignore: cast_nullable_to_non_nullable
               as bool,
       photoUrl: freezed == photoUrl
           ? _value.photoUrl
@@ -491,6 +536,14 @@ class __$$ProfileEntityImplCopyWithImpl<$Res>
           ? _value._amenities
           : amenities // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      technicianSpecialty: freezed == technicianSpecialty
+          ? _value.technicianSpecialty
+          : technicianSpecialty // ignore: cast_nullable_to_non_nullable
+              as String?,
+      experienceRange: freezed == experienceRange
+          ? _value.experienceRange
+          : experienceRange // ignore: cast_nullable_to_non_nullable
+              as String?,
       updatedAt: freezed == updatedAt
           ? _value.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
@@ -514,6 +567,8 @@ class _$ProfileEntityImpl extends _ProfileEntity {
       @TimestampConverter() required this.createdAt,
       this.notificationRadius = 20.0,
       this.notificationRadiusEnabled = true,
+      this.allowConnectionSuggestions = true,
+      this.allowConnectionRequests = true,
       this.photoUrl,
       this.birthYear,
       this.bio,
@@ -533,6 +588,8 @@ class _$ProfileEntityImpl extends _ProfileEntity {
       this.operatingHours,
       this.website,
       final List<String>? amenities,
+      this.technicianSpecialty,
+      this.experienceRange,
       @NullableTimestampConverter() this.updatedAt})
       : _instruments = instruments,
         _genres = genres,
@@ -571,6 +628,12 @@ class _$ProfileEntityImpl extends _ProfileEntity {
   @override
   @JsonKey()
   final bool notificationRadiusEnabled;
+  @override
+  @JsonKey()
+  final bool allowConnectionSuggestions;
+  @override
+  @JsonKey()
+  final bool allowConnectionRequests;
   @override
   final String? photoUrl;
   @override
@@ -642,13 +705,18 @@ class _$ProfileEntityImpl extends _ProfileEntity {
     return EqualUnmodifiableListView(value);
   }
 
+// Technician-specific fields
+  @override
+  final String? technicianSpecialty;
+  @override
+  final String? experienceRange;
   @override
   @NullableTimestampConverter()
   final DateTime? updatedAt;
 
   @override
   String toString() {
-    return 'ProfileEntity(profileId: $profileId, uid: $uid, name: $name, username: $username, isBand: $isBand, profileType: $profileType, city: $city, location: $location, createdAt: $createdAt, notificationRadius: $notificationRadius, notificationRadiusEnabled: $notificationRadiusEnabled, photoUrl: $photoUrl, birthYear: $birthYear, bio: $bio, instruments: $instruments, genres: $genres, level: $level, instagramLink: $instagramLink, tiktokLink: $tiktokLink, youtubeLink: $youtubeLink, spotifyLink: $spotifyLink, deezerLink: $deezerLink, neighborhood: $neighborhood, state: $state, bandMembers: $bandMembers, spaceType: $spaceType, phone: $phone, operatingHours: $operatingHours, website: $website, amenities: $amenities, updatedAt: $updatedAt)';
+    return 'ProfileEntity(profileId: $profileId, uid: $uid, name: $name, username: $username, isBand: $isBand, profileType: $profileType, city: $city, location: $location, createdAt: $createdAt, notificationRadius: $notificationRadius, notificationRadiusEnabled: $notificationRadiusEnabled, allowConnectionSuggestions: $allowConnectionSuggestions, allowConnectionRequests: $allowConnectionRequests, photoUrl: $photoUrl, birthYear: $birthYear, bio: $bio, instruments: $instruments, genres: $genres, level: $level, instagramLink: $instagramLink, tiktokLink: $tiktokLink, youtubeLink: $youtubeLink, spotifyLink: $spotifyLink, deezerLink: $deezerLink, neighborhood: $neighborhood, state: $state, bandMembers: $bandMembers, spaceType: $spaceType, phone: $phone, operatingHours: $operatingHours, website: $website, amenities: $amenities, technicianSpecialty: $technicianSpecialty, experienceRange: $experienceRange, updatedAt: $updatedAt)';
   }
 
   @override
@@ -672,9 +740,13 @@ class _$ProfileEntityImpl extends _ProfileEntity {
                 other.createdAt == createdAt) &&
             (identical(other.notificationRadius, notificationRadius) ||
                 other.notificationRadius == notificationRadius) &&
-            (identical(other.notificationRadiusEnabled,
-                    notificationRadiusEnabled) ||
+            (identical(other.notificationRadiusEnabled, notificationRadiusEnabled) ||
                 other.notificationRadiusEnabled == notificationRadiusEnabled) &&
+            (identical(other.allowConnectionSuggestions, allowConnectionSuggestions) ||
+                other.allowConnectionSuggestions ==
+                    allowConnectionSuggestions) &&
+            (identical(other.allowConnectionRequests, allowConnectionRequests) ||
+                other.allowConnectionRequests == allowConnectionRequests) &&
             (identical(other.photoUrl, photoUrl) ||
                 other.photoUrl == photoUrl) &&
             (identical(other.birthYear, birthYear) ||
@@ -707,8 +779,11 @@ class _$ProfileEntityImpl extends _ProfileEntity {
             (identical(other.website, website) || other.website == website) &&
             const DeepCollectionEquality()
                 .equals(other._amenities, _amenities) &&
-            (identical(other.updatedAt, updatedAt) ||
-                other.updatedAt == updatedAt));
+            (identical(other.technicianSpecialty, technicianSpecialty) ||
+                other.technicianSpecialty == technicianSpecialty) &&
+            (identical(other.experienceRange, experienceRange) ||
+                other.experienceRange == experienceRange) &&
+            (identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -726,6 +801,8 @@ class _$ProfileEntityImpl extends _ProfileEntity {
         createdAt,
         notificationRadius,
         notificationRadiusEnabled,
+        allowConnectionSuggestions,
+        allowConnectionRequests,
         photoUrl,
         birthYear,
         bio,
@@ -745,6 +822,8 @@ class _$ProfileEntityImpl extends _ProfileEntity {
         operatingHours,
         website,
         const DeepCollectionEquality().hash(_amenities),
+        technicianSpecialty,
+        experienceRange,
         updatedAt
       ]);
 
@@ -777,6 +856,8 @@ abstract class _ProfileEntity extends ProfileEntity {
           @TimestampConverter() required final DateTime createdAt,
           final double notificationRadius,
           final bool notificationRadiusEnabled,
+          final bool allowConnectionSuggestions,
+          final bool allowConnectionRequests,
           final String? photoUrl,
           final int? birthYear,
           final String? bio,
@@ -796,6 +877,8 @@ abstract class _ProfileEntity extends ProfileEntity {
           final String? operatingHours,
           final String? website,
           final List<String>? amenities,
+          final String? technicianSpecialty,
+          final String? experienceRange,
           @NullableTimestampConverter() final DateTime? updatedAt}) =
       _$ProfileEntityImpl;
   const _ProfileEntity._() : super._();
@@ -828,6 +911,10 @@ abstract class _ProfileEntity extends ProfileEntity {
   double get notificationRadius;
   @override
   bool get notificationRadiusEnabled;
+  @override
+  bool get allowConnectionSuggestions;
+  @override
+  bool get allowConnectionRequests;
   @override
   String? get photoUrl;
   @override
@@ -865,7 +952,11 @@ abstract class _ProfileEntity extends ProfileEntity {
   @override
   String? get website;
   @override
-  List<String>? get amenities;
+  List<String>? get amenities; // Technician-specific fields
+  @override
+  String? get technicianSpecialty;
+  @override
+  String? get experienceRange;
   @override
   @NullableTimestampConverter()
   DateTime? get updatedAt;

@@ -1,6 +1,7 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_cache_provider.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
@@ -55,7 +56,9 @@ class ProfileSwitcherNotifier extends _$ProfileSwitcherNotifier {
       ref.invalidate(postNotifierProvider);
       // 2.1 ✅ Invalidar interesses (depende do perfil ativo)
       ref.invalidate(interestNotifierProvider);
-      debugPrint('   ✅ Cache de posts invalidado');
+      // 2.2 ✅ Limpar streams compartilhados de bloqueio
+      BlockedRelations.clearStreamCache();
+      debugPrint('   ✅ Cache de posts e streams de bloqueio invalidados');
       
       // 3. ✅ Invalidar providers de notificações e mensagens
       // Nota: Estes providers usam activeProfile, serão automaticamente

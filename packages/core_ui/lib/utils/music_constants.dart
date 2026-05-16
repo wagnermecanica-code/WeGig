@@ -196,6 +196,28 @@ class MusicConstants {
     'Outro',
   ];
 
+  /// Especialidades para perfil Técnico
+  static const List<String> technicianSpecialtyOptions = [
+    'Técnico de Som',
+    'Técnico de Luz',
+    'Roadie',
+    'Produtor Musical',
+    'Stage Manager',
+    'Videomaker',
+    'Fotógrafo',
+    'Operador de Transmissão',
+    'Outro',
+  ];
+
+  /// Faixas de experiência para perfil Técnico
+  static const List<String> experienceRangeOptions = [
+    'Menos de 1 ano',
+    '1 a 2 anos',
+    '3 a 5 anos',
+    '6 a 10 anos',
+    'Mais de 10 anos',
+  ];
+
   /// Formatos de contratação (tamanho do grupo)
   static const List<String> gigFormatOptions = [
     'Solo',

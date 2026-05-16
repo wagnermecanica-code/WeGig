@@ -36,6 +36,10 @@ class AppColors {
         return spaceColor;
       case 'musician':
         return musicianColor;
+      case 'technician':
+        return musicianColor; // sem cor distinta por ora
+      case 'contractor':
+        return musicianColor; // sem cor distinta por ora
       case 'sales':
         return salesColor;
       case 'hiring':

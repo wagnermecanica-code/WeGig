@@ -38,6 +38,10 @@ class SettingsRemoteDataSource implements ISettingsRemoteDataSource {
         // ✅ FIX: Carregar notifyInterests e notifyMessages do Firestore
         notifyInterests: data['notifyInterests'] as bool? ?? true,
         notifyMessages: data['notifyMessages'] as bool? ?? true,
+        allowConnectionSuggestions:
+          data['allowConnectionSuggestions'] as bool? ?? true,
+        allowConnectionRequests:
+          data['allowConnectionRequests'] as bool? ?? true,
       );
 
       debugPrint('✅ SettingsDataSource: Settings loaded');
@@ -66,6 +70,8 @@ class SettingsRemoteDataSource implements ISettingsRemoteDataSource {
         // ✅ FIX: Persistir notifyInterests e notifyMessages no Firestore
         'notifyInterests': settings.notifyInterests,
         'notifyMessages': settings.notifyMessages,
+        'allowConnectionSuggestions': settings.allowConnectionSuggestions,
+        'allowConnectionRequests': settings.allowConnectionRequests,
         'profileUid': settings.profileId, // CRITICAL: Isolamento de perfil
         'updatedAt': FieldValue.serverTimestamp(),
       });

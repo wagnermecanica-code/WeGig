@@ -3,6 +3,7 @@ import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -79,6 +80,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           title: Text('Configurações',
               style: AppTypography.headlineMedium.copyWith(color: Colors.white)),
           backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          iconTheme: const IconThemeData(color: Colors.white),
+          actionsIconTheme: const IconThemeData(color: Colors.white),
           elevation: 0,
           centerTitle: true,
         ),
@@ -411,9 +415,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         child: const Padding(
           padding: EdgeInsets.all(20),
           child: Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-            ),
+            child: AppRadioPulseLoader(size: 44, color: AppColors.primary),
           ),
         ),
       ),
@@ -471,6 +473,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               },
             ),
             const SizedBox(height: 8),
+            SettingsSwitchTile(
+              icon: Iconsax.user_search,
+              title: 'Aparecer em sugestões',
+              subtitle: 'Permitir que seu perfil apareça em sugestões de conexão',
+              value: settings.allowConnectionSuggestions,
+              onChanged: (value) {
+                ref
+                    .read(userSettingsProvider.notifier)
+                    .toggleAllowConnectionSuggestions(value);
+                _showSnackBar('Preferência salva');
+              },
+            ),
+            const SizedBox(height: 8),
+            SettingsSwitchTile(
+              icon: Iconsax.user_add,
+              title: 'Receber convites de conexão',
+              subtitle: 'Permitir que outros perfis enviem convites para você',
+              value: settings.allowConnectionRequests,
+              onChanged: (value) {
+                ref
+                    .read(userSettingsProvider.notifier)
+                    .toggleAllowConnectionRequests(value);
+                _showSnackBar('Preferência salva');
+              },
+            ),
+            const SizedBox(height: 8),
             _buildNearbyPostsCard(),
           ],
         );
@@ -479,9 +507,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         children: [
           SizedBox(height: 40),
           Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-            ),
+            child: AppRadioPulseLoader(size: 44, color: AppColors.primary),
           ),
           SizedBox(height: 40),
         ],
@@ -735,7 +761,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CircularProgressIndicator(),
+                      AppRadioPulseLoader(size: 40),
                       SizedBox(height: 16),
                       Text('Excluindo conta...'),
                     ],
@@ -790,7 +816,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          CircularProgressIndicator(),
+                          AppRadioPulseLoader(size: 40),
                           SizedBox(height: 16),
                           Text('Excluindo conta...'),
                         ],
@@ -1161,10 +1187,7 @@ class _PasswordReauthDialogState extends State<_PasswordReauthDialog> {
               ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
+                  child: AppRadioPulseLoader(size: 20, color: Colors.white),
                 )
               : const Text('Confirmar'),
         ),

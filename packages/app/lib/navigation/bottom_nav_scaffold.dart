@@ -6,11 +6,14 @@ import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:core_ui/features/notifications/domain/entities/notification_entity.dart';
 import 'package:core_ui/models/search_params.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:core_ui/widgets/mention_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/features/connections/presentation/pages/my_network_page.dart';
+import 'package:wegig_app/features/connections/presentation/providers/connections_providers.dart';
 import 'package:wegig_app/features/home/presentation/pages/home_page.dart';
 import 'package:wegig_app/features/home/presentation/pages/search_page_new.dart';
 import 'package:wegig_app/features/mensagens_new/mensagens_new.dart';
@@ -78,7 +81,9 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
       onOpenSearch: _openSearchPage,
       refreshNotifier: _homeRefreshNotifier,
     ),
-    const NotificationsNewPage(),
+    MyNetworkPage(
+      currentTabIndexListenable: _currentIndexNotifier,
+    ),
     const SizedBox.shrink(), // Placeholder - abre bottom sheet ao tocar
     const MensagensNewPage(),
     // ViewProfilePage without userId shows the current authenticated user's profile
@@ -95,8 +100,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   // Configuração dos itens da bottom nav (elimina código repetitivo)
   static const List<_NavItemConfig> _navItems = [
     _NavItemConfig(icon: Iconsax.home, label: 'Início'),
-    _NavItemConfig(
-        icon: Iconsax.notification, label: 'Notificações', hasBadge: true),
+    _NavItemConfig(icon: Iconsax.profile_2user, label: 'Minha Rede', hasBadge: true),
     _NavItemConfig(icon: Iconsax.add_circle, label: 'Criar Post'),
     _NavItemConfig(icon: Iconsax.message, label: 'Mensagens', hasBadge: true),
     _NavItemConfig(icon: Iconsax.user, label: 'Perfil', isAvatar: true),
@@ -164,8 +168,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
             },
             items: List.generate(
               _navItems.length,
-              (index) =>
-                  _buildNavItem(_navItems[index], index == currentIndex),
+              (index) => _buildNavItem(_navItems[index], index == currentIndex),
             ),
           ),
         );
@@ -179,9 +182,9 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     Widget icon;
 
     if (config.hasBadge) {
-      // Badges: notificações ou mensagens
-      if (config.label == 'Notificações') {
-        icon = _buildNotificationIcon(isSelected: isSelected);
+      // Badges: minha rede ou mensagens
+      if (config.label == 'Minha Rede') {
+        icon = _buildMyNetworkIcon(isSelected: isSelected);
       } else if (config.label == 'Mensagens') {
         icon = _buildMessagesIcon(isSelected: isSelected);
       } else {
@@ -205,42 +208,58 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     );
   }
 
-  /// Ícone de notificações com badge reativo
-  Widget _buildNotificationIcon({bool isSelected = false}) {
+  /// Ícone de Minha Rede com badge baseado em movimentações da feature
+  Widget _buildMyNetworkIcon({bool isSelected = false}) {
     final profileState = ref.watch(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
     final authUid = ref.watch(currentUserProvider)?.uid;
 
-    final isProfileReadyForQueries =
-        authUid != null && activeProfile != null && activeProfile.uid == authUid;
+    final isProfileReadyForQueries = authUid != null &&
+        activeProfile != null &&
+        activeProfile.uid == authUid;
 
     if (!isProfileReadyForQueries) {
       return Container(
         padding: const EdgeInsets.all(4),
         child: Icon(
-          Iconsax.notification,
+          Iconsax.profile_2user,
           size: 26,
           color: isSelected ? _navSelectedColor : AppColors.textSecondary,
         ),
       );
     }
 
-    // Usa o novo provider de notificações
-    final unreadCountAsync = ref.watch(
-      unreadNotificationCountNewStreamProvider(
-        activeProfile.profileId,
-        activeProfile.uid,
+    final seenAtAsync = ref.watch(
+      networkBadgeSeenAtProvider(activeProfile.profileId),
+    );
+
+    if (seenAtAsync.isLoading) {
+      return Container(
+        padding: const EdgeInsets.all(4),
+        child: Icon(
+          Iconsax.profile_2user,
+          size: 26,
+          color: isSelected ? _navSelectedColor : AppColors.textSecondary,
+        ),
+      );
+    }
+
+    final badgeCountAsync = ref.watch(
+      networkBadgeCountStreamProvider(
+        profileId: activeProfile.profileId,
+        recipientUid: activeProfile.uid,
+        seenAtMillis: seenAtAsync.valueOrNull?.millisecondsSinceEpoch,
       ),
     );
 
-    return unreadCountAsync.when(
+    return badgeCountAsync.when(
       loading: () => Container(
         padding: const EdgeInsets.all(4),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
             Icon(
-              Iconsax.notification,
+              Iconsax.profile_2user,
               size: 28,
               color: isSelected ? _navSelectedColor : AppColors.textSecondary,
             ),
@@ -250,7 +269,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
               child: SizedBox(
                 width: 12,
                 height: 12,
-                child: CircularProgressIndicator(strokeWidth: 1.5),
+                child: AppRadioPulseLoader(size: 12),
               ),
             ),
           ],
@@ -259,22 +278,22 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
       error: (_, __) => Container(
         padding: const EdgeInsets.all(4),
         child: Icon(
-          Iconsax.notification_bing,
+          Iconsax.profile_2user,
           size: 28,
           color: isSelected ? _navSelectedColor : AppColors.textSecondary,
         ),
       ),
-      data: (unreadCount) => Container(
+      data: (badgeCount) => Container(
         padding: const EdgeInsets.all(4),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
             Icon(
-              Iconsax.notification,
+              Iconsax.profile_2user,
               size: 26,
               color: isSelected ? _navSelectedColor : AppColors.textSecondary,
             ),
-            if (unreadCount > 0)
+            if (!isSelected && badgeCount > 0)
               Positioned(
                 right: -4,
                 top: -4,
@@ -292,7 +311,9 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
                     minHeight: 20,
                   ),
                   child: Text(
-                    unreadCount > 99 ? '99+' : unreadCount.toString(),
+                    badgeCount > 99
+                        ? '99+'
+                        : badgeCount.toString(),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 10,
@@ -308,15 +329,15 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
     );
   }
 
-
   /// Ícone de mensagens com badge reativo (usando novo provider MensagensNew)
   Widget _buildMessagesIcon({bool isSelected = false}) {
     final profileState = ref.watch(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
     final authUid = ref.watch(currentUserProvider)?.uid;
 
-    final isProfileReadyForQueries =
-        authUid != null && activeProfile != null && activeProfile.uid == authUid;
+    final isProfileReadyForQueries = authUid != null &&
+        activeProfile != null &&
+        activeProfile.uid == authUid;
 
     if (!isProfileReadyForQueries) {
       return Icon(
@@ -351,7 +372,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
               child: SizedBox(
                 width: 12,
                 height: 12,
-                child: CircularProgressIndicator(strokeWidth: 1.5),
+                child: AppRadioPulseLoader(size: 12),
               ),
             ),
           ],
@@ -432,9 +453,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
-            color: isSelected
-                ? _navSelectedColor
-                : Colors.transparent,
+            color: isSelected ? _navSelectedColor : Colors.transparent,
             width: 2,
           ),
         ),
@@ -525,8 +544,7 @@ class NotificationsModal extends ConsumerStatefulWidget {
   const NotificationsModal({super.key});
 
   @override
-  ConsumerState<NotificationsModal> createState() =>
-      _NotificationsModalState();
+  ConsumerState<NotificationsModal> createState() => _NotificationsModalState();
 }
 
 class _NotificationsModalState extends ConsumerState<NotificationsModal> {
@@ -582,7 +600,7 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
                 final profileState = ref.watch(profileProvider);
                 final activeProfile = profileState.value?.activeProfile;
                 if (activeProfile == null) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: AppRadioPulseLoader(size: 48));
                 }
 
                 // Usa o novo stream provider
@@ -595,7 +613,7 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
 
                 return notificationsAsync.when(
                   loading: () =>
-                      const Center(child: CircularProgressIndicator()),
+                      const Center(child: AppRadioPulseLoader(size: 48)),
                   error: (error, _) => Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -789,8 +807,7 @@ class _NotificationsModalState extends ConsumerState<NotificationsModal> {
 
     // Navegar usando novo handler
     if (!context.mounted) return;
-    final handler =
-        NotificationNewActionHandler(ref: ref, context: context);
+    final handler = NotificationNewActionHandler(ref: ref, context: context);
     await handler.handle(notification);
   }
 
@@ -829,119 +846,119 @@ extension on _BottomNavScaffoldState {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-            // Handle visual
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+              // Handle visual
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            
-            // Título
-            const Text(
-              'Criar post como:',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF37475A),
+              const SizedBox(height: 20),
+
+              // Título
+              const Text(
+                'Criar post como:',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF37475A),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Opção: Músico
-            _buildPostTypeOption(
-              context: context,
-              icon: Iconsax.user,
-              title: 'Músico',
-              subtitle: 'Procuro banda, freela ou projeto',
-              color: AppColors.musicianColor, // Roxo vibrante para músicos
-              onTap: () async {
-                Navigator.pop(context);
-                final result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute<bool>(
-                    builder: (context) => PostPage(postType: 'musician'),
-                  ),
-                );
-                if (result == true) {
-                  // Post criado com sucesso - invalidar providers
-                  ref.invalidate(postNotifierProvider);
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-            
-            // Opção: Banda
-            _buildPostTypeOption(
-              context: context,
-              icon: Iconsax.people,
-              title: 'Banda',
-              subtitle: 'Procuro músico para a banda',
-              color: AppColors.bandColor, // Cor laranja para bandas
-              onTap: () async {
-                Navigator.pop(context);
-                final result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute<bool>(
-                    builder: (context) => PostPage(postType: 'band'),
-                  ),
-                );
-                if (result == true) {
-                  // Post criado com sucesso - invalidar providers
-                  ref.invalidate(postNotifierProvider);
-                }
-              },
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 24),
 
-            // Opção: Anúncio
-            _buildPostTypeOption(
-              context: context,
-              icon: Iconsax.tag,
-              title: 'Anúncio',
-              subtitle: 'Oferecer produto ou serviço',
-              color: AppColors.salesColor,
-              onTap: () async {
-                Navigator.pop(context);
-                final result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute<bool>(
-                    builder: (context) => PostPage(postType: 'sales'),
-                  ),
-                );
-                if (result == true) {
-                  ref.invalidate(postNotifierProvider);
-                }
-              },
-            ),
-            const SizedBox(height: 12),
+              // Opção: Músico
+              _buildPostTypeOption(
+                context: context,
+                icon: Iconsax.user,
+                title: 'Músico',
+                subtitle: 'Procuro banda, freela ou projeto',
+                color: AppColors.musicianColor, // Roxo vibrante para músicos
+                onTap: () async {
+                  Navigator.pop(context);
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute<bool>(
+                      builder: (context) => PostPage(postType: 'musician'),
+                    ),
+                  );
+                  if (result == true) {
+                    // Post criado com sucesso - invalidar providers
+                    ref.invalidate(postNotifierProvider);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
 
-            // Opção: Contratação
-            _buildPostTypeOption(
-              context: context,
-              icon: Iconsax.briefcase,
-              title: 'Contratação',
-              subtitle: 'Oportunidade de contratação',
-              color: AppColors.hiringColor,
-              onTap: () async {
-                Navigator.pop(context);
-                final result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute<bool>(
-                    builder: (context) => PostPage(postType: 'hiring'),
-                  ),
-                );
-                if (result == true) {
-                  ref.invalidate(postNotifierProvider);
-                }
-              },
-            ),
-          ],
-        ),
-      );
+              // Opção: Banda
+              _buildPostTypeOption(
+                context: context,
+                icon: Iconsax.people,
+                title: 'Banda',
+                subtitle: 'Procuro músico para a banda',
+                color: AppColors.bandColor, // Cor laranja para bandas
+                onTap: () async {
+                  Navigator.pop(context);
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute<bool>(
+                      builder: (context) => PostPage(postType: 'band'),
+                    ),
+                  );
+                  if (result == true) {
+                    // Post criado com sucesso - invalidar providers
+                    ref.invalidate(postNotifierProvider);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Opção: Anúncio
+              _buildPostTypeOption(
+                context: context,
+                icon: Iconsax.tag,
+                title: 'Anúncio',
+                subtitle: 'Oferecer produto ou serviço',
+                color: AppColors.salesColor,
+                onTap: () async {
+                  Navigator.pop(context);
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute<bool>(
+                      builder: (context) => PostPage(postType: 'sales'),
+                    ),
+                  );
+                  if (result == true) {
+                    ref.invalidate(postNotifierProvider);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Opção: Contratação
+              _buildPostTypeOption(
+                context: context,
+                icon: Iconsax.briefcase,
+                title: 'Contratação',
+                subtitle: 'Oportunidade de contratação',
+                color: AppColors.hiringColor,
+                onTap: () async {
+                  Navigator.pop(context);
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute<bool>(
+                      builder: (context) => PostPage(postType: 'hiring'),
+                    ),
+                  );
+                  if (result == true) {
+                    ref.invalidate(postNotifierProvider);
+                  }
+                },
+              ),
+            ],
+          ),
+        );
       },
     );
   }
@@ -1010,8 +1027,9 @@ extension on _BottomNavScaffoldState {
 
   /// Mostra bottom sheet de troca de perfil
   void _showProfileSwitcher(BuildContext context) {
-    final activeProfileId = ref.read(profileProvider).value?.activeProfile?.profileId;
-    
+    final activeProfileId =
+        ref.read(profileProvider).value?.activeProfile?.profileId;
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,

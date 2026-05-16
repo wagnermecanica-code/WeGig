@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
+import 'package:wegig_app/features/connections/presentation/providers/connections_providers.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_switcher_provider.dart';
@@ -94,7 +95,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                   return const Center(
                     child: Padding(
                       padding: EdgeInsets.all(24),
-                      child: CircularProgressIndicator(),
+                      child: AppRadioPulseLoader(size: 44),
                     ),
                   );
                 }
@@ -489,6 +490,10 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
         return Iconsax.building;
       case ProfileType.musician:
         return Iconsax.user;
+      case ProfileType.technician:
+        return Iconsax.headphone;
+      case ProfileType.contractor:
+        return Iconsax.briefcase;
     }
   }
 
@@ -501,6 +506,10 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
         return 'Espaço';
       case ProfileType.musician:
         return 'Músico';
+      case ProfileType.technician:
+        return 'Técnico';
+      case ProfileType.contractor:
+        return 'Contratante';
     }
   }
 
@@ -681,7 +690,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
   }
 }
 
-/// Widget: Badge counter unificado para notificações + mensagens de um perfil
+/// Widget: Badge counter unificado para notificações, mensagens e Minha Rede.
 /// Padrão: Circular/oblongo com cor #FF2828
 class _UnifiedBadgeCounter extends ConsumerWidget {
   const _UnifiedBadgeCounter({
@@ -698,19 +707,37 @@ class _UnifiedBadgeCounter extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    // Soma de notificações + mensagens
-    // ✅ FIX: Passar uid para match com Security Rules
-    final notificationsAsync = ref.watch(unreadNotificationCountNewStreamProvider(profileId, uid));
-    final messagesAsync = ref.watch(unreadMessagesNewCountProvider(profileId: profileId, profileUid: uid));
+    final seenAtAsync = ref.watch(networkBadgeSeenAtProvider(profileId));
+
+    if (seenAtAsync.isLoading) {
+      return const SizedBox.shrink();
+    }
+
+    // Soma de notificações + mensagens + Minha Rede
+    final notificationsAsync =
+        ref.watch(unreadNotificationCountNewStreamProvider(profileId, uid));
+    final messagesAsync = ref.watch(
+      unreadMessagesNewCountProvider(profileId: profileId, profileUid: uid),
+    );
+    final networkAsync = ref.watch(
+      networkBadgeCountStreamProvider(
+        profileId: profileId,
+        recipientUid: uid,
+        seenAtMillis: seenAtAsync.valueOrNull?.millisecondsSinceEpoch,
+      ),
+    );
     
-    // Aguardar ambos os providers carregarem
-    if (notificationsAsync.isLoading || messagesAsync.isLoading) {
+    // Aguardar todos os providers carregarem
+    if (notificationsAsync.isLoading ||
+        messagesAsync.isLoading ||
+        networkAsync.isLoading) {
       return const SizedBox.shrink();
     }
     
     final notificationCount = notificationsAsync.value ?? 0;
     final messageCount = messagesAsync.value ?? 0;
-    final totalCount = notificationCount + messageCount;
+    final networkCount = networkAsync.value ?? 0;
+    final totalCount = notificationCount + messageCount + networkCount;
     
     if (totalCount <= 0) return const SizedBox.shrink();
     

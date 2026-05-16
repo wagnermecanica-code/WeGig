@@ -27,6 +27,9 @@ _$ProfileEntityImpl _$$ProfileEntityImplFromJson(Map<String, dynamic> json) =>
           (json['notificationRadius'] as num?)?.toDouble() ?? 20.0,
       notificationRadiusEnabled:
           json['notificationRadiusEnabled'] as bool? ?? true,
+      allowConnectionSuggestions:
+          json['allowConnectionSuggestions'] as bool? ?? true,
+      allowConnectionRequests: json['allowConnectionRequests'] as bool? ?? true,
       photoUrl: json['photoUrl'] as String?,
       birthYear: (json['birthYear'] as num?)?.toInt(),
       bio: json['bio'] as String?,
@@ -53,6 +56,8 @@ _$ProfileEntityImpl _$$ProfileEntityImplFromJson(Map<String, dynamic> json) =>
       amenities: (json['amenities'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList(),
+      technicianSpecialty: json['technicianSpecialty'] as String?,
+      experienceRange: json['experienceRange'] as String?,
       updatedAt: const NullableTimestampConverter().fromJson(json['updatedAt']),
     );
 
@@ -69,6 +74,8 @@ Map<String, dynamic> _$$ProfileEntityImplToJson(_$ProfileEntityImpl instance) =>
       'createdAt': const TimestampConverter().toJson(instance.createdAt),
       'notificationRadius': instance.notificationRadius,
       'notificationRadiusEnabled': instance.notificationRadiusEnabled,
+      'allowConnectionSuggestions': instance.allowConnectionSuggestions,
+      'allowConnectionRequests': instance.allowConnectionRequests,
       'photoUrl': instance.photoUrl,
       'birthYear': instance.birthYear,
       'bio': instance.bio,
@@ -88,6 +95,8 @@ Map<String, dynamic> _$$ProfileEntityImplToJson(_$ProfileEntityImpl instance) =>
       'operatingHours': instance.operatingHours,
       'website': instance.website,
       'amenities': instance.amenities,
+      'technicianSpecialty': instance.technicianSpecialty,
+      'experienceRange': instance.experienceRange,
       'updatedAt':
           const NullableTimestampConverter().toJson(instance.updatedAt),
     };
@@ -96,4 +105,6 @@ const _$ProfileTypeEnumMap = {
   ProfileType.musician: 'musician',
   ProfileType.band: 'band',
   ProfileType.space: 'space',
+  ProfileType.technician: 'technician',
+  ProfileType.contractor: 'contractor',
 };

@@ -1,6 +1,7 @@
 // lib/app/router/app_router.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../navigation/bottom_nav_scaffold.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,6 +19,10 @@ import 'package:wegig_app/features/auth/presentation/providers/auth_providers.da
 import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_feed_page.dart';
 import 'package:wegig_app/features/post/presentation/pages/post_detail_page.dart';
+import 'package:wegig_app/features/connections/presentation/pages/connections_page.dart';
+import 'package:wegig_app/features/connections/presentation/pages/connection_suggestions_page.dart';
+import 'package:wegig_app/features/connections/presentation/pages/network_activity_page.dart';
+import 'package:wegig_app/features/connections/presentation/pages/connection_requests_page.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/pages/view_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
@@ -96,14 +101,29 @@ class AppRoutes {
       '/conversation/$conversationId';
 
   /// Chat new route template (MensagensNew feature)
-  static String chatNew(String conversationId) =>
-      '/chat-new/$conversationId';
+  static String chatNew(String conversationId) => '/chat-new/$conversationId';
 
   /// Edit profile route template
   static String editProfile(String profileId) => '/profile/$profileId/edit';
 
   /// Notifications new route path
   static const String notificationsNew = '/notifications-new';
+
+  /// Dedicated connections route path
+  static const String connections = '/network/connections';
+
+  /// Dedicated connection suggestions route path
+  static const String connectionSuggestions = '/network/suggestions';
+
+  /// Dedicated network activity route path
+  static const String networkActivity = '/network/activity';
+
+  /// Dedicated pending received requests route path
+  static const String pendingReceivedRequests =
+      '/network/requests/received';
+
+  /// Dedicated pending sent requests route path
+  static const String pendingSentRequests = '/network/requests/sent';
 }
 
 // ============================================
@@ -185,15 +205,17 @@ GoRouter goRouter(Ref ref) {
       final isGoingToCreateProfile =
           state.matchedLocation == AppRoutes.createProfile;
 
-      debugPrint('Router: location=${state.matchedLocation}, isLoggedIn=$isLoggedIn, isGoingToAuth=$isGoingToAuth, isGoingToSplash=$isGoingToSplash, isGoingToCreateProfile=$isGoingToCreateProfile');
-      
+      debugPrint(
+          'Router: location=${state.matchedLocation}, isLoggedIn=$isLoggedIn, isGoingToAuth=$isGoingToAuth, isGoingToSplash=$isGoingToSplash, isGoingToCreateProfile=$isGoingToCreateProfile');
+
       // ✅ CRÍTICO: Se uma operação de auth está em andamento, não redirecionar
       // Isso evita race condition durante login social onde precisamos verificar
       // Firestore antes de decidir se o login é válido
       final isAuthOperationInProgress =
           ref.read(authOperationInProgressProvider);
       if (isAuthOperationInProgress) {
-        debugPrint('Router: ⏸️ Auth operation in progress, NOT redirecting (staying at ${state.matchedLocation})');
+        debugPrint(
+            'Router: ⏸️ Auth operation in progress, NOT redirecting (staying at ${state.matchedLocation})');
         return null; // Manter na rota atual
       }
 
@@ -208,7 +230,7 @@ GoRouter goRouter(Ref ref) {
       final hasProfileData = profileData != null;
       final hasAnyProfile = (profileData?.profiles.isNotEmpty ?? false);
       final hasActiveProfile = profileData?.activeProfile != null;
-      
+
       // ✅ FIX: Mostrar splash apenas durante bootstrap real.
       // - Auth loading => sempre splash
       // - Logado, mas profile ainda não tem valor algum (AsyncLoading sem valor anterior) => splash
@@ -216,11 +238,15 @@ GoRouter goRouter(Ref ref) {
       //   NÃO bloquear navegação (evita bounce após salvar/editar perfil).
       final shouldShowSplash = authState.isLoading ||
           (isLoggedIn &&
-              (isProfileBootstrapping || (!hasProfileData && profileState.isLoading)));
+              (isProfileBootstrapping ||
+                  (!hasProfileData && profileState.isLoading)));
 
-      debugPrint('Router: authState.isLoading=${authState.isLoading}, authState.hasError=${authState.hasError}, user=$user');
-      debugPrint('Router: profileState.isLoading=${profileState.isLoading}, profileState.hasError=${profileState.hasError}');
-      debugPrint('Router: shouldShowSplash=$shouldShowSplash, hasProfileData=$hasProfileData, hasAnyProfile=$hasAnyProfile, hasActiveProfile=$hasActiveProfile');
+      debugPrint(
+          'Router: authState.isLoading=${authState.isLoading}, authState.hasError=${authState.hasError}, user=$user');
+      debugPrint(
+          'Router: profileState.isLoading=${profileState.isLoading}, profileState.hasError=${profileState.hasError}');
+      debugPrint(
+          'Router: shouldShowSplash=$shouldShowSplash, hasProfileData=$hasProfileData, hasAnyProfile=$hasAnyProfile, hasActiveProfile=$hasActiveProfile');
 
       if (shouldShowSplash) {
         if (isGoingToSplash) return null;
@@ -240,11 +266,12 @@ GoRouter goRouter(Ref ref) {
         return AppRoutes.auth;
       }
 
-      // ✅ CRÍTICO: Se profileState ainda está carregando (isLoading=true), 
+      // ✅ CRÍTICO: Se profileState ainda está carregando (isLoading=true),
       // NÃO tomar decisão sobre createProfile ainda!
       // Isso evita race condition onde decidimos "não tem perfis" antes da query do servidor terminar.
       if (profileState.isLoading && !hasAnyProfile) {
-        debugPrint('Router: ⏳ profile still loading, waiting before deciding (staying at ${state.matchedLocation})');
+        debugPrint(
+            'Router: ⏳ profile still loading, waiting before deciding (staying at ${state.matchedLocation})');
         // Se já está no splash, ficar lá
         if (isGoingToSplash) return null;
         // Se está em outra rota válida, manter lá temporariamente
@@ -255,7 +282,8 @@ GoRouter goRouter(Ref ref) {
 
       // Agora sabemos que está logado E profileState carregou com sucesso
       if (hasProfileData && !isProfileBootstrapping && !hasAnyProfile) {
-        debugPrint('Router: logged in but no profiles, returning createProfile');
+        debugPrint(
+            'Router: logged in but no profiles, returning createProfile');
         return AppRoutes.createProfile;
       }
 
@@ -268,7 +296,8 @@ GoRouter goRouter(Ref ref) {
       }
 
       // Rota atual é válida (home, profile, post, conversation, createProfile, etc) - não redirecionar
-      debugPrint('Router: logged in with profiles, allowing current route: ${state.matchedLocation}');
+      debugPrint(
+          'Router: logged in with profiles, allowing current route: ${state.matchedLocation}');
       return null;
     },
     routes: <RouteBase>[
@@ -398,6 +427,40 @@ GoRouter goRouter(Ref ref) {
         pageBuilder: (context, state) =>
             _slideLeftPage(state, const NotificationsNewPage()),
       ),
+      GoRoute(
+        path: AppRoutes.connections,
+        name: 'connections',
+        pageBuilder: (context, state) =>
+            _slideLeftPage(state, const ConnectionsPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.connectionSuggestions,
+        name: 'connectionSuggestions',
+        pageBuilder: (context, state) =>
+            _slideLeftPage(state, const ConnectionSuggestionsPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.networkActivity,
+        name: 'networkActivity',
+        pageBuilder: (context, state) =>
+            _slideLeftPage(state, const NetworkActivityPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.pendingReceivedRequests,
+        name: 'pendingReceivedRequests',
+        pageBuilder: (context, state) => _slideLeftPage(
+          state,
+          const ConnectionRequestsPage.received(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.pendingSentRequests,
+        name: 'pendingSentRequests',
+        pageBuilder: (context, state) => _slideLeftPage(
+          state,
+          const ConnectionRequestsPage.sent(),
+        ),
+      ),
       // ✅ NOVA ROTA: Chat New (MensagensNew feature)
       GoRoute(
         path: '/chat-new/:conversationId',
@@ -484,9 +547,11 @@ class _SplashPage extends StatelessWidget {
     return const Scaffold(
       body: Center(
         child: SizedBox(
-          width: 48,
-          height: 48,
-          child: CircularProgressIndicator(),
+          width: 64,
+          height: 64,
+          child: AppRadioPulseLoader(
+            size: 64,
+          ),
         ),
       ),
     );
@@ -632,6 +697,42 @@ extension TypedNavigationExtension on BuildContext {
     push(uri.toString());
   }
 
+  /// Push notifications inbox page
+  void pushNotificationsNew() {
+    _logNavigation('notifications_new', {});
+    push(AppRoutes.notificationsNew);
+  }
+
+  /// Push dedicated connections page
+  void pushConnections() {
+    _logNavigation('connections', {});
+    push(AppRoutes.connections);
+  }
+
+  /// Push dedicated connection suggestions page
+  void pushConnectionSuggestions() {
+    _logNavigation('connection_suggestions', {});
+    push(AppRoutes.connectionSuggestions);
+  }
+
+  /// Push dedicated network activity page
+  void pushNetworkActivity() {
+    _logNavigation('network_activity', {});
+    push(AppRoutes.networkActivity);
+  }
+
+  /// Push dedicated pending received requests page
+  void pushPendingReceivedRequests() {
+    _logNavigation('pending_received_requests', {});
+    push(AppRoutes.pendingReceivedRequests);
+  }
+
+  /// Push dedicated pending sent requests page
+  void pushPendingSentRequests() {
+    _logNavigation('pending_sent_requests', {});
+    push(AppRoutes.pendingSentRequests);
+  }
+
   /// Push profile screen resolving from @username
   Future<void> pushProfileByUsername(String username) async {
     final sanitized = username.trim().replaceAll('@', '');
@@ -644,7 +745,7 @@ extension TypedNavigationExtension on BuildContext {
       final currentUser = FirebaseAuth.instance.currentUser;
       final container = ProviderScope.containerOf(this);
       final activeProfile = container.read(activeProfileProvider);
-      
+
       final excludedProfileIds = (currentUser == null || activeProfile == null)
           ? const <String>[]
           : await BlockedRelations.getExcludedProfileIds(

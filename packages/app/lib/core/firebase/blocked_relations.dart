@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rxdart/rxdart.dart';
@@ -122,6 +124,10 @@ class BlockedRelations {
   // Isso é essencial para reverse visibility (o bloqueado conseguir saber que foi bloqueado).
   static final Map<String, Set<String>> _syncedEdgesByBlockerProfileId = <String, Set<String>>{};
 
+  // Guard para evitar race condition: múltiplas chamadas concorrentes aguardam
+  // a mesma operação de escrita ao invés de cada uma disparar sua própria.
+  static final Map<String, Completer<void>> _selfHealInFlight = <String, Completer<void>>{};
+
   static Future<void> _ensureEdgesForBlockedProfiles({
     required FirebaseFirestore firestore,
     required String blockedByProfileId,
@@ -141,6 +147,15 @@ class BlockedRelations {
     final already = _syncedEdgesByBlockerProfileId[by] ?? <String>{};
     final missing = normalized.where((p) => !already.contains(p)).toList(growable: false);
     if (missing.isEmpty) return;
+
+    // Se já existe uma operação em andamento para este profileId, aguarda ela.
+    final existing = _selfHealInFlight[by];
+    if (existing != null && !existing.isCompleted) {
+      await existing.future;
+      return;
+    }
+    final completer = Completer<void>();
+    _selfHealInFlight[by] = completer;
 
     // Sem blockedByUid, o edge pode se tornar ilegível para o próprio bloqueador
     // (dependendo das rules/legados), gerando ruído de permission-denied.
@@ -208,8 +223,12 @@ class BlockedRelations {
       final updated = <String>{...already, ...missing};
       _syncedEdgesByBlockerProfileId[by] = updated;
       debugPrint('✅ BlockedRelations: Self-heal criou ${missing.length} edges com UIDs resolvidos');
+      completer.complete();
     } catch (e, st) {
       _logError('Edge self-heal failed (non-critical)', e, st);
+      completer.complete(); // Não propaga erro — é best-effort
+    } finally {
+      _selfHealInFlight.remove(by);
     }
   }
 
@@ -426,6 +445,18 @@ class BlockedRelations {
     return result;
   }
 
+  // Cache de streams compartilhados por profileId.
+  // Evita criar múltiplos snapshot listeners para o mesmo perfil.
+  // Usa BehaviorSubject via shareReplay para que novos subscribers
+  // recebam o último valor emitido imediatamente.
+  static final Map<String, Stream<List<String>>> _sharedExcludedStreams = <String, Stream<List<String>>>{};
+
+  /// Limpa o cache de streams compartilhados.
+  /// Chamar ao trocar de perfil ativo para forçar re-criação dos listeners.
+  static void clearStreamCache() {
+    _sharedExcludedStreams.clear();
+  }
+
   /// Stream de profileIds excluídos (bloqueados + quem me bloqueou).
   static Stream<List<String>> watchExcludedProfileIds({
     required FirebaseFirestore firestore,
@@ -436,7 +467,11 @@ class BlockedRelations {
     final currentProfileId = profileId.trim();
     if (currentProfileId.isEmpty) return Stream.value(const <String>[]);
 
-    debugPrint('🔍 BlockedRelations.watchExcludedProfileIds: Iniciando stream para profileId=$currentProfileId');
+    // Retorna stream compartilhado se já existir para este profileId.
+    final cached = _sharedExcludedStreams[currentProfileId];
+    if (cached != null) return cached;
+
+    debugPrint('🔍 BlockedRelations.watchExcludedProfileIds: Criando stream compartilhado para profileId=$currentProfileId');
 
     final blocked$ = BlockedProfiles.watch(firestore: firestore, profileId: currentProfileId)
         .doOnData((blocked) {
@@ -463,7 +498,7 @@ class BlockedRelations {
         .doOnError((e, st) => _logError('watchExcludedProfileIds: blockedBy stream error', e, st))
         .onErrorReturn(const <String>[]);
 
-    return Rx.combineLatest2<List<String>, List<String>, List<String>>(
+    final shared = Rx.combineLatest2<List<String>, List<String>, List<String>>(
       blocked$,
       blockedBy$,
       (a, b) {
@@ -471,7 +506,10 @@ class BlockedRelations {
         debugPrint('🔍 BlockedRelations.watchExcludedProfileIds: Combinado (blocked=$a + blockedBy=$b) = $result');
         return result;
       },
-    ).distinct(listEquals);
+    ).distinct(listEquals).shareReplay(maxSize: 1);
+
+    _sharedExcludedStreams[currentProfileId] = shared;
+    return shared;
   }
 
   /// Retorna lista limitada para uso em whereNotIn (máximo 10 valores).

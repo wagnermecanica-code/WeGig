@@ -141,6 +141,28 @@ Future<void> handlePushNotificationTap({
       goHomeThenPush(uri.toString());
       return;
 
+    case 'connectionRequest':
+    case 'connectionAccepted':
+      // Abre o perfil do outro usuário empilhado sobre /home?index=1,
+      // mantendo bottom nav na aba "Minha Rede". O perfil já exibe o
+      // botão contextual (Aceitar / Conectado / Cancelar convite).
+      final senderProfileId = _trimString(data['senderProfileId']).isNotEmpty
+          ? _trimString(data['senderProfileId'])
+          : _trimString(data['connectionProfileId']);
+      debugPrint('🔔 PushDeepLink: $type senderProfileId=$senderProfileId');
+      if (senderProfileId.isEmpty) {
+        router.go('/home?index=1');
+        return;
+      }
+      router.go('/home?index=1');
+      final delay = Platform.isIOS
+          ? const Duration(milliseconds: 350)
+          : Duration.zero;
+      Future.delayed(delay, () {
+        router.push('/profile/$senderProfileId');
+      });
+      return;
+
     default:
       // Fallback: abre home (com bottom nav) na aba de notificações.
       // Usar go('/notifications-new') diretamente fazia o BottomNavScaffold

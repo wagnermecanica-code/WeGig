@@ -332,14 +332,21 @@ class ProfileNotifier extends AutoDisposeAsyncNotifier<ProfileState> {
         // Se já foi concedida, retorna imediatamente
         final settings = await service.requestPermission();
         debugPrint('🔔 FCM: Permissão: ${settings.authorizationStatus}');
-        
-        // IMPORTANTE: Forçar refresh do token para garantir que está válido
-        // Necessário após adicionar SHA-1 no Firebase Console
-        debugPrint('🔔 FCM: Forçando refresh do token...');
-        final token = await service.forceTokenRefresh();
+
+        debugPrint('🔔 FCM: Obtendo token atual...');
+        var token = await service.getToken();
+
+        if (token == null) {
+          debugPrint('🔔 FCM: Token indisponível, tentando refresh controlado...');
+          token = await service.forceTokenRefresh();
+        }
+
         debugPrint('🔔 FCM: Token obtido: ${token != null ? "SIM (${token.length} chars)" : "NULL"}');
         if (token != null) {
           debugPrint('🔔 FCM: FULL TOKEN: $token');
+        } else {
+          debugPrint('⚠️ FCM: Token ainda indisponível; salvamento será adiado');
+          return;
         }
         
         // Salvar token para TODOS os perfis do usuário

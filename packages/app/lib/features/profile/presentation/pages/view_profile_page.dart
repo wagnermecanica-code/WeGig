@@ -21,6 +21,10 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/features/connections/domain/entities/common_connection_entity.dart';
+import 'package:wegig_app/features/connections/domain/entities/connection_status.dart';
+import 'package:wegig_app/features/connections/domain/entities/connection_status_entity.dart';
+import 'package:wegig_app/features/connections/presentation/providers/connections_providers.dart';
 import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
 import 'package:wegig_app/features/mensagens_new/presentation/providers/mensagens_new_providers.dart';
 import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
@@ -50,6 +54,11 @@ class ViewProfilePage extends ConsumerStatefulWidget {
 
 class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     with TickerProviderStateMixin {
+  static const double _commonConnectionAvatarRadius = 22;
+  static const double _commonConnectionAvatarDiameter =
+      _commonConnectionAvatarRadius * 2;
+  static const double _commonConnectionAvatarStep = 24;
+
   ProfileEntity? _profile;
   List<String> _gallery = [];
   bool _loadingProfile = false;
@@ -64,9 +73,91 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
   // Estado de loading para o botão de mensagem (evita cliques múltiplos)
   bool _isOpeningConversation = false;
-  
+  bool _isSendingConnectionRequest = false;
+
   // Cache de conversationId para acelerar abertura do chat
   String? _prefetchedConversationId;
+
+  Future<void> _handleSendConnectionRequest(ProfileEntity profile) async {
+    if (_isSendingConnectionRequest) {
+      debugPrint(
+        '⚠️ ViewProfile: envio de conexão já em andamento para ${profile.profileId}',
+      );
+      return;
+    }
+
+    final activeProfile = ref.read(activeProfileProvider);
+    if (activeProfile == null) {
+      if (mounted) {
+        AppSnackBar.showError(context, 'Perfil ativo não encontrado');
+      }
+      return;
+    }
+
+    debugPrint(
+      '🤝 ViewProfile: enviando convite ${activeProfile.profileId} -> ${profile.profileId}',
+    );
+
+    setState(() => _isSendingConnectionRequest = true);
+
+    try {
+      await ref
+          .read(connectionsActionsProvider.notifier)
+          .sendRequest(recipientProfile: profile);
+
+      if (!mounted) {
+        return;
+      }
+
+      final actionState = ref.read(connectionsActionsProvider);
+      if (actionState.hasError) {
+        final message = _connectionActionErrorMessage(actionState.error);
+        debugPrint(
+          '❌ ViewProfile: falha visível no envio para ${profile.profileId}: $message',
+        );
+        AppSnackBar.showError(context, message);
+        return;
+      }
+
+      final refreshedStatus =
+          await ref.refresh(connectionStatusProvider(profile.profileId).future);
+
+      if (!mounted) {
+        return;
+      }
+
+      if (refreshedStatus.status ==
+          ConnectionRelationshipStatus.pendingSent) {
+        debugPrint(
+          '✅ ViewProfile: convite registrado com sucesso para ${profile.profileId}',
+        );
+        AppSnackBar.showSuccess(context, 'Convite enviado!');
+      } else {
+        debugPrint(
+          '⚠️ ViewProfile: status inesperado após envio para ${profile.profileId}: ${refreshedStatus.status}',
+        );
+        AppSnackBar.showInfo(
+          context,
+          'O status da conexão foi atualizado. Confira o botão novamente.',
+        );
+      }
+    } catch (error, stackTrace) {
+      debugPrint(
+        '❌ ViewProfile: exceção ao enviar convite para ${profile.profileId}: $error',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) {
+        AppSnackBar.showError(
+          context,
+          _connectionActionErrorMessage(error),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingConnectionRequest = false);
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -74,15 +165,15 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     _tabController = TabController(
         length: 4, vsync: this); // 4 tabs: Gallery, YouTube, Posts, Interests
     _loadProfileFromFirestore();
-    
+
     // Prefetch conversation ID em background (não bloqueia UI)
     _prefetchConversationIfNeeded();
   }
-  
+
   // Função para formatar telefone brasileiro
   String _formatBrazilianPhone(String phone) {
     final digitsOnly = phone.replaceAll(RegExp(r'\D'), '');
-    
+
     if (digitsOnly.length == 10) {
       // Formato: (XX) XXXX-XXXX
       return '(${digitsOnly.substring(0, 2)}) ${digitsOnly.substring(2, 6)}-${digitsOnly.substring(6)}';
@@ -90,7 +181,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       // Formato: (XX) XXXXX-XXXX
       return '(${digitsOnly.substring(0, 2)}) ${digitsOnly.substring(2, 7)}-${digitsOnly.substring(7)}';
     }
-    
+
     // Retorna o telefone original se não conseguir formatar
     return phone;
   }
@@ -120,14 +211,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   Future<void> _prefetchConversationIfNeeded() async {
     // Só faz prefetch para perfis de outros usuários
     if (widget.profileId == null && widget.userId == null) return;
-    
+
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) return;
-      
+
       final activeProfile = ref.read(activeProfileProvider);
       if (activeProfile == null) return;
-      
+
       // Aguarda perfil carregar
       await Future.delayed(const Duration(milliseconds: 500));
       if (_profile == null) return;
@@ -145,21 +236,22 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       } catch (_) {
         // Non-critical: se falhar, segue o prefetch (Chat/NewPage tem guards também).
       }
-      
+
       // Evita prefetch para si mesmo
       if (activeProfile.profileId == _profile!.profileId) return;
-      
+
       // Query otimizada: busca APENAS conversationId (não cria)
       final query = await FirebaseFirestore.instance
           .collection('conversations')
           .where('participants', arrayContains: currentUser.uid)
           .limit(10) // Limita para economizar bandwidth
           .get();
-      
+
       // Filtra client-side (mais rápido que query complexa)
       for (final doc in query.docs) {
         final data = doc.data();
-        final participantProfiles = (data['participantProfiles'] as List?)?.cast<String>() ?? [];
+        final participantProfiles =
+            (data['participantProfiles'] as List?)?.cast<String>() ?? [];
 
         // CRÍTICO: prefetch deve pegar APENAS conversa 1:1.
         // Caso contrário, se existir um grupo com os mesmos perfis,
@@ -174,11 +266,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 (groupName == null || groupName.trim().isEmpty));
 
         if (!isDirect) continue;
-        
+
         if (participantProfiles.contains(activeProfile.profileId) &&
             participantProfiles.contains(_profile!.profileId)) {
           _prefetchedConversationId = doc.id;
-          debugPrint('⚡ ViewProfile: Conversation prefetched: $_prefetchedConversationId');
+          debugPrint(
+              '⚡ ViewProfile: Conversation prefetched: $_prefetchedConversationId');
           break;
         }
       }
@@ -248,7 +341,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         }
 
         profileId = otherProfiles.docs.first.id;
-        debugPrint('ViewProfilePage: Carregando perfil público do usuário: $profileId');
+        debugPrint(
+            'ViewProfilePage: Carregando perfil público do usuário: $profileId');
       }
 
       if (profileId == null) {
@@ -279,8 +373,10 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       try {
         final currentUid = FirebaseAuth.instance.currentUser?.uid;
         final activeProfile = ref.read(activeProfileProvider);
-        if (currentUid != null && currentUid.isNotEmpty && 
-            activeProfile != null && profile.profileId != activeProfile.profileId) {
+        if (currentUid != null &&
+            currentUid.isNotEmpty &&
+            activeProfile != null &&
+            profile.profileId != activeProfile.profileId) {
           final excluded = await BlockedRelations.getExcludedProfileIds(
             firestore: FirebaseFirestore.instance,
             profileId: activeProfile.profileId,
@@ -304,7 +400,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       final gallery =
           (doc.data()?['gallery'] as List<dynamic>?)?.cast<String>() ??
               <String>[];
-      _gallery = gallery.take(12).toList(); // Limitar a 12 fotos para performance
+      _gallery =
+          gallery.take(12).toList(); // Limitar a 12 fotos para performance
 
       // Preparar YouTube controller se link válido
       final videoId = _extractYoutubeVideoId(profile.youtubeLink);
@@ -343,7 +440,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
       debugPrint(
           '✅ ViewProfilePage: Perfil carregado com sucesso - ${profile.name} (${profile.profileId})');
-      debugPrint('   📊 Profile Type: ${profile.profileType.label} (isSpace=${profile.isSpace})');
+      debugPrint(
+          '   📊 Profile Type: ${profile.profileType.label} (isSpace=${profile.isSpace})');
       if (profile.isSpace) {
         debugPrint('   🏢 Space Type: ${profile.spaceType}');
         debugPrint('   📞 Phone: ${profile.phone}');
@@ -405,7 +503,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     bool isLoading = false,
   }) {
     final isDisabled = onPressed == null || isLoading;
-    
+
     return Expanded(
       child: SizedBox(
         height: 36,
@@ -413,7 +511,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           onPressed: isDisabled ? null : onPressed,
           style: ElevatedButton.styleFrom(
             backgroundColor: isPrimary
-                ? (isDisabled ? AppColors.primary.withOpacity(0.7) : AppColors.primary)
+                ? (isDisabled
+                    ? AppColors.primary.withOpacity(0.7)
+                    : AppColors.primary)
                 : (isDisabled ? Colors.grey[300] : Colors.grey[200]),
             foregroundColor: isPrimary ? Colors.white : Colors.black,
             elevation: 0,
@@ -426,11 +526,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               ? SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      isPrimary ? Colors.white : Colors.black54,
-                    ),
+                  child: AppRadioPulseLoader(
+                    size: 16,
+                    color: isPrimary ? Colors.white : Colors.black54,
                   ),
                 )
               : Icon(
@@ -456,6 +554,437 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     );
   }
 
+  Widget _buildConnectionActionButton({
+    required ProfileEntity profile,
+    required bool isBusy,
+  }) {
+    final effectiveBusy = isBusy || _isSendingConnectionRequest;
+    final statusAsync =
+        ref.watch(effectiveConnectionStatusProvider(profile.profileId));
+
+    return statusAsync.when(
+      loading: () => _buildActionButton(
+        label: 'Rede',
+        icon: Iconsax.profile_2user,
+        onPressed: null,
+        isPrimary: false,
+        isLoading: true,
+      ),
+      error: (_, __) => _buildActionButton(
+        label: 'Rede',
+        icon: Iconsax.profile_2user,
+        onPressed: null,
+        isPrimary: false,
+      ),
+      data: (status) => _buildConnectionActionButtonForStatus(
+        profile: profile,
+        status: status,
+        isBusy: effectiveBusy,
+        effectiveBusy: effectiveBusy,
+      ),
+    );
+  }
+
+  Widget _buildConnectionActionButtonForStatus({
+    required ProfileEntity profile,
+    required ConnectionStatusEntity status,
+    required bool isBusy,
+    required bool effectiveBusy,
+  }) {
+    switch (status.status) {
+      case ConnectionRelationshipStatus.none:
+        if (!profile.allowConnectionRequests) {
+          return _buildActionButton(
+            label: 'Convites fechados',
+            icon: Icons.lock_outline_rounded,
+            onPressed: null,
+            isPrimary: false,
+          );
+        }
+        return _buildActionButton(
+          label: 'Conectar',
+          icon: Iconsax.user_add,
+          onPressed: effectiveBusy ? null : () => _handleSendConnectionRequest(profile),
+          isPrimary: false,
+          isLoading: isBusy,
+        );
+      case ConnectionRelationshipStatus.pendingReceived:
+        return _buildActionButton(
+          label: 'Aceitar',
+          icon: Iconsax.tick_circle,
+          onPressed: isBusy || status.requestId == null
+              ? null
+              : () =>
+                  ref.read(connectionsActionsProvider.notifier).acceptRequest(
+                        requestId: status.requestId!,
+                        otherProfileId: profile.profileId,
+                      ),
+          isPrimary: true,
+          isLoading: isBusy,
+        );
+      case ConnectionRelationshipStatus.pendingSent:
+        return _buildActionButton(
+          label: 'Convite enviado',
+          icon: Iconsax.clock,
+          onPressed: isBusy || status.requestId == null
+              ? null
+              : () => _confirmAndCancelRequest(
+                    profile,
+                    status.requestId!,
+                  ),
+          isPrimary: false,
+          isLoading: isBusy,
+        );
+      case ConnectionRelationshipStatus.connected:
+        return _buildActionButton(
+          label: 'Conectado',
+          icon: Iconsax.profile_2user,
+          onPressed: isBusy
+              ? null
+              : () => _confirmAndDisconnect(profile, status.connectionId),
+          isPrimary: false,
+          isLoading: isBusy,
+        );
+    }
+  }
+
+  Future<void> _confirmAndDisconnect(
+    ProfileEntity profile,
+    String? connectionId,
+  ) async {
+    if (connectionId == null || connectionId.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Desconectar'),
+        content: Text(
+          'Deseja remover ${profile.name} das suas conexões?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Desconectar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      ref.read(connectionsActionsProvider.notifier).removeConnection(
+            connectionId: connectionId,
+            otherProfileId: profile.profileId,
+          );
+    }
+  }
+
+  Future<void> _confirmAndCancelRequest(
+    ProfileEntity profile,
+    String requestId,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancelar convite'),
+        content: Text(
+          'Deseja cancelar o convite enviado para ${profile.name}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Voltar'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Cancelar convite'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    await ref.read(connectionsActionsProvider.notifier).cancelRequest(
+          requestId: requestId,
+          otherProfileId: profile.profileId,
+        );
+
+    if (!mounted) {
+      return;
+    }
+
+    final actionState = ref.read(connectionsActionsProvider);
+    if (actionState.hasError) {
+      AppSnackBar.showError(
+        context,
+        _connectionActionErrorMessage(actionState.error),
+      );
+      return;
+    }
+
+    AppSnackBar.showSuccess(context, 'Convite cancelado.');
+  }
+
+  Widget _buildCommonConnectionsSection({
+    required ProfileEntity activeProfile,
+    required ProfileEntity viewedProfile,
+  }) {
+    final commonConnectionsAsync = ref.watch(
+      commonConnectionsProvider(
+        profileId: activeProfile.profileId,
+        profileUid: activeProfile.uid,
+        otherProfileId: viewedProfile.profileId,
+        otherProfileUid: viewedProfile.uid,
+      ),
+    );
+
+    return commonConnectionsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.only(top: 12),
+        child: LinearProgressIndicator(minHeight: 2),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (commonConnections) {
+        if (commonConnections.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final names = commonConnections
+            .map((connection) => connection.name.trim())
+            .where((name) => name.isNotEmpty)
+            .toList(growable: false);
+
+        final description = names.length == 1
+            ? 'Conexao em comum com ${names.first}'
+            : 'Conexoes em comum com ${names.take(2).join(' e ')}${names.length > 2 ? ' e mais ${names.length - 2}' : ''}';
+
+        return GestureDetector(
+          onTap: () => _showCommonConnectionsList(context, commonConnections),
+          child: Container(
+            margin: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.primary.withOpacity(0.12),
+              ),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: _commonConnectionAvatarDiameter +
+                      ((commonConnections.length - 1) *
+                          _commonConnectionAvatarStep),
+                  height: _commonConnectionAvatarDiameter,
+                  child: Stack(
+                    children: [
+                      for (var index = 0;
+                          index < commonConnections.length;
+                          index++)
+                        Positioned(
+                          left: index * _commonConnectionAvatarStep,
+                          child: _buildCommonConnectionAvatar(
+                              commonConnections[index]),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        commonConnections.length == 1
+                            ? '1 conexao em comum'
+                            : '${commonConnections.length} conexoes em comum',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        description,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Iconsax.arrow_right_3,
+                  size: 16,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCommonConnectionAvatar(CommonConnectionEntity connection) {
+    final photoUrl = connection.photoUrl?.trim() ?? '';
+    final initial = connection.name.trim().isEmpty
+        ? '?'
+        : connection.name.trim()[0].toUpperCase();
+
+    return Container(
+      width: _commonConnectionAvatarDiameter,
+      height: _commonConnectionAvatarDiameter,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+        color: AppColors.primary.withOpacity(0.08),
+      ),
+      child: ClipOval(
+        child: photoUrl.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: photoUrl,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Center(
+                  child: Text(
+                    initial,
+                    style: TextStyle(
+                      fontSize: _commonConnectionAvatarRadius * 0.65,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                errorWidget: (_, __, ___) => Center(
+                  child: Text(
+                    initial,
+                    style: TextStyle(
+                      fontSize: _commonConnectionAvatarRadius * 0.65,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              )
+            : Center(
+                child: Text(
+                  initial,
+                  style: TextStyle(
+                    fontSize: _commonConnectionAvatarRadius * 0.65,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
+  void _showCommonConnectionsList(
+    BuildContext context,
+    List<CommonConnectionEntity> connections,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.8,
+        expand: false,
+        builder: (_, scrollController) => Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              connections.length == 1
+                  ? '1 conexão em comum'
+                  : '${connections.length} conexões em comum',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView.builder(
+                controller: scrollController,
+                itemCount: connections.length,
+                itemBuilder: (_, index) {
+                  final connection = connections[index];
+                  return ListTile(
+                    minLeadingWidth: _commonConnectionAvatarDiameter,
+                    horizontalTitleGap: 12,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 2,
+                    ),
+                    leading: _buildCommonConnectionAvatar(connection),
+                    title: Text(
+                      connection.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    subtitle: connection.username != null &&
+                            connection.username!.isNotEmpty
+                        ? Text('@${connection.username}')
+                        : null,
+                    trailing: const Icon(
+                      Iconsax.arrow_right_3,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.pushProfile(connection.profileId);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _connectionActionErrorMessage(Object? error) {
+    if (error is StateError) {
+      return error.message ?? 'Nao foi possivel atualizar o status da conexao.';
+    }
+
+    // Diagnostic: show actual error type for non-StateError
+    return 'Erro: ${error.runtimeType}: $error';
+  }
+
   /// Abre ou cria uma conversa com o perfil visualizado
   Future<void> _openOrCreateConversation() async {
     // Debouncing: evita cliques múltiplos
@@ -463,7 +992,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       debugPrint('⚠️ ViewProfile: Operação já em andamento, ignorando clique');
       return;
     }
-    
+
     if (_profile == null) return;
 
     final currentUser = FirebaseAuth.instance.currentUser;
@@ -528,7 +1057,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           final data = doc.data();
           if (doc.exists && data != null) {
             final participantProfiles =
-                (data['participantProfiles'] as List<dynamic>?)?.cast<String>() ?? [];
+                (data['participantProfiles'] as List<dynamic>?)
+                        ?.cast<String>() ??
+                    [];
             final conversationType = data['conversationType'] as String?;
             final explicitIsGroup = data['isGroup'] as bool?;
             final groupName = data['groupName'] as String?;
@@ -539,13 +1070,15 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                     participantProfiles.length == 2 &&
                     (groupName == null || groupName.trim().isEmpty));
 
-            final matchesProfiles = participantProfiles.contains(activeProfile.profileId) &&
-                participantProfiles.contains(_profile!.profileId) &&
-                participantProfiles.length == 2;
+            final matchesProfiles =
+                participantProfiles.contains(activeProfile.profileId) &&
+                    participantProfiles.contains(_profile!.profileId) &&
+                    participantProfiles.length == 2;
 
             if (isDirect && matchesProfiles) {
               conversationId = candidateId;
-              debugPrint('⚡ ViewProfile: Usando conversation prefetched (validada)');
+              debugPrint(
+                  '⚡ ViewProfile: Usando conversation prefetched (validada)');
             } else {
               _prefetchedConversationId = null;
               throw Exception('Prefetch apontava para conversa não-1:1');
@@ -556,7 +1089,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           }
         } catch (_) {
           // Fallback: busca/cria conversa normalmente
-          final conversation = await ref.read(mensagensNewRepositoryProvider).getOrCreateConversation(
+          final conversation = await ref
+              .read(mensagensNewRepositoryProvider)
+              .getOrCreateConversation(
             currentProfileId: activeProfile.profileId,
             currentUid: currentUser.uid,
             otherProfileId: _profile!.profileId,
@@ -574,7 +1109,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         }
       } else {
         // Fallback: busca/cria conversa normalmente
-        final conversation = await ref.read(mensagensNewRepositoryProvider).getOrCreateConversation(
+        final conversation = await ref
+            .read(mensagensNewRepositoryProvider)
+            .getOrCreateConversation(
           currentProfileId: activeProfile.profileId,
           currentUid: currentUser.uid,
           otherProfileId: _profile!.profileId,
@@ -595,7 +1132,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       if (mounted) {
         // Desativar loading antes de navegar
         setState(() => _isOpeningConversation = false);
-        
+
         Navigator.of(context).push<void>(
           MaterialPageRoute<void>(
             builder: (_) => ChatNewPage(
@@ -684,10 +1221,13 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     try {
       // Adicionar protocolo se não tiver
       var finalUrl = url;
-      if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('tel:') && !url.startsWith('whatsapp://')) {
+      if (!url.startsWith('http://') &&
+          !url.startsWith('https://') &&
+          !url.startsWith('tel:') &&
+          !url.startsWith('whatsapp://')) {
         finalUrl = 'https://$url';
       }
-      
+
       final uri = Uri.tryParse(finalUrl);
       if (uri != null) {
         if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
@@ -724,15 +1264,13 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             placeholder: (context, url) => Container(
               color: Colors.grey[200],
               child: const Center(
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                ),
+                child: AppRadioPulseLoader(size: 36, color: AppColors.primary),
               ),
             ),
             errorWidget: (context, url, error) => Container(
               color: Colors.grey[300],
-              child: const Icon(Iconsax.gallery_slash, size: 42, color: Colors.grey),
+              child: const Icon(Iconsax.gallery_slash,
+                  size: 42, color: Colors.grey),
             ),
             memCacheWidth: 400,
             memCacheHeight: 400,
@@ -919,7 +1457,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               debugPrint('ViewProfile: Imagem comprimida: $compressedPath');
 
               final squareFile = await _createLetterboxedSquare(compressedPath);
-              debugPrint('ViewProfile: Imagem com letterbox pronta: ${squareFile.path}');
+              debugPrint(
+                  'ViewProfile: Imagem com letterbox pronta: ${squareFile.path}');
 
               // Fazer upload da foto editada
               final profileState = ref.read(profileProvider);
@@ -1037,12 +1576,15 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   Widget build(BuildContext context) {
     final isOwnProfile = _isMyProfile();
     final theme = Theme.of(context);
+    final connectionActionState = ref.watch(connectionsActionsProvider);
+    final activeProfile = ref.watch(activeProfileProvider);
 
     final route = ModalRoute.of(context);
     // Não usa Navigator.canPop() diretamente porque ele fica true quando há
     // bottom sheets/dialogs abertos na mesma Navigator. Aqui queremos mostrar
     // "voltar" apenas quando esta página não é a rota inicial.
-    final shouldShowBackButton = route != null ? !route.isFirst : Navigator.canPop(context);
+    final shouldShowBackButton =
+        route != null ? !route.isFirst : Navigator.canPop(context);
 
     // ✅ FIX: Listener para detectar mudanças no perfil ativo
     // Após trocar de perfil, recarrega ViewProfilePage ao invés de ir para Home
@@ -1073,6 +1615,28 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             }
           });
         }
+      },
+    );
+
+    ref.listen<AsyncValue<void>>(
+      connectionsActionsProvider,
+      (previous, next) {
+        if (!next.hasError || next.isLoading) {
+          return;
+        }
+
+        if (previous?.error == next.error) {
+          return;
+        }
+
+        if (!mounted) {
+          return;
+        }
+
+        AppSnackBar.showError(
+          context,
+          _connectionActionErrorMessage(next.error),
+        );
       },
     );
 
@@ -1110,7 +1674,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         actions: isOwnProfile
             ? [
                 IconButton(
-                  icon: const Icon(Iconsax.arrow_swap_horizontal, color: Colors.black),
+                  icon: const Icon(Iconsax.arrow_swap_horizontal,
+                      color: Colors.black),
                   tooltip: 'Trocar perfil',
                   onPressed: () {
                     ProfileSwitcherBottomSheet.show(
@@ -1155,9 +1720,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       ),
       body: _loadingProfile
           ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-              ),
+              child: AppRadioPulseLoader(size: 52),
             )
           : _profile == null
               ? const Center(child: Text('Perfil não encontrado'))
@@ -1180,14 +1743,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                     physics: const BouncingScrollPhysics(
                       parent: AlwaysScrollableScrollPhysics(),
                     ),
-                    // floatHeaderSlivers: false garante que o header não "flutue" 
+                    // floatHeaderSlivers: false garante que o header não "flutue"
                     // e mantenha o comportamento de scroll natural
                     floatHeaderSlivers: false,
                     headerSliverBuilder: (context, innerBoxIsScrolled) {
                       return <Widget>[
-                      SliverToBoxAdapter(
-                        child: Column(
-                          children: [
+                        SliverToBoxAdapter(
+                          child: Column(
+                            children: [
                               // Header: Avatar + Stats
                               Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -1201,13 +1764,13 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                       child: CircleAvatar(
                                         radius: 42,
                                         backgroundColor: Colors.grey[300],
-                                        foregroundImage: _profile!.photoUrl !=
-                                                    null &&
-                                                _profile!.photoUrl!
-                                                    .startsWith('http')
-                                            ? CachedNetworkImageProvider(
-                                                _profile!.photoUrl!)
-                                            : null,
+                                        foregroundImage:
+                                            _profile!.photoUrl != null &&
+                                                    _profile!.photoUrl!
+                                                        .startsWith('http')
+                                                ? CachedNetworkImageProvider(
+                                                    _profile!.photoUrl!)
+                                                : null,
                                         child: _profile!.photoUrl == null
                                             ? const Icon(Iconsax.user,
                                                 size: 42, color: Colors.grey)
@@ -1223,15 +1786,13 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                         children: [
                                           Text(
                                             _profile!.name,
-                                            style: theme
-                                                    .textTheme.headlineSmall
+                                            style: theme.textTheme.headlineSmall
                                                     ?.copyWith(
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      fontSize: 22,
-                                                      height: 1.2,
-                                                      color: Colors.black87,
-                                                    ) ??
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 22,
+                                                  height: 1.2,
+                                                  color: Colors.black87,
+                                                ) ??
                                                 const TextStyle(
                                                   fontWeight: FontWeight.w700,
                                                   fontSize: 22,
@@ -1242,17 +1803,16 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                           if ((_profile!.username ?? '')
                                               .isNotEmpty)
                                             Padding(
-                                              padding: const EdgeInsets.only(
-                                                  top: 4),
+                                              padding:
+                                                  const EdgeInsets.only(top: 4),
                                               child: Text(
                                                 '@${_profile!.username}',
                                                 style: theme
                                                         .textTheme.bodyMedium
                                                         ?.copyWith(
-                                                          fontSize: 16,
-                                                          color:
-                                                              Colors.grey[700],
-                                                        ) ??
+                                                      fontSize: 16,
+                                                      color: Colors.grey[700],
+                                                    ) ??
                                                     TextStyle(
                                                       fontSize: 16,
                                                       color: Colors.grey[700],
@@ -1262,18 +1822,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                           if (_profile!.bio != null &&
                                               _profile!.bio!.isNotEmpty)
                                             Padding(
-                                              padding: const EdgeInsets.only(
-                                                  top: 4),
+                                              padding:
+                                                  const EdgeInsets.only(top: 4),
                                               child: Text(
                                                 _profile!.bio!,
                                                 style: theme
                                                         .textTheme.bodyMedium
                                                         ?.copyWith(
-                                                          fontSize: 15,
-                                                          height: 1.4,
-                                                          color:
-                                                              Colors.grey[800],
-                                                        ) ??
+                                                      fontSize: 15,
+                                                      height: 1.4,
+                                                      color: Colors.grey[800],
+                                                    ) ??
                                                     const TextStyle(
                                                         fontSize: 15),
                                                 maxLines: 4,
@@ -1289,8 +1848,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
                               // Location and Social Links Section - ALINHADO À ESQUERDA
                               Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 20),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment
                                       .start, // Alinhamento à esquerda
@@ -1304,10 +1863,10 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                             .label,
                                         style: theme.textTheme.bodyMedium
                                                 ?.copyWith(
-                                                  fontSize: 15,
-                                                  color: AppColors.primary,
-                                                  fontWeight: FontWeight.w600,
-                                                ) ??
+                                              fontSize: 15,
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ) ??
                                             TextStyle(
                                               fontSize: 15,
                                               color: AppColors.primary,
@@ -1318,22 +1877,31 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                     ],
 
                                     // Location info
-                                    Text(
-                                      formatCleanLocation(
-                                        neighborhood: _profile!.neighborhood,
-                                        city: _profile!.city,
-                                        state: _profile!.state,
-                                      ),
-                                      style: theme.textTheme.bodyMedium
-                                              ?.copyWith(
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Container(
+                                        width: double.infinity,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          formatCleanLocation(
+                                            neighborhood:
+                                                _profile!.neighborhood,
+                                            city: _profile!.city,
+                                            state: _profile!.state,
+                                          ),
+                                          textAlign: TextAlign.left,
+                                          style: theme.textTheme.bodyMedium
+                                                  ?.copyWith(
                                                 fontSize: 14.5,
                                                 color: Colors.grey[700],
                                                 fontWeight: FontWeight.w500,
                                               ) ??
-                                          TextStyle(
-                                            fontSize: 14.5,
-                                            color: Colors.grey[700],
-                                          ),
+                                              TextStyle(
+                                                fontSize: 14.5,
+                                                color: Colors.grey[700],
+                                              ),
+                                        ),
+                                      ),
                                     ),
 
                                     const SizedBox(height: 12),
@@ -1342,8 +1910,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                     if (_profile!.isSpace) ...[
                                       // Horário de funcionamento
                                       if (_profile!.operatingHours != null &&
-                                          _profile!
-                                              .operatingHours!.isNotEmpty)
+                                          _profile!.operatingHours!.isNotEmpty)
                                         Padding(
                                           padding:
                                               const EdgeInsets.only(bottom: 8),
@@ -1370,8 +1937,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
                                       // Comodidades
                                       if (_profile!.amenities != null &&
-                                          _profile!
-                                              .amenities!.isNotEmpty)
+                                          _profile!.amenities!.isNotEmpty)
                                         Padding(
                                           padding:
                                               const EdgeInsets.only(bottom: 8),
@@ -1399,8 +1965,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
                                       // Site/Linktree (shortlink)
                                       if (_profile!.website != null &&
-                                          _profile!
-                                              .website!.isNotEmpty)
+                                          _profile!.website!.isNotEmpty)
                                         Padding(
                                           padding:
                                               const EdgeInsets.only(bottom: 8),
@@ -1428,8 +1993,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                                     style: const TextStyle(
                                                       fontSize: 14,
                                                       color: AppColors.primary,
-                                                      decoration:
-                                                          TextDecoration.underline,
+                                                      decoration: TextDecoration
+                                                          .underline,
                                                     ),
                                                     maxLines: 1,
                                                     overflow:
@@ -1446,19 +2011,23 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                     if (_hasSocialLinks())
                                       _buildSocialLinksBlock(),
 
-                                    // Botões de ação alinhados: Mensagem, Ligar, WhatsApp
+                                    // Botões de ação alinhados: Conexao, Mensagem, Ligar, WhatsApp
                                     if (!isOwnProfile ||
                                         (_profile!.isSpace &&
                                             _profile!.phone != null &&
-                                            _profile!
-                                                .phone!.isNotEmpty)) ...[
+                                            _profile!.phone!.isNotEmpty)) ...[
                                       const SizedBox(height: 16),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        children: [
-                                          // Botão Mensagem (sempre visível para não-donos)
-                                          if (!isOwnProfile)
+                                      if (!isOwnProfile)
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.start,
+                                          children: [
+                                            _buildConnectionActionButton(
+                                              profile: _profile!,
+                                              isBusy: connectionActionState
+                                                  .isLoading,
+                                            ),
+                                            const SizedBox(width: 8),
                                             _buildActionButton(
                                               label: 'Mensagem',
                                               icon: Iconsax.message,
@@ -1467,14 +2036,26 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                               isPrimary: true,
                                               isLoading: _isOpeningConversation,
                                             ),
-                                          // Botões de telefone (apenas para spaces com telefone)
-                                          if (_profile!.isSpace &&
-                                              _profile!.phone != null &&
-                                              _profile!
-                                                  .phone!.isNotEmpty) ...[
-                                            if (!isOwnProfile)
-                                              const SizedBox(width: 8),
-                                            // Botão de ligar
+                                          ],
+                                        ),
+                                      if (!isOwnProfile &&
+                                          activeProfile != null)
+                                        _buildCommonConnectionsSection(
+                                          activeProfile: activeProfile,
+                                          viewedProfile: _profile!,
+                                        ),
+                                      if (!isOwnProfile &&
+                                          _profile!.isSpace &&
+                                          _profile!.phone != null &&
+                                          _profile!.phone!.isNotEmpty)
+                                        const SizedBox(height: 8),
+                                      if (_profile!.isSpace &&
+                                          _profile!.phone != null &&
+                                          _profile!.phone!.isNotEmpty)
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.start,
+                                          children: [
                                             _buildActionButton(
                                               label: 'Ligar',
                                               icon: Iconsax.call,
@@ -1483,7 +2064,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                               isPrimary: isOwnProfile,
                                             ),
                                             const SizedBox(width: 8),
-                                            // Botão WhatsApp
                                             _buildActionButton(
                                               label: 'WhatsApp',
                                               icon: Icons.chat,
@@ -1501,8 +2081,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                               isPrimary: false,
                                             ),
                                           ],
-                                        ],
-                                      ),
+                                        ),
                                     ],
 
                                     // Seção "Sobre o Músico/Banda"
@@ -1536,68 +2115,76 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                     },
                     body: Builder(
                       builder: (context) {
-                        final primaryController = PrimaryScrollController.of(context);
-                          return TabBarView(
-                            controller: _tabController,
-                            children: _profile!.isSpace
-                                ? [
-                                    _wrapWithPrimaryScrollController(
-                                      primaryController,
-                                      KeyedSubtree(
-                                        key: const PageStorageKey<String>('viewProfile_gallery'),
-                                        child: _buildGalleryTab(),
-                                      ),
+                        final primaryController =
+                            PrimaryScrollController.of(context);
+                        return TabBarView(
+                          controller: _tabController,
+                          children: _profile!.isSpace
+                              ? [
+                                  _wrapWithPrimaryScrollController(
+                                    primaryController,
+                                    KeyedSubtree(
+                                      key: const PageStorageKey<String>(
+                                          'viewProfile_gallery'),
+                                      child: _buildGalleryTab(),
                                     ),
-                                    _wrapWithPrimaryScrollController(
-                                      primaryController,
-                                      KeyedSubtree(
-                                        key: const PageStorageKey<String>('viewProfile_youtube'),
-                                        child: _buildYoutubeTab(),
-                                      ),
+                                  ),
+                                  _wrapWithPrimaryScrollController(
+                                    primaryController,
+                                    KeyedSubtree(
+                                      key: const PageStorageKey<String>(
+                                          'viewProfile_youtube'),
+                                      child: _buildYoutubeTab(),
                                     ),
-                                    _wrapWithPrimaryScrollController(
-                                      primaryController,
-                                      KeyedSubtree(
-                                        key: const PageStorageKey<String>('viewProfile_posts'),
-                                        child: _buildPostsTab(),
-                                      ),
+                                  ),
+                                  _wrapWithPrimaryScrollController(
+                                    primaryController,
+                                    KeyedSubtree(
+                                      key: const PageStorageKey<String>(
+                                          'viewProfile_posts'),
+                                      child: _buildPostsTab(),
                                     ),
-                                  ]
-                                : [
-                                    _wrapWithPrimaryScrollController(
-                                      primaryController,
-                                      KeyedSubtree(
-                                        key: const PageStorageKey<String>('viewProfile_gallery'),
-                                        child: _buildGalleryTab(),
-                                      ),
+                                  ),
+                                ]
+                              : [
+                                  _wrapWithPrimaryScrollController(
+                                    primaryController,
+                                    KeyedSubtree(
+                                      key: const PageStorageKey<String>(
+                                          'viewProfile_gallery'),
+                                      child: _buildGalleryTab(),
                                     ),
-                                    _wrapWithPrimaryScrollController(
-                                      primaryController,
-                                      KeyedSubtree(
-                                        key: const PageStorageKey<String>('viewProfile_youtube'),
-                                        child: _buildYoutubeTab(),
-                                      ),
+                                  ),
+                                  _wrapWithPrimaryScrollController(
+                                    primaryController,
+                                    KeyedSubtree(
+                                      key: const PageStorageKey<String>(
+                                          'viewProfile_youtube'),
+                                      child: _buildYoutubeTab(),
                                     ),
-                                    _wrapWithPrimaryScrollController(
-                                      primaryController,
-                                      KeyedSubtree(
-                                        key: const PageStorageKey<String>('viewProfile_posts'),
-                                        child: _buildPostsTab(),
-                                      ),
+                                  ),
+                                  _wrapWithPrimaryScrollController(
+                                    primaryController,
+                                    KeyedSubtree(
+                                      key: const PageStorageKey<String>(
+                                          'viewProfile_posts'),
+                                      child: _buildPostsTab(),
                                     ),
-                                    _wrapWithPrimaryScrollController(
-                                      primaryController,
-                                      KeyedSubtree(
-                                        key: const PageStorageKey<String>('viewProfile_interests'),
-                                        child: _buildInterestsTab(),
-                                      ),
+                                  ),
+                                  _wrapWithPrimaryScrollController(
+                                    primaryController,
+                                    KeyedSubtree(
+                                      key: const PageStorageKey<String>(
+                                          'viewProfile_interests'),
+                                      child: _buildInterestsTab(),
                                     ),
-                                  ],
-                          );
+                                  ),
+                                ],
+                        );
                       },
                     ),
-                    ),
                   ),
+                ),
     );
   }
 
@@ -1619,15 +2206,18 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     return (_profile?.instagramLink != null &&
             _profile!.instagramLink!.isNotEmpty) ||
         (_profile?.tiktokLink != null && _profile!.tiktokLink!.isNotEmpty) ||
-      (_profile?.youtubeLink != null && _profile!.youtubeLink!.isNotEmpty) ||
-      (_profile?.spotifyLink != null && _profile!.spotifyLink!.isNotEmpty) ||
-      (_profile?.deezerLink != null && _profile!.deezerLink!.isNotEmpty);
+        (_profile?.youtubeLink != null && _profile!.youtubeLink!.isNotEmpty) ||
+        (_profile?.spotifyLink != null && _profile!.spotifyLink!.isNotEmpty) ||
+        (_profile?.deezerLink != null && _profile!.deezerLink!.isNotEmpty);
   }
 
   Widget _buildSocialLinksBlock() {
     return Container(
+      width: double.infinity,
+      alignment: Alignment.centerLeft,
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Wrap(
+        alignment: WrapAlignment.start,
         spacing: 8,
         runSpacing: 8,
         children: [
@@ -1658,8 +2248,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               label: 'Spotify',
               onTap: () => _launchUrl(_profile!.spotifyLink!),
             ),
-          if (_profile?.deezerLink != null &&
-              _profile!.deezerLink!.isNotEmpty)
+          if (_profile?.deezerLink != null && _profile!.deezerLink!.isNotEmpty)
             _buildSocialIcon(
               icon: Iconsax.music_square,
               label: 'Deezer',
@@ -1702,11 +2291,16 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   bool _shouldShowProfileInfo() {
     if (_profile == null) return false;
 
-    // Mostrar se tiver nível (músico), instrumentos, gêneros ou membros da banda
+    // Mostrar seção quando houver dados relevantes para o tipo de perfil.
     return (_profile!.level != null && _profile!.level!.isNotEmpty) ||
         (_profile!.instruments?.isNotEmpty ?? false) ||
         (_profile!.genres?.isNotEmpty ?? false) ||
-        (_profile!.isBand && (_profile!.bandMembers?.isNotEmpty ?? false));
+      (_profile!.isBand && (_profile!.bandMembers?.isNotEmpty ?? false)) ||
+      (_profile!.isTechnician &&
+        ((_profile!.technicianSpecialty?.isNotEmpty ?? false) ||
+          (_profile!.experienceRange?.isNotEmpty ?? false) ||
+          (_profile!.phone?.trim().isNotEmpty ?? false))) ||
+      (_profile!.isContractor && (_profile!.phone?.trim().isNotEmpty ?? false));
   }
 
   Widget _buildProfileInfoSection() {
@@ -1761,6 +2355,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         );
 
     return Container(
+      width: double.infinity,
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1772,10 +2367,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
         children: [
           Text(
-            _profile!.isSpace
-                ? 'Sobre o Espaço'
-                : (_profile!.isBand ? 'Sobre a Banda' : 'Sobre o Músico'),
+          _profile!.isSpace
+            ? 'Sobre o Espaço'
+            : _profile!.isBand
+              ? 'Sobre a Banda'
+              : _profile!.isTechnician
+                ? 'Sobre o Técnico'
+                : _profile!.isContractor
+                  ? 'Sobre o Contratante'
+                  : 'Sobre o Músico',
             style: sectionTitleStyle,
+          textAlign: TextAlign.left,
           ),
           const SizedBox(height: 12),
 
@@ -1784,6 +2386,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
                     _profile!.isBand ? Iconsax.calendar : Iconsax.cake,
@@ -1791,9 +2394,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                     color: Colors.grey[600],
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    _profile!.ageOrFormationText!,
-                    style: valueStyle,
+                  Expanded(
+                    child: Text(
+                      _profile!.ageOrFormationText!,
+                      style: valueStyle,
+                      textAlign: TextAlign.left,
+                    ),
                   ),
                 ],
               ),
@@ -1802,36 +2408,45 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
           // Nível (apenas para músicos, não para espaços)
           if (!_profile!.isSpace &&
               !_profile!.isBand &&
+              !_profile!.isTechnician &&
+              !_profile!.isContractor &&
               _profile!.level != null &&
               _profile!.level!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Iconsax.chart, size: 20, color: Colors.grey[600]),
                   const SizedBox(width: 8),
-                  Text(
-                    'Nível: ',
-                    style: labelStyle,
-                  ),
-                  Text(
-                    _profile!.level!,
-                    style: valueStyle,
+                  Expanded(
+                    child: RichText(
+                      textAlign: TextAlign.left,
+                      text: TextSpan(
+                        children: [
+                          TextSpan(text: 'Nível: ', style: labelStyle),
+                          TextSpan(text: _profile!.level!, style: valueStyle),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
 
           // Instrumentos (rótulo adaptável) - não para espaços
-          if (!_profile!.isSpace && (_profile!.instruments?.isNotEmpty ?? false))
+          if (!_profile!.isSpace &&
+              (_profile!.instruments?.isNotEmpty ?? false))
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
+                crossAxisAlignment:
+                    CrossAxisAlignment.start, // Alinhamento à esquerda
                 children: [
                   Row(
                     children: [
-                      Icon(Iconsax.musicnote, size: 20, color: Colors.grey[600]),
+                      Icon(Iconsax.musicnote,
+                          size: 20, color: Colors.grey[600]),
                       const SizedBox(width: 8),
                       Text(
                         _profile!.isBand ? 'Instrumentação:' : 'Instrumentos:',
@@ -1865,11 +2480,13 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             ),
 
           // Gêneros - não para espaços
-          if (!_profile!.isSpace && (_profile!.genres?.isNotEmpty ?? false))
+          if ((_profile!.isMusician || _profile!.isBand) &&
+              (_profile!.genres?.isNotEmpty ?? false))
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
+                crossAxisAlignment:
+                    CrossAxisAlignment.start, // Alinhamento à esquerda
                 children: [
                   Row(
                     children: [
@@ -1906,6 +2523,116 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                 ],
               ),
             ),
+
+          // ===== TÉCNICO: Campos Específicos =====
+          if (_profile!.isTechnician) ...[
+            if (_profile!.technicianSpecialty != null &&
+                _profile!.technicianSpecialty!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Iconsax.headphone, size: 20, color: Colors.grey[600]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: RichText(
+                        textAlign: TextAlign.left,
+                        text: TextSpan(
+                          children: [
+                            TextSpan(text: 'Especialidade: ', style: labelStyle),
+                            TextSpan(
+                              text: _profile!.technicianSpecialty!,
+                              style: valueStyle,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            if (_profile!.experienceRange != null &&
+                _profile!.experienceRange!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Iconsax.clock, size: 20, color: Colors.grey[600]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: RichText(
+                        textAlign: TextAlign.left,
+                        text: TextSpan(
+                          children: [
+                            TextSpan(text: 'Experiência: ', style: labelStyle),
+                            TextSpan(
+                              text: _profile!.experienceRange!,
+                              style: valueStyle,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            if (_profile!.phone != null && _profile!.phone!.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InkWell(
+                  onTap: () => _launchUrl('tel:${_profile!.phone}'),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Iconsax.call, size: 20, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _formatBrazilianPhone(_profile!.phone!.trim()),
+                          textAlign: TextAlign.left,
+                          style: valueStyle.copyWith(
+                            color: AppColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+
+          // ===== CONTRATANTE: Campos Específicos =====
+          if (_profile!.isContractor) ...[
+            if (_profile!.phone != null && _profile!.phone!.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InkWell(
+                  onTap: () => _launchUrl('tel:${_profile!.phone}'),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Iconsax.call, size: 20, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _formatBrazilianPhone(_profile!.phone!.trim()),
+                          textAlign: TextAlign.left,
+                          style: valueStyle.copyWith(
+                            color: AppColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
 
           // ===== ESPAÇO: Campos Específicos =====
           if (_profile!.isSpace) ...[
@@ -2033,21 +2760,25 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               ),
 
             // Website (shortlink - última posição)
-            if (_profile!.website != null && _profile!.website!.trim().isNotEmpty)
+            if (_profile!.website != null &&
+                _profile!.website!.trim().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: InkWell(
                   onTap: () => _launchUrl(_profile!.website!),
                   child: Row(
                     children: [
-                      const Icon(Iconsax.link, size: 20, color: AppColors.primary),
+                      const Icon(Iconsax.link,
+                          size: 20, color: AppColors.primary),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          _profile!.website!.trim()
+                          _profile!.website!
+                              .trim()
                               .replaceFirst(RegExp(r'^https?://'), '')
                               .replaceFirst(RegExp(r'^www\.'), '')
-                              .split('/').first,
+                              .split('/')
+                              .first,
                           style: valueStyle.copyWith(
                             color: AppColors.primary,
                             decoration: TextDecoration.underline,
@@ -2339,7 +3070,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       debugPrint('ViewProfile: Imagem comprimida: $compressedPath');
 
       final squareFile = await _createLetterboxedSquare(compressedPath);
-      debugPrint('ViewProfile: Imagem com letterbox pronta: ${squareFile.path}');
+      debugPrint(
+          'ViewProfile: Imagem com letterbox pronta: ${squareFile.path}');
 
       // Upload para o Firebase Storage
       final user = FirebaseAuth.instance.currentUser;
@@ -2398,8 +3130,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Iconsax.video_play,
-                      size: 64, color: Colors.grey[400]),
+                  Icon(Iconsax.video_play, size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
                     'Nenhum vídeo do YouTube',
@@ -2487,10 +3218,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
-                  child: CircularProgressIndicator(
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-                  ),
+                  child: AppRadioPulseLoader(size: 48),
                 ),
               ),
             ],
@@ -2536,8 +3264,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                       const SizedBox(height: 16),
                       Text(
                         'Nenhum post encontrado',
-                        style:
-                            TextStyle(color: Colors.grey[600], fontSize: 16),
+                        style: TextStyle(color: Colors.grey[600], fontSize: 16),
                       ),
                     ],
                   ),
@@ -2558,7 +3285,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             final postId = docs[i].id;
             // ✅ Verificar se o usuário ativo demonstrou interesse neste post
             final isInterestSent = interestsAsync.contains(postId);
-            return _buildPostCard(postId, d, isOwner, 
+            return _buildPostCard(postId, d, isOwner,
                 isInterestSent: isInterestSent, allDocs: docs, docIndex: i);
           },
         );
@@ -2573,9 +3300,11 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       final currentUid = FirebaseAuth.instance.currentUser?.uid;
       final viewedProfileId = _profile?.profileId;
       final activeProfile = ref.read(activeProfileProvider);
-      if (currentUid != null && currentUid.isNotEmpty &&
+      if (currentUid != null &&
+          currentUid.isNotEmpty &&
           activeProfile != null &&
-          viewedProfileId != null && viewedProfileId.isNotEmpty &&
+          viewedProfileId != null &&
+          viewedProfileId.isNotEmpty &&
           viewedProfileId != activeProfile.profileId) {
         try {
           final excluded = await BlockedRelations.getExcludedProfileIds(
@@ -2667,10 +3396,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
-                  child: CircularProgressIndicator(
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-                  ),
+                  child: AppRadioPulseLoader(size: 48),
                 ),
               ),
             ],
@@ -2716,8 +3442,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                       const SizedBox(height: 16),
                       Text(
                         'Nenhum interesse enviado',
-                        style:
-                            TextStyle(color: Colors.grey[600], fontSize: 16),
+                        style: TextStyle(color: Colors.grey[600], fontSize: 16),
                       ),
                     ],
                   ),
@@ -2833,10 +3558,10 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
       // ✅ Usar provider global para optimistic update e persistência
       await ref.read(interestNotifierProvider.notifier).addInterest(
-        postId: postId,
-        postAuthorUid: postAuthorUid,
-        postAuthorProfileId: authorProfileId,
-      );
+            postId: postId,
+            postAuthorUid: postAuthorUid,
+            postAuthorProfileId: authorProfileId,
+          );
 
       if (mounted) {
         AppSnackBar.showSuccess(
@@ -2865,8 +3590,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
       // ✅ Usar provider global para optimistic update e remoção
       await ref.read(interestNotifierProvider.notifier).removeInterest(
-        postId: postId,
-      );
+            postId: postId,
+          );
 
       if (mounted) {
         AppSnackBar.showInfo(
@@ -2890,7 +3615,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final type = (data['type'] as String?) ?? '';
     final authorProfileId = (data['authorProfileId'] as String?) ?? '';
     final authorUid = (data['authorUid'] as String?) ?? '';
-    
+
     // Converter GeoPoint para formato válido
     final locationData = data['location'];
     final GeoPoint location;
@@ -2904,11 +3629,12 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     } else {
       location = const GeoPoint(0, 0);
     }
-    
+
     // Criar PostEntity manualmente para evitar problemas de serialização
-    final createdAt = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+    final createdAt =
+        (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
     final expiresAt = (data['expiresAt'] as Timestamp?)?.toDate() ??
-      createdAt.add(const Duration(days: 30));
+        createdAt.add(const Duration(days: 30));
 
     final post = PostEntity(
       id: postId,
@@ -2926,10 +3652,13 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       deezerLink: data['deezerLink'] as String?,
       type: type,
       level: (data['level'] as String?) ?? '',
-      instruments: (data['instruments'] as List<dynamic>?)?.cast<String>() ?? [],
+      instruments:
+          (data['instruments'] as List<dynamic>?)?.cast<String>() ?? [],
       genres: (data['genres'] as List<dynamic>?)?.cast<String>() ?? [],
-      seekingMusicians: (data['seekingMusicians'] as List<dynamic>?)?.cast<String>() ?? [],
-      availableFor: (data['availableFor'] as List<dynamic>?)?.cast<String>() ?? [],
+      seekingMusicians:
+          (data['seekingMusicians'] as List<dynamic>?)?.cast<String>() ?? [],
+      availableFor:
+          (data['availableFor'] as List<dynamic>?)?.cast<String>() ?? [],
       eventDate: (data['eventDate'] as Timestamp?)?.toDate(),
       eventType: data['eventType'] as String?,
       gigFormat: data['gigFormat'] as String?,
@@ -2961,8 +3690,10 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
       post: post,
       isInterestSent: isInterestSent,
       isOwner: isOwner,
-      onSendInterest: () => _sendInterestOptimistically(postId, authorProfileId, type),
-      onRemoveInterest: () => _removeInterestOptimistically(postId, authorProfileId),
+      onSendInterest: () =>
+          _sendInterestOptimistically(postId, authorProfileId, type),
+      onRemoveInterest: () =>
+          _removeInterestOptimistically(postId, authorProfileId),
       onDeletePost: () => _confirmDeletePost(post),
       onViewProfile: () => context.pushProfile(authorProfileId),
       onPostEdited: () {
@@ -3063,16 +3794,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     try {
       final newExpiresAt = DateTime.now().add(const Duration(days: 30));
 
-      await FirebaseFirestore.instance
-          .collection('posts')
-          .doc(post.id)
-          .update({
+      await FirebaseFirestore.instance.collection('posts').doc(post.id).update({
         'expiresAt': Timestamp.fromDate(newExpiresAt),
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
       if (mounted) {
-        AppSnackBar.showSuccess(context, 'Post renovado! Válido por mais 30 dias.');
+        AppSnackBar.showSuccess(
+            context, 'Post renovado! Válido por mais 30 dias.');
         setState(() {
           _postsKey++; // Força rebuild do FutureBuilder
         });
@@ -3086,28 +3815,32 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   }
 
   Widget _buildPostCard(String postId, Map<String, dynamic> data, bool isOwner,
-      {bool isInterestCard = false, bool isInterestSent = false,
-      List<QueryDocumentSnapshot<Map<String, dynamic>>>? allDocs, int? docIndex}) {
+      {bool isInterestCard = false,
+      bool isInterestSent = false,
+      List<QueryDocumentSnapshot<Map<String, dynamic>>>? allDocs,
+      int? docIndex}) {
     // ✅ Priorizar photoUrls (carrossel) com fallback para photoUrl legado
-    final photoUrls = (data['photoUrls'] as List<dynamic>?)?.cast<String>() ?? [];
-    final photo = photoUrls.isNotEmpty 
-        ? photoUrls.first 
+    final photoUrls =
+        (data['photoUrls'] as List<dynamic>?)?.cast<String>() ?? [];
+    final photo = photoUrls.isNotEmpty
+        ? photoUrls.first
         : (data['photoUrl'] as String? ?? '');
-    
+
     final type = (data['type'] as String?) ?? '';
     final city = (data['city'] as String?) ?? '';
     final state = (data['state'] as String?) ?? '';
     // Se é um card de interesse, já foi enviado. Senão, verifica no Set ou parâmetro
     final primaryColor = AppColors.primary;
 
-    final createdAt = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
-    
+    final createdAt =
+        (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+
     // ✅ CORREÇÃO: Para posts "sales", usar promoEndDate como validade
     final DateTime effectiveExpiry;
     if (type == 'sales') {
       final promoEndDate = (data['promoEndDate'] as Timestamp?)?.toDate();
-      effectiveExpiry = promoEndDate ?? 
-          (data['expiresAt'] as Timestamp?)?.toDate() ?? 
+      effectiveExpiry = promoEndDate ??
+          (data['expiresAt'] as Timestamp?)?.toDate() ??
           createdAt.add(const Duration(days: 30));
     } else {
       effectiveExpiry = (data['expiresAt'] as Timestamp?)?.toDate() ??
@@ -3209,7 +3942,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                           color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Iconsax.musicnote, color: Colors.grey, size: 24),
+                        child: const Icon(Iconsax.musicnote,
+                            color: Colors.grey, size: 24),
                       ),
                     ),
               title: isOwner && timeAgo != null
@@ -3290,12 +4024,14 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                           children: [
                             if (daysUntilExpiry != null && daysUntilExpiry! < 0)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
                                 margin: const EdgeInsets.only(right: 6),
                                 decoration: BoxDecoration(
                                   color: Colors.red.shade50,
                                   borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: Colors.red.shade200, width: 0.5),
+                                  border: Border.all(
+                                      color: Colors.red.shade200, width: 0.5),
                                 ),
                                 child: Text(
                                   'EXPIRADO',
@@ -3306,14 +4042,18 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                                   ),
                                 ),
                               )
-                            else if (daysUntilExpiry != null && daysUntilExpiry! <= 1)
+                            else if (daysUntilExpiry != null &&
+                                daysUntilExpiry! <= 1)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
                                 margin: const EdgeInsets.only(right: 6),
                                 decoration: BoxDecoration(
                                   color: Colors.orange.shade50,
                                   borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: Colors.orange.shade200, width: 0.5),
+                                  border: Border.all(
+                                      color: Colors.orange.shade200,
+                                      width: 0.5),
                                 ),
                                 child: Text(
                                   'EXPIRA HOJE',
@@ -3394,7 +4134,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     final end = data['eventEndTime'] as String?;
     final durationMinutes = (data['eventDurationMinutes'] as num?)?.toInt();
     final timeLabel = _formatHiringTime(start, end, durationMinutes);
-    final dateLabel = eventDate != null ? DateFormat('dd/MM').format(eventDate) : null;
+    final dateLabel =
+        eventDate != null ? DateFormat('dd/MM').format(eventDate) : null;
     final budget = (data['budgetRange'] as String?)?.trim();
 
     final parts = <String>[];
@@ -3481,8 +4222,8 @@ class _PhotoViewerPageState extends State<_PhotoViewerPage> {
           alignment: Alignment.center,
           placeholder: (context, url) => const ColoredBox(
             color: Colors.black,
-            child:
-                Center(child: CircularProgressIndicator(color: Colors.white)),
+            child: Center(
+                child: AppRadioPulseLoader(size: 40, color: Colors.white)),
           ),
           errorWidget: (context, url, error) =>
               const Icon(Iconsax.gallery_slash, size: 100, color: Colors.white),

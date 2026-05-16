@@ -24,6 +24,8 @@ class ProfileEntity with _$ProfileEntity {
     @TimestampConverter() required DateTime createdAt,
     @Default(20.0) double notificationRadius,
     @Default(true) bool notificationRadiusEnabled,
+    @Default(true) bool allowConnectionSuggestions,
+    @Default(true) bool allowConnectionRequests,
     String? photoUrl,
     int? birthYear,
     String? bio,
@@ -44,6 +46,9 @@ class ProfileEntity with _$ProfileEntity {
     String? operatingHours,
     String? website,
     List<String>? amenities,
+    // Technician-specific fields
+    String? technicianSpecialty,
+    String? experienceRange,
     @NullableTimestampConverter() DateTime? updatedAt,
   }) = _ProfileEntity;
 
@@ -85,7 +90,10 @@ class ProfileEntity with _$ProfileEntity {
     // Parse profile type with backward compatibility
     ProfileType parseProfileType() {
       if (data.containsKey('profileType')) {
-        return ProfileType.fromString(data['profileType'] as String);
+        final rawProfileType = data['profileType'];
+        if (rawProfileType is String) {
+          return ProfileType.fromString(rawProfileType);
+        }
       }
       // Backward compatibility: use isBand field
       final isBand = (data['isBand'] as bool?) ?? false;
@@ -106,6 +114,10 @@ class ProfileEntity with _$ProfileEntity {
           (data['notificationRadius'] as num?)?.toDouble() ?? 20.0,
       notificationRadiusEnabled:
           (data['notificationRadiusEnabled'] as bool?) ?? true,
+        allowConnectionSuggestions:
+          (data['allowConnectionSuggestions'] as bool?) ?? true,
+        allowConnectionRequests:
+          (data['allowConnectionRequests'] as bool?) ?? true,
       photoUrl: data['photoUrl'] as String?,
       birthYear: data['birthYear'] as int?,
       bio: data['bio'] as String?,
@@ -125,6 +137,8 @@ class ProfileEntity with _$ProfileEntity {
       operatingHours: data['operatingHours'] as String?,
       website: data['website'] as String?,
       amenities: (data['amenities'] as List<dynamic>?)?.cast<String>(),
+      technicianSpecialty: data['technicianSpecialty'] as String?,
+      experienceRange: data['experienceRange'] as String?,
       updatedAt:
           data['updatedAt'] != null ? parseTimestamp(data['updatedAt']) : null,
     );
@@ -213,6 +227,12 @@ class ProfileEntity with _$ProfileEntity {
 
   /// Check if profile is a space
   bool get isSpace => profileType == ProfileType.space;
+
+  /// Check if profile is a technician
+  bool get isTechnician => profileType == ProfileType.technician;
+
+  /// Check if profile is a contractor
+  bool get isContractor => profileType == ProfileType.contractor;
 
   double get latitude => location.latitude;
   double get longitude => location.longitude;

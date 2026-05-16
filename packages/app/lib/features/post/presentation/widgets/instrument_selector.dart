@@ -50,6 +50,7 @@ class InstrumentSelector extends StatelessWidget {
     'Saxofone',
     'Trompete',
     'Trombone',
+    'Trompa',
     'Flauta',
     'Clarinete',
     'Oboé',

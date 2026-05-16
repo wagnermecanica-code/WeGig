@@ -7,6 +7,7 @@ class SearchParams with _$SearchParams {
   const factory SearchParams({
     required String city,
     required double maxDistanceKm,
+    @Default(false) bool onlyConnections,
     String? level,
     @Default({}) Set<String> instruments,
     @Default({}) Set<String> genres,

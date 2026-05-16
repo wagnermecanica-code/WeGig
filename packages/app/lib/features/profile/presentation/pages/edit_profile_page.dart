@@ -16,6 +16,7 @@ import 'package:core_ui/utils/debouncer.dart';
 import 'package:core_ui/utils/location_utils.dart';
 import 'package:core_ui/utils/music_constants.dart';
 import 'package:core_ui/utils/objectionable_content_filter.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:core_ui/widgets/multi_select_field.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -78,6 +79,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   String? _selectedLevel;
   Set<String> _selectedInstruments = {};
   Set<String> _selectedGenres = {};
+  // Technician-specific state
+  String? _selectedTechnicianSpecialty;
+  String? _selectedExperienceRange;
 
   GeoPoint? _selectedLocation;
   String? _selectedCity;
@@ -87,10 +91,12 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
   // ✅ Estado para validação de username em tempo real (apenas para novos perfis)
   bool _isCheckingUsername = false;
-  bool? _isUsernameAvailable; // null = não verificado, true = disponível, false = em uso
+  bool?
+      _isUsernameAvailable; // null = não verificado, true = disponível, false = em uso
   String? _lastCheckedUsername;
   Timer? _usernameDebounceTimer;
-  List<String> _usernameSuggestions = []; // ✅ Sugestões de username do login social
+  List<String> _usernameSuggestions =
+      []; // ✅ Sugestões de username do login social
   int _usernameAutoResolveGeneration = 0;
 
   // Computed property para evitar lógica no build
@@ -106,42 +112,55 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   static const int maxInstruments = 5;
   static const int maxGenres = 5;
 
+  List<String> get _instrumentOptions {
+    final optionsByKey = <String, String>{
+      for (final option in MusicConstants.instrumentOptions)
+        option.trim().toLowerCase(): option,
+    };
+
+    optionsByKey.putIfAbsent('trompa', () => 'Trompa');
+    return optionsByKey.values.toList(growable: false);
+  }
+
   @override
   void initState() {
     super.initState();
-    
+
     // ✅ Para novos perfis, consumir dados do login social após o frame inicial
     // Isso garante que os providers foram atualizados antes de ler
     if (widget.isNewProfile) {
-      debugPrint('EditProfile: 🆕 initState - isNewProfile=true, agendando consumo de dados');
+      debugPrint(
+          'EditProfile: 🆕 initState - isNewProfile=true, agendando consumo de dados');
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await _consumeSocialLoginData();
       });
     }
-    
+
     _loadProfile();
   }
-  
+
   /// Consome dados do login social (Apple/Google) e preenche os campos
   /// Deve ser chamado após o frame inicial para garantir sincronização
   Future<void> _consumeSocialLoginData() async {
     if (!widget.isNewProfile) {
-      debugPrint('EditProfile: ⚠️ _consumeSocialLoginData ignorado - não é novo perfil');
+      debugPrint(
+          'EditProfile: ⚠️ _consumeSocialLoginData ignorado - não é novo perfil');
       return;
     }
-    
+
     debugPrint('EditProfile: 🔄 _consumeSocialLoginData() chamado');
     debugPrint('EditProfile: 🔄 mounted=$mounted');
-    
+
     // ✅ Ler dados do login social
     final socialLoginData = ref.read(socialLoginDataProvider);
     final verifiedBirthYear = ref.read(verifiedBirthYearProvider);
-    
+
     debugPrint('EditProfile: 📊 ====== VALORES DOS PROVIDERS ======');
     debugPrint('EditProfile: 📊 socialLoginDataProvider:');
     if (socialLoginData != null) {
       debugPrint('EditProfile:    ├─ provider: ${socialLoginData.provider}');
-      debugPrint('EditProfile:    ├─ displayName: "${socialLoginData.displayName}"');
+      debugPrint(
+          'EditProfile:    ├─ displayName: "${socialLoginData.displayName}"');
       debugPrint('EditProfile:    ├─ email: "${socialLoginData.email}"');
       debugPrint('EditProfile:    └─ photoUrl: "${socialLoginData.photoUrl}"');
     } else {
@@ -149,28 +168,32 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     }
     debugPrint('EditProfile: 📊 verifiedBirthYearProvider: $verifiedBirthYear');
     debugPrint('EditProfile: 📊 ===================================');
-    
+
     // Pré-preencher ano de nascimento
     if (verifiedBirthYear != null && _birthYearController.text.isEmpty) {
       _birthYearController.text = verifiedBirthYear.toString();
-      debugPrint('EditProfile: ✅ Ano de nascimento pré-preenchido: $verifiedBirthYear');
+      debugPrint(
+          'EditProfile: ✅ Ano de nascimento pré-preenchido: $verifiedBirthYear');
     }
-    
+
     // Consumir dados do login social
     if (socialLoginData != null) {
-      debugPrint('EditProfile: ✅ Processando dados de login social (${socialLoginData.provider})...');
-      
+      debugPrint(
+          'EditProfile: ✅ Processando dados de login social (${socialLoginData.provider})...');
+
       bool shouldUpdate = false;
-      
+
       // Pré-preencher nome
-      if (socialLoginData.displayName != null && 
+      if (socialLoginData.displayName != null &&
           socialLoginData.displayName!.isNotEmpty &&
           _nameController.text.isEmpty) {
         _nameController.text = socialLoginData.displayName!;
         shouldUpdate = true;
-        debugPrint('EditProfile: ✅ Nome pré-preenchido: "${socialLoginData.displayName}"');
+        debugPrint(
+            'EditProfile: ✅ Nome pré-preenchido: "${socialLoginData.displayName}"');
       } else {
-        debugPrint('EditProfile: ⏭️ Nome não pré-preenchido (displayName=${socialLoginData.displayName}, nameController.text=${_nameController.text})');
+        debugPrint(
+            'EditProfile: ⏭️ Nome não pré-preenchido (displayName=${socialLoginData.displayName}, nameController.text=${_nameController.text})');
       }
 
       // Fallback Apple: usar parte local do email como nome (melhor que vazio)
@@ -184,50 +207,59 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         if (cleaned.isNotEmpty) {
           _nameController.text = cleaned;
           shouldUpdate = true;
-          debugPrint('EditProfile: ✅ Nome fallback (email) pré-preenchido: "$cleaned"');
+          debugPrint(
+              'EditProfile: ✅ Nome fallback (email) pré-preenchido: "$cleaned"');
         }
       }
-      
+
       // Pré-preencher foto
-      if (socialLoginData.photoUrl != null && 
+      if (socialLoginData.photoUrl != null &&
           socialLoginData.photoUrl!.isNotEmpty &&
           _photoUrl == null) {
         _photoUrl = socialLoginData.photoUrl;
         shouldUpdate = true;
-        debugPrint('EditProfile: ✅ Foto pré-preenchida: "${socialLoginData.photoUrl}"');
+        debugPrint(
+            'EditProfile: ✅ Foto pré-preenchida: "${socialLoginData.photoUrl}"');
       } else {
-        debugPrint('EditProfile: ⏭️ Foto não pré-preenchida (photoUrl=${socialLoginData.photoUrl}, _photoUrl=$_photoUrl)');
+        debugPrint(
+            'EditProfile: ⏭️ Foto não pré-preenchida (photoUrl=${socialLoginData.photoUrl}, _photoUrl=$_photoUrl)');
       }
-      
+
       // Gerar sugestões de username
       if (_profileUsernameController.text.isEmpty) {
         final suggestions = socialLoginData.generateUsernameSuggestions();
-        debugPrint('EditProfile: 📝 Sugestões de username geradas: $suggestions');
+        debugPrint(
+            'EditProfile: 📝 Sugestões de username geradas: $suggestions');
         if (suggestions.isNotEmpty) {
           _usernameSuggestions = suggestions;
           shouldUpdate = true;
-          debugPrint('EditProfile: ✅ Sugestões aplicadas - escolhendo automaticamente a primeira disponível');
+          debugPrint(
+              'EditProfile: ✅ Sugestões aplicadas - escolhendo automaticamente a primeira disponível');
 
           // ✅ Escolher automaticamente a primeira sugestão disponível
           await _autoPickFirstAvailableUsernameSuggestion(suggestions);
         }
       } else {
-        debugPrint('EditProfile: ⏭️ Username não sugerido (usernameController.text=${_profileUsernameController.text})');
+        debugPrint(
+            'EditProfile: ⏭️ Username não sugerido (usernameController.text=${_profileUsernameController.text})');
       }
-      
+
       // ⚠️ NÃO limpar providers aqui - limpar apenas após SALVAR o perfil
       // Isso evita perda de dados se o usuário voltar para esta tela
-      debugPrint('EditProfile: ℹ️ Providers NÃO limpos (serão limpos ao salvar)');
-      
+      debugPrint(
+          'EditProfile: ℹ️ Providers NÃO limpos (serão limpos ao salvar)');
+
       // Atualizar UI se necessário
       if (shouldUpdate && mounted) {
         setState(() {});
         debugPrint('EditProfile: 🔄 UI atualizada com dados sociais');
       } else {
-        debugPrint('EditProfile: ⚠️ UI não atualizada (shouldUpdate=$shouldUpdate, mounted=$mounted)');
+        debugPrint(
+            'EditProfile: ⚠️ UI não atualizada (shouldUpdate=$shouldUpdate, mounted=$mounted)');
       }
     } else {
-      debugPrint('EditProfile: ⚠️ socialLoginData é NULL - cadastro manual ou email/senha');
+      debugPrint(
+          'EditProfile: ⚠️ socialLoginData é NULL - cadastro manual ou email/senha');
     }
   }
 
@@ -273,7 +305,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
             // ✅ Para novo perfil: se este username estiver em uso, já sugerir/auto-escolher uma alternativa
             if (widget.isNewProfile) {
-              final suggestions = _generateUsernameSuggestionsFromUsername(base);
+              final suggestions =
+                  _generateUsernameSuggestionsFromUsername(base);
               _usernameSuggestions = suggestions;
               await _autoPickFirstAvailableUsernameSuggestion(suggestions);
             }
@@ -283,8 +316,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
       // Se é novo perfil, apenas finaliza loading (dados sociais já consumidos via addPostFrameCallback)
       if (widget.isNewProfile) {
-        debugPrint('EditProfile: Modo novo perfil - aguardando consumo de dados sociais via callback');
-        
+        debugPrint(
+            'EditProfile: Modo novo perfil - aguardando consumo de dados sociais via callback');
+
         if (mounted) {
           setState(() => _isLoadingProfile = false);
         }
@@ -323,7 +357,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           _youtubeController.text = profile.youtubeLink ?? '';
           _spotifyController.text = profile.spotifyLink ?? '';
           _deezerController.text = profile.deezerLink ?? '';
-          _instagramController.text = _extractInstagramUsername(profile.instagramLink);
+          _instagramController.text =
+              _extractInstagramUsername(profile.instagramLink);
           _tiktokController.text = _extractTikTokUsername(profile.tiktokLink);
           _photoUrl = profile.photoUrl;
           _profileType = profile.profileType;
@@ -336,6 +371,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           _operatingHoursController.text = profile.operatingHours ?? '';
           _websiteController.text = profile.website ?? '';
           _selectedAmenities = {...?profile.amenities};
+          // Technician-specific fields
+          _selectedTechnicianSpecialty = profile.technicianSpecialty;
+          _selectedExperienceRange = profile.experienceRange;
         }
       } else {
         // Carrega perfil ativo
@@ -364,8 +402,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           _youtubeController.text = activeProfile.youtubeLink ?? '';
           _spotifyController.text = activeProfile.spotifyLink ?? '';
           _deezerController.text = activeProfile.deezerLink ?? '';
-          _instagramController.text = _extractInstagramUsername(activeProfile.instagramLink);
-          _tiktokController.text = _extractTikTokUsername(activeProfile.tiktokLink);
+          _instagramController.text =
+              _extractInstagramUsername(activeProfile.instagramLink);
+          _tiktokController.text =
+              _extractTikTokUsername(activeProfile.tiktokLink);
           _photoUrl = activeProfile.photoUrl;
           _profileType = activeProfile.profileType;
           _selectedLevel = activeProfile.level;
@@ -377,6 +417,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           _operatingHoursController.text = activeProfile.operatingHours ?? '';
           _websiteController.text = activeProfile.website ?? '';
           _selectedAmenities = {...?activeProfile.amenities};
+          // Technician-specific fields
+          _selectedTechnicianSpecialty = activeProfile.technicianSpecialty;
+          _selectedExperienceRange = activeProfile.experienceRange;
         }
       }
     } catch (e) {
@@ -579,7 +622,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     // ✅ Limpar providers de login social após salvar com sucesso
     // Isso evita que os dados sejam reutilizados em futuras criações de perfil
     if (isCreation && widget.isNewProfile) {
-      debugPrint('EditProfile: 🧹 Limpando providers de login social após salvar');
+      debugPrint(
+          'EditProfile: 🧹 Limpando providers de login social após salvar');
       ref.read(socialLoginDataProvider.notifier).state = null;
       ref.read(verifiedBirthYearProvider.notifier).state = null;
     }
@@ -674,7 +718,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     if (_profileType == null) {
       AppSnackBar.showWarning(
         context,
-        'Por favor, selecione o tipo de perfil (Músico, Banda ou Espaço)',
+        'Por favor, selecione o tipo de perfil (Músico, Banda, Espaço, Técnico ou Contratante)',
       );
       return;
     }
@@ -686,12 +730,14 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       final currentYear = DateTime.now().year;
 
       if (birthYear == null) {
-        AppSnackBar.showWarning(context, 'Informe um ano de nascimento válido (apenas números)');
+        AppSnackBar.showWarning(
+            context, 'Informe um ano de nascimento válido (apenas números)');
         return;
       }
 
       if (birthYear > currentYear) {
-        AppSnackBar.showWarning(context, 'Ano de nascimento não pode ser no futuro');
+        AppSnackBar.showWarning(
+            context, 'Ano de nascimento não pode ser no futuro');
         return;
       }
 
@@ -716,11 +762,27 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       }
     }
 
+    // Validar campos específicos de Técnico
+    if (_profileType == ProfileType.technician) {
+      if (_selectedTechnicianSpecialty == null) {
+        AppSnackBar.showWarning(
+          context,
+          'Por favor, selecione sua especialidade',
+        );
+        return;
+      }
+    }
+
     debugPrint('📝 EditProfile: Iniciando salvamento de perfil...');
 
     setState(() => _isSaving = true);
 
     try {
+      final selectedProfileType = _profileType;
+      if (selectedProfileType == null) {
+        throw Exception('Tipo de perfil não selecionado');
+      }
+
       final auth = FirebaseAuth.instance;
       final currentUser = auth.currentUser;
       if (currentUser == null) {
@@ -757,9 +819,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       }
 
       // Upload da foto se for um arquivo local
-      if (_photoUrl != null && !_photoUrl!.startsWith('http')) {
+      if (_photoUrl != null && !_isRemoteImageUrl(_photoUrl!)) {
         debugPrint('📸 EditProfile: Detectado arquivo local: $_photoUrl');
-        final photoFile = File(_photoUrl!);
+        final photoFile = _fileFromPhotoPath(_photoUrl!);
         if (await photoFile.exists()) {
           debugPrint('📸 EditProfile: Fazendo upload da foto de perfil...');
           final storageRef = FirebaseStorage.instance
@@ -773,6 +835,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           debugPrint('✅ EditProfile: Foto uploaded - $uploadedPhotoUrl');
         } else {
           debugPrint('❌ EditProfile: Arquivo não existe: $_photoUrl');
+          uploadedPhotoUrl = _profile?.photoUrl;
         }
       } else if (_photoUrl != null) {
         debugPrint('📸 EditProfile: Usando URL existente: $_photoUrl');
@@ -816,15 +879,23 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           neighborhood: _selectedNeighborhood,
           state: _selectedState,
           photoUrl: uploadedPhotoUrl,
-          isBand: _profileType == ProfileType.band,
-          profileType: _profileType!,
-          level: _profileType == ProfileType.musician ? _selectedLevel : null,
-          instruments: _selectedInstruments.toList(),
-          genres: _selectedGenres.toList(),
+          isBand: selectedProfileType == ProfileType.band,
+          profileType: selectedProfileType,
+          level: selectedProfileType == ProfileType.musician
+              ? _selectedLevel
+              : null,
+          instruments: selectedProfileType == ProfileType.musician ||
+                  selectedProfileType == ProfileType.band
+              ? _selectedInstruments.toList()
+              : null,
+          genres: selectedProfileType == ProfileType.musician ||
+                  selectedProfileType == ProfileType.band
+              ? _selectedGenres.toList()
+              : null,
           youtubeLink: _youtubeController.text.trim().isEmpty
               ? null
               : _youtubeController.text.trim(),
-            spotifyLink: _buildSpotifyUrl(_spotifyController.text),
+          spotifyLink: _buildSpotifyUrl(_spotifyController.text),
           deezerLink: _buildDeezerUrl(_deezerController.text),
           instagramLink: _buildInstagramUrl(_instagramController.text),
           tiktokLink: _buildTikTokUrl(_tiktokController.text),
@@ -839,16 +910,18 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           website: _websiteController.text.trim().isEmpty
               ? null
               : _websiteController.text.trim(),
-          amenities: _selectedAmenities.isEmpty
-              ? null
-              : _selectedAmenities.toList(),
+          amenities:
+              _selectedAmenities.isEmpty ? null : _selectedAmenities.toList(),
+          // Technician-specific fields
+          technicianSpecialty: _selectedTechnicianSpecialty,
+          experienceRange: _selectedExperienceRange,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
 
         // ✅ Capturar notifier ANTES das operações assíncronas para evitar "ref after disposed"
         final profileNotifier = ref.read(profileProvider.notifier);
-        
+
         // ✅ Usar profileProvider.notifier (Clean Architecture)
         final result = await profileNotifier.createProfile(newProfile);
 
@@ -924,15 +997,23 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           neighborhood: _selectedNeighborhood,
           state: _selectedState,
           photoUrl: uploadedPhotoUrl,
-          isBand: _profileType == ProfileType.band,
-          profileType: _profileType ?? ProfileType.musician,
-          level: _profileType == ProfileType.musician ? _selectedLevel : null,
-          instruments: _selectedInstruments.toList(),
-          genres: _selectedGenres.toList(),
+          isBand: selectedProfileType == ProfileType.band,
+          profileType: selectedProfileType,
+          level: selectedProfileType == ProfileType.musician
+              ? _selectedLevel
+              : null,
+          instruments: selectedProfileType == ProfileType.musician ||
+                  selectedProfileType == ProfileType.band
+              ? _selectedInstruments.toList()
+              : null,
+          genres: selectedProfileType == ProfileType.musician ||
+                  selectedProfileType == ProfileType.band
+              ? _selectedGenres.toList()
+              : null,
           youtubeLink: _youtubeController.text.trim().isEmpty
               ? null
               : _youtubeController.text.trim(),
-            spotifyLink: _buildSpotifyUrl(_spotifyController.text),
+          spotifyLink: _buildSpotifyUrl(_spotifyController.text),
           deezerLink: _buildDeezerUrl(_deezerController.text),
           instagramLink: _buildInstagramUrl(_instagramController.text),
           tiktokLink: _buildTikTokUrl(_tiktokController.text),
@@ -947,17 +1028,20 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           website: _websiteController.text.trim().isEmpty
               ? null
               : _websiteController.text.trim(),
-          amenities: _selectedAmenities.isEmpty
-              ? null
-              : _selectedAmenities.toList(),
+          amenities:
+              _selectedAmenities.isEmpty ? null : _selectedAmenities.toList(),
+          // Technician-specific fields
+          technicianSpecialty: _selectedTechnicianSpecialty,
+          experienceRange: _selectedExperienceRange,
           updatedAt: DateTime.now(),
         );
 
         // ✅ Capturar notifier ANTES das operações assíncronas para evitar "ref after disposed"
         final profileNotifierUpdate = ref.read(profileProvider.notifier);
-        
+
         // ✅ Usar profileProvider.notifier (Clean Architecture)
-        final result = await profileNotifierUpdate.updateProfile(updatedProfile);
+        final result =
+            await profileNotifierUpdate.updateProfile(updatedProfile);
 
         switch (result) {
           case ProfileSuccess(:final profile):
@@ -1003,7 +1087,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       if (mounted) {
         // Mensagens de erro específicas
         final errorString = e.toString();
-        
+
         // Validações de campo (warnings)
         if (errorString.contains('Este nome de usuário já está em uso')) {
           AppSnackBar.showWarning(
@@ -1012,7 +1096,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           );
           return;
         }
-        
+
         if (errorString.contains('Informe um nome de usuário')) {
           AppSnackBar.showWarning(
             context,
@@ -1020,7 +1104,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           );
           return;
         }
-        
+
         if (errorString.contains('Localização')) {
           AppSnackBar.showWarning(
             context,
@@ -1076,9 +1160,11 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   onPressed: () async {
                     if (widget.isNewProfile) {
                       // Verificar se usuário já tem outros perfis
-                      final profileState = ref.read(profileProvider).valueOrNull;
-                      final hasExistingProfiles = profileState?.profiles.isNotEmpty ?? false;
-                      
+                      final profileState =
+                          ref.read(profileProvider).valueOrNull;
+                      final hasExistingProfiles =
+                          profileState?.profiles.isNotEmpty ?? false;
+
                       if (hasExistingProfiles) {
                         // Usuário já tem perfis, apenas voltar para a tela anterior
                         if (mounted) {
@@ -1106,9 +1192,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         ),
         body: _isLoadingProfile
             ? const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-                ),
+                child: AppRadioPulseLoader(size: 52),
               )
             : Form(
                 key: _formKey,
@@ -1133,6 +1217,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                     ],
                     if (_profileType == ProfileType.space) ...[
                       _buildSpaceDetailsBlock(),
+                      const SizedBox(height: 24),
+                    ],
+                    if (_profileType == ProfileType.technician) ...[
+                      _buildTechnicianBlock(),
                       const SizedBox(height: 24),
                     ],
 
@@ -1171,10 +1259,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                          strokeWidth: 2,
+                        child: AppRadioPulseLoader(
+                          size: 20,
+                          color: Colors.white,
                         ),
                       )
                     : Text(
@@ -1195,13 +1282,15 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
   Widget _buildEssentialBlock() {
     final activeProfile = ref.watch(profileProvider).value?.activeProfile;
-    final usernameValue = (activeProfile?.username ?? _profile?.username ?? _accountUsername)?.trim();
+    final usernameValue =
+        (activeProfile?.username ?? _profile?.username ?? _accountUsername)
+            ?.trim();
     final hasUsername = usernameValue != null && usernameValue.isNotEmpty;
     final sanitizedUsername = hasUsername
-      ? (usernameValue.startsWith('@')
-        ? usernameValue.substring(1)
-        : usernameValue)
-      : null;
+        ? (usernameValue.startsWith('@')
+            ? usernameValue.substring(1)
+            : usernameValue)
+        : null;
 
     return Column(
       children: [
@@ -1226,18 +1315,23 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                CircleAvatar(
-                  radius: 60,
-                  backgroundColor: Colors.grey[300],
-                  foregroundImage: _photoUrl != null
-                      ? (_photoUrl!.startsWith('http')
-                          ? CachedNetworkImageProvider(_photoUrl!)
-                              as ImageProvider
-                          : FileImage(File(_photoUrl!)))
-                      : null,
-                  child: _photoUrl == null
-                      ? Icon(Iconsax.user, size: 64, color: Colors.grey[600])
-                      : null,
+                Builder(
+                  builder: (context) {
+                    final avatarImageProvider =
+                        _buildProfileAvatarImageProvider();
+                    return CircleAvatar(
+                      radius: 60,
+                      backgroundColor: Colors.grey[300],
+                      foregroundImage: avatarImageProvider,
+                      child: avatarImageProvider == null
+                          ? Icon(
+                              Iconsax.user,
+                              size: 64,
+                              color: Colors.grey[600],
+                            )
+                          : null,
+                    );
+                  },
                 ),
                 Positioned(
                   bottom: 0,
@@ -1320,7 +1414,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 ? 'Nome da banda'
                 : _profileType == ProfileType.space
                     ? 'Nome do espaço'
-                    : 'Seu nome',
+                    : _profileType == ProfileType.contractor
+                        ? 'Nome ou empresa'
+                        : 'Seu nome',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -1346,7 +1442,11 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 ? 'Conte sobre a banda, estilo, história...'
                 : _profileType == ProfileType.space
                     ? 'Descreva o espaço, serviços, diferenciais...'
-                    : 'Conte sobre você, experiência, objetivos...',
+                    : _profileType == ProfileType.technician
+                        ? 'Conte sobre sua experiência e serviços...'
+                        : _profileType == ProfileType.contractor
+                            ? 'Conte sobre você e os eventos que organiza...'
+                            : 'Conte sobre você, experiência, objetivos...',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -1377,7 +1477,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
               borderRadius: BorderRadius.circular(12),
             ),
             prefixIcon: Icon(
-              _profileType == ProfileType.musician ? Iconsax.cake : Iconsax.calendar,
+              _profileType == ProfileType.musician
+                  ? Iconsax.cake
+                  : Iconsax.calendar,
             ),
           ),
           validator: (value) {
@@ -1397,7 +1499,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
             final currentYear = DateTime.now().year;
 
-            if (_profileType == ProfileType.band || _profileType == ProfileType.space) {
+            if (_profileType == ProfileType.band ||
+                _profileType == ProfileType.space) {
               // BANDAS/ESPAÇOS: Validação de ano de formação/fundação
               if (year < 1900) {
                 return 'Ano muito antigo (mínimo: 1900)';
@@ -1405,6 +1508,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
               if (year > currentYear) {
                 return 'Ano não pode ser no futuro';
               }
+            } else if (_profileType == ProfileType.technician ||
+                _profileType == ProfileType.contractor) {
+              // TÉCNICO/CONTRATANTE: campo opcional, sem validação especial
             } else {
               // MÚSICOS: Validação de idade (18 a 120 anos)
               if (year > currentYear) {
@@ -1443,75 +1549,82 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           ),
         ),
         const SizedBox(height: 12),
-          TypeAheadField<Map<String, dynamic>>(
-            controller: _locationController,
-            focusNode: _locationFocusNode,
-            debounceDuration: const Duration(milliseconds: 600), // nativo!
-            suggestionsCallback: _fetchAddressSuggestions,
-            loadingBuilder: (context) => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            ),
-            emptyBuilder: (context) => Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Iconsax.search_normal, color: Colors.grey[400]),
-                  const SizedBox(width: 8),
-                  Text('Digite para buscar endereço', style: TextStyle(color: Colors.grey[600])),
-                ],
-              ),
-            ),
-            builder: (context, controller, focusNode) {
-              return TextFormField(
-                controller: controller,
-                focusNode: focusNode,
-                decoration: InputDecoration(
-                  hintText: 'Buscar localização (cidade, bairro, endereço...)',
-                  prefixIcon: const Icon(Iconsax.location, color: AppColors.primary),
-                  suffixIcon: controller.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Iconsax.close_circle, color: AppColors.textSecondary),
-                          onPressed: () {
-                            controller.clear();
-                            setState(() {
-                              _selectedLocation = null;
-                              _selectedCity = null;
-                              _selectedNeighborhood = null;
-                              _selectedState = null;
-                            });
-                            focusNode.unfocus();
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primary),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                  ),
-                ),
-                validator: (_) => _selectedLocation == null ? 'Selecione uma localização' : null,
-              );
-            },
-            itemBuilder: (context, suggestion) {
-              final displayName = suggestion['display_name'] as String? ?? '';
-              return ListTile(
-                leading: const Icon(Iconsax.location, color: AppColors.primary),
-                title: Text(
-                  displayName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14),
-                ),
-              );
-            },
-            onSelected: _onAddressSelected,
+        TypeAheadField<Map<String, dynamic>>(
+          controller: _locationController,
+          focusNode: _locationFocusNode,
+          debounceDuration: const Duration(milliseconds: 600), // nativo!
+          suggestionsCallback: _fetchAddressSuggestions,
+          loadingBuilder: (context) => const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(child: AppRadioPulseLoader(size: 24)),
           ),
+          emptyBuilder: (context) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Iconsax.search_normal, color: Colors.grey[400]),
+                const SizedBox(width: 8),
+                Text('Digite para buscar endereço',
+                    style: TextStyle(color: Colors.grey[600])),
+              ],
+            ),
+          ),
+          builder: (context, controller, focusNode) {
+            return TextFormField(
+              controller: controller,
+              focusNode: focusNode,
+              decoration: InputDecoration(
+                hintText: 'Buscar localização (cidade, bairro, endereço...)',
+                prefixIcon:
+                    const Icon(Iconsax.location, color: AppColors.primary),
+                suffixIcon: controller.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Iconsax.close_circle,
+                            color: AppColors.textSecondary),
+                        onPressed: () {
+                          controller.clear();
+                          setState(() {
+                            _selectedLocation = null;
+                            _selectedCity = null;
+                            _selectedNeighborhood = null;
+                            _selectedState = null;
+                          });
+                          focusNode.unfocus();
+                        },
+                      )
+                    : null,
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.primary),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: AppColors.primary, width: 2),
+                ),
+              ),
+              validator: (_) => _selectedLocation == null
+                  ? 'Selecione uma localização'
+                  : null,
+            );
+          },
+          itemBuilder: (context, suggestion) {
+            final displayName = suggestion['display_name'] as String? ?? '';
+            return ListTile(
+              leading: const Icon(Iconsax.location, color: AppColors.primary),
+              title: Text(
+                displayName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14),
+              ),
+            );
+          },
+          onSelected: _onAddressSelected,
+        ),
       ],
     );
   }
@@ -1557,10 +1670,11 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 icon: Iconsax.user,
                 label: 'Músico',
                 isSelected: _profileType == ProfileType.musician,
-                onTap: () => setState(() => _profileType = ProfileType.musician),
+                onTap: () =>
+                    setState(() => _profileType = ProfileType.musician),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 6),
             Expanded(
               child: _buildTypeCard(
                 icon: Iconsax.people,
@@ -1569,7 +1683,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 onTap: () => setState(() => _profileType = ProfileType.band),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 6),
             Expanded(
               child: _buildTypeCard(
                 icon: Iconsax.building,
@@ -1578,10 +1692,71 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 onTap: () => setState(() => _profileType = ProfileType.space),
               ),
             ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _buildTypeCard(
+                icon: Iconsax.headphone,
+                label: 'Técnico',
+                isSelected: _profileType == ProfileType.technician,
+                onTap: () =>
+                    setState(() => _profileType = ProfileType.technician),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _buildTypeCard(
+                icon: Iconsax.briefcase,
+                label: 'Contratante',
+                isSelected: _profileType == ProfileType.contractor,
+                onTap: () =>
+                    setState(() => _profileType = ProfileType.contractor),
+              ),
+            ),
           ],
+        ),
+        const SizedBox(height: 12),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: Container(
+            key: ValueKey(_profileType),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Text(
+              _getProfileTypeLegendText(),
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.3,
+                color: Colors.grey[700],
+              ),
+            ),
+          ),
         ),
       ],
     );
+  }
+
+  String _getProfileTypeLegendText() {
+    switch (_profileType) {
+      case ProfileType.musician:
+        return 'Músico: perfil para artistas individuais que tocam, cantam ou atuam em projetos autorais e colaborações.';
+      case ProfileType.band:
+        return 'Banda: perfil para grupos musicais com integrantes fixos ou formação recorrente.';
+      case ProfileType.space:
+        return 'Espaço: perfil para locais e negócios do mercado musical, como estúdios, casas de show e escolas.';
+      case ProfileType.technician:
+        return 'Técnico: perfil para profissionais independentes de suporte, como técnico de som, técnico de luz, roadie e produtor.';
+      case ProfileType.contractor:
+        return 'Contratante: perfil para quem busca músicos e bandas para eventos e oportunidades específicas.';
+      case null:
+        return 'Selecione um tipo para ver a descrição e entender melhor como o perfil será exibido no aplicativo.';
+    }
   }
 
   Widget _buildTypeCard({
@@ -1590,38 +1765,74 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.1)
-              : Colors.grey[100],
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: 'Tipo de perfil: $label',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.grey[300]!,
-            width: 2,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 40,
-              color: isSelected ? AppColors.primary : Colors.grey[600],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? AppColors.primary : Colors.grey[700],
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            height: 94,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? AppColors.primary.withValues(alpha: 0.08)
+                  : Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                width: isSelected ? 2 : 1,
               ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : null,
             ),
-          ],
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 22,
+                  color: isSelected ? AppColors.primary : Colors.grey[600],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.1,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    color: isSelected ? AppColors.primary : Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  height: 3,
+                  width: isSelected ? 26 : 0,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1659,9 +1870,11 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
         // Instrumentos
         MultiSelectField(
-          title: _profileType == ProfileType.band ? 'Instrumentação' : 'Instrumentos',
+          title: _profileType == ProfileType.band
+              ? 'Instrumentação'
+              : 'Instrumentos',
           placeholder: 'Selecione até 5 instrumentos',
-          options: MusicConstants.instrumentOptions,
+          options: _instrumentOptions,
           selectedItems: _selectedInstruments,
           maxSelections: maxInstruments,
           onSelectionChanged: (values) {
@@ -1874,7 +2087,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             _buildAmenityChip('Bebidas disponíveis'),
             _buildAmenityChip('Comida disponível'),
             _buildAmenityChip('Palco para apresentações'),
-            _buildAmenityChip('Live streaming'), 
+            _buildAmenityChip('Live streaming'),
             _buildAmenityChip('Acessibilidade'),
             _buildAmenityChip('Próximo ao metrô'),
           ],
@@ -1910,6 +2123,114 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     );
   }
 
+  Widget _buildTechnicianBlock() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Detalhes do Técnico',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Especialidade (obrigatória)
+        const Text(
+          'Especialidade *',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _selectedTechnicianSpecialty,
+          items: MusicConstants.technicianSpecialtyOptions
+              .map(
+                (s) => DropdownMenuItem(value: s, child: Text(s)),
+              )
+              .toList(),
+          onChanged: (value) =>
+              setState(() => _selectedTechnicianSpecialty = value),
+          decoration: InputDecoration(
+            hintText: 'Selecione sua especialidade',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: AppColors.primary,
+                width: 2,
+              ),
+            ),
+            prefixIcon: const Icon(Iconsax.headphone),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Especialidade é obrigatória';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // Experiência (opcional)
+        const Text(
+          'Experiência',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _selectedExperienceRange,
+          items: MusicConstants.experienceRangeOptions
+              .map(
+                (s) => DropdownMenuItem(value: s, child: Text(s)),
+              )
+              .toList(),
+          onChanged: (value) =>
+              setState(() => _selectedExperienceRange = value),
+          decoration: InputDecoration(
+            hintText: 'Tempo de atuação no mercado',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            prefixIcon: const Icon(Iconsax.clock),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Telefone/WhatsApp (opcional)
+        TextFormField(
+          controller: _phoneController,
+          keyboardType: TextInputType.phone,
+          inputFormatters: [_BrazilianPhoneFormatter()],
+          decoration: InputDecoration(
+            labelText: 'Telefone/WhatsApp',
+            hintText: '(11) 99999-9999',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            prefixIcon: const Icon(Iconsax.call),
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) return null;
+            final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
+            if (digitsOnly.length < 10 || digitsOnly.length > 11) {
+              return 'Telefone inválido';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
   /// Valida username do Instagram (1-30 chars, letras, números, pontos e underscores)
   bool _isValidInstagramUsername(String username) {
     if (username.trim().isEmpty) return true; // Campo opcional
@@ -1931,12 +2252,12 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   /// Extrai username de uma URL do Instagram (para compatibilidade com dados existentes)
   String _extractInstagramUsername(String? url) {
     if (url == null || url.isEmpty) return '';
-    
+
     // Se já é apenas o username (sem URL)
     if (!url.contains('/') && !url.contains('.com')) {
       return url.replaceFirst('@', '');
     }
-    
+
     // Extrai username da URL
     final regex = RegExp(
       r'(?:instagram\.com|instagr\.am)/([a-zA-Z0-9._]+)/?',
@@ -1949,12 +2270,12 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   /// Extrai username de uma URL do TikTok (para compatibilidade com dados existentes)
   String _extractTikTokUsername(String? url) {
     if (url == null || url.isEmpty) return '';
-    
+
     // Se já é apenas o username (sem URL)
     if (!url.contains('/') && !url.contains('.com')) {
       return url.replaceFirst('@', '');
     }
-    
+
     // Extrai username da URL
     final regex = RegExp(
       r'(?:tiktok\.com|vm\.tiktok\.com)/@?([a-zA-Z0-9._]+)/?',
@@ -1978,10 +2299,43 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     return 'https://tiktok.com/@$cleanUsername';
   }
 
+  bool _isRemoteImageUrl(String value) {
+    final uri = Uri.tryParse(value.trim());
+    return uri != null &&
+        uri.hasScheme &&
+        uri.hasAuthority &&
+        (uri.scheme == 'http' || uri.scheme == 'https');
+  }
+
+  ImageProvider? _buildProfileAvatarImageProvider() {
+    final photoUrl = _photoUrl?.trim();
+    if (photoUrl == null || photoUrl.isEmpty) return null;
+
+    if (_isRemoteImageUrl(photoUrl)) {
+      return CachedNetworkImageProvider(photoUrl);
+    }
+
+    final file = _fileFromPhotoPath(photoUrl);
+    if (file.existsSync()) {
+      return FileImage(file);
+    }
+
+    return null;
+  }
+
+  File _fileFromPhotoPath(String value) {
+    final trimmed = value.trim();
+    if (trimmed.startsWith('file://')) {
+      return File(Uri.parse(trimmed).toFilePath());
+    }
+    return File(trimmed);
+  }
+
   bool _isValidSpotifyUrl(String url) {
     final normalized = url.trim();
     if (normalized.isEmpty) return false;
-    return normalized.startsWith('https://open.spotify.com/') || normalized.startsWith('spotify:');
+    return normalized.startsWith('https://open.spotify.com/') ||
+        normalized.startsWith('spotify:');
   }
 
   bool _isValidDeezerUrl(String url) {
@@ -2067,11 +2421,13 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(11)),
             ),
             child: Row(
               children: [
-                Icon(Iconsax.video_play, size: 16, color: AppColors.textSecondary),
+                Icon(Iconsax.video_play,
+                    size: 16, color: AppColors.textSecondary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -2087,19 +2443,21 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           ),
           // Thumbnail do vídeo
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
+            borderRadius:
+                const BorderRadius.vertical(bottom: Radius.circular(11)),
             child: AspectRatio(
               aspectRatio: 16 / 9,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
                   CachedNetworkImage(
-                    imageUrl: 'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
+                    imageUrl:
+                        'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
                       color: Colors.grey[200],
                       child: const Center(
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: AppRadioPulseLoader(size: 36),
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(
@@ -2130,7 +2488,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   bool _isValidWebsiteUrl(String url) {
     if (url.trim().isEmpty) return false;
     final trimmedUrl = url.trim();
-    return trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://');
+    return trimmedUrl.startsWith('http://') ||
+        trimmedUrl.startsWith('https://');
   }
 
   Widget _buildSocialLinksBlock() {
@@ -2324,9 +2683,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           ),
           onChanged: (_) => setState(() {}),
         ),
-        
+
         // ✅ Preview do vídeo do YouTube
-        if (_youtubeController.text.isNotEmpty && _isValidYouTubeUrl(_youtubeController.text))
+        if (_youtubeController.text.isNotEmpty &&
+            _isValidYouTubeUrl(_youtubeController.text))
           _buildYouTubePreview(),
       ],
     );
@@ -2488,9 +2848,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       final merged = <String>{
         ...suggestions.map(_sanitizeProfileUsername),
         ...fallback.map(_sanitizeProfileUsername),
-      }
-          .where((s) => s.trim().isNotEmpty)
-          .toList();
+      }.where((s) => s.trim().isNotEmpty).toList();
 
       if (mounted) {
         setState(() {
@@ -2583,12 +2941,12 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
     // Usuário começou a digitar: cancela qualquer auto-seleção em andamento
     _usernameAutoResolveGeneration++;
-    
+
     // Cancelar timer anterior
     _usernameDebounceTimer?.cancel();
-    
+
     final normalizedUsername = _sanitizeProfileUsername(username).toLowerCase();
-    
+
     // Se username inválido ou muito curto, resetar estado
     if (normalizedUsername.isEmpty || normalizedUsername.length < 3) {
       setState(() {
@@ -2598,45 +2956,45 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       });
       return;
     }
-    
+
     // Se já verificou este username, não verificar novamente
     if (_lastCheckedUsername == normalizedUsername) {
       return;
     }
-    
+
     // Mostrar loading
     setState(() {
       _isCheckingUsername = true;
       _isUsernameAvailable = null;
     });
-    
+
     // Debounce de 500ms para não sobrecarregar o Firestore
     _usernameDebounceTimer = Timer(const Duration(milliseconds: 500), () async {
       if (!mounted) return;
-      
+
       try {
-        debugPrint('🔍 EditProfile: Verificando disponibilidade de @$normalizedUsername...');
-        
+        debugPrint(
+            '🔍 EditProfile: Verificando disponibilidade de @$normalizedUsername...');
+
         final snapshot = await FirebaseFirestore.instance
             .collection('profiles')
             .where('usernameLowercase', isEqualTo: normalizedUsername)
             .limit(1)
             .get();
-        
+
         if (!mounted) return;
-        
+
         final isAvailable = snapshot.docs.isEmpty;
-        
+
         setState(() {
           _isUsernameAvailable = isAvailable;
           _isCheckingUsername = false;
           _lastCheckedUsername = normalizedUsername;
         });
-        
-        debugPrint(isAvailable 
-            ? '✅ EditProfile: @$normalizedUsername está disponível!' 
+
+        debugPrint(isAvailable
+            ? '✅ EditProfile: @$normalizedUsername está disponível!'
             : '❌ EditProfile: @$normalizedUsername já está em uso');
-            
       } catch (e) {
         debugPrint('⚠️ EditProfile: Erro ao verificar username: $e');
         if (mounted) {
@@ -2653,34 +3011,31 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   Widget? _buildUsernameSuffixIcon() {
     // Só mostra indicadores para novos perfis
     if (!widget.isNewProfile) return null;
-    
+
     final username = _profileUsernameController.text.trim();
-    
+
     // Não mostrar nada se username muito curto
     if (username.length < 3) return null;
-    
+
     if (_isCheckingUsername) {
       return const Padding(
         padding: EdgeInsets.all(12),
         child: SizedBox(
           width: 20,
           height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-          ),
+          child: AppRadioPulseLoader(size: 20, color: AppColors.primary),
         ),
       );
     }
-    
+
     if (_isUsernameAvailable == true) {
       return const Icon(Icons.check_circle, color: Colors.green);
     }
-    
+
     if (_isUsernameAvailable == false) {
       return const Icon(Icons.cancel, color: AppColors.error);
     }
-    
+
     return null;
   }
 
@@ -2688,14 +3043,15 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   Widget _buildUsernameAvailabilityIndicator() {
     // Só mostra indicadores para novos perfis
     if (!widget.isNewProfile) return const SizedBox.shrink();
-    
+
     final username = _profileUsernameController.text.trim();
-    
+
     // Não mostrar nada se username muito curto ou validação básica falhou
-    if (username.length < 3 || !RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(username)) {
+    if (username.length < 3 ||
+        !RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(username)) {
       return const SizedBox.shrink();
     }
-    
+
     if (_isCheckingUsername) {
       return Padding(
         padding: const EdgeInsets.only(top: 6, left: 12),
@@ -2704,9 +3060,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             SizedBox(
               width: 12,
               height: 12,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[600]!),
+              child: AppRadioPulseLoader(
+                size: 12,
+                color: Colors.grey,
               ),
             ),
             const SizedBox(width: 8),
@@ -2721,7 +3077,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         ),
       );
     }
-    
+
     if (_isUsernameAvailable == true) {
       return const Padding(
         padding: EdgeInsets.only(top: 6, left: 12),
@@ -2741,7 +3097,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         ),
       );
     }
-    
+
     if (_isUsernameAvailable == false) {
       return Padding(
         padding: const EdgeInsets.only(top: 6, left: 12),
@@ -2776,7 +3132,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         ),
       );
     }
-    
+
     return const SizedBox.shrink();
   }
 
@@ -2786,7 +3142,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     if (!widget.isNewProfile || _usernameSuggestions.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Column(
@@ -2805,7 +3161,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             spacing: 8,
             runSpacing: 8,
             children: _usernameSuggestions.take(5).map((suggestion) {
-              final isSelected = _profileUsernameController.text.trim().toLowerCase() == suggestion.toLowerCase();
+              final isSelected =
+                  _profileUsernameController.text.trim().toLowerCase() ==
+                      suggestion.toLowerCase();
               return InkWell(
                 onTap: () {
                   setState(() {
@@ -2824,13 +3182,13 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: isSelected 
-                        ? AppColors.primary.withOpacity(0.2) 
+                    color: isSelected
+                        ? AppColors.primary.withOpacity(0.2)
                         : AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isSelected 
-                          ? AppColors.primary 
+                      color: isSelected
+                          ? AppColors.primary
                           : AppColors.primary.withOpacity(0.3),
                       width: isSelected ? 2 : 1,
                     ),
@@ -2840,7 +3198,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                     style: TextStyle(
                       fontSize: 13,
                       color: AppColors.primary,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight:
+                          isSelected ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
                 ),

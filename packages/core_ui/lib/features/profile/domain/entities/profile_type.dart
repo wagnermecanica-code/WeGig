@@ -2,27 +2,59 @@
 enum ProfileType {
   /// Individual musician profile
   musician('musician', 'Músico'),
-  
+
   /// Band/group profile
   band('band', 'Banda'),
-  
+
   /// Musical space/venue profile (studios, stores, venues, etc.)
-  space('space', 'Espaço');
+  space('space', 'Espaço'),
+
+  /// Music industry technician (sound tech, lighting tech, roadie, producer, etc.)
+  technician('technician', 'Técnico'),
+
+  /// Contractor profile — looks for musicians/bands for events
+  contractor('contractor', 'Contratante');
 
   const ProfileType(this.value, this.label);
 
   /// Firestore value representation
   final String value;
-  
+
   /// User-friendly label
   final String label;
 
   /// Parse ProfileType from string value
   static ProfileType fromString(String value) {
-    return ProfileType.values.firstWhere(
-      (type) => type.value == value,
-      orElse: () => ProfileType.musician,
-    );
+    final normalized = value.trim().toLowerCase();
+
+    // Backward compatibility for legacy/alternative stored values.
+    switch (normalized) {
+      case 'space':
+      case 'venue':
+      case 'espaco':
+      case 'espaço':
+      case 'local':
+        return ProfileType.space;
+      case 'band':
+      case 'grupo':
+        return ProfileType.band;
+      case 'technician':
+      case 'tecnico':
+      case 'técnico':
+        return ProfileType.technician;
+      case 'contractor':
+      case 'contratante':
+        return ProfileType.contractor;
+      case 'musician':
+      case 'musico':
+      case 'músico':
+        return ProfileType.musician;
+      default:
+        return ProfileType.values.firstWhere(
+          (type) => type.value == normalized,
+          orElse: () => ProfileType.musician,
+        );
+    }
   }
 }
 

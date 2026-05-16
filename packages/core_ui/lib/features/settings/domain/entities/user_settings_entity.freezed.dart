@@ -20,6 +20,8 @@ mixin _$UserSettingsEntity {
   bool get notifyInterests => throw _privateConstructorUsedError;
   bool get notifyMessages => throw _privateConstructorUsedError;
   bool get notifyNearbyPosts => throw _privateConstructorUsedError;
+  bool get allowConnectionSuggestions => throw _privateConstructorUsedError;
+  bool get allowConnectionRequests => throw _privateConstructorUsedError;
   double get nearbyRadiusKm => throw _privateConstructorUsedError;
 
   /// Create a copy of UserSettingsEntity
@@ -40,6 +42,8 @@ abstract class $UserSettingsEntityCopyWith<$Res> {
       bool notifyInterests,
       bool notifyMessages,
       bool notifyNearbyPosts,
+      bool allowConnectionSuggestions,
+      bool allowConnectionRequests,
       double nearbyRadiusKm});
 }
 
@@ -62,6 +66,8 @@ class _$UserSettingsEntityCopyWithImpl<$Res, $Val extends UserSettingsEntity>
     Object? notifyInterests = null,
     Object? notifyMessages = null,
     Object? notifyNearbyPosts = null,
+    Object? allowConnectionSuggestions = null,
+    Object? allowConnectionRequests = null,
     Object? nearbyRadiusKm = null,
   }) {
     return _then(_value.copyWith(
@@ -80,6 +86,14 @@ class _$UserSettingsEntityCopyWithImpl<$Res, $Val extends UserSettingsEntity>
       notifyNearbyPosts: null == notifyNearbyPosts
           ? _value.notifyNearbyPosts
           : notifyNearbyPosts // ignore: cast_nullable_to_non_nullable
+              as bool,
+      allowConnectionSuggestions: null == allowConnectionSuggestions
+          ? _value.allowConnectionSuggestions
+          : allowConnectionSuggestions // ignore: cast_nullable_to_non_nullable
+              as bool,
+      allowConnectionRequests: null == allowConnectionRequests
+          ? _value.allowConnectionRequests
+          : allowConnectionRequests // ignore: cast_nullable_to_non_nullable
               as bool,
       nearbyRadiusKm: null == nearbyRadiusKm
           ? _value.nearbyRadiusKm
@@ -102,6 +116,8 @@ abstract class _$$UserSettingsEntityImplCopyWith<$Res>
       bool notifyInterests,
       bool notifyMessages,
       bool notifyNearbyPosts,
+      bool allowConnectionSuggestions,
+      bool allowConnectionRequests,
       double nearbyRadiusKm});
 }
 
@@ -122,6 +138,8 @@ class __$$UserSettingsEntityImplCopyWithImpl<$Res>
     Object? notifyInterests = null,
     Object? notifyMessages = null,
     Object? notifyNearbyPosts = null,
+    Object? allowConnectionSuggestions = null,
+    Object? allowConnectionRequests = null,
     Object? nearbyRadiusKm = null,
   }) {
     return _then(_$UserSettingsEntityImpl(
@@ -141,6 +159,14 @@ class __$$UserSettingsEntityImplCopyWithImpl<$Res>
           ? _value.notifyNearbyPosts
           : notifyNearbyPosts // ignore: cast_nullable_to_non_nullable
               as bool,
+      allowConnectionSuggestions: null == allowConnectionSuggestions
+          ? _value.allowConnectionSuggestions
+          : allowConnectionSuggestions // ignore: cast_nullable_to_non_nullable
+              as bool,
+      allowConnectionRequests: null == allowConnectionRequests
+          ? _value.allowConnectionRequests
+          : allowConnectionRequests // ignore: cast_nullable_to_non_nullable
+              as bool,
       nearbyRadiusKm: null == nearbyRadiusKm
           ? _value.nearbyRadiusKm
           : nearbyRadiusKm // ignore: cast_nullable_to_non_nullable
@@ -157,6 +183,8 @@ class _$UserSettingsEntityImpl implements _UserSettingsEntity {
       this.notifyInterests = true,
       this.notifyMessages = true,
       this.notifyNearbyPosts = true,
+      this.allowConnectionSuggestions = true,
+      this.allowConnectionRequests = true,
       this.nearbyRadiusKm = 20.0});
 
   @override
@@ -172,11 +200,17 @@ class _$UserSettingsEntityImpl implements _UserSettingsEntity {
   final bool notifyNearbyPosts;
   @override
   @JsonKey()
+  final bool allowConnectionSuggestions;
+  @override
+  @JsonKey()
+  final bool allowConnectionRequests;
+  @override
+  @JsonKey()
   final double nearbyRadiusKm;
 
   @override
   String toString() {
-    return 'UserSettingsEntity(profileId: $profileId, notifyInterests: $notifyInterests, notifyMessages: $notifyMessages, notifyNearbyPosts: $notifyNearbyPosts, nearbyRadiusKm: $nearbyRadiusKm)';
+    return 'UserSettingsEntity(profileId: $profileId, notifyInterests: $notifyInterests, notifyMessages: $notifyMessages, notifyNearbyPosts: $notifyNearbyPosts, allowConnectionSuggestions: $allowConnectionSuggestions, allowConnectionRequests: $allowConnectionRequests, nearbyRadiusKm: $nearbyRadiusKm)';
   }
 
   @override
@@ -192,13 +226,27 @@ class _$UserSettingsEntityImpl implements _UserSettingsEntity {
                 other.notifyMessages == notifyMessages) &&
             (identical(other.notifyNearbyPosts, notifyNearbyPosts) ||
                 other.notifyNearbyPosts == notifyNearbyPosts) &&
+            (identical(other.allowConnectionSuggestions,
+                    allowConnectionSuggestions) ||
+                other.allowConnectionSuggestions ==
+                    allowConnectionSuggestions) &&
+            (identical(
+                    other.allowConnectionRequests, allowConnectionRequests) ||
+                other.allowConnectionRequests == allowConnectionRequests) &&
             (identical(other.nearbyRadiusKm, nearbyRadiusKm) ||
                 other.nearbyRadiusKm == nearbyRadiusKm));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, profileId, notifyInterests,
-      notifyMessages, notifyNearbyPosts, nearbyRadiusKm);
+  int get hashCode => Object.hash(
+      runtimeType,
+      profileId,
+      notifyInterests,
+      notifyMessages,
+      notifyNearbyPosts,
+      allowConnectionSuggestions,
+      allowConnectionRequests,
+      nearbyRadiusKm);
 
   /// Create a copy of UserSettingsEntity
   /// with the given fields replaced by the non-null parameter values.
@@ -216,6 +264,8 @@ abstract class _UserSettingsEntity implements UserSettingsEntity {
       final bool notifyInterests,
       final bool notifyMessages,
       final bool notifyNearbyPosts,
+      final bool allowConnectionSuggestions,
+      final bool allowConnectionRequests,
       final double nearbyRadiusKm}) = _$UserSettingsEntityImpl;
 
   @override
@@ -226,6 +276,10 @@ abstract class _UserSettingsEntity implements UserSettingsEntity {
   bool get notifyMessages;
   @override
   bool get notifyNearbyPosts;
+  @override
+  bool get allowConnectionSuggestions;
+  @override
+  bool get allowConnectionRequests;
   @override
   double get nearbyRadiusKm;
 

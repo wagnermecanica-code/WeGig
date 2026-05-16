@@ -10,6 +10,8 @@ class UserSettingsEntity with _$UserSettingsEntity {
     @Default(true) bool notifyInterests,
     @Default(true) bool notifyMessages,
     @Default(true) bool notifyNearbyPosts,
+    @Default(true) bool allowConnectionSuggestions,
+    @Default(true) bool allowConnectionRequests,
     @Default(20.0) double nearbyRadiusKm,
   }) = _UserSettingsEntity;
 }

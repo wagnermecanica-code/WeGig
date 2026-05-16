@@ -100,4 +100,16 @@ class UserSettings extends _$UserSettings {
     if (current == null) return;
     await updateSettings(current.copyWith(nearbyRadiusKm: value));
   }
+
+  Future<void> toggleAllowConnectionSuggestions(bool value) async {
+    final current = state.value;
+    if (current == null) return;
+    await updateSettings(current.copyWith(allowConnectionSuggestions: value));
+  }
+
+  Future<void> toggleAllowConnectionRequests(bool value) async {
+    final current = state.value;
+    if (current == null) return;
+    await updateSettings(current.copyWith(allowConnectionRequests: value));
+  }
 }

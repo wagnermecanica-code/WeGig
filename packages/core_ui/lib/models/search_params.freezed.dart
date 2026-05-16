@@ -18,6 +18,7 @@ final _privateConstructorUsedError = UnsupportedError(
 mixin _$SearchParams {
   String get city => throw _privateConstructorUsedError;
   double get maxDistanceKm => throw _privateConstructorUsedError;
+  bool get onlyConnections => throw _privateConstructorUsedError;
   String? get level => throw _privateConstructorUsedError;
   Set<String> get instruments => throw _privateConstructorUsedError;
   Set<String> get genres => throw _privateConstructorUsedError;
@@ -60,6 +61,7 @@ abstract class $SearchParamsCopyWith<$Res> {
   $Res call(
       {String city,
       double maxDistanceKm,
+      bool onlyConnections,
       String? level,
       Set<String> instruments,
       Set<String> genres,
@@ -96,6 +98,7 @@ class _$SearchParamsCopyWithImpl<$Res, $Val extends SearchParams>
   $Res call({
     Object? city = null,
     Object? maxDistanceKm = null,
+    Object? onlyConnections = null,
     Object? level = freezed,
     Object? instruments = null,
     Object? genres = null,
@@ -123,6 +126,10 @@ class _$SearchParamsCopyWithImpl<$Res, $Val extends SearchParams>
           ? _value.maxDistanceKm
           : maxDistanceKm // ignore: cast_nullable_to_non_nullable
               as double,
+      onlyConnections: null == onlyConnections
+          ? _value.onlyConnections
+          : onlyConnections // ignore: cast_nullable_to_non_nullable
+              as bool,
       level: freezed == level
           ? _value.level
           : level // ignore: cast_nullable_to_non_nullable
@@ -206,6 +213,7 @@ abstract class _$$SearchParamsImplCopyWith<$Res>
   $Res call(
       {String city,
       double maxDistanceKm,
+      bool onlyConnections,
       String? level,
       Set<String> instruments,
       Set<String> genres,
@@ -240,6 +248,7 @@ class __$$SearchParamsImplCopyWithImpl<$Res>
   $Res call({
     Object? city = null,
     Object? maxDistanceKm = null,
+    Object? onlyConnections = null,
     Object? level = freezed,
     Object? instruments = null,
     Object? genres = null,
@@ -267,6 +276,10 @@ class __$$SearchParamsImplCopyWithImpl<$Res>
           ? _value.maxDistanceKm
           : maxDistanceKm // ignore: cast_nullable_to_non_nullable
               as double,
+      onlyConnections: null == onlyConnections
+          ? _value.onlyConnections
+          : onlyConnections // ignore: cast_nullable_to_non_nullable
+              as bool,
       level: freezed == level
           ? _value.level
           : level // ignore: cast_nullable_to_non_nullable
@@ -345,6 +358,7 @@ class _$SearchParamsImpl implements _SearchParams {
   const _$SearchParamsImpl(
       {required this.city,
       required this.maxDistanceKm,
+      this.onlyConnections = false,
       this.level,
       final Set<String> instruments = const {},
       final Set<String> genres = const {},
@@ -375,6 +389,9 @@ class _$SearchParamsImpl implements _SearchParams {
   final String city;
   @override
   final double maxDistanceKm;
+  @override
+  @JsonKey()
+  final bool onlyConnections;
   @override
   final String? level;
   final Set<String> _instruments;
@@ -479,7 +496,7 @@ class _$SearchParamsImpl implements _SearchParams {
 
   @override
   String toString() {
-    return 'SearchParams(city: $city, maxDistanceKm: $maxDistanceKm, level: $level, instruments: $instruments, genres: $genres, postType: $postType, availableFor: $availableFor, hasYoutube: $hasYoutube, hasSpotify: $hasSpotify, hasDeezer: $hasDeezer, eventTypes: $eventTypes, gigFormats: $gigFormats, venueSetups: $venueSetups, budgetRanges: $budgetRanges, salesTypes: $salesTypes, minPrice: $minPrice, maxPrice: $maxPrice, onlyWithDiscount: $onlyWithDiscount, searchUsername: $searchUsername)';
+    return 'SearchParams(city: $city, maxDistanceKm: $maxDistanceKm, onlyConnections: $onlyConnections, level: $level, instruments: $instruments, genres: $genres, postType: $postType, availableFor: $availableFor, hasYoutube: $hasYoutube, hasSpotify: $hasSpotify, hasDeezer: $hasDeezer, eventTypes: $eventTypes, gigFormats: $gigFormats, venueSetups: $venueSetups, budgetRanges: $budgetRanges, salesTypes: $salesTypes, minPrice: $minPrice, maxPrice: $maxPrice, onlyWithDiscount: $onlyWithDiscount, searchUsername: $searchUsername)';
   }
 
   @override
@@ -490,6 +507,8 @@ class _$SearchParamsImpl implements _SearchParams {
             (identical(other.city, city) || other.city == city) &&
             (identical(other.maxDistanceKm, maxDistanceKm) ||
                 other.maxDistanceKm == maxDistanceKm) &&
+            (identical(other.onlyConnections, onlyConnections) ||
+                other.onlyConnections == onlyConnections) &&
             (identical(other.level, level) || other.level == level) &&
             const DeepCollectionEquality()
                 .equals(other._instruments, _instruments) &&
@@ -529,6 +548,7 @@ class _$SearchParamsImpl implements _SearchParams {
         runtimeType,
         city,
         maxDistanceKm,
+        onlyConnections,
         level,
         const DeepCollectionEquality().hash(_instruments),
         const DeepCollectionEquality().hash(_genres),
@@ -561,6 +581,7 @@ abstract class _SearchParams implements SearchParams {
   const factory _SearchParams(
       {required final String city,
       required final double maxDistanceKm,
+      final bool onlyConnections,
       final String? level,
       final Set<String> instruments,
       final Set<String> genres,
@@ -583,6 +604,8 @@ abstract class _SearchParams implements SearchParams {
   String get city;
   @override
   double get maxDistanceKm;
+  @override
+  bool get onlyConnections;
   @override
   String? get level;
   @override
