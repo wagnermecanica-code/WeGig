@@ -114,6 +114,17 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não Publicado]
 
+### 📱 Release 1.0.16+22 - Android e iOS (16/05/2026)
+
+- Atualizado o versionamento do app para `1.0.16+22` como base do novo envio para Google Play e App Store.
+- Corrigido o fluxo de recuperação de senha na tela de login para evitar fechamento frágil de diálogo.
+- Reforçada a proteção de imagens locais/temporárias em perfil e feed, evitando paths inválidos em preview, cache e Crashlytics.
+- Classificadas falhas conhecidas de imagem/cache como não fatais no Crashlytics.
+- Adicionadas proteções de lifecycle em fluxo assíncrono do feed e navegação/dialog.
+- Mitigado risco de layout instável do Google Maps em Android.
+- Ajustadas experiências de `Minha Rede` e `Sugestões`, incluindo filtros, ordenação por afinidade, paginação filtrada e estados de cards no Android.
+- Padronizados ajustes visuais dos cards de sugestões, badges e header.
+
 ### 🔐 Segurança de deeplink - isolamento por perfil em push de mensagens (22/04/2026)
 
 - Corrigido um vazamento de contexto entre perfis do mesmo usuário no toque de push `newMessage`, que podia abrir conversa fora do perfil ativo.
