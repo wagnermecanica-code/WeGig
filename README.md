@@ -13,7 +13,7 @@ App Flutter para conectar músicos e bandas usando arquitetura multi-perfil esti
 
 ## 🎯 Visão Geral
 
-**WeGig** é uma plataforma social para músicos e bandas se encontrarem através de busca geoespacial, posts efêmeros (30 dias) e mensagens em tempo real. Cada usuário pode ter múltiplos perfis (músico ou banda), alternando entre eles como no Instagram.
+**WeGig** é uma plataforma social para músicos, bandas e espaços musicais se conectarem através de busca geoespacial, posts efêmeros (30 dias), conexões por perfil, mensagens em tempo real e notificações contextuais. Cada conta pode administrar múltiplos perfis, alternando entre identidades de músico, banda e espaço no mesmo fluxo.
 
 **Stack Principal:**
 
@@ -31,7 +31,7 @@ App Flutter para conectar músicos e bandas usando arquitetura multi-perfil esti
 ### 🔐 Autenticação Multi-Perfil
 
 - Login via email/senha ou Google Sign-In
-- Cada usuário Firebase pode ter múltiplos perfis (músico/banda)
+- Cada usuário Firebase pode ter múltiplos perfis (`musician`, `band`, `space`)
 - Troca de perfil instantânea estilo Instagram
 - Isolamento completo de dados entre perfis
 
@@ -46,10 +46,19 @@ App Flutter para conectar músicos e bandas usando arquitetura multi-perfil esti
 ### 📝 Posts Efêmeros
 
 - Validade de 30 dias (expiração automática)
-- Filtros por tipo (músico/banda), gêneros, instrumentos
+- Filtros por tipo (`musician`, `band`, `sales`, `hiring`), gêneros, instrumentos
 - Galeria de imagens (até 9 fotos)
 - Carrossel com navegação horizontal
 - Compressão de imagens em isolate (evita freeze de UI)
+
+### 🤝 Minha Rede & Conexões
+
+- `Minha Rede` como hub social principal no bottom nav
+- Convites, aceite, recusa, cancelamento e remoção de conexão por perfil
+- Sugestões de conexão com razões textuais e conexões em comum
+- Atividade da rede com navegação para perfil e detalhe do post
+- Reaproveitamento de conversa direta existente ao abrir chat por conexão
+- Badge social integrado à navegação principal e ao seletor de perfis
 
 ### 💬 Chat em Tempo Real
 
@@ -62,15 +71,24 @@ App Flutter para conectar músicos e bandas usando arquitetura multi-perfil esti
 
 - **Proximidade:** Cloud Function detecta novos posts no raio configurado (5-100km)
 - **Interesses:** Notifica quando alguém demonstra interesse no seu post
+- **Sociais:** Convites enviados, conexões aceitas e movimentações de `Minha Rede`
 - Badge de não lidas em tempo real
 - Streams otimizados com `distinctUntilChanged`
+
+### ⚙️ Preferências & Privacidade
+
+- Controle do raio de notificação por perfil
+- Toggle para aparecer em sugestões de conexão
+- Toggle para receber convites de conexão
+- Gestão de perfis bloqueados com enforcement bidirecional nas superfícies sociais
 
 ### 🎨 Design System
 
 - Material 3 + tema customizado
 - Cor primária: Teal `#00A699`
-- Tipografia: Inter (Regular, Medium, SemiBold, Bold)
+- Tipografia principal: Cereal
 - Dark mode opcional (via `.env`)
+- Loader visual padronizado com `AppRadioPulseLoader`
 
 ---
 
@@ -309,11 +327,12 @@ firebase functions:log  # Monitor
 
 ### Pré-requisitos
 
-- Flutter SDK 3.9.2+
-- Dart SDK 3.5+
+- Flutter SDK 3.27.1+
+- Dart SDK 3.10+
 - Xcode 15+ (iOS) ou Android Studio (Android)
 - Firebase CLI
 - Node.js 18+ (Cloud Functions)
+- Melos
 
 ### Instalação
 
@@ -322,11 +341,10 @@ firebase functions:log  # Monitor
 ```bash
 git clone https://github.com/wagnermecanica-code/ToSemBandaRepo.git
 cd to_sem_banda
-flutter pub get
+melos bootstrap
 ```
 
 2. **Firebase config:**
-
    - Baixe `google-services.json` (Android) e `GoogleService-Info.plist` (iOS)
    - Coloque em `android/app/` e `ios/WeGig/`
 
@@ -361,7 +379,12 @@ npm install
 firebase deploy --only functions
 ```
 
-6. **Run:**
+6. **Dependências locais de mapas (quando aplicável):**
+
+- O app usa um fork local de `google_maps_flutter` em `.tools/third_party/google_maps_flutter`
+- Preserve o `dependency_overrides` de `packages/app/pubspec.yaml` ao atualizar ambiente ou CI
+
+7. **Run:**
 
 ```bash
 flutter run
@@ -440,10 +463,13 @@ firestore.indexes.json          # 13 composite indexes
 
 ## 📚 Documentação Adicional
 
-- **[Copilot Instructions](.github/copilot-instructions.md)** - Guia completo de arquitetura
-- **[Cloud Functions](NEARBY_POST_NOTIFICATIONS.md)** - Notificações de proximidade
-- **[Performance](SESSION_10_CODE_QUALITY_OPTIMIZATION.md)** - Otimizações aplicadas
-- **[Wireframe](WIREFRAME.md)** - Design system e UI/UX
+- **[Índice da documentação](./docs/README.md)** - ponto de entrada da base documental
+- **[MVP macro](./MVP_Rev0.0.md)** - escopo funcional consolidado
+- **[Resumo executivo do MVP](./docs/project-info/MVP_DESCRIPTION.md)** - baseline atual do produto
+- **[Checklist do MVP](./docs/guides/MVP_CHECKLIST.md)** - baseline e próximos ajustes
+- **[Changelog](./docs/changelog/CHANGELOG.md)** - histórico incremental do projeto
+- **[Sessão de consolidação documental](./docs/sessions/SESSION_20_DOCUMENTATION_BASELINE_2026-04-19.md)** - contexto desta revisão
+- **[Copilot Instructions](./.github/copilot-instructions.md)** - padrões técnicos do repositório
 
 ---
 
@@ -487,7 +513,6 @@ O WeGig possui pipelines automatizados de CI/CD no GitHub Actions:
 ### Workflows Disponíveis
 
 1. **CI - Build & Test** (`ci.yml`)
-
    - ✅ Análise estática e testes
    - ✅ Build iOS (sem codesign)
    - ✅ Build Android com APK artifact
@@ -514,11 +539,12 @@ git push origin feat/nova-feature
 gh pr create  # Executa ci.yml automaticamente
 ```
 
-**Documentação completa:**
+**Referências existentes:**
 
-- [Pipeline Detalhado](./docs/CI_CD_PIPELINE.md)
-- [Quick Start Guide](./docs/CI_CD_QUICK_START.md)
-- [Flow Diagram](./docs/CI_CD_FLOW_DIAGRAM.md)
+- [Guia de deploy](./docs/deployment/DEPLOY_GUIDE_WEGIG.md)
+- [Code signing](./docs/code-signing/CODE_SIGNING_SETUP.md)
+- [Secrets do GitHub](./docs/github-setup/GITHUB_SECRETS_SETUP.md)
+- [Status atual de CI/CD](./docs/build-status/CI_CD_TESTING_BLOCKED.md)
 
 ---
 
@@ -539,27 +565,22 @@ gh pr create  # Executa ci.yml automaticamente
 - ✅ Monorepo migration (packages/app + packages/core_ui)
 - ✅ Firebase dependencies updated (4.x/6.x series)
 
-### Última Atualização (06/12/2025)
+### Baseline documental atual (19/04/2026)
 
-#### Correções Críticas
+- ✅ **Versão documentada do app:** `1.0.14+19`
+- ✅ **Monorepo ativo:** `packages/app` + `packages/core_ui`
+- ✅ **Tipos de perfil:** músico, banda e espaço
+- ✅ **Tipos de post:** `musician`, `band`, `sales`, `hiring`
+- ✅ **Documentação central sincronizada:** README, MVP, checklist, índice e changelog
+- ✅ **Sessão histórica registrada:** `SESSION_20_DOCUMENTATION_BASELINE_2026-04-19.md`
 
-- ✅ **GoRouter Navigation:** Corrigido redirect infinito - navegação para `/profile/:id` e `/post/:id` agora funciona
-- ✅ **Firebase Multi-Ambiente:** Auditoria completa - `main_prod.dart` corrigido para `to-sem-banda-83e19`
-- ✅ **Notificações:** Latência reduzida (300ms → 50ms), tratamento de erros melhorado
-- ✅ **NotificationsModal:** Bottom sheet não mostra mais erro para perfis sem notificações
+### Fechamento desta etapa (21/04/2026)
 
-#### Melhorias de Performance
-
-- ⚡ **Debounce otimizado:** Streams de notificações com 50ms (antes 300ms)
-- ⚡ **Memory leaks:** Fixados 8 vazamentos (home_page dispose, profile_transition_overlay)
-- ⚡ **Query optimization:** `recipientUid` + filtro client-side por `profileId`
-
-#### Configuração Multi-Ambiente
-
-- ✅ **DEV:** `wegig-dev` (logs ON, Crashlytics OFF)
-- ✅ **STAGING:** `wegig-staging` (logs ON, Crashlytics ON)
-- ✅ **PROD:** `to-sem-banda-83e19` (logs OFF, Crashlytics ON)
-- ✅ **Validação:** Runtime check via `expectedProjectId` previne dados cruzados
+- ✅ `Minha Rede` consolidada como hub social com badge dedicado
+- ✅ Preferências de conexão por perfil documentadas
+- ✅ Loader padronizado documentado para superfícies-chave
+- ✅ Site público alinhado à feature de conexões e publicado via GitHub Pages
+- ✅ Instruções da IA revisadas para o estado atual do repositório
 
 ---
 
@@ -573,9 +594,9 @@ gh pr create  # Executa ci.yml automaticamente
 
 ---
 
-## 📄 Licença
+## 📄 Licenciamento
 
-Este projeto está sob a licença MIT. Veja [LICENSE](LICENSE) para mais detalhes.
+Não há arquivo `LICENSE` na raiz do repositório neste momento. Até uma definição formal, trate este código como repositório de uso interno/proprietário.
 
 ---
 

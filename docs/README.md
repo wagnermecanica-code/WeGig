@@ -1,78 +1,72 @@
-# 📚 WeGig Documentation Index
+# WeGig Documentation Index
 
-> Documentação organizada do projeto WeGig
+Ponto de entrada da documentação do projeto WeGig.
 
-## 📁 Estrutura de Pastas
+## Leia primeiro
 
-```
-docs/
-├── api/                    # Documentação de APIs
-├── architecture/           # Arquitetura do sistema
-├── audits/                 # Auditorias de código e segurança
-├── build-status/           # Status de builds e CI/CD
-├── changelog/              # Histórico de mudanças
-├── code-signing/           # Configuração de assinatura de código
-├── contributing/           # Guias de contribuição e boas práticas
-├── deployment/             # Guias de deploy
-├── design/                 # Design system e UI/UX
-├── features/               # Documentação de features
-├── firebase/               # Configurações Firebase
-├── firestore/              # Índices e queries Firestore
-├── fix-reports/            # Relatórios de correções
-├── github-setup/           # Configuração GitHub Actions/Secrets
-├── guides/                 # Guias gerais de desenvolvimento
-├── legacy/                 # Documentação antiga (arquivada)
-├── legal/                  # Termos legais (privacidade, uso)
-├── MVP/                    # Documentação do MVP
-├── Old/                    # Arquivos antigos (para remoção futura)
-├── project-info/           # Informações gerais do projeto
-├── refector/               # Planos de refatoração
-├── reports/                # Relatórios diversos
-├── security/               # Documentação de segurança
-├── sessions/               # Logs de sessões de desenvolvimento
-├── setup/                  # Guias de setup inicial
-├── sprints/                # Documentação de sprints
-├── tasks/                  # Tasks e TODOs
-├── troubleshooting/        # Solução de problemas
-└── website/                # Arquivos do site público (GitHub Pages)
-```
+- `../README.md`: visão geral do repositório
+- `../MVP_Rev0.0.md`: escopo macro do MVP
+- `project-info/MVP_DESCRIPTION.md`: resumo executivo atual
+- `guides/MVP_CHECKLIST.md`: checklist de baseline
+- `changelog/CHANGELOG.md`: histórico incremental
 
-## 🔗 Links Rápidos
+## Pastas principais
 
-### 🚀 Começando
-- [Setup Firebase](setup/FIREBASE_SETUP_QUICK_START.md)
-- [Quick Start iOS Deploy](setup/QUICK_START_IOS_DEPLOY.md)
-- [Deep Linking Guide](setup/DEEP_LINKING_GUIDE.md)
+- `architecture/`: arquitetura, migrações e padrões estruturais
+- `audits/`: auditorias técnicas e de segurança
+- `build-status/`: diagnósticos de build e CI/CD
+- `changelog/`: histórico de mudanças
+- `deployment/`: processos de deploy
+- `features/`: documentação por feature
+- `firebase/` e `firestore/`: integrações e índices
+- `guides/`: guias operacionais
+- `project-info/`: contexto do produto e do repositório
+- `sessions/`: registro cronológico de sessões importantes
+- `setup/`: setup de ambiente e distribuição
+- `sprints/`: marcos de execução
+- `tasks/`: backlog e checklists
+- `troubleshooting/`: problemas conhecidos e soluções
 
-### 📋 Contribuição
-- [Best Practices](contributing/BEST_PRACTICES.md)
-- [Contributing Guide](contributing/CONTRIBUTING.md)
-- [Changelog](changelog/CHANGELOG.md)
+## Documentos recomendados por objetivo
 
-### 🏗️ Arquitetura
-- [Monorepo Structure](project-info/MONOREPO_STRUCTURE.md)
-- [Project Structure](project-info/PROJECT_STRUCTURE_COMPLETE_2025-11-29.md)
+### Entender o produto
 
-### 🔥 Firebase & Firestore
-- [Firebase Integration Audit](firebase/FIREBASE_INTEGRATION_AUDIT_2025-12-06.md)
-- [Firestore Indexes Optimization](firestore/FIRESTORE_INDEXES_OPTIMIZATION_2025-12-06.md)
-- [Firestore Query Fixes](firestore/FIRESTORE_QUERY_FIXES_2025-12-01.md)
+- `../MVP_Rev0.0.md`
+- `project-info/MVP_DESCRIPTION.md`
+- `guides/MVP_CHECKLIST.md`
 
-### 🔧 Troubleshooting
-- [Xcode Build Analysis](build-status/XCODE_BUILD_ANALYSIS_COMPLETE_04DEC2025.md)
-- [Flutter Target Error Fix](troubleshooting/SOLUCAO_ERRO_FLUTTER_TARGET.md)
-- [Freezed Bug Prompt](troubleshooting/FREEZED_BUG_PROMPT.md)
+### Entender a arquitetura
 
-### 📱 Deploy & CI/CD
-- [Code Signing Setup](code-signing/CODE_SIGNING_SETUP.md)
-- [GitHub Secrets Setup](github-setup/GITHUB_SECRETS_SETUP.md)
-- [CI/CD Testing Status](build-status/CI_CD_TESTING_BLOCKED.md)
+- `architecture/ARCHITECTURE.md`
+- `project-info/MONOREPO_STRUCTURE.md`
+- `features/MULTIPLE_PROFILES_IMPLEMENTATION.md`
+- `design/POST_UI_SYSTEM.md`
+- `tasks/CONNECTIONS_IMPLEMENTATION_ROADMAP_2026-04-19.md`
 
-### ✅ Tasks & Planning
-- [TODO List](tasks/TODO.md)
-- [Manual Testing Checklist](tasks/MANUAL_TESTING_CHECKLIST.md)
-- [Clean Architecture Monorepo TODO](tasks/TODO_CLEAN_ARCHITECTURE_MONOREPO.md)
+### Operar builds e deploys
 
----
+- `deployment/DEPLOY_GUIDE_WEGIG.md`
+- `code-signing/CODE_SIGNING_SETUP.md`
+- `github-setup/GITHUB_SECRETS_SETUP.md`
+- `build-status/CI_CD_TESTING_BLOCKED.md`
 
-*Última atualização: 13 de dezembro de 2025*
+### Consultar histórico
+
+- `changelog/CHANGELOG.md`
+- `sessions/SESSION_21_STAGE_CLOSURE_2026-04-21.md`
+- `sessions/SESSION_20_DOCUMENTATION_BASELINE_2026-04-19.md`
+- `audits/LEGACY_DOCUMENTATION_AUDIT_2026-04-20.md`
+- `sprints/`
+
+### Troubleshooting recorrente
+
+- `troubleshooting/INTERESTED_USERS_SECTION.md`
+- `troubleshooting/MAP_DISTANCE_FILTER.md`
+
+## Observação
+
+Pastas como `legacy/` e documentos muito específicos de correção continuam úteis para histórico, mas não devem substituir os documentos canônicos listados acima. A triagem atual está registrada em `audits/LEGACY_DOCUMENTATION_AUDIT_2026-04-20.md`.
+
+## Última atualização
+
+21 de abril de 2026.

@@ -38,6 +38,9 @@ migrate_working_dir/
 *.env
 !.env.example
 
+# Private keys / App Store Connect API keys (NUNCA commitar)
+docs/p8/*.p8
+
 # Symbolication related
 app.*.symbols
 

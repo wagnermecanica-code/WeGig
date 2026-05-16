@@ -3,23 +3,23 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>27906769066-5cglghj0fieot8tnqko4snjkf6i4htiq.apps.googleusercontent.com</string>
+	<string>278498777601-db30frfmi8dd44khpstus6kgog0nttg1.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.27906769066-5cglghj0fieot8tnqko4snjkf6i4htiq</string>
+	<string>com.googleusercontent.apps.278498777601-db30frfmi8dd44khpstus6kgog0nttg1</string>
 	<key>ANDROID_CLIENT_ID</key>
-	<string>27906769066-65unmtfgnvita759p3d8tq05u9hoekhj.apps.googleusercontent.com</string>
+	<string>278498777601-1pbl191m1rcovkgbiiftcndelbphmofl.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
-	<string>AIzaSyAca3GkAy6euZ0QeO55TZ71gFQlM1c0c5Y</string>
+	<string>AIzaSyCvn3IYakmtmrEphx_MHB7cNiglLkElEtY</string>
 	<key>GCM_SENDER_ID</key>
-	<string>27906769066</string>
+	<string>278498777601</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.tosembanda.wegig.staging</string>
+	<string>com.wegig.wegig</string>
 	<key>PROJECT_ID</key>
-	<string>wegig-staging</string>
+	<string>to-sem-banda-83e19</string>
 	<key>STORAGE_BUCKET</key>
-	<string>wegig-staging.firebasestorage.app</string>
+	<string>to-sem-banda-83e19.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -31,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:27906769066:ios:4c2d8c2392483486bcd0d3</string>
+	<string>1:278498777601:ios:b2c57188e4ac4bb39ebe00</string>
 </dict>
 </plist>

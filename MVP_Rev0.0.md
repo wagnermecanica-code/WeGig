@@ -1,33 +1,41 @@
 # WeGig - Minimum Viable Product (MVP)
 
-## Revisão 1.2 | 16 de Janeiro de 2026 — **LANÇAMENTO OFICIAL**
+## Revisão 1.4 | 21 de abril de 2026 — Baseline documental consolidada com Conexões
 
 ---
 
 ## 📋 Sumário Executivo
 
-**WeGig (18+)** é uma plataforma social móvel **exclusiva para maiores de 18 anos** que conecta músicos, bandas e espaços musicais através de busca geoespacial, posts efêmeros (30 dias de validade), mensagens em tempo real e notificações de proximidade. O sistema de múltiplos perfis (estilo Instagram) permite que um único usuário gerencie perfis de músico, banda e espaço (estúdios, escolas, luthierias, etc.) separadamente.
+**WeGig (18+)** é uma plataforma social móvel para conectar músicos, bandas e espaços musicais por geolocalização, posts efêmeros, conexões por perfil, mensagens em tempo real e notificações contextuais. O produto opera com múltiplos perfis por conta, separando identidade, dados e interações de músico, banda e espaço.
 
-### 🚀 Status de Lançamento
+### Snapshot do produto
 
-| Plataforma          | Status                                    | Data de Lançamento |
-| ------------------- | ----------------------------------------- | ------------------ |
-| **Apple App Store** | ✅ **DISPONÍVEL**                         | 09/01/2026         |
-| **Google Play**     | ⏳ Em revisão (disponível em ~18/01/2026) | 18/01/2026         |
+| Categoria             | Estado atual documentado                               |
+| --------------------- | ------------------------------------------------------ |
+| **Versão do app**     | `1.0.15+20`                                            |
+| **Baseline de build** | Flutter `3.38.1`, Dart `3.10.0`                        |
+| **Estrutura**         | Monorepo Melos com `packages/app` e `packages/core_ui` |
+| **Ambientes**         | DEV / STAGING / PROD                                   |
+| **Tipos de perfil**   | `musician`, `band`, `space`                            |
+| **Tipos de post**     | `musician`, `band`, `sales`, `hiring`                  |
+| **Backend**           | Firebase Auth, Firestore, Storage, Cloud Functions     |
+| **Status documental** | Revisado e sincronizado em 21/04/2026                  |
 
-> **Download iOS**: [App Store - WeGig](https://apps.apple.com/app/wegig/id6738976498)
+### Governança deste documento
 
-### Métricas do MVP
+Este arquivo é a **especificação funcional macro do MVP**. Para manter um histórico de desenvolvimento consistente, ele deve ser lido em conjunto com:
 
-| Categoria               | Status                            |
-| ----------------------- | --------------------------------- |
-| **Plataformas**         | iOS 15.0+ / Android API 24+       |
-| **Ambientes**           | DEV / STAGING / PROD              |
-| **Erros de Compilação** | 0 (packages/app)                  |
-| **Cobertura de Testes** | 270+ testes passando              |
-| **Cloud Functions**     | 10 funções ativas                 |
-| **Firestore Indexes**   | 13 indexes compostos              |
-| **Tipos de Post**       | 4 (musician, band, sales, hiring) |
+- `README.md` para visão geral operacional do repositório
+- `docs/project-info/MVP_DESCRIPTION.md` para o resumo executivo atual
+- `docs/guides/MVP_CHECKLIST.md` para o checklist de prontidão e lacunas
+- `docs/changelog/CHANGELOG.md` para o histórico incremental
+- `docs/sessions/SESSION_20_DOCUMENTATION_BASELINE_2026-04-19.md` para a baseline documental consolidada
+- `docs/sessions/SESSION_21_STAGE_CLOSURE_2026-04-21.md` para o fechamento desta etapa de desenvolvimento
+
+### Status de distribuição
+
+- A operação mobile do produto está documentada e ativa no repositório.
+- Antes de campanhas externas, confirme o estado real das publicações nas lojas com os artefatos e contas de distribuição vigentes.
 
 ---
 
@@ -39,6 +47,7 @@
 - Espaços musicais (estúdios, escolas, luthierias) sem visibilidade local
 - Plataformas existentes não focam em geolocalização de músicos e serviços
 - Falta de comunicação direta e em tempo real entre músicos e prestadores de serviço
+- Ausência de uma camada social orientada por perfil para manter relacionamento, contexto e recorrência entre contatos
 
 ### 1.2 Proposta de Valor
 
@@ -47,8 +56,9 @@
 - **Multi-Perfil**: Gerencie perfis de músico, banda e espaço na mesma conta
 - **Anúncios de Serviços**: Espaços podem criar anúncios com preços, promoções e WhatsApp
 - **Contratação de Músicos**: Publique oportunidades de trabalho com detalhes completos
+- **Conexões por Perfil**: Construa sua rede, acompanhe convites, conexões em comum e atividade da sua rede
 - **Chat em Tempo Real**: Comunicação instantânea com suporte a grupos, reações e replies
-- **Notificações Inteligentes**: Alertas de novos posts na sua região
+- **Notificações Inteligentes**: Alertas de novos posts na sua região e eventos sociais relevantes
 
 ### 1.3 Público-Alvo
 
@@ -449,7 +459,68 @@ if (distance <= selectedRadiusKm) {
 }
 ```
 
-### 3.5 Mensagens / Chat (mensagens_new/)
+### 3.5 Conexões / Minha Rede (connections/)
+
+#### Funcionalidades
+
+- ✅ `Minha Rede` como superfície social principal no bottom nav
+- ✅ Overview em dashboard com convites, preview de conexões e atividade da rede
+- ✅ Enviar convite de conexão entre perfis
+- ✅ Aceitar, recusar e cancelar convites pendentes
+- ✅ Remover conexão ativa
+- ✅ Sugestões de conexão com score e razões textuais
+- ✅ Conexões em comum no perfil visitado
+- ✅ Atividade recente da rede com navegação para perfil e detalhe do post
+- ✅ Tela dedicada de conexões com busca, filtros, ordenação e paginação
+- ✅ Tela dedicada de atividade da rede com filtros, ordenação e paginação
+- ✅ Atalho de mensagem a partir de conexão ativa
+- ✅ Reuso de conversa direta existente ao abrir chat pela rede social
+- ✅ Notificações sociais para convite enviado e conexão aceita
+- ✅ Badge dedicado de Minha Rede na navegação principal e no seletor de perfis
+- ✅ Preferências por perfil para aparecer em sugestões e receber convites
+- ✅ Enforcement de bloqueio bidirecional em convites, conexões, sugestões e atividade
+- ✅ Analytics do funil social e limpeza de estado ao trocar o perfil ativo
+
+#### Estrutura funcional
+
+- A rede social é orientada por `profileId`, não apenas por `uid`
+- `Minha Rede` substitui `Notificações` no bottom nav como hub social principal
+- `Notificações` continuam acessíveis por fluxo secundário, preservando a inbox existente
+- O chat iniciado pelas conexões compartilha o mesmo datasource de `mensagens_new`, evitando duplicação de conversas diretas
+- As preferências sociais são persistidas por perfil, permitindo controlar elegibilidade em sugestões e convites
+
+#### Modelo de Dados
+
+```javascript
+// connectionRequests/{requestId}
+{
+  requesterProfileId: "profile-a",
+  requesterUid: "firebase-auth-uid-a",
+  recipientProfileId: "profile-b",
+  recipientUid: "firebase-auth-uid-b",
+  status: "pending" | "accepted" | "rejected" | "cancelled",
+  createdAt: Timestamp,
+  respondedAt: Timestamp
+}
+
+// connections/{connectionId}
+{
+  profileIds: ["profile-a", "profile-b"],
+  profileUids: ["uid-a", "uid-b"],
+  createdAt: Timestamp,
+  updatedAt: Timestamp
+}
+
+// connectionStats/{profileId}
+{
+  totalConnections: 12,
+  pendingReceived: 2,
+  pendingSent: 1,
+  updatedAt: Timestamp
+}
+```
+
+### 3.6 Mensagens / Chat (mensagens_new/)
 
 #### Funcionalidades
 
@@ -548,7 +619,7 @@ O sistema de reações permite que usuários expressem sentimentos rapidamente:
 }
 ```
 
-### 3.6 Notificações (notifications_new/)
+### 3.7 Notificações (notifications_new/)
 
 #### Funcionalidades
 
@@ -557,6 +628,7 @@ O sistema de reações permite que usuários expressem sentimentos rapidamente:
 - ✅ Notificações de proximidade (novos posts na região)
 - ✅ Notificações de interesse (alguém interessou no seu post)
 - ✅ Notificações de mensagens (novas mensagens)
+- ✅ Notificações sociais de convite e aceite de conexão
 - ✅ Marcar como lida
 - ✅ Deletar notificação
 - ✅ Streams em tempo real
@@ -569,7 +641,7 @@ O sistema de reações permite que usuários expressem sentimentos rapidamente:
 {
   recipientUid: "firebase-auth-uid",
   recipientProfileId: "profile-id",
-  type: "nearby_post" | "interest" | "message",
+  type: "nearby_post" | "interest" | "message" | "connection_request" | "connection_accepted",
   title: "Novo músico na sua região!",
   body: "João está procurando banda...",
   data: {
@@ -582,12 +654,14 @@ O sistema de reações permite que usuários expressem sentimentos rapidamente:
 }
 ```
 
-### 3.7 Configurações (settings/)
+### 3.8 Configurações (settings/)
 
 #### Funcionalidades
 
 - ✅ Configurar raio de notificações (5-100km)
 - ✅ Habilitar/desabilitar notificações de proximidade
+- ✅ Habilitar/desabilitar aparição em sugestões de conexão
+- ✅ Habilitar/desabilitar recebimento de convites de conexão
 - ✅ Gerenciar perfis (criar, editar, deletar)
 - ✅ Informações da conta
 - ✅ Logout
@@ -598,7 +672,7 @@ O sistema de reações permite que usuários expressem sentimentos rapidamente:
 - ✅ **Desbloquear perfis**
 - ✅ **Deletar conta** (com re-autenticação e cascade delete)
 
-### 3.8 Sistema de Denúncias (report/)
+### 3.9 Sistema de Denúncias (report/)
 
 #### Funcionalidades
 
@@ -669,7 +743,7 @@ Quando uma denúncia é criada, uma notificação por email é enviada automatic
 // Ação: Envia email para contato@wegig.com.br com detalhes da denúncia
 ```
 
-### 3.9 Sistema de Bloqueio (blocking/)
+### 3.10 Sistema de Bloqueio (blocking/)
 
 #### Funcionalidades
 
@@ -683,6 +757,8 @@ Quando uma denúncia é criada, uma notificação por email é enviada automatic
 - ✅ **Enforcement em todas as áreas**:
   - Posts não aparecem no feed
   - Não pode enviar mensagens
+  - Não pode enviar ou aceitar convites de conexão
+  - Não aparece em sugestões ou conexões em comum
   - Não recebe notificações
   - Não pode demonstrar interesse
   - Perfil não aparece na busca
@@ -700,7 +776,7 @@ Firestore Structure:
 
 Firestore Security Rules não conseguem filtrar queries públicas (posts/perfis). O enforcement é feito no código do app usando `BlockedRelations.getExcludedProfileIds()`.
 
-### 3.10 Moderação Automática de Conteúdo
+### 3.11 Moderação Automática de Conteúdo
 
 #### Funcionalidades
 
@@ -718,6 +794,7 @@ Firestore Security Rules não conseguem filtrar queries públicas (posts/perfis)
 | Posts      | 20/dia  | Por UID    |
 | Mensagens  | 500/dia | Por perfil |
 | Interesses | 50/dia  | Por perfil |
+| Conexões   | Ativo   | Por perfil |
 
 ---
 
@@ -730,6 +807,7 @@ Firestore Security Rules não conseguem filtrar queries públicas (posts/perfis)
 | `notifyNearbyPosts`               | `posts.onCreate`      | Notifica perfis quando novo post é criado na região |
 | `sendInterestNotification`        | `interests.onCreate`  | Notifica autor quando alguém demonstra interesse    |
 | `sendMessageNotification`         | `messages.onCreate`   | Notifica destinatário de nova mensagem              |
+| `connection lifecycle triggers`   | `connection*.onWrite` | Reconciliam stats, notificações e limpeza do grafo  |
 | `cleanupExpiredNotifications`     | Scheduled (daily 3am) | Limpa notificações expiradas                        |
 | `onProfileDelete`                 | `profiles.onDelete`   | Cleanup de posts e Storage quando perfil é deletado |
 | `onUserDelete`                    | Auth `onDelete`       | Cascade cleanup quando usuário Auth é deletado      |
@@ -749,6 +827,7 @@ Firestore Security Rules não conseguem filtrar queries públicas (posts/perfis)
 | Posts      | 20/dia  | Por UID    | `rateLimits/{uid}_posts`           |
 | Mensagens  | 500/dia | Por perfil | `rateLimits/{profileId}_messages`  |
 | Interesses | 50/dia  | Por perfil | `rateLimits/{profileId}_interests` |
+| Conexões   | Ativo   | Por perfil | validação no app + Cloud Functions |
 
 ### 4.4 Notificações de Proximidade (Algoritmo)
 
@@ -779,17 +858,20 @@ Firestore Security Rules não conseguem filtrar queries públicas (posts/perfis)
 
 #### Regras por Collection
 
-| Collection        | Read                     | Create             | Update              | Delete            |
-| ----------------- | ------------------------ | ------------------ | ------------------- | ----------------- |
-| **profiles**      | Autenticado              | Próprio uid        | Próprio uid         | Próprio uid       |
-| **users**         | Próprio                  | Próprio            | Próprio             | Próprio           |
-| **posts**         | Autenticado              | Próprio authorUid  | Próprio authorUid   | Próprio authorUid |
-| **conversations** | Participante             | Participante       | Participante        | Participante      |
-| **messages**      | Participante da conversa | Participante       | Sender ou reactions | Sender            |
-| **notifications** | Próprio recipientUid     | Autenticado        | Próprio             | Próprio           |
-| **interests**     | Autenticado              | Próprio profileUid | Próprio             | Próprio           |
-| **blocks**        | Próprio                  | Próprio            | Próprio             | Próprio           |
-| **reports**       | Próprio reporterUid      | Autenticado        | Admin only          | Admin only        |
+| Collection             | Read                     | Create             | Update              | Delete             |
+| ---------------------- | ------------------------ | ------------------ | ------------------- | ------------------ |
+| **profiles**           | Autenticado              | Próprio uid        | Próprio uid         | Próprio uid        |
+| **users**              | Próprio                  | Próprio            | Próprio             | Próprio            |
+| **posts**              | Autenticado              | Próprio authorUid  | Próprio authorUid   | Próprio authorUid  |
+| **conversations**      | Participante             | Participante       | Participante        | Participante       |
+| **messages**           | Participante da conversa | Participante       | Sender ou reactions | Sender             |
+| **notifications**      | Próprio recipientUid     | Autenticado        | Próprio             | Próprio            |
+| **interests**          | Autenticado              | Próprio profileUid | Próprio             | Próprio            |
+| **connectionRequests** | Perfis envolvidos        | Perfil remetente   | Perfis envolvidos   | Perfis envolvidos  |
+| **connections**        | Perfis envolvidos        | Sistema/controlado | Perfis envolvidos   | Perfis envolvidos  |
+| **connectionStats**    | Próprio profileId        | Sistema/controlado | Sistema/controlado  | Sistema/controlado |
+| **blocks**             | Próprio                  | Próprio            | Próprio             | Próprio            |
+| **reports**            | Próprio reporterUid      | Autenticado        | Admin only          | Admin only         |
 
 ### 5.2 Validações Implementadas
 
@@ -1227,6 +1309,7 @@ rm -rf Pods Podfile.lock && pod install
 - [x] ~~Sistema de bloqueio~~ ✅ **Implementado** (bidirecional por perfil)
 - [x] ~~Moderação automática~~ ✅ **Implementado** (filtro de conteúdo + rate limiting)
 - [x] ~~Deep Links~~ ✅ **Implementado** (compartilhar perfis e posts)
+- [x] ~~Conexões / Minha Rede~~ ✅ **Implementado** (grafo social por perfil + atividade da rede)
 - [x] ~~Lançamento App Store~~ ✅ **DISPONÍVEL**
 - [x] ~~Lançamento Google Play~~ ⏳ **Em revisão** (~18/01/2026)
 
@@ -1298,6 +1381,7 @@ O WeGig opera em um modelo **Freemium + B2B SaaS**, com monetização planejada 
 | Posts por mês               | Ilimitado       |
 | Conversas/grupos            | Ilimitado       |
 | Busca geoespacial           | Ilimitada       |
+| Minha Rede / conexões       | ✅ Disponível   |
 | Notificações de proximidade | ✅ Ativas       |
 | Posts de anúncio (sales)    | ✅ Disponível   |
 | Filtros avançados           | ✅ Todos        |
@@ -1311,6 +1395,7 @@ O WeGig opera em um modelo **Freemium + B2B SaaS**, com monetização planejada 
 - Validar proposta de valor com usuários reais
 - Coletar feedback para evolução do produto
 - Criar network effects (quanto mais usuários, mais valor)
+- Aumentar retenção via grafo social e recorrência de relacionamento entre perfis
 - Iterar rapidamente com base em dados reais
 
 ### 15.3 Assinatura PRO (Fase Futura)
@@ -1324,6 +1409,7 @@ O WeGig opera em um modelo **Freemium + B2B SaaS**, com monetização planejada 
 | **Múltiplos Perfis**       | Até 5            | Até 5               |
 | **Limite de Posts**        | Ilimitado        | Ilimitado           |
 | **Limite de Chats**        | Ilimitado        | Ilimitado           |
+| **Minha Rede / Conexões**  | ✅ Incluído      | ✅ Incluído         |
 | **Visualização de Perfil** | ❌ (futuro)      | ✅ Ver quem visitou |
 | **Confirmação de Leitura** | ❌ (futuro)      | ✅ Double checkmark |
 | **Badge PRO**              | ❌               | ✅ Selo no perfil   |

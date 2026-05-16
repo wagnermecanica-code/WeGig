@@ -10,6 +10,7 @@
 | `.config/firestore.rules`        | Security rules                                                                              |
 | `.config/firestore.indexes.json` | Composite indexes — update when adding Firestore queries                                    |
 | `admin-dashboard/`               | Vite + React + Tailwind admin for moderating reports                                        |
+| `docs/`                          | GitHub Pages site + technical/project documentation                                         |
 | `.tools/scripts/`                | Build, deploy, and migration helpers                                                        |
 
 ## Critical workflows
@@ -42,7 +43,7 @@ firebase deploy --only functions
 
 Path: `packages/app/lib/features/<feature>/{data,domain,presentation}`
 
-Features: `auth`, `post`, `profile`, `mensagens_new` (chat v2), `notifications_new`, `comment`, `report`, `settings`, `home`.
+Features: `auth`, `post`, `profile`, `connections`, `mensagens_new` (chat v2), `notifications_new`, `comment`, `report`, `settings`, `home`.
 
 ### Provider DI chain (follow this pattern exactly)
 
@@ -106,7 +107,14 @@ Key collections: `posts`, `profiles`, `interests`, `blocks`, `conversations`, `c
 
 ### Profile switching
 
-`profileSwitcherNotifierProvider.notifier.switchToProfile(id)` — invalidates post/interest caches, updates Analytics. FCM tokens **kept across all profiles**.
+`profileSwitcherNotifierProvider.notifier.switchToProfile(id)` — invalidates post/interest caches, clears shared blocked-relations streams, updates Analytics. FCM tokens **kept across all profiles**.
+
+### Connections and social state
+
+- `Minha Rede` is the social hub in bottom nav and owns the social badge surface.
+- Social badge counts are driven by `networkBadgeSeenAtProvider` + `networkBadgeCountStreamProvider`; do not duplicate ad hoc badge queries in UI.
+- Profile switcher bottom sheet uses a unified badge that sums notifications, messages, and `Minha Rede` activity.
+- Connection privacy is profile-scoped via `allowConnectionSuggestions` and `allowConnectionRequests`, persisted on the profile/settings documents.
 
 ### Post caching
 
@@ -123,13 +131,20 @@ Key collections: `posts`, `profiles`, `interests`, `blocks`, `conversations`, `c
 ## UI rules
 
 - **Never** `Image.network` — always `CachedNetworkImage` with placeholder + errorWidget.
+- Prefer `AppRadioPulseLoader` over raw `CircularProgressIndicator` where the branded loading pattern is already adopted.
 - Image compression: `FlutterImageCompress.compressAndGetFile(path, target, quality: 85, minWidth: 800, minHeight: 800)`.
 - Profile-type colors: `AppColors.getProfileTypeColor(type)`.
 - Domain constants: `MusicConstants.instrumentOptions`, `genreOptions`, etc. in `core_ui/lib/utils/music_constants.dart`.
 
+## Package and platform notes
+
+- `google_maps_flutter` is pinned to the local fork under `.tools/third_party/google_maps_flutter` via `dependency_overrides`; preserve this unless intentionally updating the map stack.
+- `firebase_app_check` is part of app dependencies; keep environment/bootstrap documentation aligned when App Check rollout changes.
+- Native splash configuration is owned by `flutter_native_splash` in `packages/app/pubspec.yaml`.
+
 ## Cloud Functions
 
-All in `southamerica-east1`. `syncBlockedByProfileIndex` (onWrite blocks), `notifyNearbyPosts` (onCreate posts), `sendInterestNotification` (onCreate interests), `sendMessageNotification` (onCreate messages), `cleanupExpiredNotifications` (daily 3AM BRT), `onProfileDelete` (cascading cleanup).
+All in `southamerica-east1`. `syncBlockedByProfileIndex` (onWrite blocks), `notifyNearbyPosts` (onCreate posts), `sendInterestNotification` (onCreate interests), `sendMessageNotification` (onCreate messages), `connection lifecycle triggers` (stats/social cleanup), `cleanupExpiredNotifications` (daily 3AM BRT), `onProfileDelete` (cascading cleanup).
 
 ## Testing
 
@@ -143,9 +158,11 @@ Tests at `packages/app/test/features/`, mirroring feature structure. **Manual mo
 | Router + auth guard | `packages/app/lib/app/router/app_router.dart`                                             |
 | Block filtering     | `packages/app/lib/core/firebase/blocked_relations.dart`                                   |
 | Cache config        | `packages/app/lib/core/firebase/firebase_cache_config.dart`                               |
+| Connections badge   | `packages/app/lib/features/connections/presentation/providers/connections_providers.dart` |
 | Profile switcher    | `packages/app/lib/features/profile/presentation/providers/profile_switcher_provider.dart` |
 | Env service         | `packages/core_ui/lib/services/env_service.dart`                                          |
 | core_ui barrel      | `packages/core_ui/lib/core_ui.dart`                                                       |
+| Loading system      | `packages/core_ui/lib/widgets/app_loading_overlay.dart`                                   |
 | Security rules      | `.config/firestore.rules`                                                                 |
 | Cloud Functions     | `.config/functions/index.js`                                                              |
 | Content filter      | `packages/core_ui/lib/utils/objectionable_content_filter.dart`                            |

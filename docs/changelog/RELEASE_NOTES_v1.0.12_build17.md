@@ -136,21 +136,21 @@ Find musicians and bands in your area! 🎵
 
 ### 🔧 Build & Otimização (Build 16-17)
 
-| Mudança                     | Descrição                                                                          | Arquivo                |
-| --------------------------- | ---------------------------------------------------------------------------------- | ---------------------- |
-| R8 Minificação              | Habilitado `isMinifyEnabled` e `isShrinkResources` para builds release             | `build.gradle.kts`     |
-| Debug Symbols               | NDK `debugSymbolLevel = FULL` — .so.dbg auto-incluídos no AAB                      | `build.gradle.kts`     |
-| Deobfuscation               | mapping.txt auto-incluído no AAB via R8                                            | `build.gradle.kts`     |
-| ProGuard Rules              | Regras abrangentes para Facebook SDK, UCrop, Geolocator, OkHttp, Glide, etc.       | `proguard-rules.pro`   |
-| Remoção keepDebugSymbols    | Removido bloco `packaging.jniLibs.keepDebugSymbols` (substituído por ndk config)   | `build.gradle.kts`     |
+| Mudança                  | Descrição                                                                        | Arquivo              |
+| ------------------------ | -------------------------------------------------------------------------------- | -------------------- |
+| R8 Minificação           | Habilitado `isMinifyEnabled` e `isShrinkResources` para builds release           | `build.gradle.kts`   |
+| Debug Symbols            | NDK `debugSymbolLevel = FULL` — .so.dbg auto-incluídos no AAB                    | `build.gradle.kts`   |
+| Deobfuscation            | mapping.txt auto-incluído no AAB via R8                                          | `build.gradle.kts`   |
+| ProGuard Rules           | Regras abrangentes para Facebook SDK, UCrop, Geolocator, OkHttp, Glide, etc.     | `proguard-rules.pro` |
+| Remoção keepDebugSymbols | Removido bloco `packaging.jniLibs.keepDebugSymbols` (substituído por ndk config) | `build.gradle.kts`   |
 
 ### 🌐 Site (wegig.com.br)
 
-| Mudança                     | Descrição                                                                          |
-| --------------------------- | ---------------------------------------------------------------------------------- |
-| Ícones Iconsax SVG          | Adicionados ícones inline SVG (Iconsax Linear) em todos os 9 feature cards         |
-| Ícones nos stat cards       | Adicionados ícones nos 6 stat cards da seção Sobre                                 |
-| Remoção CSS CDN quebrado    | Removido link `iconsax@1.0.0/dist/css/iconsax.css` que retornava 404               |
+| Mudança                  | Descrição                                                                  |
+| ------------------------ | -------------------------------------------------------------------------- |
+| Ícones Iconsax SVG       | Adicionados ícones inline SVG (Iconsax Linear) em todos os 9 feature cards |
+| Ícones nos stat cards    | Adicionados ícones nos 6 stat cards da seção Sobre                         |
+| Remoção CSS CDN quebrado | Removido link `iconsax@1.0.0/dist/css/iconsax.css` que retornava 404       |
 
 ### 🔒 Segurança & Infraestrutura
 
