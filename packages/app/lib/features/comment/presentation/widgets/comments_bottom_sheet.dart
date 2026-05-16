@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -603,9 +604,9 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                       );
                     },
                     loading: () => const Center(
-                      child: CircularProgressIndicator(
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      child: AppRadioPulseLoader(
+                        size: 44,
+                        color: AppColors.primary,
                       ),
                     ),
                     error: (error, _) => Center(
@@ -737,11 +738,9 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                                     child: SizedBox(
                                       width: 20,
                                       height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          AppColors.primary,
-                                        ),
+                                      child: AppRadioPulseLoader(
+                                        size: 20,
+                                        color: AppColors.primary,
                                       ),
                                     ),
                                   ),

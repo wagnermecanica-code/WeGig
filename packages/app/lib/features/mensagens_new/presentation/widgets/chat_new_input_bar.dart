@@ -1,4 +1,5 @@
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
@@ -338,12 +339,7 @@ class _ChatNewInputBarState extends State<ChatNewInputBar> {
         child: widget.isSending
             ? Padding(
                 padding: const EdgeInsets.all(10),
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.white,
-                  ),
-                ),
+                child: AppRadioPulseLoader(size: 20, color: Colors.white),
               )
             : Icon(
                 widget.editingMessage != null ? Iconsax.tick_circle : Iconsax.send_1,

@@ -8,12 +8,16 @@ import 'package:flutter/services.dart';
 class TikTokService {
   TikTokService._();
   static final TikTokService instance = TikTokService._();
+  static const bool _isEnabled = false;
 
   static const _channel = MethodChannel('com.wegig.wegig/tiktok');
 
   /// Track a standard TikTok event by name.
   Future<void> trackEvent(String eventName) async {
-    if (!Platform.isAndroid) return;
+    if (!_isEnabled || !Platform.isAndroid) {
+      debugPrint('⚠️ TikTok trackEvent skipped: SDK disabled');
+      return;
+    }
     try {
       await _channel.invokeMethod('trackEvent', {'eventName': eventName});
     } on PlatformException catch (e) {
@@ -28,7 +32,10 @@ class TikTokService {
     String phone = '',
     String email = '',
   }) async {
-    if (!Platform.isAndroid) return;
+    if (!_isEnabled || !Platform.isAndroid) {
+      debugPrint('⚠️ TikTok identify skipped: SDK disabled');
+      return;
+    }
     try {
       await _channel.invokeMethod('identify', {
         'externalId': externalId,

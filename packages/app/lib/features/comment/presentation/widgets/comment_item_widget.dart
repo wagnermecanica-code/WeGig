@@ -5,9 +5,6 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'package:wegig_app/features/comment/domain/entities/comment_entity.dart';
 
 /// Widget para exibir um comentário individual no bottom sheet.
-///
-/// Layout: [Avatar] [Nome + Texto + Timestamp + Responder] [Botão delete se for do autor]
-/// Respostas são exibidas com indentação e indicador visual.
 class CommentItemWidget extends StatelessWidget {
   const CommentItemWidget({
     required this.comment,
@@ -17,175 +14,209 @@ class CommentItemWidget extends StatelessWidget {
     this.isLiked = false,
     this.likeCount = 0,
     this.onDelete,
-    this.onTapProfile,
     this.onReply,
     this.onToggleLike,
     this.onViewLikers,
     this.onLongPress,
+    this.onTapProfile,
     super.key,
   });
 
   final CommentEntity comment;
   final bool isOwnComment;
-  /// Se true, exibe o botão de excluir (autor do comentário OU dono do post)
   final bool canDelete;
-  /// Se true, exibe com indentação (é uma resposta)
   final bool isReply;
-  /// Se o usuário atual curtiu este comentário
   final bool isLiked;
-  /// Quantidade de curtidas
   final int likeCount;
   final VoidCallback? onDelete;
-  final VoidCallback? onTapProfile;
-  /// Callback para responder a este comentário
   final VoidCallback? onReply;
-  /// Callback para curtir/descurtir este comentário
   final VoidCallback? onToggleLike;
-  /// Callback para ver quem curtiu
   final VoidCallback? onViewLikers;
-  /// Callback para long press (menu de opções: excluir, denunciar, bloquear)
   final VoidCallback? onLongPress;
+  final VoidCallback? onTapProfile;
 
   @override
   Widget build(BuildContext context) {
+    final likeHitPadding = EdgeInsets.symmetric(
+      horizontal: isReply ? 8 : 10,
+      vertical: isReply ? 6 : 8,
+    );
+
+    final avatarRadius = isReply ? 14.0 : 18.0;
+    final contentPadding = EdgeInsets.only(
+      left: isReply ? 48 : 16,
+      right: 16,
+      top: isReply ? 4 : 8,
+      bottom: isReply ? 4 : 8,
+    );
+
     return GestureDetector(
-      onLongPress: onLongPress,
       behavior: HitTestBehavior.opaque,
+      onLongPress: onLongPress,
       child: Padding(
-      padding: EdgeInsets.only(
-        left: isReply ? 48 : 16,
-        right: 16,
-        top: isReply ? 4 : 8,
-        bottom: isReply ? 4 : 8,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Avatar
-          GestureDetector(
-            onTap: onTapProfile,
-            child: CircleAvatar(
-              radius: isReply ? 14 : 18,
-              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-              backgroundImage: (comment.authorPhotoUrl != null &&
-                      comment.authorPhotoUrl!.isNotEmpty)
-                  ? CachedNetworkImageProvider(comment.authorPhotoUrl!)
-                  : null,
-              child: (comment.authorPhotoUrl == null ||
-                      comment.authorPhotoUrl!.isEmpty)
-                  ? Icon(Icons.person, size: isReply ? 14 : 18, color: AppColors.primary)
-                  : null,
+        padding: contentPadding,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: onTapProfile,
+              child: CircleAvatar(
+                radius: avatarRadius,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                backgroundImage: (comment.authorPhotoUrl != null &&
+                        comment.authorPhotoUrl!.isNotEmpty)
+                    ? CachedNetworkImageProvider(comment.authorPhotoUrl!)
+                    : null,
+                child: (comment.authorPhotoUrl == null ||
+                        comment.authorPhotoUrl!.isEmpty)
+                    ? Icon(
+                        Icons.person,
+                        size: isReply ? 14 : 18,
+                        color: AppColors.primary,
+                      )
+                    : null,
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          // Conteúdo
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    // Nome do autor
-                    GestureDetector(
-                      onTap: onTapProfile,
-                      child: Text(
-                        comment.authorName,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: isReply ? 12 : 13,
-                          color: Colors.black87,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: onTapProfile,
+                          child: Text(
+                            comment.authorName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: isReply ? 12 : 13,
+                              color: Colors.black87,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Timestamp
+                      const SizedBox(width: 6),
+                      Text(
+                        timeago.format(comment.createdAt, locale: 'pt_BR'),
+                        style: TextStyle(
+                          fontSize: isReply ? 10 : 11,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  if (comment.isReply && comment.replyToName != null) ...[
                     Text(
-                      timeago.format(comment.createdAt, locale: 'pt_BR'),
-                      style: TextStyle(
-                        fontSize: isReply ? 10 : 11,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                // Indicador de resposta (ex: "@NomeDoUsuário")
-                if (comment.isReply && comment.replyToName != null) ...[
-                  Text(
-                    '@${comment.replyToName}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                ],
-                // Texto do comentário
-                Text(
-                  comment.text,
-                  style: TextStyle(
-                    fontSize: isReply ? 13 : 14,
-                    color: Colors.black87,
-                    height: 1.3,
-                  ),
-                ),
-                // Botão Responder
-                if (onReply != null) ...[
-                  const SizedBox(height: 4),
-                  GestureDetector(
-                    onTap: onReply,
-                    child: Text(
-                      'Responder',
-                      style: TextStyle(
+                      '@${comment.replyToName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
                         fontSize: 12,
-                        color: Colors.grey[500],
-                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          // Botão curtir (coração + contagem)
-          if (onToggleLike != null)
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: onToggleLike,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Icon(
-                      isLiked ? Icons.favorite : Icons.favorite_border,
-                      size: isReply ? 18 : 21,
-                      color: isLiked ? Colors.red : Colors.grey[400],
+                    const SizedBox(height: 2),
+                  ],
+                  Text(
+                    comment.text,
+                    style: TextStyle(
+                      fontSize: isReply ? 13 : 14,
+                      color: Colors.black87,
+                      height: 1.3,
                     ),
                   ),
-                ),
-                if (likeCount > 0)
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onViewLikers,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      child: Text(
-                        '$likeCount',
-                        style: TextStyle(
-                          fontSize: isReply ? 13 : 14,
-                          color: isLiked ? Colors.red : Colors.grey[500],
-                          fontWeight: FontWeight.w500,
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    children: [
+                      if (onReply != null)
+                        GestureDetector(
+                          onTap: onReply,
+                          child: Text(
+                            'Responder',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[500],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      if (canDelete && onDelete != null)
+                        GestureDetector(
+                          onTap: onDelete,
+                          child: Text(
+                            'Excluir',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[500],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      if (isOwnComment)
+                        Text(
+                          'Seu comentário',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[400],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (onToggleLike != null || likeCount > 0)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onToggleLike != null)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onToggleLike,
+                      child: Padding(
+                        padding: likeHitPadding,
+                        child: Icon(
+                          isLiked ? Icons.favorite : Icons.favorite_border,
+                          size: isReply ? 18 : 21,
+                          color: isLiked ? Colors.red : Colors.grey[400],
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-        ],
+                  if (likeCount > 0)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onViewLikers,
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          left: likeHitPadding.horizontal / 2,
+                          right: likeHitPadding.horizontal / 2,
+                          top: 0,
+                          bottom: isReply ? 2 : 4,
+                        ),
+                        child: Text(
+                          '$likeCount',
+                          style: TextStyle(
+                            fontSize: isReply ? 13 : 14,
+                            color: isLiked ? Colors.red : Colors.grey[500],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+          ],
+        ),
       ),
-    ),
     );
   }
 }

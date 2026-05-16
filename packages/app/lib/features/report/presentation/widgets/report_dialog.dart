@@ -621,12 +621,7 @@ class _ReportBottomSheetState extends ConsumerState<_ReportBottomSheet> {
                                 ? const SizedBox(
                                     width: 20,
                                     height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
+                                    child: AppRadioPulseLoader(size: 20, color: Colors.white),
                                   )
                                 : const Text(
                                     'Enviar Denúncia',

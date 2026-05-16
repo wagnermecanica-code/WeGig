@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
@@ -87,7 +88,7 @@ class PostPhotoPicker extends StatelessWidget {
           imageUrl: remotePhotoUrl!,
           fit: BoxFit.cover,
           placeholder: (_, __) => const Center(
-            child: CircularProgressIndicator.adaptive(),
+            child: AppRadioPulseLoader(size: 36),
           ),
         ),
       );

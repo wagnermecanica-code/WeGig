@@ -24,29 +24,43 @@ class HomeMapWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GoogleMap(
-      mapType: MapType.normal,
-      initialCameraPosition: const CameraPosition(
-        target: LatLng(-23.5505, -46.6333), // São Paulo default
-        zoom: 12,
-      ),
-      onMapCreated: (controller) {
-        mapControllerWrapper.setController(controller);
-        // Note: applyMapStyle() moved to MapControllerWrapper.setController()
-        onMapCreated(controller);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!constraints.hasBoundedWidth ||
+            !constraints.hasBoundedHeight ||
+            constraints.maxWidth <= 0 ||
+            constraints.maxHeight <= 0) {
+          return const SizedBox.shrink();
+        }
+
+        return SizedBox(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+          child: GoogleMap(
+            mapType: MapType.normal,
+            initialCameraPosition: const CameraPosition(
+              target: LatLng(-23.5505, -46.6333),
+              zoom: 12,
+            ),
+            onMapCreated: (controller) {
+              mapControllerWrapper.setController(controller);
+              onMapCreated(controller);
+            },
+            markers: markers,
+            onCameraIdle: onMapIdle,
+            onCameraMove: onCameraMove,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            compassEnabled: false,
+            rotateGesturesEnabled: true,
+            scrollGesturesEnabled: true,
+            tiltGesturesEnabled: false,
+            zoomGesturesEnabled: true,
+          ),
+        );
       },
-      markers: markers,
-      onCameraIdle: onMapIdle,
-      onCameraMove: onCameraMove,
-      myLocationEnabled: true,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      mapToolbarEnabled: false,
-      compassEnabled: false,
-      rotateGesturesEnabled: true,
-      scrollGesturesEnabled: true,
-      tiltGesturesEnabled: false,
-      zoomGesturesEnabled: true,
     );
   }
 }

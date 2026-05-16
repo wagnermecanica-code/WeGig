@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
@@ -256,10 +257,7 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
                 SizedBox(
                   width: 30,
                   height: 30,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    valueColor: AlwaysStoppedAnimation<Color>(color),
-                  ),
+                  child: AppRadioPulseLoader(size: 30, color: color),
                 ),
               ],
             ),

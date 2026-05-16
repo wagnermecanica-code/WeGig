@@ -12,7 +12,8 @@
 /// - Criar canal de notificação de alta importância (Android)
 library;
 
-import 'dart:async' show Completer;
+import 'dart:async' show Completer, StreamSubscription;
+import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:math' show min;
 import 'dart:ui' show Color;
@@ -23,6 +24,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../../core/firebase/blocked_relations.dart';
+import '../../../../core/firebase/blocked_profiles.dart';
 
 /// Service para gerenciar Push Notifications via Firebase Cloud Messaging
 ///
@@ -48,14 +53,24 @@ class PushNotificationService {
   static const String _highImportanceChannelName = 'Notificações Importantes';
   static const String _highImportanceChannelDesc =
       'Canal para notificações de posts próximos, interesses e mensagens';
+  static const String _myNetworkBadgeSeenAtKeyPrefix =
+      'my_network_badge_seen_at_v1';
+  static const String _myNetworkBadgeSeenAtField = 'myNetworkBadgeSeenAt';
 
   // Evita concorrência: o plugin do Firebase Messaging só permite 1 requestPermission
   // por vez. Se múltiplos fluxos chamarem em paralelo (bootstrap + salvar token +
   // troca de perfil), as chamadas extras aguardam a mesma Future.
   static Completer<NotificationSettings>? _permissionRequestInFlight;
+  static Completer<String?>? _apnsTokenWaitInFlight;
+  static final Map<String, Future<void>> _badgeSyncInFlight = {};
 
   String? _currentToken;
   String? _currentProfileId;
+  bool _isInitialized = false;
+
+  StreamSubscription<RemoteMessage>? _onMessageSubscription;
+  StreamSubscription<RemoteMessage>? _onMessageOpenedSubscription;
+  StreamSubscription<String>? _onTokenRefreshSubscription;
 
   /// Callback quando notificação é clicada (app terminated/background)
   void Function(RemoteMessage)? onNotificationTapped;
@@ -90,6 +105,14 @@ class PushNotificationService {
   /// ```
   Future<void> initialize() async {
     debugPrint('🔔 PushNotificationService: Iniciando initialize()...');
+
+    if (_isInitialized) {
+      debugPrint(
+        'ℹ️ PushNotificationService: initialize() já executado, reaproveitando listeners existentes',
+      );
+      return;
+    }
+
     try {
       // ANDROID CRÍTICO: Criar canal ANTES de qualquer outra operação FCM
       // O canal DEVE existir antes de receber qualquer notificação
@@ -124,7 +147,8 @@ class PushNotificationService {
       _setupMessageHandlers();
 
       // Escutar mudanças de token (refresh automático FCM)
-      _messaging.onTokenRefresh.listen((newToken) {
+      _onTokenRefreshSubscription?.cancel();
+      _onTokenRefreshSubscription = _messaging.onTokenRefresh.listen((newToken) {
         debugPrint(
             '🔄 PushNotificationService: Token refreshed: ${newToken.substring(0, min(20, newToken.length))}...');
         _currentToken = newToken;
@@ -134,6 +158,8 @@ class PushNotificationService {
           saveTokenForProfile(_currentProfileId!);
         }
       });
+
+      _isInitialized = true;
 
       debugPrint('✅ PushNotificationService: Initialized successfully');
 
@@ -197,7 +223,7 @@ class PushNotificationService {
       initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         debugPrint('👆 Local notification tapped: ${response.payload}');
-        // Payload pode conter dados para navegação
+        _handleLocalNotificationTap(response.payload);
       },
       onDidReceiveBackgroundNotificationResponse: _notificationTapBackground,
     );
@@ -212,6 +238,35 @@ class PushNotificationService {
   @pragma('vm:entry-point')
   static void _notificationTapBackground(NotificationResponse response) {
     debugPrint('👆 [Background] Notification tapped: ${response.payload}');
+  }
+
+  void _handleLocalNotificationTap(String? payload) {
+    if (payload == null || payload.trim().isEmpty) {
+      return;
+    }
+
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is! Map<String, dynamic>) {
+        debugPrint('⚠️ PushNotificationService: Invalid local payload shape');
+        return;
+      }
+
+      final message = RemoteMessage.fromMap(<String, dynamic>{
+        'data': decoded,
+      });
+
+      final handler = onNotificationTapped;
+      if (handler != null) {
+        handler(message);
+      } else {
+        _pendingNotificationTap = message;
+      }
+    } catch (error) {
+      debugPrint(
+        '⚠️ PushNotificationService: Failed to decode local notification payload: $error',
+      );
+    }
   }
 
   // 🍎 NOTA: flutter_local_notifications NÃO é inicializado no iOS.
@@ -264,7 +319,7 @@ class PushNotificationService {
       notification.title,
       notification.body,
       notificationDetails,
-      payload: message.data.toString(),
+      payload: jsonEncode(message.data),
     );
 
     debugPrint('📱 PushNotificationService: Local notification shown');
@@ -275,7 +330,8 @@ class PushNotificationService {
     debugPrint('🔔 _setupMessageHandlers: Registrando listeners FCM...');
 
     // Foreground: app aberto
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    _onMessageSubscription?.cancel();
+    _onMessageSubscription = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('📩 PushNotificationService: Message received (foreground)');
       debugPrint('   Title: ${message.notification?.title}');
       debugPrint('   Body: ${message.notification?.body}');
@@ -293,7 +349,8 @@ class PushNotificationService {
 
     // Background/Terminated: app minimizado ou fechado
     // Quando usuário clica na notificação
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    _onMessageOpenedSubscription?.cancel();
+    _onMessageOpenedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       debugPrint(
           '👆 PushNotificationService: Notification tapped (background)');
       debugPrint('   Type: ${message.data['type']}');
@@ -401,6 +458,15 @@ class PushNotificationService {
       debugPrint(
         '📱 PushNotificationService: Permission already decided: ${current.authorizationStatus}',
       );
+
+      if (Platform.isIOS &&
+          current.authorizationStatus == AuthorizationStatus.authorized) {
+        final apnsToken = await _waitForApnsToken();
+        debugPrint(
+          '🍎 PushNotificationService: APNS after cached permission = ${apnsToken != null ? "OK" : "MISSING"}',
+        );
+      }
+
       return current;
     }
 
@@ -424,6 +490,10 @@ class PushNotificationService {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         debugPrint('✅ PushNotificationService: Permission granted');
+        final apnsToken = await _waitForApnsToken();
+        debugPrint(
+          '🍎 PushNotificationService: APNS after permission = ${apnsToken != null ? "OK" : "MISSING"}',
+        );
       } else if (settings.authorizationStatus ==
           AuthorizationStatus.provisional) {
         debugPrint('⚠️ PushNotificationService: Provisional permission');
@@ -456,6 +526,16 @@ class PushNotificationService {
   Future<String?> forceTokenRefresh() async {
     debugPrint('🔄 PushNotificationService: Forcing token refresh...');
     try {
+      if (Platform.isIOS) {
+        final apnsToken = await _waitForApnsToken();
+        if (apnsToken == null) {
+          debugPrint(
+            '⚠️ PushNotificationService: Skipping FCM token refresh because APNS token is still unavailable',
+          );
+          return null;
+        }
+      }
+
       // Deletar o token antigo
       await _messaging.deleteToken();
       debugPrint('🗑️ PushNotificationService: Old token deleted');
@@ -495,6 +575,16 @@ class PushNotificationService {
     try {
       if (_currentToken != null) return _currentToken;
 
+      if (Platform.isIOS) {
+        final apnsToken = await _waitForApnsToken();
+        if (apnsToken == null) {
+          debugPrint(
+            '⚠️ PushNotificationService: APNS token not available yet, deferring FCM token fetch',
+          );
+          return null;
+        }
+      }
+
       _currentToken = await _messaging.getToken();
 
       if (_currentToken != null) {
@@ -514,6 +604,47 @@ class PushNotificationService {
     } catch (e) {
       debugPrint('❌ PushNotificationService: Get token error: $e');
       return null;
+    }
+  }
+
+  Future<String?> _waitForApnsToken() async {
+    if (!Platform.isIOS) {
+      return null;
+    }
+
+    final inFlight = _apnsTokenWaitInFlight;
+    if (inFlight != null) {
+      return inFlight.future;
+    }
+
+    final completer = Completer<String?>();
+    _apnsTokenWaitInFlight = completer;
+
+    try {
+      for (var attempt = 0; attempt < 10; attempt++) {
+        final apnsToken = await _messaging.getAPNSToken();
+        if (apnsToken != null && apnsToken.isNotEmpty) {
+          completer.complete(apnsToken);
+          return apnsToken;
+        }
+
+        if (attempt == 0) {
+          debugPrint(
+            '🍎 PushNotificationService: Waiting for APNS token before FCM operations...',
+          );
+        }
+
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
+
+      completer.complete(null);
+      return null;
+    } catch (e, st) {
+      debugPrint('❌ PushNotificationService: APNS token wait error: $e');
+      completer.completeError(e, st);
+      rethrow;
+    } finally {
+      _apnsTokenWaitInFlight = null;
     }
   }
 
@@ -682,7 +813,7 @@ class PushNotificationService {
     debugPrint('🗑️ PushNotificationService: Token removed from all profiles');
   }
 
-  /// Troca de perfil: remove token do antigo e adiciona no novo
+  /// Troca de perfil: garante token no novo perfil sem remover dos demais
   ///
   /// ```dart
   /// await service.switchProfile(
@@ -694,9 +825,6 @@ class PushNotificationService {
     required String? oldProfileId,
     required String newProfileId,
   }) async {
-    if (oldProfileId != null) {
-      await removeTokenFromProfile(oldProfileId);
-    }
     await saveTokenForProfile(newProfileId);
 
     debugPrint('🔄 PushNotificationService: Switched profile: '
@@ -802,16 +930,48 @@ class PushNotificationService {
   // 📱 APP BADGE MANAGEMENT (iOS/Android icon badge)
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Atualiza o badge do ícone do app com o número de notificações não lidas
+  /// Atualiza o badge do ícone do app com a contagem canônica da Minha Rede.
   ///
   /// Deve ser chamado quando:
-  /// - App é aberto (para sincronizar com Firestore)
-  /// - Notificação é marcada como lida
-  /// - Todas notificações são marcadas como lidas
+  /// - App é aberto ou retorna do background
+  /// - Ações que alteram a contagem da Minha Rede acontecem em foreground
+  /// - O perfil ativo muda
   ///
   /// [profileId] - ID do perfil ativo
   /// [uid] - UID do usuário (para query Firestore)
   Future<void> updateAppBadge(String profileId, String uid) async {
+    final trimmedProfileId = profileId.trim();
+    final trimmedUid = uid.trim();
+    final syncKey = '$trimmedProfileId|$trimmedUid';
+
+    final inFlight = _badgeSyncInFlight[syncKey];
+    if (inFlight != null) {
+      debugPrint(
+        '⏳ PushNotificationService: Reusing in-flight badge sync for $trimmedProfileId',
+      );
+      await inFlight;
+      return;
+    }
+
+    final syncFuture = _updateAppBadgeInternal(
+      profileId: trimmedProfileId,
+      uid: trimmedUid,
+    );
+    _badgeSyncInFlight[syncKey] = syncFuture;
+
+    try {
+      await syncFuture;
+    } finally {
+      if (identical(_badgeSyncInFlight[syncKey], syncFuture)) {
+        _badgeSyncInFlight.remove(syncKey);
+      }
+    }
+  }
+
+  Future<void> _updateAppBadgeInternal({
+    required String profileId,
+    required String uid,
+  }) async {
     try {
       // Verificar se o dispositivo suporta badge
       final isSupported = await FlutterAppBadger.isAppBadgeSupported();
@@ -821,79 +981,463 @@ class PushNotificationService {
         return;
       }
 
-      final trimmedProfileId = profileId.trim();
-      final trimmedUid = uid.trim();
-      if (trimmedProfileId.isEmpty || trimmedUid.isEmpty) {
-        debugPrint('📱 PushNotificationService: Skip badge sync (missing profileId/uid)');
+      if (profileId.isEmpty || uid.isEmpty) {
+        debugPrint(
+            '📱 PushNotificationService: Skip badge sync (missing profileId/uid)');
         return;
       }
 
-      // Contar notificações não lidas do perfil no Firestore.
-      //
-      // IMPORTANTE:
-      // - Evita usar `count()` + múltiplos `where` (especialmente `expiresAt`) pois
-      //   isso costuma exigir índices compostos e pode falhar silenciosamente no device,
-      //   mantendo o badge antigo (ex.: sempre 1 via APNS).
-      // - `expiresAt` pode ser null em alguns docs; então fazemos filtro client-side.
-      // - O badge do ícone do app deve incluir `newMessage` (mensagens não lidas).
-      QuerySnapshot<Map<String, dynamic>> snapshot;
-      try {
-        debugPrint('📱 PushNotificationService: Fetching badge count from server for uid=$trimmedUid profile=$trimmedProfileId');
-        snapshot = await _firestore
-            .collection('notifications')
-            .where('recipientUid', isEqualTo: trimmedUid)
-            .where('read', isEqualTo: false)
-            .get(const GetOptions(source: Source.server));
-        debugPrint('📱 PushNotificationService: Server returned ${snapshot.docs.length} docs');
-      } catch (e) {
-        // Fallback: offline/stale. Preferimos mostrar algo do cache do que manter
-        // um badge antigo vindo do APNS.
-        debugPrint('📱 PushNotificationService: Badge server fetch failed, using cache: $e');
-        try {
-          snapshot = await _firestore
-              .collection('notifications')
-              .where('recipientUid', isEqualTo: trimmedUid)
-              .where('read', isEqualTo: false)
-              .get(const GetOptions(source: Source.cache));
-          debugPrint('📱 PushNotificationService: Cache returned ${snapshot.docs.length} docs');
-        } catch (cacheError) {
-          // Nem cache funcionou - forçar limpeza do badge para evitar valor "preso"
-          debugPrint('📱 PushNotificationService: Cache also failed: $cacheError - clearing badge');
-          await FlutterAppBadger.updateBadgeCount(0);
-          await FlutterAppBadger.removeBadge();
-          return;
-        }
-      }
-
-      final now = DateTime.now();
-      final unreadCount = snapshot.docs.where((doc) {
-        final data = doc.data();
-
-        final recipientProfileId = data['recipientProfileId'] as String?;
-        if (recipientProfileId != trimmedProfileId) return false;
-
-        final expiresAt = data['expiresAt'] as Timestamp?;
-        if (expiresAt != null && expiresAt.toDate().isBefore(now)) return false;
-
-        return true;
-      }).length;
+      final badgeCounts = await _loadAppBadgeCounts(
+        profileId: profileId,
+        uid: uid,
+      );
+      final badgeCount = badgeCounts.total;
 
       debugPrint(
-          '📱 PushNotificationService: Badge sync - found $unreadCount unread for profile $trimmedProfileId (total docs: ${snapshot.docs.length})');
+          '📱 PushNotificationService: Badge sync for $profileId => notifications=${badgeCounts.notifications}, messages=${badgeCounts.messages}, myNetwork=${badgeCounts.myNetwork}, total=$badgeCount');
 
-      if (unreadCount > 0) {
-        await FlutterAppBadger.updateBadgeCount(unreadCount);
+      if (badgeCount > 0) {
+        await FlutterAppBadger.updateBadgeCount(badgeCount);
         debugPrint(
-            '📱 PushNotificationService: App badge updated to $unreadCount');
+            '📱 PushNotificationService: App badge updated to $badgeCount');
       } else {
         // Forçar limpeza dupla para Samsung - às vezes removeBadge sozinho não funciona
         await FlutterAppBadger.updateBadgeCount(0);
         await FlutterAppBadger.removeBadge();
-        debugPrint('📱 PushNotificationService: App badge removed (0 unread)');
+        // Android: quando não há nada pendente, limpar a bandeja também —
+        // do contrário launchers que derivam o badge de NotificationCompat
+        // .setNumber mantêm pushes antigos mostrando números obsoletos.
+        if (Platform.isAndroid) {
+          try {
+            await _localNotifications.cancelAll();
+          } catch (e) {
+            debugPrint(
+                '⚠️ PushNotificationService: Failed to clear Android tray: $e');
+          }
+        }
+        debugPrint('📱 PushNotificationService: App badge removed (0 count)');
       }
     } catch (e) {
       debugPrint('❌ PushNotificationService: Error updating app badge: $e');
     }
+  }
+
+  Future<_AppBadgeCounts> _loadAppBadgeCounts({
+    required String profileId,
+    required String uid,
+  }) async {
+    final blockedProfileIds = await BlockedProfiles.get(
+      firestore: _firestore,
+      profileId: profileId,
+    );
+    final excludedProfileIds = await BlockedRelations.getExcludedProfileIds(
+      firestore: _firestore,
+      profileId: profileId,
+      uid: uid,
+    );
+
+    final results = await Future.wait<int>([
+      _loadUnreadNotificationCount(
+        profileId: profileId,
+        uid: uid,
+        blockedProfileIds: blockedProfileIds,
+      ),
+      _loadUnreadMessagesCount(
+        profileId: profileId,
+        uid: uid,
+        excludedProfileIds: excludedProfileIds,
+      ),
+      _loadMyNetworkBadgeCount(
+        profileId: profileId,
+        uid: uid,
+        excludedProfileIds: excludedProfileIds,
+      ),
+    ]);
+
+    return _AppBadgeCounts(
+      notifications: results[0],
+      messages: results[1],
+      myNetwork: results[2],
+    );
+  }
+
+  Future<int> _loadUnreadNotificationCount({
+    required String profileId,
+    required String uid,
+    required List<String> blockedProfileIds,
+  }) async {
+    final snapshot = await _loadQueryWithCacheFallback(
+      _firestore
+          .collection('notifications')
+          .where('recipientProfileId', isEqualTo: profileId)
+          .where('recipientUid', isEqualTo: uid)
+          .where('read', isEqualTo: false),
+      debugLabel: 'unread notifications for badge sync',
+    );
+
+    final now = DateTime.now();
+    return snapshot.docs.where((doc) {
+      final data = doc.data();
+      if (_isNotificationTypeExcludedFromBadge(data)) {
+        return false;
+      }
+      if (_isConnectionActivityNotificationData(data)) {
+        return false;
+      }
+      if (_isNotificationExpired(data, now)) {
+        return false;
+      }
+      if (_notificationMatchesBlockedProfile(data, blockedProfileIds)) {
+        return false;
+      }
+      return true;
+    }).length;
+  }
+
+  bool _isNotificationTypeExcludedFromBadge(
+    Map<String, dynamic> notificationData,
+  ) {
+    final type = (notificationData['type'] as String? ?? '').trim();
+    return type == 'newMessage';
+  }
+
+  bool _isConnectionActivityNotificationData(
+    Map<String, dynamic> notificationData,
+  ) {
+    final actionData = _coerceMap(notificationData['actionData']);
+    final data = _coerceMap(notificationData['data']);
+    final eventType =
+        ((actionData['eventType'] ?? data['eventType']) as String?)?.trim();
+    return eventType?.startsWith('connection') ?? false;
+  }
+
+  bool _isNotificationExpired(
+    Map<String, dynamic> notificationData,
+    DateTime now,
+  ) {
+    final expiresAt = _parseTimestamp(notificationData['expiresAt']);
+    return expiresAt != null && expiresAt.isBefore(now);
+  }
+
+  bool _notificationMatchesBlockedProfile(
+    Map<String, dynamic> notificationData,
+    List<String> blockedProfileIds,
+  ) {
+    if (blockedProfileIds.isEmpty) {
+      return false;
+    }
+
+    final blockedSet = blockedProfileIds.toSet();
+    final actionData = _coerceMap(notificationData['actionData']);
+    final data = _coerceMap(notificationData['data']);
+    final candidateProfileIds = <String>{};
+
+    void addCandidate(dynamic value) {
+      if (value is! String) {
+        return;
+      }
+      final normalized = value.trim();
+      if (normalized.isNotEmpty) {
+        candidateProfileIds.add(normalized);
+      }
+    }
+
+    addCandidate(notificationData['senderProfileId']);
+    addCandidate(actionData['authorProfileId']);
+    addCandidate(actionData['interestedProfileId']);
+    addCandidate(actionData['senderProfileId']);
+    addCandidate(actionData['commenterProfileId']);
+    addCandidate(data['actionProfileId']);
+    addCandidate(data['authorProfileId']);
+    addCandidate(data['interestedProfileId']);
+    addCandidate(data['senderProfileId']);
+
+    return candidateProfileIds.any(blockedSet.contains);
+  }
+
+  Map<String, dynamic> _coerceMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return const <String, dynamic>{};
+  }
+
+  Future<int> _loadUnreadMessagesCount({
+    required String profileId,
+    required String uid,
+    required List<String> excludedProfileIds,
+  }) async {
+    final snapshot = await _loadQueryWithCacheFallback(
+      _firestore
+          .collection('conversations')
+          .where('participants', arrayContains: uid),
+      debugLabel: 'conversations for unread badge sync',
+    );
+
+    var unreadConversations = 0;
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+
+      final participantProfiles =
+          (data['participantProfiles'] as List<dynamic>? ?? const <dynamic>[])
+              .cast<String>();
+      if (!participantProfiles.contains(profileId)) {
+        continue;
+      }
+
+      final deletedByProfiles =
+          (data['deletedByProfiles'] as List<dynamic>? ?? const <dynamic>[])
+              .cast<String>();
+      if (deletedByProfiles.contains(profileId)) {
+        continue;
+      }
+
+      final archivedByProfiles =
+          (data['archivedByProfiles'] as List<dynamic>? ?? const <dynamic>[])
+              .cast<String>();
+      if (archivedByProfiles.contains(profileId)) {
+        continue;
+      }
+
+      final otherProfileId = participantProfiles.firstWhere(
+        (candidate) => candidate != profileId,
+        orElse: () => '',
+      );
+      if (otherProfileId.isNotEmpty &&
+          excludedProfileIds.contains(otherProfileId)) {
+        continue;
+      }
+
+      final unreadCount = Map<String, dynamic>.from(
+          data['unreadCount'] as Map<String, dynamic>? ??
+              const <String, dynamic>{});
+      final countForProfile = (unreadCount[profileId] as num?)?.toInt() ?? 0;
+      if (countForProfile > 0) {
+        unreadConversations++;
+      }
+    }
+
+    return unreadConversations;
+  }
+
+  Future<int> _loadMyNetworkBadgeCount({
+    required String profileId,
+    required String uid,
+    required List<String> excludedProfileIds,
+  }) async {
+    final seenAt = await _loadMyNetworkBadgeSeenAt(profileId);
+
+    final pendingRequests = await _loadPendingReceivedRequests(
+      profileId: profileId,
+      uid: uid,
+    );
+    final connections = await _loadConnections(
+      profileId: profileId,
+      uid: uid,
+    );
+
+    final pendingReceivedCount = pendingRequests.docs.where((doc) {
+      final data = doc.data();
+      final requesterProfileId =
+          (data['requesterProfileId'] as String? ?? '').trim();
+      final requesterUid = (data['requesterUid'] as String? ?? '').trim();
+      final requesterName = (data['requesterName'] as String? ?? '').trim();
+      final createdAt = _parseTimestamp(data['createdAt']);
+
+      return requesterProfileId.isNotEmpty &&
+          requesterUid.isNotEmpty &&
+          requesterName.isNotEmpty &&
+          (seenAt == null ||
+              (createdAt != null && createdAt.isAfter(seenAt))) &&
+          !excludedProfileIds.contains(requesterProfileId);
+    }).length;
+
+    final newlyAcceptedOutgoingCount = connections.docs.where((doc) {
+      final data = doc.data();
+      final profileIds =
+          (data['profileIds'] as List<dynamic>? ?? const <dynamic>[])
+              .cast<String>();
+      if (!profileIds.contains(profileId)) {
+        return false;
+      }
+
+      final initiatedByProfileId =
+          (data['initiatedByProfileId'] as String? ?? '').trim();
+      if (initiatedByProfileId != profileId) {
+        return false;
+      }
+
+      final createdAt = _parseTimestamp(data['createdAt']);
+      if (seenAt != null && (createdAt == null || !createdAt.isAfter(seenAt))) {
+        return false;
+      }
+
+      final otherProfileId = profileIds
+          .firstWhere((candidate) => candidate != profileId, orElse: () => '');
+      if (otherProfileId.isEmpty ||
+          excludedProfileIds.contains(otherProfileId)) {
+        return false;
+      }
+
+      final profileUids =
+          (data['profileUids'] as List<dynamic>? ?? const <dynamic>[])
+              .cast<String>();
+      final profileNames = Map<String, dynamic>.from(
+        data['profileNames'] as Map<String, dynamic>? ??
+            const <String, dynamic>{},
+      );
+      final otherIndex = profileIds.indexOf(otherProfileId);
+      final otherUid = otherIndex >= 0 && otherIndex < profileUids.length
+          ? profileUids[otherIndex].trim()
+          : '';
+      final otherName = (profileNames[otherProfileId] as String? ?? '').trim();
+
+      return otherUid.isNotEmpty && otherName.isNotEmpty;
+    }).length;
+
+    return pendingReceivedCount + newlyAcceptedOutgoingCount;
+  }
+
+  Future<DateTime?> _loadMyNetworkBadgeSeenAt(String profileId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final localSeenAtMillis = prefs.getInt(_badgeSeenAtKey(profileId));
+    final localSeenAt = localSeenAtMillis != null
+        ? DateTime.fromMillisecondsSinceEpoch(localSeenAtMillis)
+        : null;
+
+    DateTime? remoteSeenAt;
+    try {
+      final profileSnapshot = await _loadDocumentWithCacheFallback(
+        _firestore.collection('profiles').doc(profileId),
+        debugLabel: 'profile badge seenAt',
+      );
+      remoteSeenAt = _parseTimestamp(
+        profileSnapshot.data()?[_myNetworkBadgeSeenAtField],
+      );
+    } catch (error) {
+      debugPrint(
+        '📱 PushNotificationService: Failed to load remote badge seenAt for $profileId: $error',
+      );
+    }
+
+    final resolvedSeenAt = _latestDate(localSeenAt, remoteSeenAt);
+    if (resolvedSeenAt != null &&
+        resolvedSeenAt.millisecondsSinceEpoch != localSeenAtMillis) {
+      await prefs.setInt(
+        _badgeSeenAtKey(profileId),
+        resolvedSeenAt.millisecondsSinceEpoch,
+      );
+    }
+
+    return resolvedSeenAt;
+  }
+
+  Future<QuerySnapshot<Map<String, dynamic>>> _loadPendingReceivedRequests({
+    required String profileId,
+    required String uid,
+  }) {
+    return _loadQueryWithCacheFallback(
+      _firestore
+          .collection('connectionRequests')
+          .where('recipientProfileId', isEqualTo: profileId)
+          .where('recipientUid', isEqualTo: uid)
+          .where('status', isEqualTo: 'pending'),
+      debugLabel: 'pending received requests',
+    );
+  }
+
+  Future<QuerySnapshot<Map<String, dynamic>>> _loadConnections({
+    required String profileId,
+    required String uid,
+  }) {
+    return _loadQueryWithCacheFallback(
+      _firestore
+          .collection('connections')
+          .where('profileUids', arrayContains: uid)
+          .orderBy('createdAt', descending: true),
+      debugLabel: 'connections for badge sync',
+    );
+  }
+
+  Future<QuerySnapshot<Map<String, dynamic>>> _loadQueryWithCacheFallback(
+    Query<Map<String, dynamic>> query, {
+    required String debugLabel,
+  }) async {
+    try {
+      final snapshot = await query.get(const GetOptions(source: Source.server));
+      debugPrint(
+        '📱 PushNotificationService: Loaded $debugLabel from server (${snapshot.docs.length} docs)',
+      );
+      return snapshot;
+    } catch (error) {
+      debugPrint(
+        '📱 PushNotificationService: Server fetch failed for $debugLabel, using cache: $error',
+      );
+      try {
+        final snapshot =
+            await query.get(const GetOptions(source: Source.cache));
+        debugPrint(
+          '📱 PushNotificationService: Loaded $debugLabel from cache (${snapshot.docs.length} docs)',
+        );
+        return snapshot;
+      } catch (cacheError) {
+        debugPrint(
+          '📱 PushNotificationService: Cache fetch failed for $debugLabel: $cacheError',
+        );
+        rethrow;
+      }
+    }
+  }
+
+  Future<DocumentSnapshot<Map<String, dynamic>>> _loadDocumentWithCacheFallback(
+    DocumentReference<Map<String, dynamic>> reference, {
+    required String debugLabel,
+  }) async {
+    try {
+      final snapshot =
+          await reference.get(const GetOptions(source: Source.server));
+      debugPrint(
+        '📱 PushNotificationService: Loaded $debugLabel from server (exists=${snapshot.exists})',
+      );
+      return snapshot;
+    } catch (error) {
+      debugPrint(
+        '📱 PushNotificationService: Server fetch failed for $debugLabel, using cache: $error',
+      );
+      final snapshot =
+          await reference.get(const GetOptions(source: Source.cache));
+      debugPrint(
+        '📱 PushNotificationService: Loaded $debugLabel from cache (exists=${snapshot.exists})',
+      );
+      return snapshot;
+    }
+  }
+
+  DateTime? _parseTimestamp(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+    if (value is DateTime) {
+      return value;
+    }
+    return null;
+  }
+
+  DateTime? _latestDate(DateTime? first, DateTime? second) {
+    if (first == null) {
+      return second;
+    }
+    if (second == null) {
+      return first;
+    }
+    return first.isAfter(second) ? first : second;
+  }
+
+  String _badgeSeenAtKey(String profileId) {
+    return '$_myNetworkBadgeSeenAtKeyPrefix:$profileId';
   }
 
   /// Remove o badge do ícone do app (zera o contador)
@@ -910,4 +1454,18 @@ class PushNotificationService {
       debugPrint('❌ PushNotificationService: Error clearing app badge: $e');
     }
   }
+}
+
+class _AppBadgeCounts {
+  const _AppBadgeCounts({
+    required this.notifications,
+    required this.messages,
+    required this.myNetwork,
+  });
+
+  final int notifications;
+  final int messages;
+  final int myNetwork;
+
+  int get total => notifications + messages + myNetwork;
 }

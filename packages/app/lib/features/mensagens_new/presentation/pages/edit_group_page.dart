@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/utils/debouncer.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -923,13 +924,13 @@ class _EditGroupPageState extends ConsumerState<EditGroupPage> {
               child: SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: AppRadioPulseLoader(size: 20),
               ),
             ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: AppRadioPulseLoader(size: 48))
           : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1181,7 +1182,7 @@ class _EditGroupPageState extends ConsumerState<EditGroupPage> {
                   child: SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: AppRadioPulseLoader(size: 20),
                   ),
                 )
               : Icon(Iconsax.search_normal, color: AppColors.textHint),
@@ -1206,7 +1207,7 @@ class _EditGroupPageState extends ConsumerState<EditGroupPage> {
           child: SizedBox(
             width: 24,
             height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
+            child: AppRadioPulseLoader(size: 24),
           ),
         ),
       );

@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -280,7 +281,7 @@ class _MensagensNewPageState extends ConsumerState<MensagensNewPage> {
 
     if (!isProfileReadyForQueries) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(child: AppRadioPulseLoader(size: 52)),
       );
     }
 

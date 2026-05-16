@@ -34,11 +34,8 @@ Stream<List<CommentEntity>> commentsStream(CommentsStreamRef ref, String postId)
 /// Provider para buscar commentCount de um post (para exibir o contador)
 @riverpod
 Stream<int> commentCountStream(CommentCountStreamRef ref, String postId) {
-  return FirebaseFirestore.instance
-      .collection('posts')
-      .doc(postId)
-      .snapshots()
-      .map((doc) => (doc.data()?['commentCount'] as num?)?.toInt() ?? 0);
+  final repository = ref.watch(commentRepositoryProvider);
+  return repository.watchComments(postId).map((comments) => comments.length);
 }
 
 /// Provider para buscar forwardCount de um post (para exibir o contador)

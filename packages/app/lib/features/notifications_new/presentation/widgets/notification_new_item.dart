@@ -515,7 +515,7 @@ class _NotificationInlineContentState extends State<NotificationInlineContent> {
   String? _buildEventMeta(NotificationEntity notification) {
     final data = notification.data;
     final actionData = notification.actionData;
-    final eventType = ((actionData?['eventType'] ?? data['eventType']) as String?)?.trim();
+    final rawEventType = ((actionData?['eventType'] ?? data['eventType']) as String?)?.trim();
     final rawDate = actionData?['eventDate'] ?? data['eventDate'];
 
     DateTime? eventDate;
@@ -526,13 +526,33 @@ class _NotificationInlineContentState extends State<NotificationInlineContent> {
     }
 
     final parts = <String>[];
-    if (eventType != null && eventType.isNotEmpty) parts.add(eventType);
+    if (rawEventType != null && rawEventType.isNotEmpty) {
+      parts.add(_translateEventType(rawEventType));
+    }
     if (eventDate != null) {
       parts.add(DateFormat('dd/MM').format(eventDate));
     }
 
     if (parts.isEmpty) return null;
     return parts.join(' • ');
+  }
+
+  /// Traduz o eventType para Portuguese legível ao usuário.
+  String _translateEventType(String eventType) {
+    switch (eventType) {
+      case 'connectionRequest':
+        return 'Convite recebido';
+      case 'connectionAccepted':
+        return 'Conexão aceita';
+      case 'connectionDeclined':
+        return 'Convite recusado';
+      case 'connectionRemoved':
+        return 'Conexão removida';
+      case 'connectionCancelled':
+        return 'Convite cancelado';
+      default:
+        return eventType;
+    }
   }
 
   /// Extrai a ação do body da notificação

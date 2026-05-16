@@ -50,7 +50,9 @@ class NotificationService {
     required String body,
     Map<String, dynamic> data = const {},
     String? senderProfileId,
+    String? senderName,
     String? senderUsername,
+    String? senderPhoto,
   }) async {
     try {
       final now = DateTime.now();
@@ -90,7 +92,9 @@ class NotificationService {
         'recipientUid': finalRecipientUid, // ✅ CRÍTICO: Obrigatório para Security Rules
         'profileUid': finalRecipientUid, // CRITICAL: Isolamento de perfil (backwards compat)
         'senderProfileId': senderProfileId,
+        'senderName': senderName,
         'senderUsername': normalizedUsername,
+        'senderPhoto': senderPhoto,
         'title': title,
         'message': body,
         'body': body,
@@ -173,8 +177,11 @@ class NotificationService {
       // Invalidar cache do badge counter
       invalidateUnreadCountCache();
 
-      // Zerar badge do ícone do app (todas lidas)
-      await PushNotificationService().clearAppBadge();
+      // Recalcular o badge do ícone do app com a regra canônica da Minha Rede.
+      await PushNotificationService().updateAppBadge(
+        activeProfile.profileId,
+        activeProfile.uid,
+      );
 
       debugPrint(
           'NotificationService: ${notifications.docs.length} notificações marcadas como lidas');

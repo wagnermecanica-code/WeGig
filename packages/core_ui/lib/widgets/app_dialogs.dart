@@ -1,3 +1,4 @@
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
@@ -124,7 +125,7 @@ class AppDialogs {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const CircularProgressIndicator(),
+                const AppRadioPulseLoader(size: 40),
                 const SizedBox(height: 16),
                 Text(
                   message,

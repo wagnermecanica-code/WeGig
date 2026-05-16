@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:iconsax/iconsax.dart';
 
 /// Widgets reutilizáveis para tela de autenticação
@@ -102,9 +103,9 @@ class AuthPrimaryButton extends StatelessWidget {
           ? const SizedBox(
               height: 20,
               width: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              child: AppRadioPulseLoader(
+                size: 20,
+                color: Colors.white,
               ),
             )
           : Text(text),

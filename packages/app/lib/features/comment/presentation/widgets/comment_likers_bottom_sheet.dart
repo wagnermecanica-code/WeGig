@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -155,9 +156,9 @@ class _CommentLikersBottomSheetState
                   bottom: bottomPadding > 0 ? bottomPadding : 32,
                 ),
                 child: const Center(
-                  child: CircularProgressIndicator(
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  child: AppRadioPulseLoader(
+                    size: 44,
+                    color: AppColors.primary,
                   ),
                 ),
               )

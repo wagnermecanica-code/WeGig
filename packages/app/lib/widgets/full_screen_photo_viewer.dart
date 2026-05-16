@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:iconsax/iconsax.dart';
@@ -240,10 +241,7 @@ class _FullScreenPhotoViewerState extends State<FullScreenPhotoViewer> {
                     imageUrl: photoUrl,
                     fit: BoxFit.contain,
                     placeholder: (context, url) => const Center(
-                      child: CircularProgressIndicator(
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-                      ),
+                      child: AppRadioPulseLoader(size: 44),
                     ),
                     errorWidget: (context, url, error) {
                       debugPrint('❌ FullScreenPhotoViewer error: $error for URL: $url');
@@ -401,10 +399,7 @@ class _FullScreenPhotoViewerState extends State<FullScreenPhotoViewer> {
             ? const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
+                child: AppRadioPulseLoader(size: 20, color: Colors.white),
               )
             : Icon(
                 icon,

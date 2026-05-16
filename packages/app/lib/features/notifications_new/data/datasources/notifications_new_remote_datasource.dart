@@ -207,6 +207,18 @@ class NotificationsNewRemoteDataSource
     );
   }
 
+  bool _isConnectionActivityNotification(NotificationEntity notification) {
+    final eventType =
+        ((notification.actionData?['eventType'] ?? notification.data['eventType'])
+                as String?)
+            ?.trim();
+    if (eventType == null || eventType.isEmpty) {
+      return false;
+    }
+
+    return eventType.startsWith('connection');
+  }
+
   @override
   Future<List<NotificationEntity>> getNotifications({
     required String profileId,
@@ -294,6 +306,12 @@ class NotificationsNewRemoteDataSource
             if (n.type == NotificationType.newMessage) {
               debugPrint(
                   '🚫 Filtrado tipo newMessage: já notificado na MessagesNewPage');
+              return false;
+            }
+
+            if (_isConnectionActivityNotification(n)) {
+              debugPrint(
+                  '🚫 Filtrado tipo connection: exibido apenas em Minha Rede');
               return false;
             }
 
@@ -517,6 +535,10 @@ class NotificationsNewRemoteDataSource
               return false;
             }
 
+            if (_isConnectionActivityNotification(n)) {
+              return false;
+            }
+
             // Filtro: se EU bloqueei, remover completamente.
             if (_matchesProfileSet(n, blockSets.blocked)) {
               return false;
@@ -560,6 +582,7 @@ class NotificationsNewRemoteDataSource
             .where((n) {
               if (n.recipientProfileId != profileId) return false;
               if (n.type == NotificationType.newMessage) return false;
+              if (_isConnectionActivityNotification(n)) return false;
               if (n.expiresAt != null && n.expiresAt!.isBefore(now)) return false;
               if (_matchesProfileSet(n, blockSets.blocked)) return false;
               return true;

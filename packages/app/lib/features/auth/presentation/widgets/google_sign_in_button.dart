@@ -1,3 +1,4 @@
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 
 /// Botão oficial "Sign In with Google" seguindo as diretrizes do Google
@@ -38,10 +39,9 @@ class GoogleSignInButton extends StatelessWidget {
             ? SizedBox(
                 height: 20,
                 width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(Colors.grey.shade700),
+                child: AppRadioPulseLoader(
+                  size: 20,
+                  color: Colors.grey.shade700,
                 ),
               )
             : Row(

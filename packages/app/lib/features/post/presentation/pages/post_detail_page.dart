@@ -7,6 +7,7 @@ import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
 import 'package:core_ui/utils/location_utils.dart';
 import 'package:core_ui/utils/price_calculator.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:core_ui/widgets/mention_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -651,6 +652,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     required Color iconColor,
     required Color bgColor,
     double iconSize = 24,
+    VoidCallback? onCountTap,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -665,14 +667,20 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           ),
         ),
         if (count > 0)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              count > 999 ? '${(count / 1000).toStringAsFixed(1)}k' : '$count',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: iconColor,
+          GestureDetector(
+            onTap: onCountTap,
+            behavior: onCountTap != null
+                ? HitTestBehavior.opaque
+                : HitTestBehavior.deferToChild,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2, left: 6, right: 6, bottom: 2),
+              child: Text(
+                count > 999 ? '${(count / 1000).toStringAsFixed(1)}k' : '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: iconColor,
+                ),
               ),
             ),
           ),
@@ -798,10 +806,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
+                      child: AppRadioPulseLoader(size: 16, color: Colors.white),
                     )
                   : const Icon(Iconsax.refresh, size: 18),
               label: Text(
@@ -885,10 +890,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
+                      child: AppRadioPulseLoader(size: 16, color: Colors.white),
                     )
                   : const Icon(Iconsax.refresh, size: 18),
               label: Text(
@@ -929,9 +931,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
             SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
+              child: AppRadioPulseLoader(
+                size: 20,
+                color: Colors.grey,
               ),
             ),
             const SizedBox(width: 12),
@@ -1415,9 +1417,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
               placeholder: (context, url) => Container(
                 color: Colors.grey[200],
                 child: const Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-                  ),
+                  child: AppRadioPulseLoader(size: 40),
                 ),
               ),
               errorWidget: (context, url, error) => Container(
@@ -1456,9 +1456,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                     placeholder: (context, url) => Container(
                       color: Colors.grey[200],
                       child: const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-                        ),
+                        child: AppRadioPulseLoader(size: 40),
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(
@@ -1533,9 +1531,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-          ),
+          child: AppRadioPulseLoader(size: 52),
         ),
       );
     }
@@ -1549,6 +1545,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
     final screenWidth = MediaQuery.of(context).size.width;
     final photoHeight = screenWidth * 0.7; // Proporção ~10:7
+    final liveCommentCount = ref.watch(commentCountStreamProvider(_post!.id)).value ?? _post!.commentCount;
 
     return PopScope(
       canPop: true,
@@ -1640,9 +1637,12 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                               if (_post != null) ...[
                                 _buildIconWithCounter(
                                   icon: Iconsax.message,
-                                  count: _post!.commentCount,
+                                  count: liveCommentCount,
                                   tooltip: 'Comentários',
                                   onPressed: () {
+                                    CommentsBottomSheet.show(context, _post!);
+                                  },
+                                  onCountTap: () {
                                     CommentsBottomSheet.show(context, _post!);
                                   },
                                   iconColor: AppColors.textSecondary,
@@ -2885,9 +2885,7 @@ class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
                         imageUrl: widget.photos[index],
                         fit: BoxFit.contain,
                         placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-                          ),
+                          child: AppRadioPulseLoader(size: 40),
                         ),
                         errorWidget: (context, url, error) => const Icon(
                           Iconsax.image,

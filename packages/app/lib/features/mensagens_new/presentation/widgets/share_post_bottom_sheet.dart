@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -193,7 +194,7 @@ class _SharePostBottomSheetState extends ConsumerState<SharePostBottomSheet> {
                 );
               },
               loading: () => const Center(
-                child: CircularProgressIndicator(),
+                child: AppRadioPulseLoader(size: 44),
               ),
               error: (e, _) => Center(
                 child: Text(
@@ -331,7 +332,7 @@ class _SharePostBottomSheetState extends ConsumerState<SharePostBottomSheet> {
           ? const SizedBox(
               width: 24,
               height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: AppRadioPulseLoader(size: 24),
             )
           : Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),

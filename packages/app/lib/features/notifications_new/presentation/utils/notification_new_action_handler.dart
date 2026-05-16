@@ -54,15 +54,57 @@ class NotificationNewActionHandler {
     debugPrint('   ActionType: ${notification.actionType?.name ?? 'null'}');
     debugPrint('   TargetId: ${notification.targetId ?? 'null'}');
 
+    final router = GoRouter.of(context);
+    final eventType =
+        ((notification.actionData?['eventType'] ??
+                    notification.data['eventType'])
+                as String?)
+            ?.trim();
+
     // 1. Marcar como lida (otimista - não bloqueia navegação)
     if (!notification.read) {
       _markAsReadAsync(notification.notificationId);
     }
 
+    // Notificações da Minha Rede: abre a aba Minha Rede e empilha o perfil
+    // do remetente para que o usuário veja o botão contextual
+    // (Aceitar / Conectado / Cancelar convite).
+    if (eventType == 'connectionRequest' || eventType == 'connectionAccepted') {
+      final senderProfileId = (notification.senderProfileId ??
+              notification.actionData?['connectionProfileId'] as String? ??
+              notification.data['connectionProfileId'] as String? ??
+              notification.actionData?['senderProfileId'] as String? ??
+              notification.data['senderProfileId'] as String? ??
+              '')
+          .trim();
+      debugPrint(
+        '🔔 NotificationNewHandler: $eventType senderProfileId=$senderProfileId',
+      );
+
+      router.go('/home?index=1');
+      if (senderProfileId.isEmpty) {
+        return;
+      }
+
+      final allowed = await _canOpenProfile(senderProfileId);
+      if (!allowed) {
+        if (context.mounted) {
+          AppSnackBar.showInfo(context, 'Perfil indisponível.');
+        }
+        return;
+      }
+
+      // Aguarda GoRouter trocar para /home antes de empilhar o perfil.
+      // Usa delay em ambos plataformas para evitar race com BottomNavScaffold.
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      if (!context.mounted) return;
+      router.push('/profile/$senderProfileId');
+      return;
+    }
+
     // 2. Navegar baseado em actionType
     if (!context.mounted) return;
 
-    final router = GoRouter.of(context);
     var handled = false;
 
     switch (notification.actionType) {
@@ -256,7 +298,11 @@ class NotificationNewActionHandler {
       return false;
     }
 
-    router.push(route);
+    if (route.startsWith('/home')) {
+      router.go(route);
+    } else {
+      router.push(route);
+    }
     debugPrint('✅ NotificationNewHandler: Navigated to route $route');
     return true;
   }
@@ -266,6 +312,17 @@ class NotificationNewActionHandler {
       NotificationEntity notification, GoRouter router) async {
     debugPrint(
         '🔔 NotificationNewHandler: Trying fallback for ${notification.type.name}');
+
+    final eventType =
+        ((notification.actionData?['eventType'] ?? notification.data['eventType'])
+                as String?)
+            ?.trim();
+
+    if (eventType == 'connectionRequest' ||
+        eventType == 'connectionAccepted') {
+      router.go('/home?index=1');
+      return true;
+    }
 
     switch (notification.type) {
       // Interesses: navega para post ou perfil do interessado

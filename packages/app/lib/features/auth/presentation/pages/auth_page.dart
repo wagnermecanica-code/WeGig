@@ -39,7 +39,7 @@ class _AuthPageState extends ConsumerState<AuthPage>
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  bool _isLogin = true; // true = Login, false = Cadastro
+  bool _isLogin = false; // true = Login, false = Cadastro
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -82,24 +82,24 @@ class _AuthPageState extends ConsumerState<AuthPage>
     });
   }
 
-    Future<void> _loadSavedEmail() async {
-      try {
-        final savedEmail = await _secureStorage.read(key: 'last_used_email');
-        if (savedEmail != null && savedEmail.isNotEmpty) {
-          _emailController.text = savedEmail;
-          debugPrint('E-mail restaurado: $savedEmail');
-          
-          // Opcional: já deixa o foco na senha
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (mounted) {
-              FocusScope.of(context).nextFocus(); // pula pro campo senha
-            }
-          });
-        }
-      } catch (e) {
-        debugPrint('Erro ao carregar e-mail salvo: $e');
+  Future<void> _loadSavedEmail() async {
+    try {
+      final savedEmail = await _secureStorage.read(key: 'last_used_email');
+      if (savedEmail != null && savedEmail.isNotEmpty) {
+        _emailController.text = savedEmail;
+        debugPrint('E-mail restaurado: $savedEmail');
+
+        // Opcional: já deixa o foco na senha
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            FocusScope.of(context).nextFocus(); // pula pro campo senha
+          }
+        });
       }
+    } catch (e) {
+      debugPrint('Erro ao carregar e-mail salvo: $e');
     }
+  }
 
   @override
   void dispose() {
@@ -133,7 +133,8 @@ class _AuthPageState extends ConsumerState<AuthPage>
 
   Future<void> _saveEmailToSecureStorage(String email) async {
     try {
-      await _secureStorage.write(key: 'last_used_email', value: email.trim().toLowerCase());
+      await _secureStorage.write(
+          key: 'last_used_email', value: email.trim().toLowerCase());
       debugPrint('E-mail salvo com segurança: $email');
     } catch (e) {
       debugPrint('Erro ao salvar e-mail: $e');
@@ -184,9 +185,10 @@ class _AuthPageState extends ConsumerState<AuthPage>
   Future<void> _showForgotPasswordDialog() async {
     final formKey = GlobalKey<FormState>();
     final emailController = TextEditingController();
+    final pageContext = context;
     await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Recuperar Senha'),
         content: Form(
           key: formKey,
@@ -225,7 +227,7 @@ class _AuthPageState extends ConsumerState<AuthPage>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(dialogContext).maybePop(),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
@@ -242,18 +244,23 @@ class _AuthPageState extends ConsumerState<AuthPage>
                 final useCase = ref.read(sendPasswordResetEmailUseCaseProvider);
                 await useCase(email);
 
-                if (context.mounted) {
-                  Navigator.pop(context);
+                if (dialogContext.mounted) {
+                  await Navigator.of(dialogContext).maybePop();
+                }
+                if (pageContext.mounted) {
                   AppSnackBar.showSuccess(
-                    context,
+                    pageContext,
                     'E-mail de recuperação enviado! Verifique sua caixa de entrada.',
                   );
                 }
               } catch (e) {
-                if (context.mounted) {
-                  Navigator.pop(context);
+                if (dialogContext.mounted) {
+                  await Navigator.of(dialogContext).maybePop();
+                }
+                if (mounted) {
                   setState(() {
-                    _errorMessage = 'Erro ao enviar e-mail. Verifique o endereço.';
+                    _errorMessage =
+                        'Erro ao enviar e-mail. Verifique o endereço.';
                   });
                 }
               }
@@ -263,6 +270,7 @@ class _AuthPageState extends ConsumerState<AuthPage>
         ],
       ),
     );
+    emailController.dispose();
   }
 
   Future<void> _submitEmailPassword() async {
@@ -289,7 +297,7 @@ class _AuthPageState extends ConsumerState<AuthPage>
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
           );
-          
+
           await _saveEmailToSecureStorage(_emailController.text);
 
           debugPrint(
@@ -302,25 +310,30 @@ class _AuthPageState extends ConsumerState<AuthPage>
           String errorMsg;
           switch (e.code) {
             case 'user-not-found':
-              errorMsg = 'Conta não encontrada. Use "Criar conta" para se cadastrar.';
+              errorMsg =
+                  'Conta não encontrada. Use "Criar conta" para se cadastrar.';
               break;
             case 'wrong-password':
-              errorMsg = 'Senha incorreta. Tente novamente ou recupere a senha.';
+              errorMsg =
+                  'Senha incorreta. Tente novamente ou recupere a senha.';
               break;
             case 'invalid-credential':
             case 'INVALID_LOGIN_CREDENTIALS':
               // Firebase Auth (2023+) retorna este código por segurança
               // quando email não existe OU senha está errada
-              errorMsg = 'E-mail ou senha incorretos. Verifique seus dados ou crie uma conta.';
+              errorMsg =
+                  'E-mail ou senha incorretos. Verifique seus dados ou crie uma conta.';
               break;
             case 'invalid-email':
               errorMsg = 'E-mail inválido. Verifique o formato.';
               break;
             case 'user-disabled':
-              errorMsg = 'Esta conta foi desativada. Entre em contato com o suporte.';
+              errorMsg =
+                  'Esta conta foi desativada. Entre em contato com o suporte.';
               break;
             case 'too-many-requests':
-              errorMsg = 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+              errorMsg =
+                  'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
               break;
             case 'network-request-failed':
               errorMsg = 'Sem conexão com a internet. Verifique sua rede.';
@@ -348,7 +361,8 @@ class _AuthPageState extends ConsumerState<AuthPage>
         }
 
         // ✅ Verificação de idade obrigatória para cadastro
-        setState(() => _isLoading = false); // Desliga loading para mostrar dialog
+        setState(
+            () => _isLoading = false); // Desliga loading para mostrar dialog
         final ageResult = await AgeVerificationDialog.show(context, ref: ref);
         if (!ageResult.isAdult) {
           debugPrint('⚠️ AuthPage: Usuário não passou na verificação de idade');
@@ -362,7 +376,8 @@ class _AuthPageState extends ConsumerState<AuthPage>
         }
         setState(() => _isLoading = true); // Religa loading após verificação
 
-        debugPrint('🔐 AuthPage: Delegando cadastro para SignUpWithEmailUseCase...');
+        debugPrint(
+            '🔐 AuthPage: Delegando cadastro para SignUpWithEmailUseCase...');
         final useCase = ref.read(signUpWithEmailUseCaseProvider);
         final result = await useCase(
           _emailController.text.trim(),
@@ -371,9 +386,10 @@ class _AuthPageState extends ConsumerState<AuthPage>
 
         // Pattern matching com AuthResult
         await result.when(
-          success: (user, requiresEmailVerification, requiresProfileCreation) async {
+          success:
+              (user, requiresEmailVerification, requiresProfileCreation) async {
             debugPrint('✅ AuthPage: Cadastro bem-sucedido! UID: ${user.uid}');
-            
+
             await _saveEmailToSecureStorage(_emailController.text);
 
             if (!mounted) return;
@@ -446,13 +462,14 @@ class _AuthPageState extends ConsumerState<AuthPage>
       });
       return;
     }
-    
+
     // ✅ NO MODO CADASTRO: Verificar idade ANTES de autenticar
     AgeVerificationResult? ageResult;
     if (!_isLogin) {
       ageResult = await AgeVerificationDialog.show(context, ref: ref);
       if (!ageResult.isAdult) {
-        debugPrint('⚠️ AuthPage: Usuário não passou na verificação de idade (Google pré-auth)');
+        debugPrint(
+            '⚠️ AuthPage: Usuário não passou na verificação de idade (Google pré-auth)');
         return;
       }
       debugPrint('✅ AuthPage: Idade verificada antes do Google Sign-In');
@@ -466,26 +483,30 @@ class _AuthPageState extends ConsumerState<AuthPage>
     // ✅ CAPTURAR dependências do Riverpod ANTES de qualquer await
     // AuthPage pode ser desmontada/reconstruída quando authState/profileState mudam.
     // Usar ref após dispose lança: "Cannot use ref after the widget was disposed".
-    final authOperationNotifier = ref.read(authOperationInProgressProvider.notifier);
-    final pendingAuthErrorNotifier = ref.read(pendingAuthErrorProvider.notifier);
+    final authOperationNotifier =
+        ref.read(authOperationInProgressProvider.notifier);
+    final pendingAuthErrorNotifier =
+        ref.read(pendingAuthErrorProvider.notifier);
     final socialLoginNotifier = ref.read(socialLoginDataProvider.notifier);
-    final verifiedBirthYearNotifier = ref.read(verifiedBirthYearProvider.notifier);
+    final verifiedBirthYearNotifier =
+        ref.read(verifiedBirthYearProvider.notifier);
     final authService = ref.read(authServiceProvider);
-    
+
     // ✅ CRÍTICO: Bloquear redirect do router durante operação
     authOperationNotifier.state = true;
     debugPrint('🔐 AuthPage: authOperationInProgress = TRUE');
 
     try {
       final result = await authService.signInWithGoogle();
-      
+
       await result.when(
-        success: (user, requiresEmailVerification, requiresProfileCreation) async {
+        success:
+            (user, requiresEmailVerification, requiresProfileCreation) async {
           debugPrint('✅ AuthPage: Login Google SUCESSO! UID: ${user.uid}');
           debugPrint('✅ AuthPage: Email: ${user.email}');
           debugPrint('✅ AuthPage: DisplayName: ${user.displayName}');
           debugPrint('✅ AuthPage: PhotoURL: ${user.photoURL}');
-          
+
           // ✅ DETECÇÃO DE USUÁRIO NOVO via documento Firestore (100% confiável)
           // Firebase Auth para providers sociais SEMPRE cria conta se não existir
           // Verificamos se o documento users/{uid} existe no Firestore
@@ -498,23 +519,28 @@ class _AuthPageState extends ConsumerState<AuthPage>
                 .get(const GetOptions(source: Source.server));
             debugPrint('✅ AuthPage: users/${user.uid} obtido do SERVIDOR');
           } catch (e) {
-            debugPrint('⚠️ AuthPage: Falha ao obter do servidor, tentando default: $e');
+            debugPrint(
+                '⚠️ AuthPage: Falha ao obter do servidor, tentando default: $e');
             userDoc = await FirebaseFirestore.instance
                 .collection('users')
                 .doc(user.uid)
                 .get();
           }
           final bool isNewUser = !userDoc.exists;
-          debugPrint('✅ AuthPage: Documento users/${user.uid} existe? ${userDoc.exists}');
+          debugPrint(
+              '✅ AuthPage: Documento users/${user.uid} existe? ${userDoc.exists}');
           debugPrint('✅ AuthPage: É novo usuário (Firestore)? $isNewUser');
-          debugPrint('✅ AuthPage: Modo atual: ${_isLogin ? "LOGIN" : "CADASTRO"}');
+          debugPrint(
+              '✅ AuthPage: Modo atual: ${_isLogin ? "LOGIN" : "CADASTRO"}');
 
           // ✅ BLOQUEAR: Se estamos no modo LOGIN e o usuário é novo, significa que
           // a conta não existe - devemos bloquear e mostrar erro IMEDIATAMENTE
           if (_isLogin && isNewUser) {
-            debugPrint('⚠️ AuthPage: Usuário tentou LOGIN mas conta não existe (Google)');
-            debugPrint('⚠️ AuthPage: Executando signOut e deletando usuário Auth...');
-            
+            debugPrint(
+                '⚠️ AuthPage: Usuário tentou LOGIN mas conta não existe (Google)');
+            debugPrint(
+                '⚠️ AuthPage: Executando signOut e deletando usuário Auth...');
+
             // Deletar conta IMEDIATAMENTE antes que ProfileNotifier carregue
             final currentUser = FirebaseAuth.instance.currentUser;
             if (currentUser != null) {
@@ -528,13 +554,15 @@ class _AuthPageState extends ConsumerState<AuthPage>
             // Usar authService.signOut() para limpeza completa
             await authService.signOut();
             debugPrint('🔓 AuthPage: SignOut completo via authService');
-            
+
             // ✅ Liberar bloqueio APÓS signOut completar
             authOperationNotifier.state = false;
-            debugPrint('🔐 AuthPage: authOperationInProgress = FALSE (após signOut)');
-            
+            debugPrint(
+                '🔐 AuthPage: authOperationInProgress = FALSE (após signOut)');
+
             // Mostrar apenas erro na UI (sem snackbar/overlay)
-            const errorMsg = 'Conta não encontrada. Use "Criar conta" para se cadastrar.';
+            const errorMsg =
+                'Conta não encontrada. Use "Criar conta" para se cadastrar.';
             if (mounted) {
               setState(() {
                 _errorMessage = errorMsg;
@@ -560,16 +588,21 @@ class _AuthPageState extends ConsumerState<AuthPage>
             debugPrint('   - email: ${socialData.email}');
             debugPrint('   - photoUrl: ${socialData.photoUrl}');
             debugPrint('   - provider: ${socialData.provider}');
-            
+
             // Também armazenar ano de nascimento verificado
             if (ageResult != null && ageResult.birthYear != null) {
               verifiedBirthYearNotifier.state = ageResult.birthYear;
-              debugPrint('✅ AuthPage: Ano de nascimento armazenado: ${ageResult.birthYear}');
+              debugPrint(
+                  '✅ AuthPage: Ano de nascimento armazenado: ${ageResult.birthYear}');
             }
-            
+
             // 2. DEPOIS: Criar o documento do usuário
-            debugPrint('✅ AuthPage: Criando documento users/${user.uid} após verificação de idade (Google)');
-            await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+            debugPrint(
+                '✅ AuthPage: Criando documento users/${user.uid} após verificação de idade (Google)');
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .set({
               'email': user.email ?? '',
               'activeProfileId': null,
               'createdAt': FieldValue.serverTimestamp(),
@@ -581,21 +614,25 @@ class _AuthPageState extends ConsumerState<AuthPage>
               'termsVersion': '1.0', // Incrementar quando os termos mudarem
               'ageVerifiedAt': FieldValue.serverTimestamp(),
             });
-            debugPrint('✅ AuthPage: Documento users/${user.uid} criado com sucesso');
-            
+            debugPrint(
+                '✅ AuthPage: Documento users/${user.uid} criado com sucesso');
+
             // 3. ✅ CRÍTICO: Liberar bloqueio ANTES de navegação automática
             authOperationNotifier.state = false;
-            debugPrint('🔐 AuthPage: authOperationInProgress = FALSE (cadastro Google OK)');
-            
+            debugPrint(
+                '🔐 AuthPage: authOperationInProgress = FALSE (cadastro Google OK)');
+
             // 4. Navegação será automática via router quando profileState atualizar
             // Não precisamos chamar context.go() manualmente
-            debugPrint('🚀 AuthPage: Aguardando navegação automática para /profiles/new (Google)');
+            debugPrint(
+                '🚀 AuthPage: Aguardando navegação automática para /profiles/new (Google)');
             return; // Sair do método - router vai redirecionar automaticamente
           }
-          
+
           // ✅ USUÁRIO EXISTENTE (LOGIN): Liberar bloqueio
           authOperationNotifier.state = false;
-          debugPrint('🔐 AuthPage: authOperationInProgress = FALSE (login existente Google)');
+          debugPrint(
+              '🔐 AuthPage: authOperationInProgress = FALSE (login existente Google)');
 
           if (user.email != null && user.email!.isNotEmpty) {
             await _saveEmailToSecureStorage(user.email!);
@@ -606,7 +643,8 @@ class _AuthPageState extends ConsumerState<AuthPage>
           debugPrint('❌ AuthPage: Código de erro: $code');
           // ✅ Liberar bloqueio em caso de erro
           authOperationNotifier.state = false;
-          debugPrint('🔐 AuthPage: authOperationInProgress = FALSE (erro Google)');
+          debugPrint(
+              '🔐 AuthPage: authOperationInProgress = FALSE (erro Google)');
 
           final msg = message.isNotEmpty
               ? message
@@ -622,14 +660,16 @@ class _AuthPageState extends ConsumerState<AuthPage>
           debugPrint('⚠️ AuthPage: Usuário CANCELOU login com Google');
           // ✅ Liberar bloqueio quando cancelado
           authOperationNotifier.state = false;
-          debugPrint('🔐 AuthPage: authOperationInProgress = FALSE (cancelado Google)');
+          debugPrint(
+              '🔐 AuthPage: authOperationInProgress = FALSE (cancelado Google)');
         },
       );
     } catch (e) {
       debugPrint('❌ AuthPage: ERRO INESPERADO no Google Sign-In: $e');
       // ✅ Liberar bloqueio em caso de exceção
       authOperationNotifier.state = false;
-      debugPrint('🔐 AuthPage: authOperationInProgress = FALSE (exceção Google)');
+      debugPrint(
+          '🔐 AuthPage: authOperationInProgress = FALSE (exceção Google)');
 
       const msg = 'Erro ao fazer login com Google. Tente novamente.';
       pendingAuthErrorNotifier.state = msg;
@@ -657,13 +697,14 @@ class _AuthPageState extends ConsumerState<AuthPage>
       });
       return;
     }
-    
+
     // ✅ NO MODO CADASTRO: Verificar idade ANTES de autenticar
     AgeVerificationResult? ageResult;
     if (!_isLogin) {
       ageResult = await AgeVerificationDialog.show(context, ref: ref);
       if (!ageResult.isAdult) {
-        debugPrint('⚠️ AuthPage: Usuário não passou na verificação de idade (Apple pré-auth)');
+        debugPrint(
+            '⚠️ AuthPage: Usuário não passou na verificação de idade (Apple pré-auth)');
         return;
       }
       debugPrint('✅ AuthPage: Idade verificada antes do Apple Sign-In');
@@ -675,27 +716,31 @@ class _AuthPageState extends ConsumerState<AuthPage>
     });
 
     // ✅ CAPTURAR dependências do Riverpod ANTES de qualquer await
-    final authOperationNotifier = ref.read(authOperationInProgressProvider.notifier);
-    final pendingAuthErrorNotifier = ref.read(pendingAuthErrorProvider.notifier);
+    final authOperationNotifier =
+        ref.read(authOperationInProgressProvider.notifier);
+    final pendingAuthErrorNotifier =
+        ref.read(pendingAuthErrorProvider.notifier);
     final socialLoginNotifier = ref.read(socialLoginDataProvider.notifier);
-    final verifiedBirthYearNotifier = ref.read(verifiedBirthYearProvider.notifier);
+    final verifiedBirthYearNotifier =
+        ref.read(verifiedBirthYearProvider.notifier);
     final authService = ref.read(authServiceProvider);
-    
+
     // ✅ CRÍTICO: Bloquear redirect do router durante operação
     authOperationNotifier.state = true;
     debugPrint('🍎 AuthPage: authOperationInProgress = TRUE');
 
     try {
       final result = await authService.signInWithApple();
-      
+
       // Pattern matching com AuthResult
       await result.when(
-        success: (user, requiresEmailVerification, requiresProfileCreation) async {
+        success:
+            (user, requiresEmailVerification, requiresProfileCreation) async {
           debugPrint('✅ AuthPage: Login Apple bem-sucedido! UID: ${user.uid}');
           debugPrint('✅ AuthPage: Email: ${user.email}');
           debugPrint('✅ AuthPage: DisplayName: ${user.displayName}');
           debugPrint('✅ AuthPage: PhotoURL: ${user.photoURL}');
-          
+
           // ✅ DETECÇÃO DE USUÁRIO NOVO via documento Firestore (100% confiável)
           // Firebase Auth para providers sociais SEMPRE cria conta se não existir
           // Verificamos se o documento users/{uid} existe no Firestore
@@ -708,23 +753,28 @@ class _AuthPageState extends ConsumerState<AuthPage>
                 .get(const GetOptions(source: Source.server));
             debugPrint('✅ AuthPage: users/${user.uid} obtido do SERVIDOR');
           } catch (e) {
-            debugPrint('⚠️ AuthPage: Falha ao obter do servidor, tentando default: $e');
+            debugPrint(
+                '⚠️ AuthPage: Falha ao obter do servidor, tentando default: $e');
             userDoc = await FirebaseFirestore.instance
                 .collection('users')
                 .doc(user.uid)
                 .get();
           }
           final bool isNewUser = !userDoc.exists;
-          debugPrint('✅ AuthPage: Documento users/${user.uid} existe? ${userDoc.exists}');
+          debugPrint(
+              '✅ AuthPage: Documento users/${user.uid} existe? ${userDoc.exists}');
           debugPrint('✅ AuthPage: É novo usuário (Firestore)? $isNewUser');
-          debugPrint('✅ AuthPage: Modo atual: ${_isLogin ? "LOGIN" : "CADASTRO"}');
-          
+          debugPrint(
+              '✅ AuthPage: Modo atual: ${_isLogin ? "LOGIN" : "CADASTRO"}');
+
           // ✅ BLOQUEAR: Se estamos no modo LOGIN e o usuário é novo, significa que
           // a conta não existe - devemos bloquear e mostrar erro IMEDIATAMENTE
           if (_isLogin && isNewUser) {
-            debugPrint('⚠️ AuthPage: Usuário tentou LOGIN mas conta não existe (Apple)');
-            debugPrint('⚠️ AuthPage: Executando signOut e deletando usuário Auth...');
-            
+            debugPrint(
+                '⚠️ AuthPage: Usuário tentou LOGIN mas conta não existe (Apple)');
+            debugPrint(
+                '⚠️ AuthPage: Executando signOut e deletando usuário Auth...');
+
             // Deletar conta IMEDIATAMENTE antes que ProfileNotifier carregue
             final currentUser = FirebaseAuth.instance.currentUser;
             if (currentUser != null) {
@@ -738,13 +788,15 @@ class _AuthPageState extends ConsumerState<AuthPage>
             // Usar authService.signOut() para limpeza completa
             await authService.signOut();
             debugPrint('🔓 AuthPage: SignOut completo via authService (Apple)');
-            
+
             // ✅ Liberar bloqueio APÓS signOut completar
             authOperationNotifier.state = false;
-            debugPrint('🍎 AuthPage: authOperationInProgress = FALSE (após signOut Apple)');
-            
+            debugPrint(
+                '🍎 AuthPage: authOperationInProgress = FALSE (após signOut Apple)');
+
             // Mostrar apenas erro na UI (sem snackbar/overlay)
-            const errorMsg = 'Conta não encontrada. Use "Criar conta" para se cadastrar.';
+            const errorMsg =
+                'Conta não encontrada. Use "Criar conta" para se cadastrar.';
             if (mounted) {
               setState(() {
                 _errorMessage = errorMsg;
@@ -771,16 +823,21 @@ class _AuthPageState extends ConsumerState<AuthPage>
             debugPrint('   - email: ${socialData.email}');
             debugPrint('   - photoUrl: ${socialData.photoUrl}');
             debugPrint('   - provider: ${socialData.provider}');
-            
+
             // Também armazenar ano de nascimento verificado
             if (ageResult != null && ageResult.birthYear != null) {
               verifiedBirthYearNotifier.state = ageResult.birthYear;
-              debugPrint('✅ AuthPage: Ano de nascimento armazenado: ${ageResult.birthYear}');
+              debugPrint(
+                  '✅ AuthPage: Ano de nascimento armazenado: ${ageResult.birthYear}');
             }
-            
+
             // 2. DEPOIS: Criar o documento do usuário
-            debugPrint('✅ AuthPage: Criando documento users/${user.uid} após verificação de idade (Apple)');
-            await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+            debugPrint(
+                '✅ AuthPage: Criando documento users/${user.uid} após verificação de idade (Apple)');
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .set({
               'email': user.email ?? '',
               'activeProfileId': null,
               'createdAt': FieldValue.serverTimestamp(),
@@ -792,24 +849,28 @@ class _AuthPageState extends ConsumerState<AuthPage>
               'termsVersion': '1.0', // Incrementar quando os termos mudarem
               'ageVerifiedAt': FieldValue.serverTimestamp(),
             });
-            debugPrint('✅ AuthPage: Documento users/${user.uid} criado com sucesso');
-            
+            debugPrint(
+                '✅ AuthPage: Documento users/${user.uid} criado com sucesso');
+
             // 3. ✅ CRÍTICO: Liberar bloqueio ANTES de navegação automática
             authOperationNotifier.state = false;
-            debugPrint('🍎 AuthPage: authOperationInProgress = FALSE (cadastro Apple OK)');
-            
+            debugPrint(
+                '🍎 AuthPage: authOperationInProgress = FALSE (cadastro Apple OK)');
+
             // 4. Navegação será automática via router quando profileState atualizar
             // Não precisamos chamar context.go() manualmente
-            debugPrint('🚀 AuthPage: Aguardando navegação automática para /profiles/new (Apple)');
+            debugPrint(
+                '🚀 AuthPage: Aguardando navegação automática para /profiles/new (Apple)');
             return; // Sair do método - router vai redirecionar automaticamente
           }
-          
+
           // ✅ USUÁRIO EXISTENTE (LOGIN): Liberar bloqueio
           authOperationNotifier.state = false;
-          debugPrint('🍎 AuthPage: authOperationInProgress = FALSE (login existente Apple)');
-          
+          debugPrint(
+              '🍎 AuthPage: authOperationInProgress = FALSE (login existente Apple)');
+
           debugPrint('🔄 AuthPage: Aguardando navegação automática...');
-          
+
           if (user.email != null && user.email!.isNotEmpty) {
             await _saveEmailToSecureStorage(user.email!);
           }
@@ -819,7 +880,8 @@ class _AuthPageState extends ConsumerState<AuthPage>
           debugPrint('❌ AuthPage: Falha no login Apple: $message');
           // ✅ Liberar bloqueio em caso de erro
           authOperationNotifier.state = false;
-          debugPrint('🍎 AuthPage: authOperationInProgress = FALSE (erro Apple)');
+          debugPrint(
+              '🍎 AuthPage: authOperationInProgress = FALSE (erro Apple)');
 
           final msg = message.isNotEmpty
               ? message
@@ -836,7 +898,8 @@ class _AuthPageState extends ConsumerState<AuthPage>
           debugPrint('⚠️ AuthPage: Usuário cancelou login com Apple');
           // ✅ Liberar bloqueio quando cancelado
           authOperationNotifier.state = false;
-          debugPrint('🍎 AuthPage: authOperationInProgress = FALSE (cancelado Apple)');
+          debugPrint(
+              '🍎 AuthPage: authOperationInProgress = FALSE (cancelado Apple)');
           if (mounted) {
             setState(() => _isLoading = false);
           }
@@ -846,7 +909,8 @@ class _AuthPageState extends ConsumerState<AuthPage>
       debugPrint('❌ AuthPage: Erro inesperado no Apple Sign-In: $e');
       // ✅ Liberar bloqueio em caso de exceção
       authOperationNotifier.state = false;
-      debugPrint('🍎 AuthPage: authOperationInProgress = FALSE (exceção Apple)');
+      debugPrint(
+          '🍎 AuthPage: authOperationInProgress = FALSE (exceção Apple)');
 
       const msg = 'Erro ao fazer login com Apple. Tente novamente.';
       pendingAuthErrorNotifier.state = msg;
@@ -861,7 +925,8 @@ class _AuthPageState extends ConsumerState<AuthPage>
       // (safe: não depende de mounted/ref)
       if (authOperationNotifier.state) {
         authOperationNotifier.state = false;
-        debugPrint('🍎 AuthPage: authOperationInProgress = FALSE (finally safety)');
+        debugPrint(
+            '🍎 AuthPage: authOperationInProgress = FALSE (finally safety)');
       }
     }
   }
@@ -971,8 +1036,8 @@ class _AuthPageState extends ConsumerState<AuthPage>
                               decoration: InputDecoration(
                                 labelText: 'Senha',
                                 hintText: _isLogin
-                                  ? 'Sua senha'
-                                  : 'Mínimo 6 caracteres, 1 maiúscula, 1 número, 1 símbolo',
+                                    ? 'Sua senha'
+                                    : 'Mínimo 6 caracteres, 1 maiúscula, 1 número, 1 símbolo',
                                 prefixIcon: const Icon(Icons.lock_outline,
                                     color: AppColors.primary),
                                 suffixIcon: IconButton(
@@ -1007,14 +1072,18 @@ class _AuthPageState extends ConsumerState<AuthPage>
                               obscureText: _obscurePassword,
                               validator: _validatePassword,
                               enabled: !_isLoading,
-                              onChanged: !_isLogin ? (value) {
-                                setState(() {
-                                  _passwordStrength = _calculatePasswordStrength(value);
-                                });
-                              } : null,
+                              onChanged: !_isLogin
+                                  ? (value) {
+                                      setState(() {
+                                        _passwordStrength =
+                                            _calculatePasswordStrength(value);
+                                      });
+                                    }
+                                  : null,
                             ),
                             // ✅ Medidor de força de senha (apenas no cadastro)
-                            if (!_isLogin && _passwordController.text.isNotEmpty) ...[
+                            if (!_isLogin &&
+                                _passwordController.text.isNotEmpty) ...[
                               const SizedBox(height: 8),
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
@@ -1023,7 +1092,8 @@ class _AuthPageState extends ConsumerState<AuthPage>
                                   minHeight: 6,
                                   backgroundColor: Colors.grey[300],
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                    _getPasswordStrengthColor(_passwordStrength),
+                                    _getPasswordStrengthColor(
+                                        _passwordStrength),
                                   ),
                                 ),
                               ),
@@ -1037,15 +1107,18 @@ class _AuthPageState extends ConsumerState<AuthPage>
                                             ? Icons.shield
                                             : Icons.verified_user,
                                     size: 16,
-                                    color: _getPasswordStrengthColor(_passwordStrength),
+                                    color: _getPasswordStrengthColor(
+                                        _passwordStrength),
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    _getPasswordStrengthLabel(_passwordStrength),
+                                    _getPasswordStrengthLabel(
+                                        _passwordStrength),
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color: _getPasswordStrengthColor(_passwordStrength),
+                                      color: _getPasswordStrengthColor(
+                                          _passwordStrength),
                                     ),
                                   ),
                                   const Spacer(),
@@ -1248,11 +1321,9 @@ class _AuthPageState extends ConsumerState<AuthPage>
                                   ? const SizedBox(
                                       height: 20,
                                       width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                                Colors.white),
+                                      child: AppRadioPulseLoader(
+                                        size: 20,
+                                        color: Colors.white,
                                       ),
                                     )
                                   : Text(_isLogin ? 'Entrar' : 'Criar Conta'),

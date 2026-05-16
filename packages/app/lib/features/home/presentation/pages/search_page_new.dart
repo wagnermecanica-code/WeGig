@@ -1,25 +1,14 @@
 // This file contains the implementation of the SearchPageNew widget.
 // It is responsible for providing a refined search experience with multiple tabs.
 // Ensure that the content is complete and properly formatted.
-import 'dart:async';
-
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/models/search_params.dart';
 import 'package:core_ui/theme/app_colors.dart';
-import 'package:core_ui/utils/debouncer.dart';
 import 'package:core_ui/utils/music_constants.dart';
 import 'package:core_ui/widgets/multi_select_field.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
-import 'package:wegig_app/core/firebase/blocked_relations.dart';
-
-import '../../../../app/router/app_router.dart';
-
-/// Busca refinada com 5 abas (músico, banda, contratação, anúncio e perfis)
+/// Busca refinada com 4 abas (músico, banda, contratação e anúncio)
 class SearchPageNew extends StatefulWidget {
   const SearchPageNew({
     required this.searchNotifier,
@@ -42,19 +31,12 @@ class _SearchPageNewState extends State<SearchPageNew>
 
   late TabController _tabController;
 
-  // Perfis
-  final TextEditingController _profileSearchController =
-      TextEditingController();
-  final Debouncer _profileDebouncer = Debouncer(milliseconds: 500);
-  bool _isSearchingProfiles = false;
-  String? _profileSearchError;
-  List<ProfileEntity> _profileResults = <ProfileEntity>[];
-
   // Controle de filtro por tipo (aba sozinha não filtra)
   bool _musicianTypeOnly = false;
   bool _bandTypeOnly = false;
   bool _hiringTypeOnly = false;
   bool _salesTypeOnly = false;
+  bool _onlyConnections = false;
 
   // Músico
   String? _musicianLevel;
@@ -107,26 +89,31 @@ class _SearchPageNewState extends State<SearchPageNew>
     super.initState();
     final current = widget.searchNotifier.value;
     _tabController = TabController(
-      length: 5,
+      length: 4,
       vsync: this,
       initialIndex: _resolveInitialTab(current),
     );
-    _profileSearchController.addListener(_onProfileQueryChanged);
+    _tabController.addListener(_handleTabChanged);
     _hydrateFromParams(current);
   }
 
   @override
   void dispose() {
-    _profileSearchController.removeListener(_onProfileQueryChanged);
-    _profileDebouncer.cancel();
-    _profileSearchController.dispose();
+    _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
     super.dispose();
   }
 
+  void _handleTabChanged() {
+    if (!mounted || _tabController.indexIsChanging) {
+      return;
+    }
+
+    setState(() {});
+  }
+
   int _resolveInitialTab(SearchParams? params) {
     if (params == null) return 0;
-    if ((params.searchUsername ?? '').isNotEmpty) return 4;
     switch (params.postType) {
       case 'band':
         return 1;
@@ -141,13 +128,11 @@ class _SearchPageNewState extends State<SearchPageNew>
   }
 
   void _hydrateFromParams(SearchParams? params) {
-    if (params == null) return;
+    if (params == null) {
+      return;
+    }
 
-    // Reset toggles e reativa conforme postType salvo
-    _musicianTypeOnly = false;
-    _bandTypeOnly = false;
-    _hiringTypeOnly = false;
-    _salesTypeOnly = false;
+    _onlyConnections = params.onlyConnections;
 
     switch (params.postType) {
       case 'musician':
@@ -166,212 +151,64 @@ class _SearchPageNewState extends State<SearchPageNew>
         break;
     }
 
-    _profileSearchController.text = params.searchUsername ?? '';
+    _musicianLevel = params.level;
+    _musicianInstruments
+      ..clear()
+      ..addAll(params.instruments);
+    _musicianGenres
+      ..clear()
+      ..addAll(params.genres);
+    _musicianAvailableFor
+      ..clear()
+      ..addAll(params.availableFor);
+    _musicianHasYoutube = params.hasYoutube ?? false;
+    _musicianHasSpotify = params.hasSpotify ?? false;
+    _musicianHasDeezer = params.hasDeezer ?? false;
 
-    switch (params.postType) {
-      case 'band':
-        _bandLevel = params.level;
-        _bandInstruments
-          ..clear()
-          ..addAll(params.instruments);
-        _bandGenres
-          ..clear()
-          ..addAll(params.genres);
-        _bandAvailableFor
-          ..clear()
-          ..addAll(params.availableFor);
-        _bandHasYoutube = params.hasYoutube ?? false;
-        _bandHasSpotify = params.hasSpotify ?? false;
-        _bandHasDeezer = params.hasDeezer ?? false;
-        break;
-      case 'hiring':
-        _hiringEventTypes
-          ..clear()
-          ..addAll(params.eventTypes);
-        _hiringGigFormats
-          ..clear()
-          ..addAll(params.gigFormats);
-        _hiringInstruments
-          ..clear()
-          ..addAll(params.instruments);
-        _hiringGenres
-          ..clear()
-          ..addAll(params.genres);
-        _hiringVenueSetups
-          ..clear()
-          ..addAll(params.venueSetups);
-        _hiringBudgetRanges
-          ..clear()
-          ..addAll(params.budgetRanges);
-        _hiringAvailableFor
-          ..clear()
-          ..addAll(params.availableFor);
-        break;
-      case 'sales':
-        _salesTypes
-          ..clear()
-          ..addAll(params.salesTypes);
-        _priceRange = RangeValues(
-          params.minPrice ?? 0,
-          params.maxPrice ?? _maxPrice,
-        );
-        _onlyWithDiscount = params.onlyWithDiscount ?? false;
-        break;
-      case 'musician':
-      default:
-        _musicianLevel = params.level;
-        _musicianInstruments
-          ..clear()
-          ..addAll(params.instruments);
-        _musicianGenres
-          ..clear()
-          ..addAll(params.genres);
-        _musicianAvailableFor
-          ..clear()
-          ..addAll(params.availableFor);
-        _musicianHasYoutube = params.hasYoutube ?? false;
-        _musicianHasSpotify = params.hasSpotify ?? false;
-        _musicianHasDeezer = params.hasDeezer ?? false;
-        break;
-    }
-  }
+    _bandLevel = params.level;
+    _bandInstruments
+      ..clear()
+      ..addAll(params.instruments);
+    _bandGenres
+      ..clear()
+      ..addAll(params.genres);
+    _bandAvailableFor
+      ..clear()
+      ..addAll(params.availableFor);
+    _bandHasYoutube = params.hasYoutube ?? false;
+    _bandHasSpotify = params.hasSpotify ?? false;
+    _bandHasDeezer = params.hasDeezer ?? false;
 
-  void _onProfileQueryChanged() {
-    final query = _profileSearchController.text.trim();
-    if (query.isEmpty) {
-      setState(() {
-        _profileResults = <ProfileEntity>[];
-        _profileSearchError = null;
-      });
-      return;
-    }
-    _profileDebouncer.run(() => _searchProfiles(query));
-  }
+    _hiringEventTypes
+      ..clear()
+      ..addAll(params.eventTypes);
+    _hiringGigFormats
+      ..clear()
+      ..addAll(params.gigFormats);
+    _hiringInstruments
+      ..clear()
+      ..addAll(params.instruments);
+    _hiringGenres
+      ..clear()
+      ..addAll(params.genres);
+    _hiringVenueSetups
+      ..clear()
+      ..addAll(params.venueSetups);
+    _hiringBudgetRanges
+      ..clear()
+      ..addAll(params.budgetRanges);
+    _hiringAvailableFor
+      ..clear()
+      ..addAll(params.availableFor);
 
-  Future<void> _searchProfiles(String rawQuery) async {
-    if (!mounted) return;
-    final trimmed = rawQuery.trim().toLowerCase().replaceFirst(RegExp('^@'), '');
-    if (trimmed.isEmpty) {
-      setState(() {
-        _profileResults = <ProfileEntity>[];
-        _profileSearchError = null;
-        _isSearchingProfiles = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _isSearchingProfiles = true;
-      _profileSearchError = null;
-    });
-
-    final firestore = FirebaseFirestore.instance;
-    final profilesRef = firestore.collection('profiles');
-
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    final currentProfileId = widget.currentProfileId;
-    final excluded = (currentUid == null || currentProfileId == null)
-        ? const <String>[]
-        : await BlockedRelations.getExcludedProfileIds(
-            firestore: firestore,
-            profileId: currentProfileId,
-            uid: currentUid,
-          );
-
-    final List<ProfileEntity> collected = <ProfileEntity>[];
-    final Set<String> seen = <String>{};
-
-    Future<void> addFromSnapshot(
-      QuerySnapshot<Map<String, dynamic>> snapshot,
-    ) async {
-      for (final doc in snapshot.docs) {
-        final profile = ProfileEntity.fromFirestore(doc);
-        if (excluded.contains(profile.profileId)) continue;
-        if (!seen.add(profile.profileId)) continue;
-        collected.add(profile);
-      }
-    }
-
-    try {
-      await addFromSnapshot(
-        await profilesRef
-            .where('usernameLowercase', isEqualTo: trimmed)
-            .limit(20)
-            .get(),
-      );
-
-      await addFromSnapshot(
-        await profilesRef.where('username', isEqualTo: trimmed).limit(20).get(),
-      );
-
-      await addFromSnapshot(
-        await profilesRef
-            .orderBy('usernameLowercase')
-            .startAt(<String>[trimmed])
-            .endAt(<String>['${trimmed}\uf8ff'])
-            .limit(20)
-            .get(),
-      );
-
-      await addFromSnapshot(
-        await profilesRef
-            .orderBy('username')
-            .startAt(<String>[trimmed])
-            .endAt(<String>['${trimmed}\uf8ff'])
-            .limit(20)
-            .get(),
-      );
-
-      try {
-        await addFromSnapshot(
-          await profilesRef
-              .where('nameLowercase', isEqualTo: trimmed)
-              .limit(20)
-              .get(),
-        );
-      } catch (_) {}
-
-      try {
-        await addFromSnapshot(
-          await profilesRef
-              .orderBy('nameLowercase')
-              .startAt(<String>[trimmed])
-              .endAt(<String>['${trimmed}\uf8ff'])
-              .limit(20)
-              .get(),
-        );
-      } catch (_) {}
-
-      if (collected.length < 20) {
-        final recent = await profilesRef
-            .orderBy('createdAt', descending: true)
-            .limit(100)
-            .get();
-        for (final doc in recent.docs) {
-          final data = doc.data();
-          final name = (data['name'] as String? ?? '').toLowerCase();
-          if (!name.contains(trimmed)) continue;
-          final profile = ProfileEntity.fromFirestore(doc);
-          if (excluded.contains(profile.profileId)) continue;
-          if (!seen.add(profile.profileId)) continue;
-          collected.add(profile);
-        }
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _profileResults = collected;
-        _isSearchingProfiles = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _profileSearchError = 'Erro ao buscar perfis';
-        _isSearchingProfiles = false;
-        _profileResults = <ProfileEntity>[];
-      });
-      debugPrint('Erro ao buscar perfis: $e');
-    }
+    _salesTypes
+      ..clear()
+      ..addAll(params.salesTypes);
+    _priceRange = RangeValues(
+      params.minPrice ?? 0,
+      params.maxPrice ?? _maxPrice,
+    );
+    _onlyWithDiscount = params.onlyWithDiscount ?? false;
   }
 
   String? _currentSelectedPostType() {
@@ -422,6 +259,7 @@ class _SearchPageNewState extends State<SearchPageNew>
         next = SearchParams(
           city: baseCity,
           maxDistanceKm: baseDistance,
+          onlyConnections: _onlyConnections,
           postType: selectedPostType,
           level: _bandLevel,
           instruments: Set.of(_bandInstruments),
@@ -436,6 +274,7 @@ class _SearchPageNewState extends State<SearchPageNew>
         next = SearchParams(
           city: baseCity,
           maxDistanceKm: baseDistance,
+          onlyConnections: _onlyConnections,
           postType: selectedPostType,
           instruments: Set.of(_hiringInstruments),
           genres: Set.of(_hiringGenres),
@@ -450,6 +289,7 @@ class _SearchPageNewState extends State<SearchPageNew>
         next = SearchParams(
           city: baseCity,
           maxDistanceKm: baseDistance,
+          onlyConnections: _onlyConnections,
           postType: selectedPostType,
           salesTypes: Set.of(_salesTypes),
           minPrice: _priceRange.start > 0 ? _priceRange.start : null,
@@ -457,20 +297,12 @@ class _SearchPageNewState extends State<SearchPageNew>
           onlyWithDiscount: _onlyWithDiscount ? true : null,
         );
         break;
-      case 4:
-        next = SearchParams(
-          city: baseCity,
-          maxDistanceKm: baseDistance,
-          searchUsername: _profileSearchController.text.trim().isEmpty
-              ? null
-              : _profileSearchController.text.trim(),
-        );
-        break;
       case 0:
       default:
         next = SearchParams(
           city: baseCity,
           maxDistanceKm: baseDistance,
+          onlyConnections: _onlyConnections,
           postType: selectedPostType,
           level: _musicianLevel,
           instruments: Set.of(_musicianInstruments),
@@ -520,20 +352,18 @@ class _SearchPageNewState extends State<SearchPageNew>
       _priceRange = const RangeValues(0, _maxPrice);
       _onlyWithDiscount = false;
 
-      _profileSearchController.clear();
-      _profileResults = <ProfileEntity>[];
-      _profileSearchError = null;
-
       _musicianTypeOnly = false;
       _bandTypeOnly = false;
       _hiringTypeOnly = false;
       _salesTypeOnly = false;
+      _onlyConnections = false;
     });
 
     _tabController.index = 0;
     widget.searchNotifier.value = SearchParams(
       city: baseCity,
       maxDistanceKm: baseDistance,
+      onlyConnections: false,
       postType: null,
     );
   }
@@ -555,25 +385,33 @@ class _SearchPageNewState extends State<SearchPageNew>
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(52),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              labelPadding: const EdgeInsets.symmetric(horizontal: 20),
-              tabs: const [
-                Tab(icon: Icon(Iconsax.user)),
-                Tab(icon: Icon(Iconsax.people)),
-                Tab(icon: Icon(Iconsax.briefcase)),
-                Tab(icon: Icon(Iconsax.tag)),
-                Tab(icon: Icon(Icons.alternate_email)),
-              ],
-            ),
+          child: TabBar(
+            controller: _tabController,
+            isScrollable: false,
+            indicatorSize: TabBarIndicatorSize.tab,
+            tabs: const [
+              Tab(icon: Icon(Iconsax.user)),
+              Tab(icon: Icon(Iconsax.people)),
+              Tab(icon: Icon(Iconsax.briefcase)),
+              Tab(icon: Icon(Iconsax.tag)),
+            ],
           ),
         ),
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Somente conexões'),
+              subtitle: const Text('Mostrar apenas posts seus e da sua rede.'),
+              value: _onlyConnections,
+              onChanged: (value) => setState(() => _onlyConnections = value),
+              activeColor: AppColors.primary,
+            ),
+          ),
+          const Divider(height: 1),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -582,7 +420,6 @@ class _SearchPageNewState extends State<SearchPageNew>
                 _buildBandTab(),
                 _buildHiringTab(),
                 _buildSalesTab(),
-                _buildProfilesTab(),
               ],
             ),
           ),
@@ -909,70 +746,6 @@ class _SearchPageNewState extends State<SearchPageNew>
     );
   }
 
-  Widget _buildProfilesTab() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            controller: _profileSearchController,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              labelText: 'Buscar perfis (@usuario ou nome)',
-              prefixText: _profileSearchController.text.startsWith('@')
-                  ? null
-                  : '@',
-              border: const OutlineInputBorder(),
-              suffixIcon: _isSearchingProfiles
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        height: 16,
-                        width: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : (_profileSearchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () {
-                            _profileSearchController.clear();
-                            setState(() {
-                              _profileResults = <ProfileEntity>[];
-                              _profileSearchError = null;
-                            });
-                          },
-                        )
-                      : null),
-              errorText: _profileSearchError,
-            ),
-          ),
-        ),
-        Expanded(
-          child: _profileResults.isEmpty
-              ? const Center(child: Text('Nenhum perfil encontrado'))
-              : ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemBuilder: (context, index) {
-                    final profile = _profileResults[index];
-                    return _ProfileTile(
-                      profile: profile,
-                      onTap: () {
-                        _profileSearchController.text =
-                            '@${profile.username ?? profile.name}';
-                        _applyFilters();
-                      },
-                      onOpenProfile: () => context.pushProfile(profile.profileId),
-                    );
-                  },
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemCount: _profileResults.length,
-                ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildStreamingRow({
     required bool hasYoutube,
     required bool hasSpotify,
@@ -1024,40 +797,6 @@ class _SearchPageNewState extends State<SearchPageNew>
           .textTheme
           .titleMedium
           ?.copyWith(fontWeight: FontWeight.bold),
-    );
-  }
-}
-
-class _ProfileTile extends StatelessWidget {
-  const _ProfileTile({
-    required this.profile,
-    required this.onTap,
-    required this.onOpenProfile,
-  });
-
-  final ProfileEntity profile;
-  final VoidCallback onTap;
-  final VoidCallback onOpenProfile;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      leading: CircleAvatar(
-        backgroundColor: Colors.grey.shade200,
-        backgroundImage: profile.photoUrl != null
-            ? CachedNetworkImageProvider(profile.photoUrl!)
-            : null,
-        child: profile.photoUrl == null
-            ? Text((profile.name.isNotEmpty ? profile.name[0] : '?'))
-            : null,
-      ),
-      title: Text(profile.name.isNotEmpty ? profile.name : 'Perfil'),
-      subtitle: Text(profile.username != null ? '@${profile.username}' : profile.city),
-      trailing: IconButton(
-        icon: const Icon(Icons.open_in_new),
-        onPressed: onOpenProfile,
-      ),
     );
   }
 }

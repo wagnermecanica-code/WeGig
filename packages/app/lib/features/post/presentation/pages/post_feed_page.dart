@@ -7,6 +7,7 @@ import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
 import 'package:core_ui/utils/price_calculator.dart';
 import 'package:core_ui/utils/location_utils.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,7 +33,7 @@ import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 /// Carrossel vertical de posts estilo TikTok/Reels.
-/// 
+///
 /// Mostra cards fullscreen com informações do post.
 /// Navegação vertical entre posts via swipe.
 /// Seção expansível com detalhes completos.
@@ -115,11 +116,13 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
 
     _heartScaleAnimation = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween(begin: 0.0, end: 1.3).chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween(begin: 0.0, end: 1.3)
+            .chain(CurveTween(curve: Curves.easeOut)),
         weight: 25,
       ),
       TweenSequenceItem(
-        tween: Tween(begin: 1.3, end: 1.0).chain(CurveTween(curve: Curves.elasticOut)),
+        tween: Tween(begin: 1.3, end: 1.0)
+            .chain(CurveTween(curve: Curves.elasticOut)),
         weight: 45,
       ),
       TweenSequenceItem(
@@ -135,6 +138,7 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
     ]).animate(_heartAnimationController);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       _precacheAdjacentImages(_currentIndex);
       _loadInterestStatus(_currentIndex);
     });
@@ -155,17 +159,20 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
         final url = post.photoUrls.isNotEmpty
             ? post.photoUrls.first
             : (post.photoUrl ?? post.firstPhotoUrl ?? '');
-        if (url.isNotEmpty && mounted) {
-          precacheImage(CachedNetworkImageProvider(url), context).catchError((_) {});
+        if (url.isNotEmpty && url.startsWith('http') && mounted) {
+          precacheImage(CachedNetworkImageProvider(url), context)
+              .catchError((_) {});
         }
       }
     }
   }
 
   Future<void> _loadInterestStatus(int index) async {
+    if (!mounted) return;
     if (index < 0 || index >= widget.posts.length) return;
     final post = widget.posts[index];
-    
+    final activeProfile = ref.read(activeProfileProvider);
+
     // Carregar contagem de interessados se ainda não tiver
     if (!_interestCountCache.containsKey(post.id)) {
       try {
@@ -176,7 +183,8 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
             .get();
 
         if (mounted) {
-          setState(() => _interestCountCache[post.id] = countSnapshot.count ?? 0);
+          setState(
+              () => _interestCountCache[post.id] = countSnapshot.count ?? 0);
         }
       } catch (e) {
         debugPrint('Erro ao carregar contagem de interessados: $e');
@@ -186,7 +194,7 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
     // Carregar status de interesse do usuário atual
     if (_interestCache.containsKey(post.id)) return;
 
-    final activeProfile = ref.read(activeProfileProvider);
+    if (!mounted) return;
     if (activeProfile == null) return;
 
     try {
@@ -241,14 +249,14 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
     try {
       if (!hasInterest) {
         await ref.read(interestNotifierProvider.notifier).addInterest(
-          postId: post.id,
-          postAuthorUid: post.authorUid,
-          postAuthorProfileId: post.authorProfileId,
-        );
+              postId: post.id,
+              postAuthorUid: post.authorUid,
+              postAuthorProfileId: post.authorProfileId,
+            );
       } else {
         await ref.read(interestNotifierProvider.notifier).removeInterest(
-          postId: post.id,
-        );
+              postId: post.id,
+            );
       }
     } catch (e) {
       // Rollback em caso de erro
@@ -286,7 +294,8 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
           ),
         ),
         body: const Center(
-          child: Text('Nenhum post disponível', style: TextStyle(color: Colors.white70)),
+          child: Text('Nenhum post disponível',
+              style: TextStyle(color: Colors.white70)),
         ),
       );
     }
@@ -314,12 +323,14 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
                 final hasInterest = _interestCache[post.id] ?? false;
 
                 return GestureDetector(
-                  onDoubleTap: post.type != 'sales' ? () => _toggleInterest(post) : null,
+                  onDoubleTap:
+                      post.type != 'sales' ? () => _toggleInterest(post) : null,
                   child: _PostFullCard(
                     post: post,
                     interestCount: interestCount,
                     hasInterest: hasInterest,
-                    onTapProfile: () => context.pushProfile(post.authorProfileId),
+                    onTapProfile: () =>
+                        context.pushProfile(post.authorProfileId),
                     onTapInterest: () => _toggleInterest(post),
                   ),
                 );
@@ -339,7 +350,9 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
                         Iconsax.heart5,
                         color: Colors.white,
                         size: 120,
-                        shadows: [Shadow(blurRadius: 30, color: Colors.black54)],
+                        shadows: [
+                          Shadow(blurRadius: 30, color: Colors.black54)
+                        ],
                       ),
                     ),
                   ),
@@ -390,21 +403,22 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // Botão voltar
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black45,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Iconsax.arrow_left_2, color: Colors.white),
-                    onPressed: () => Navigator.of(context).maybePop(),
-                  ),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.black45,
+                  borderRadius: BorderRadius.circular(24),
                 ),
+                child: IconButton(
+                  icon: const Icon(Iconsax.arrow_left_2, color: Colors.white),
+                  onPressed: () => Navigator.of(context).maybePop(),
+                ),
+              ),
               // Localização de referência
               Expanded(
                 child: Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.black45,
                       borderRadius: BorderRadius.circular(20),
@@ -412,7 +426,8 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Iconsax.location, color: Colors.white, size: 16),
+                        const Icon(Iconsax.location,
+                            color: Colors.white, size: 16),
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
@@ -433,7 +448,8 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
               ),
               // Contador
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.black45,
                   borderRadius: BorderRadius.circular(20),
@@ -456,7 +472,8 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
 
   String _buildPostLocationLabel(PostEntity post) {
     final locationParts = <String>[];
-    if (post.neighborhood?.isNotEmpty == true) locationParts.add(post.neighborhood!);
+    if (post.neighborhood?.isNotEmpty == true)
+      locationParts.add(post.neighborhood!);
     if (post.city.isNotEmpty) locationParts.add(post.city);
     if (post.state?.isNotEmpty == true) locationParts.add(post.state!);
     return locationParts.isNotEmpty ? locationParts.join(', ') : 'Localização';
@@ -536,9 +553,10 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
   late final PageController _photoPageController;
   int _currentPhotoIndex = 0;
   bool _isExpanded = false;
-  final DraggableScrollableController _sheetController = DraggableScrollableController();
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
   YoutubePlayerController? _youtubeController;
-  
+
   // Estado para interessados
   List<Map<String, dynamic>> _interestedUsers = [];
   bool _isLoadingInterests = false;
@@ -620,7 +638,8 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
         final data = interestDoc.data();
         final interestedProfileId = data['interestedProfileId'] as String?;
 
-        if (interestedProfileId == null || interestedProfileId.isEmpty) continue;
+        if (interestedProfileId == null || interestedProfileId.isEmpty)
+          continue;
         if (seenProfileIds.contains(interestedProfileId)) continue;
         seenProfileIds.add(interestedProfileId);
 
@@ -669,7 +688,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
   void _toggleExpanded() {
     setState(() => _isExpanded = !_isExpanded);
     HapticFeedback.lightImpact();
-    
+
     if (_isExpanded) {
       _sheetController.animateTo(
         0.7,
@@ -783,7 +802,8 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
                         Colors.black,
                       ],
                     ),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(20)),
                   ),
                   child: ListView(
                     controller: scrollController,
@@ -801,7 +821,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
                           ),
                         ),
                       ),
-                      
+
                       // Conteúdo principal
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -815,26 +835,26 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
                                 children: [
                                   // Avatar + Nome
                                   _buildHeader(),
-                                  
+
                                   const SizedBox(height: 12),
-                                  
+
                                   // Tipo do post
                                   _buildTypeChip(),
-                                  
+
                                   const SizedBox(height: 12),
-                                  
+
                                   // Mensagem/Descrição
                                   _buildDescription(),
-                                  
+
                                   // Seção expandida com mais detalhes
                                   if (_isExpanded) ...[
                                     const SizedBox(height: 20),
                                     _buildExpandedDetails(),
                                   ],
-                                  
+
                                   // Botão expandir/colapsar
                                   _buildExpandButton(),
-                                  
+
                                   const SizedBox(height: 40),
                                 ],
                               ),
@@ -923,6 +943,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
     required int count,
     required String tooltip,
     required VoidCallback onPressed,
+    VoidCallback? onCountTap,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -941,14 +962,23 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
           ),
         ),
         if (count > 0)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              count > 999 ? '${(count / 1000).toStringAsFixed(1)}k' : '$count',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
+          GestureDetector(
+            onTap: onCountTap,
+            behavior: onCountTap != null
+                ? HitTestBehavior.opaque
+                : HitTestBehavior.deferToChild,
+            child: Padding(
+              padding:
+                  const EdgeInsets.only(top: 2, left: 6, right: 6, bottom: 2),
+              child: Text(
+                count > 999
+                    ? '${(count / 1000).toStringAsFixed(1)}k'
+                    : '$count',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -959,6 +989,9 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
   /// Coluna de ícones de ação alinhados à direita
   Widget _buildActionIcons() {
     final isSales = widget.post.type == 'sales';
+    final liveCommentCount =
+        ref.watch(commentCountStreamProvider(widget.post.id)).value ??
+            widget.post.commentCount;
 
     return Padding(
       padding: const EdgeInsets.only(top: 4),
@@ -968,9 +1001,12 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
           // Comentários
           _buildFeedIconWithCounter(
             icon: Iconsax.message,
-            count: widget.post.commentCount,
+            count: liveCommentCount,
             tooltip: 'Comentários',
             onPressed: () {
+              CommentsBottomSheet.show(context, widget.post);
+            },
+            onCountTap: () {
               CommentsBottomSheet.show(context, widget.post);
             },
           ),
@@ -1005,15 +1041,15 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
                       )
                     : Builder(
                         builder: (context) {
-                          final hasInterest = ref.watch(interestNotifierProvider).contains(widget.post.id);
+                          final hasInterest = ref
+                              .watch(interestNotifierProvider)
+                              .contains(widget.post.id);
                           return IconButton(
                             icon: Icon(
                               hasInterest
                                   ? (isSales ? Iconsax.tag5 : Iconsax.heart5)
                                   : (isSales ? Iconsax.tag : Iconsax.heart),
-                              color: hasInterest
-                                  ? Colors.pink
-                                  : Colors.white,
+                              color: hasInterest ? Colors.pink : Colors.white,
                               size: 18,
                             ),
                             padding: const EdgeInsets.all(8),
@@ -1028,7 +1064,8 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
                   onTap: _showAllInterestedUsers,
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 4, left: 8, right: 8, bottom: 4),
+                    padding: const EdgeInsets.only(
+                        top: 4, left: 8, right: 8, bottom: 4),
                     child: Text(
                       widget.interestCount > 999
                           ? '${(widget.interestCount / 1000).toStringAsFixed(1)}k'
@@ -1050,7 +1087,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
 
   Widget _buildDescription() {
     if (widget.post.content.isEmpty) return const SizedBox.shrink();
-    
+
     return Text(
       widget.post.content,
       style: const TextStyle(
@@ -1066,7 +1103,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
   Widget _buildExpandedDetails() {
     final post = widget.post;
     final locationLabel = _buildLocationLabel(post);
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1207,22 +1244,25 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
               ),
             ],
           ],
-          
+
           // Preço (para vendas) — inclui gratuitos
           if (post.type == 'sales' && post.price != null) ...[
             const SizedBox(height: 12),
             Builder(builder: (context) {
               final priceData = PriceCalculator.getPriceDisplayData(post);
-              final currency = NumberFormat.currency(locale: 'pt_BR', symbol: r'R$');
+              final currency =
+                  NumberFormat.currency(locale: 'pt_BR', symbol: r'R$');
 
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
                   Baseline(
-                    baseline: 18, // Ajuste para alinhar com a baseline do texto (aproximadamente 80% da fontSize 22)
+                    baseline:
+                        18, // Ajuste para alinhar com a baseline do texto (aproximadamente 80% da fontSize 22)
                     baselineType: TextBaseline.alphabetic,
-                    child: const Icon(Iconsax.money, color: Colors.green, size: 20),
+                    child: const Icon(Iconsax.money,
+                        color: Colors.green, size: 20),
                   ),
                   const SizedBox(width: 10),
                   Column(
@@ -1244,7 +1284,8 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
                           children: [
                             if (priceData.discountLabel != null)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: Colors.red,
                                   borderRadius: BorderRadius.circular(6),
@@ -1294,19 +1335,23 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
               );
             }),
           ],
-          
+
           // WhatsApp (para vendas)
-          if (post.type == 'sales' && post.whatsappNumber != null && post.whatsappNumber!.isNotEmpty) ...[
+          if (post.type == 'sales' &&
+              post.whatsappNumber != null &&
+              post.whatsappNumber!.isNotEmpty) ...[
             const SizedBox(height: 16),
             GestureDetector(
               onTap: () => _openWhatsApp(post.whatsappNumber!),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: const Color(0xFF25D366).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF25D366).withValues(alpha: 0.5)),
+                  border: Border.all(
+                      color: const Color(0xFF25D366).withValues(alpha: 0.5)),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1326,16 +1371,18 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
             ),
           ],
 
-          if (widget.post.spotifyLink != null && widget.post.spotifyLink!.isNotEmpty) ...[
+          if (widget.post.spotifyLink != null &&
+              widget.post.spotifyLink!.isNotEmpty) ...[
             const SizedBox(height: 20),
             _buildSpotifySection(widget.post.spotifyLink!),
           ],
 
-          if (widget.post.deezerLink != null && widget.post.deezerLink!.isNotEmpty) ...[
+          if (widget.post.deezerLink != null &&
+              widget.post.deezerLink!.isNotEmpty) ...[
             const SizedBox(height: 20),
             _buildDeezerSection(widget.post.deezerLink!),
           ],
-          
+
           // YouTube Player
           if (_youtubeController != null) ...[
             const SizedBox(height: 20),
@@ -1371,12 +1418,14 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
             icon: const Icon(Iconsax.external_drive, color: Colors.white),
             label: const Text(
               'Abrir Spotify',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
             ),
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
               padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () => _launchSpotify(url),
           ),
@@ -1453,12 +1502,14 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
             icon: const Icon(Iconsax.external_drive, color: Colors.white),
             label: const Text(
               'Abrir Deezer',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
             ),
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
               padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () => _launchDeezer(url),
           ),
@@ -1552,10 +1603,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
     return Container(
       color: Colors.grey[900],
       child: const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-          strokeWidth: 2,
-        ),
+        child: AppRadioPulseLoader(size: 40, color: AppColors.primary),
       ),
     );
   }
@@ -1572,12 +1620,12 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
           ),
           child: Icon(
             widget.post.type == 'band'
-              ? Iconsax.people
-              : (widget.post.type == 'sales'
-                ? Iconsax.tag
-                : (widget.post.type == 'hiring'
-                  ? Iconsax.briefcase
-                  : Iconsax.user)),
+                ? Iconsax.people
+                : (widget.post.type == 'sales'
+                    ? Iconsax.tag
+                    : (widget.post.type == 'hiring'
+                        ? Iconsax.briefcase
+                        : Iconsax.user)),
             size: 64,
             color: _getTypeColor().withValues(alpha: 0.7),
           ),
@@ -1663,7 +1711,8 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
   String _formatDurationLabel(int minutes) {
     final hours = minutes ~/ 60;
     final mins = minutes % 60;
-    if (hours > 0 && mins > 0) return '${hours}h${mins.toString().padLeft(2, '0')}min';
+    if (hours > 0 && mins > 0)
+      return '${hours}h${mins.toString().padLeft(2, '0')}min';
     if (hours > 0) return '${hours}h';
     return '${minutes}min';
   }
@@ -1758,7 +1807,9 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
 
     try {
       // Busca/cria a conversa
-      final conversation = await ref.read(mensagensNewRepositoryProvider).getOrCreateConversation(
+      final conversation = await ref
+          .read(mensagensNewRepositoryProvider)
+          .getOrCreateConversation(
         currentProfileId: activeProfile.profileId,
         currentUid: currentUser.uid,
         otherProfileId: widget.post.authorProfileId,
@@ -1776,7 +1827,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
       // Navegar para a tela de chat
       if (mounted) {
         setState(() => _isOpeningConversation = false);
-        
+
         Navigator.of(context).push<void>(
           MaterialPageRoute<void>(
             builder: (_) => ChatNewPage(
@@ -1793,7 +1844,8 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
       debugPrint('Erro ao abrir conversa: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao abrir conversa. Tente novamente.')),
+          const SnackBar(
+              content: Text('Erro ao abrir conversa. Tente novamente.')),
         );
       }
     } finally {
@@ -1890,7 +1942,8 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
               ),
               ListTile(
                 leading: const Icon(Iconsax.trash, color: Colors.red),
-                title: const Text('Excluir post', style: TextStyle(color: Colors.red)),
+                title: const Text('Excluir post',
+                    style: TextStyle(color: Colors.red)),
                 onTap: () {
                   Navigator.pop(context);
                   _confirmDeletePost();
@@ -1909,7 +1962,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
     // Capturar o navigator ANTES de abrir o dialog
     final navigator = Navigator.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    
+
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1924,21 +1977,21 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
             onPressed: () async {
               // Fechar o dialog primeiro
               Navigator.pop(dialogContext);
-              
+
               try {
                 await FirebaseFirestore.instance
                     .collection('posts')
                     .doc(widget.post.id)
                     .delete();
-                
+
                 // Invalidar cache de posts para atualizar a lista imediatamente
                 ref.read(postCacheNotifierProvider.notifier).invalidate();
-                
+
                 // Usar referências capturadas antes do dialog
                 scaffoldMessenger.showSnackBar(
                   const SnackBar(content: Text('Post excluído com sucesso')),
                 );
-                
+
                 // Sair do feed usando o navigator capturado
                 if (navigator.canPop()) {
                   navigator.pop();
@@ -1959,7 +2012,8 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
   /// Mostra opções de interesse (curtir/descurtir, denunciar)
   void _showInterestOptions() {
     HapticFeedback.mediumImpact();
-    final hasInterest = ref.read(interestNotifierProvider).contains(widget.post.id);
+    final hasInterest =
+        ref.read(interestNotifierProvider).contains(widget.post.id);
 
     showInterestOptionsDialog(
       context: context,
@@ -1986,10 +2040,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
           SizedBox(
             width: 18,
             height: 18,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white38),
-            ),
+            child: AppRadioPulseLoader(size: 18, color: Colors.white38),
           ),
           const SizedBox(width: 10),
           Text(
@@ -2035,7 +2086,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
             ],
           ),
           const SizedBox(height: 8),
-          
+
           // Avatares + texto
           Row(
             children: [
@@ -2066,7 +2117,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
                 ),
               ),
               const SizedBox(width: 10),
-              
+
               // Texto descritivo
               Expanded(
                 child: Text(
@@ -2079,7 +2130,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              
+
               // Ícone de seta
               const Icon(
                 Iconsax.arrow_right_3,
@@ -2095,7 +2146,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
 
   String _getInterestedText() {
     if (_interestedUsers.isEmpty) return '';
-    
+
     final firstName = _interestedUsers[0]['name'] as String;
     if (_interestedUsers.length == 1) {
       return firstName;
@@ -2158,7 +2209,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
   /// Modal bottom sheet com lista completa de interessados
   void _showAllInterestedUsers() {
     HapticFeedback.mediumImpact();
-    
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -2169,7 +2220,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
         minChildSize: 0.4,
         builder: (context, scrollController) {
           final isSales = widget.post.type == 'sales';
-          
+
           return Container(
             decoration: const BoxDecoration(
               color: Colors.white,
@@ -2240,7 +2291,8 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
                             horizontal: 20, vertical: 4),
                         leading: CircleAvatar(
                           radius: 24,
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                          backgroundColor:
+                              AppColors.primary.withValues(alpha: 0.1),
                           backgroundImage: photoUrl.isNotEmpty
                               ? CachedNetworkImageProvider(photoUrl)
                               : null,

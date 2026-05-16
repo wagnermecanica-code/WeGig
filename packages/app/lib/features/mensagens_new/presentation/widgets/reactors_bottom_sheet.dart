@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
@@ -167,7 +168,7 @@ class _ReactorsBottomSheetState extends State<ReactorsBottomSheet>
           SizedBox(
             height: 300,
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: AppRadioPulseLoader(size: 44))
                 : TabBarView(
                     controller: _tabController,
                     children: [

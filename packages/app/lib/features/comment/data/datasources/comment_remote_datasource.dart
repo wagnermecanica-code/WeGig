@@ -55,6 +55,13 @@ class CommentRemoteDatasourceImpl implements CommentRemoteDatasource {
     return _firestore.collection('posts').doc(postId);
   }
 
+  Future<void> _reconcileCommentCount(String postId) async {
+    final exactCount = await getCommentCount(postId);
+    await _postRef(postId).set({
+      'commentCount': exactCount,
+    }, SetOptions(merge: true));
+  }
+
   @override
   Stream<List<CommentEntity>> watchComments(String postId) {
     return _commentsRef(postId)
@@ -105,6 +112,7 @@ class CommentRemoteDatasourceImpl implements CommentRemoteDatasource {
     });
 
     await batch.commit();
+    await _reconcileCommentCount(postId);
 
     debugPrint('✅ CommentDatasource: Comentário criado (postId: $postId)');
 
@@ -126,6 +134,7 @@ class CommentRemoteDatasourceImpl implements CommentRemoteDatasource {
     });
 
     await batch.commit();
+    await _reconcileCommentCount(postId);
 
     debugPrint('✅ CommentDatasource: Comentário deletado (commentId: $commentId)');
   }

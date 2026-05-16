@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
@@ -387,7 +388,7 @@ class MessageNewBubble extends StatelessWidget {
                 width: 200,
                 color: AppColors.surfaceVariant,
                 child: const Center(
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: AppRadioPulseLoader(size: 36),
                 ),
               ),
               errorWidget: (context, url, error) {

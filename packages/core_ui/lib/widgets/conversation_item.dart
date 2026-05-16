@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:iconsax/iconsax.dart';
 
 /// Widget reutilizável para item de conversa na lista
@@ -249,9 +250,8 @@ class ConversationItem extends StatelessWidget {
                                   width: 56,
                                   height: 56,
                                   fit: BoxFit.cover,
-                                  placeholder: (context, url) => const CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
+                                  placeholder: (context, url) => const AppRadioPulseLoader(
+                                    size: 28,
                                   ),
                                   errorWidget: (context, url, error) => Icon(
                                     type == 'band' ? Iconsax.people : Iconsax.user,

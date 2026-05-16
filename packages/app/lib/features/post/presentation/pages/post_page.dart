@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/post_result.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/music_constants.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:core_ui/widgets/multi_select_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -877,11 +878,7 @@ class _PostPageState extends ConsumerState<PostPage> {
                 child: SizedBox(
                   width: 24,
                   height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-                  ),
+                  child: AppRadioPulseLoader(size: 24),
                 ),
               ),
             )
@@ -898,9 +895,7 @@ class _PostPageState extends ConsumerState<PostPage> {
       ),
       body: profileAsync.when(
         loading: () => const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-          ),
+          child: AppRadioPulseLoader(size: 52),
         ),
         error: (err, stack) => const Center(
           child: Text('Erro ao carregar perfil. Tente novamente.'),
@@ -1540,7 +1535,7 @@ class _PostPageState extends ConsumerState<PostPage> {
         debounceDuration: Duration.zero,
         loadingBuilder: (context) => const Padding(
           padding: EdgeInsets.all(16.0),
-          child: CircularProgressIndicator(),
+          child: AppRadioPulseLoader(size: 24),
         ),
         errorBuilder: (context, error) => Padding(
           padding: const EdgeInsets.all(16.0),
@@ -1966,7 +1961,7 @@ class _PostPageState extends ConsumerState<PostPage> {
         debounceDuration: Duration.zero,
         loadingBuilder: (context) => const Padding(
           padding: EdgeInsets.all(16.0),
-          child: CircularProgressIndicator(),
+          child: AppRadioPulseLoader(size: 24),
         ),
         errorBuilder: (context, error) => Padding(
           padding: const EdgeInsets.all(16.0),
@@ -2221,7 +2216,7 @@ class _PostPageState extends ConsumerState<PostPage> {
                     debounceDuration: Duration.zero,
                     loadingBuilder: (context) => const Padding(
                       padding: EdgeInsets.all(16.0),
-                      child: CircularProgressIndicator(),
+                      child: AppRadioPulseLoader(size: 24),
                     ),
                     errorBuilder: (context, error) => Padding(
                       padding: const EdgeInsets.all(16.0),
@@ -2642,10 +2637,7 @@ class _PostPageState extends ConsumerState<PostPage> {
                     placeholder: (context, url) => Container(
                       color: Colors.grey[200],
                       child: const Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-                        ),
+                        child: AppRadioPulseLoader(size: 36),
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(

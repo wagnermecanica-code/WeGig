@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -783,7 +784,7 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
 
     if (activeProfile == null) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(child: AppRadioPulseLoader(size: 52)),
       );
     }
 
@@ -1252,7 +1253,7 @@ class _ChatNewPageState extends ConsumerState<ChatNewPage> {
           return const Padding(
             padding: EdgeInsets.all(16),
             child: Center(
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: AppRadioPulseLoader(size: 24),
             ),
           );
         }

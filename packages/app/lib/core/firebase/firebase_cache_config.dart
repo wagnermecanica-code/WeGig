@@ -36,21 +36,23 @@ class FirebaseCacheConfig {
   }
   
   /// Tamanho do cache por ambiente
-  /// 
-  /// - Dev: 50MB (menos posts, perfis de teste)
-  /// - Staging: 75MB (volume intermediário)
-  /// - Prod: 100MB (volume completo de usuários)
+  ///
+  /// Reduzido para ajudar a conter `phys_footprint` em iOS 26 e evitar
+  /// jetsam em background. Mantido generoso o suficiente para uso offline.
+  /// - Dev: 40MB
+  /// - Staging: 50MB
+  /// - Prod: 60MB
   static int _getCacheSizeForFlavor(String flavor) {
     switch (flavor) {
       case 'dev':
-        return 50 * 1024 * 1024; // 50MB
+        return 40 * 1024 * 1024; // 40MB
       case 'staging':
-        return 75 * 1024 * 1024; // 75MB
+        return 50 * 1024 * 1024; // 50MB
       case 'prod':
-        return 100 * 1024 * 1024; // 100MB
+        return 60 * 1024 * 1024; // 60MB
       default:
-        debugPrint('⚠️ Flavor desconhecido: $flavor, usando 100MB');
-        return 100 * 1024 * 1024;
+        debugPrint('⚠️ Flavor desconhecido: $flavor, usando 60MB');
+        return 60 * 1024 * 1024;
     }
   }
   

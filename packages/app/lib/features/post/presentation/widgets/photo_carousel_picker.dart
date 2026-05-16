@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:iconsax/iconsax.dart';
@@ -283,7 +284,7 @@ class _PhotoCarouselPickerState extends State<PhotoCarouselPicker> {
                       const SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: AppRadioPulseLoader(size: 16),
                       ),
                     ],
                   ],
@@ -385,7 +386,7 @@ class _PhotoCarouselPickerState extends State<PhotoCarouselPicker> {
                   height: double.infinity,
                   placeholder: (context, url) => Container(
                     color: Colors.grey[200],
-                    child: const Center(child: CircularProgressIndicator()),
+                    child: const Center(child: AppRadioPulseLoader(size: 36)),
                   ),
                   errorWidget: (context, url, error) => Container(
                     color: Colors.grey[200],

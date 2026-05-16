@@ -214,7 +214,7 @@ class _CommentsStreamProviderElement
 }
 
 String _$commentCountStreamHash() =>
-    r'9039f70d7b0133cbc6e5086cc618a325ea22b6ae';
+    r'5b657cb06e60b0cc8c5f6c5fbb8c9d36d02d521b';
 
 /// Provider para buscar commentCount de um post (para exibir o contador)
 ///

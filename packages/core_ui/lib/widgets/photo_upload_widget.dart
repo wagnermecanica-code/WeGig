@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
@@ -201,8 +202,9 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                            AppRadioPulseLoader(
+                              size: 44,
+                              color: AppColors.primary,
                             ),
                             SizedBox(height: 12),
                             Text(
@@ -220,10 +222,9 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
                                     imageUrl: widget.currentPhotoPath!,
                                     fit: BoxFit.cover,
                                     placeholder: (context, url) => const Center(
-                                      child: CircularProgressIndicator(
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          AppColors.primary,
-                                        ),
+                                      child: AppRadioPulseLoader(
+                                        size: 36,
+                                        color: AppColors.primary,
                                       ),
                                     ),
                                     errorWidget: (context, url, error) => const Column(

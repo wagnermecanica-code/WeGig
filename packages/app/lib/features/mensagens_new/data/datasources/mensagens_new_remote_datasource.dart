@@ -120,6 +120,148 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
   CollectionReference<Map<String, dynamic>> _messagesRef(String conversationId) =>
       _conversationsRef.doc(conversationId).collection('messages');
 
+  String _buildDirectConversationKey(String profileIdA, String profileIdB) {
+    final sortedProfileIds = [profileIdA.trim(), profileIdB.trim()]..sort();
+    return sortedProfileIds.join('__');
+  }
+
+  bool _isDirectConversation(
+    Map<String, dynamic> data,
+    List<String> participantProfiles,
+  ) {
+    final rawIsGroup = data['isGroup'] as bool?;
+    final rawGroupName = data['groupName'];
+    final conversationType = data['conversationType'] as String?;
+
+    final inferredIsGroup = conversationType == 'group' ||
+        (rawIsGroup ?? false) ||
+        participantProfiles.length > 2 ||
+        (rawGroupName is String && rawGroupName.trim().isNotEmpty);
+
+    return !inferredIsGroup && participantProfiles.length == 2;
+  }
+
+  bool _shouldFallbackDirectLookup(FirebaseException error) {
+    return error.code == 'failed-precondition' ||
+        error.code == 'permission-denied';
+  }
+
+  Future<QuerySnapshot<Map<String, dynamic>>?> _queryDirectConversationByKey({
+    required String membershipField,
+    required String currentUid,
+    required String directConversationKey,
+  }) async {
+    try {
+      return await _conversationsRef
+          .where(membershipField, arrayContains: currentUid)
+          .where('directConversationKey', isEqualTo: directConversationKey)
+          .limit(1)
+          .get();
+    } on FirebaseException catch (error) {
+      if (!_shouldFallbackDirectLookup(error)) {
+        rethrow;
+      }
+
+      debugPrint(
+        '⚠️ MensagensNewDS: directConversationKey indisponível em '
+        '$membershipField (${error.code}), usando fallback legado',
+      );
+      return null;
+    }
+  }
+
+  Future<DocumentSnapshot<Map<String, dynamic>>?> _findDirectConversationByKey({
+    required String currentUid,
+    required String directConversationKey,
+  }) async {
+    final participantsSnapshot = await _queryDirectConversationByKey(
+      membershipField: 'participants',
+      currentUid: currentUid,
+      directConversationKey: directConversationKey,
+    );
+    if (participantsSnapshot != null && participantsSnapshot.docs.isNotEmpty) {
+      return participantsSnapshot.docs.first;
+    }
+
+    final profileUidSnapshot = await _queryDirectConversationByKey(
+      membershipField: 'profileUid',
+      currentUid: currentUid,
+      directConversationKey: directConversationKey,
+    );
+    if (profileUidSnapshot != null && profileUidSnapshot.docs.isNotEmpty) {
+      return profileUidSnapshot.docs.first;
+    }
+
+    return null;
+  }
+
+  Future<DocumentSnapshot<Map<String, dynamic>>?>
+      _findLegacyDirectConversationByMembershipField({
+    required String membershipField,
+    required String currentProfileId,
+    required String currentUid,
+    required String otherProfileId,
+  }) async {
+    QueryDocumentSnapshot<Map<String, dynamic>>? lastDoc;
+
+    while (true) {
+      Query<Map<String, dynamic>> query = _conversationsRef
+          .where(membershipField, arrayContains: currentUid)
+          .limit(50);
+
+      if (lastDoc != null) {
+        query = query.startAfterDocument(lastDoc);
+      }
+
+      final snapshot = await query.get();
+      if (snapshot.docs.isEmpty) {
+        return null;
+      }
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final participantProfiles =
+            (data['participantProfiles'] as List<dynamic>?)?.cast<String>() ??
+                [];
+
+        if (_isDirectConversation(data, participantProfiles) &&
+            participantProfiles.contains(currentProfileId) &&
+            participantProfiles.contains(otherProfileId)) {
+          return doc;
+        }
+      }
+
+      if (snapshot.docs.length < 50) {
+        return null;
+      }
+
+      lastDoc = snapshot.docs.last;
+    }
+  }
+
+  Future<DocumentSnapshot<Map<String, dynamic>>?> _findLegacyDirectConversation({
+    required String currentProfileId,
+    required String currentUid,
+    required String otherProfileId,
+  }) async {
+    final participantsMatch = await _findLegacyDirectConversationByMembershipField(
+      membershipField: 'participants',
+      currentProfileId: currentProfileId,
+      currentUid: currentUid,
+      otherProfileId: otherProfileId,
+    );
+    if (participantsMatch != null) {
+      return participantsMatch;
+    }
+
+    return _findLegacyDirectConversationByMembershipField(
+      membershipField: 'profileUid',
+      currentProfileId: currentProfileId,
+      currentUid: currentUid,
+      otherProfileId: otherProfileId,
+    );
+  }
+
   // ============================================
   // CONVERSAS
   // ============================================
@@ -313,81 +455,122 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
       debugPrint(
           '🔍 MensagensNewDS: getOrCreateConversation - current=$currentProfileId, other=$otherProfileId');
 
-      // Buscar conversa existente entre os dois perfis
-      // Query otimizada: usa limit para economizar bandwidth
-      final snapshot = await _conversationsRef
-          .where('participants', arrayContains: currentUid)
-          .limit(20) // Limita busca inicial
-          .get();
+      final directConversationKey =
+          _buildDirectConversationKey(currentProfileId, otherProfileId);
 
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        final participantProfiles =
-            (data['participantProfiles'] as List<dynamic>?)?.cast<String>() ?? [];
-        final participants =
-            (data['participants'] as List<dynamic>?)?.cast<String>() ?? [];
-        final profileUid =
-            (data['profileUid'] as List<dynamic>?)?.cast<String>() ?? [];
-        final rawIsGroup = data['isGroup'] as bool?;
-        final rawGroupName = data['groupName'];
-        final conversationType = data['conversationType'] as String?;
+      DocumentSnapshot<Map<String, dynamic>>? matchedDoc =
+          await _findDirectConversationByKey(
+        currentUid: currentUid,
+        directConversationKey: directConversationKey,
+      );
 
-        // Inferir grupo mesmo quando o campo isGroup está ausente (dados legados)
-        final inferredIsGroup = (conversationType == 'group') ||
-          (rawIsGroup ?? false) ||
-          participantProfiles.length > 2 ||
-          (rawGroupName is String && rawGroupName.trim().isNotEmpty);
+      matchedDoc ??= await _findLegacyDirectConversation(
+        currentProfileId: currentProfileId,
+        currentUid: currentUid,
+        otherProfileId: otherProfileId,
+      );
 
-        // Conversa 1:1 válida: precisa ter exatamente 2 perfis e não ser grupo
-        final is1to1 = !inferredIsGroup && participantProfiles.length == 2;
+      if (matchedDoc != null) {
+        final data = matchedDoc.data();
+        if (data != null) {
+          final participantProfiles =
+              (data['participantProfiles'] as List<dynamic>?)?.cast<String>() ??
+                  [];
+          final participants =
+              (data['participants'] as List<dynamic>?)?.cast<String>() ?? [];
+          final profileUid =
+              (data['profileUid'] as List<dynamic>?)?.cast<String>() ?? [];
+          final rawIsGroup = data['isGroup'] as bool?;
+          final rawGroupName = data['groupName'];
 
-        if (is1to1 &&
-            participantProfiles.contains(currentProfileId) &&
-            participantProfiles.contains(otherProfileId)) {
-          debugPrint('✅ MensagensNewDS: Conversa 1:1 existente encontrada');
+          if (_isDirectConversation(data, participantProfiles) &&
+              participantProfiles.contains(currentProfileId) &&
+              participantProfiles.contains(otherProfileId)) {
+            debugPrint('✅ MensagensNewDS: Conversa 1:1 existente encontrada');
 
-          // Desarquivar se estava arquivada
-          final conv = ConversationNewEntity.fromFirestore(doc);
-          if (conv.isArchivedForProfile(currentProfileId)) {
-            await unarchiveConversation(conv.id, currentProfileId);
+            final conv = ConversationNewEntity.fromFirestore(matchedDoc);
+            if (conv.isArchivedForProfile(currentProfileId)) {
+              await unarchiveConversation(conv.id, currentProfileId);
+            }
+
+            final updates = <String, dynamic>{};
+            final existingConvType = data['conversationType'] as String?;
+            final existingDirectKey = (data['directConversationKey'] as String?)?.trim();
+
+            if (existingConvType != 'direct') {
+              updates['conversationType'] = 'direct';
+            }
+            if (rawIsGroup != false) updates['isGroup'] = false;
+            if (rawGroupName != null) updates['groupName'] = FieldValue.delete();
+            if (data['groupPhotoUrl'] != null) {
+              updates['groupPhotoUrl'] = FieldValue.delete();
+            }
+            if (!participants.contains(currentUid) ||
+                !participants.contains(otherUid)) {
+              updates['participants'] =
+                  FieldValue.arrayUnion([currentUid, otherUid]);
+            }
+            if (!profileUid.contains(currentUid) ||
+                !profileUid.contains(otherUid)) {
+              updates['profileUid'] =
+                  FieldValue.arrayUnion([currentUid, otherUid]);
+            }
+            if (existingDirectKey != directConversationKey) {
+              updates['directConversationKey'] = directConversationKey;
+            }
+
+            if (updates.isNotEmpty) {
+              debugPrint(
+                  '🛡️ MensagensNewDS: Self-healing 1:1 (atualizando flags/participantes)');
+              await matchedDoc.reference.update(updates);
+            }
+
+            return conv.copyWith(isGroup: false);
           }
-
-          // 🛡️ Self-healing: corrigir flags e permissões legadas
-          final updates = <String, dynamic>{};
-          final existingConvType = data['conversationType'] as String?;
-
-          // Garantir conversationType=direct para 1:1
-          if (existingConvType != 'direct') {
-            updates['conversationType'] = 'direct';
-          }
-          
-          // Garantir isGroup=false e remover campos de grupo herdados
-          if (rawIsGroup != false) updates['isGroup'] = false;
-          if (rawGroupName != null) updates['groupName'] = FieldValue.delete();
-          if (data['groupPhotoUrl'] != null) {
-            updates['groupPhotoUrl'] = FieldValue.delete();
-          }
-
-          // Garantir participantes por UID e profileUid consistentes
-          if (!participants.contains(currentUid) || !participants.contains(otherUid)) {
-            updates['participants'] = FieldValue.arrayUnion([currentUid, otherUid]);
-          }
-          if (!profileUid.contains(currentUid) || !profileUid.contains(otherUid)) {
-            updates['profileUid'] = FieldValue.arrayUnion([currentUid, otherUid]);
-          }
-
-          if (updates.isNotEmpty) {
-            debugPrint('🛡️ MensagensNewDS: Self-healing 1:1 (atualizando flags/participantes)');
-            await doc.reference.update(updates);
-          }
-
-          return conv.copyWith(isGroup: false); // garantir flag correta no retorno atual
         }
       }
 
       // Criar nova conversa
+      // ------------------------------------------------------------------
+      // DocId determinístico = directConversationKey.
+      // Garante idempotência: duas criações simultâneas convergem para o
+      // mesmo documento (impossível criar duplicatas por construção).
+      // Conversas antigas com IDs aleatórios continuam sendo encontradas
+      // pelos lookups acima (directConversationKey field + legacy scan).
+      // ------------------------------------------------------------------
       debugPrint('📝 MensagensNewDS: Criando nova conversa');
-      final newConvRef = _conversationsRef.doc();
+      final newConvRef = _conversationsRef.doc(directConversationKey);
+
+      // Race-safe re-check: outro dispositivo/chamada pode ter criado o doc
+      // nesta chave entre o lookup inicial e agora. Se existir, reaproveitamos.
+      //
+      // ⚠️ Firestore rules: ler um doc INEXISTENTE com a regra
+      // `allow read: if resource.data.participants != null ...` retorna
+      // `permission-denied` porque `resource` é null. Tratamos esse caso
+      // como "doc não existe" e seguimos para a criação.
+      DocumentSnapshot<Map<String, dynamic>>? existingByKey;
+      try {
+        existingByKey = await newConvRef.get();
+      } on FirebaseException catch (error) {
+        if (error.code == 'permission-denied') {
+          debugPrint(
+              'ℹ️ MensagensNewDS: get() determinístico negado (doc provavelmente inexistente), prosseguindo para create');
+          existingByKey = null;
+        } else {
+          rethrow;
+        }
+      }
+
+      if (existingByKey != null && existingByKey.exists) {
+        debugPrint(
+            '✅ MensagensNewDS: Conversa já existe em docId determinístico, reusando');
+        final conv = ConversationNewEntity.fromFirestore(existingByKey);
+        if (conv.isArchivedForProfile(currentProfileId)) {
+          await unarchiveConversation(conv.id, currentProfileId);
+        }
+        return conv;
+      }
+
       final now = DateTime.now();
 
       final newConv = ConversationNewEntity(
@@ -415,19 +598,28 @@ class MensagensNewRemoteDataSource implements IMensagensNewRemoteDataSource {
         ],
       );
 
-      await newConvRef.set({
-        ...newConv.toFirestore(),
-        // Adicionar profileUid para security rules
-        'profileUid': [currentUid, otherUid],
-      });
+      // SetOptions(merge:true) torna o set idempotente: se duas chamadas
+      // simultâneas passarem pelo re-check acima e criarem ao mesmo tempo,
+      // ambas convergem para os mesmos dados base sem sobrescrita destrutiva.
+      await newConvRef.set(
+        {
+          ...newConv.toFirestore(),
+          // Adicionar profileUid para security rules
+          'profileUid': [currentUid, otherUid],
+          'directConversationKey': directConversationKey,
+        },
+        SetOptions(merge: true),
+      );
 
-      debugPrint('✅ MensagensNewDS: Nova conversa criada - id=${newConvRef.id}');
+      debugPrint(
+          '✅ MensagensNewDS: Nova conversa criada - id=${newConvRef.id} (determinístico)');
       return newConv;
     } catch (e) {
       debugPrint('❌ MensagensNewDS: Erro em getOrCreateConversation - $e');
       rethrow;
     }
   }
+
 
   @override
   Future<void> archiveConversation(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:iconsax/iconsax.dart';
 
 /// Widget reutilizável para bolhas de mensagem no chat
@@ -126,9 +127,8 @@ class MessageBubble extends StatelessWidget {
                     placeholder: (context, url) => Container(
                       height: 200,
                       alignment: Alignment.center,
-                      child: const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE47911)),
-                        strokeWidth: 2,
+                      child: const AppRadioPulseLoader(
+                        size: 36,
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(

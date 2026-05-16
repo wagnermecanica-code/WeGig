@@ -2,6 +2,7 @@
 // Extracted from HomePage for better maintainability
 // Handles GPS and close card floating buttons
 
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
@@ -37,7 +38,7 @@ class HomeFloatingButtons extends StatelessWidget {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: AppRadioPulseLoader(size: 20),
                   )
                 : const Icon(Iconsax.gps, color: Colors.blue, size: 22),
           ),

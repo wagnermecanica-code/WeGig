@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
@@ -104,8 +105,7 @@ class SharedPostCardBubble extends StatelessWidget {
                     height: 120,
                     color: AppColors.surfaceVariant,
                     child: const Center(
-                      child:
-                          CircularProgressIndicator(strokeWidth: 2),
+                      child: AppRadioPulseLoader(size: 28),
                     ),
                   ),
                   errorWidget: (_, __, ___) => Container(

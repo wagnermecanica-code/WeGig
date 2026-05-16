@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/utils/debouncer.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -607,10 +608,7 @@ class _GroupChatNewPageState extends ConsumerState<GroupChatNewPage> {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                    ),
+                    child: AppRadioPulseLoader(size: 20, color: AppColors.primary),
                   )
                 : Text(
                     'Criar',
@@ -757,9 +755,7 @@ class _GroupChatNewPageState extends ConsumerState<GroupChatNewPage> {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(32),
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-          ),
+          child: AppRadioPulseLoader(size: 44, color: AppColors.primary),
         ),
       );
     }

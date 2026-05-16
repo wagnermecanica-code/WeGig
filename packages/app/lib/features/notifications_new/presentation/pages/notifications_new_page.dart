@@ -14,6 +14,7 @@
 library;
 
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
@@ -135,7 +136,7 @@ class _NotificationsNewPageState extends ConsumerState<NotificationsNewPage>
     // Loading se perfil não carregou
     if (!isProfileReadyForQueries) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(child: AppRadioPulseLoader(size: 52)),
       );
     }
 
@@ -173,6 +174,9 @@ class _NotificationsNewPageState extends ConsumerState<NotificationsNewPage>
   PreferredSizeWidget _buildAppBar(String profileId, String recipientUid) {
     return AppBar(
       backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+      iconTheme: const IconThemeData(color: Colors.white),
+      actionsIconTheme: const IconThemeData(color: Colors.white),
       elevation: 0,
       centerTitle: true,
       title: const Text(
@@ -331,7 +335,7 @@ class _NotificationsNewPageState extends ConsumerState<NotificationsNewPage>
                     child: SizedBox(
                       width: 24,
                       height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: AppRadioPulseLoader(size: 24),
                     ),
                   ),
                 );

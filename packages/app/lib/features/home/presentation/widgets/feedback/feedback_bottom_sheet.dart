@@ -234,10 +234,7 @@ class _FeedbackBottomSheetState extends State<FeedbackBottomSheet> {
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
+                            child: AppRadioPulseLoader(size: 20, color: Colors.white),
                           )
                         : const Text(
                             'Enviar',
