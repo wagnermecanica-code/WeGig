@@ -3,19 +3,99 @@
     "apps": [],
     "details": [
       {
-        "appID": "YOUR_TEAM_ID.com.example.wegig",
+        "appID": "6PP9UL45V7.com.wegig.wegig",
         "paths": [
           "/profile/*",
           "/post/*",
+          "/share.html",
           "/conversation/*",
-          "/"
+          "/chat/*",
+          "/chat-new/*"
+        ]
+      },
+      {
+        "appID": "6PP9UL45V7.com.wegig.wegig.dev",
+        "paths": [
+          "/profile/*",
+          "/post/*",
+          "/share.html",
+          "/conversation/*",
+          "/chat/*",
+          "/chat-new/*"
+        ]
+      },
+      {
+        "appID": "6PP9UL45V7.com.wegig.wegig.staging",
+        "paths": [
+          "/profile/*",
+          "/post/*",
+          "/share.html",
+          "/conversation/*",
+          "/chat/*",
+          "/chat-new/*"
+        ]
+      },
+      {
+        "appID": "6PP9UL45V7.com.tosembanda.wegig",
+        "paths": [
+          "/profile/*",
+          "/post/*",
+          "/share.html",
+          "/conversation/*",
+          "/chat/*",
+          "/chat-new/*"
+        ]
+      },
+      {
+        "appID": "6PP9UL45V7.com.tosembanda.wegig.dev",
+        "paths": [
+          "/profile/*",
+          "/post/*",
+          "/share.html",
+          "/conversation/*",
+          "/chat/*",
+          "/chat-new/*"
+        ]
+      },
+      {
+        "appID": "6PP9UL45V7.com.tosembanda.wegig.staging",
+        "paths": [
+          "/profile/*",
+          "/post/*",
+          "/share.html",
+          "/conversation/*",
+          "/chat/*",
+          "/chat-new/*"
+        ]
+      },
+      {
+        "appIDs": [
+          "6PP9UL45V7.com.wegig.wegig",
+          "6PP9UL45V7.com.wegig.wegig.dev",
+          "6PP9UL45V7.com.wegig.wegig.staging",
+          "6PP9UL45V7.com.tosembanda.wegig",
+          "6PP9UL45V7.com.tosembanda.wegig.dev",
+          "6PP9UL45V7.com.tosembanda.wegig.staging"
+        ],
+        "paths": [
+          "/profile/*",
+          "/post/*",
+          "/share.html",
+          "/conversation/*",
+          "/chat/*",
+          "/chat-new/*"
         ]
       }
     ]
   },
   "webcredentials": {
     "apps": [
-      "YOUR_TEAM_ID.com.example.wegig"
+      "6PP9UL45V7.com.wegig.wegig",
+      "6PP9UL45V7.com.wegig.wegig.dev",
+      "6PP9UL45V7.com.wegig.wegig.staging",
+      "6PP9UL45V7.com.tosembanda.wegig",
+      "6PP9UL45V7.com.tosembanda.wegig.dev",
+      "6PP9UL45V7.com.tosembanda.wegig.staging"
     ]
   }
 }

@@ -1,11 +1,14 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 /// Bottom sheet que exibe a lista de perfis que curtiram um comentário.
 ///
@@ -69,13 +72,33 @@ class _CommentLikersBottomSheetState
     });
 
     final results = await Future.wait(futures);
+    final likers = results.whereType<_LikerProfile>().toList(growable: false);
 
     if (mounted) {
       setState(() {
-        _likers.addAll(results.whereType<_LikerProfile>());
+        _likers.addAll(likers);
         _isLoading = false;
       });
+      _warmProfilePhotos(likers);
     }
+  }
+
+  void _warmProfilePhotos(List<_LikerProfile> likers) {
+    final urls = likers
+        .map((liker) => liker.photoUrl?.trim() ?? '')
+        .where((url) => url.isNotEmpty)
+        .toSet()
+        .take(12);
+
+    for (final url in urls) {
+      unawaited(_cacheProfilePhoto(url));
+    }
+  }
+
+  Future<void> _cacheProfilePhoto(String url) async {
+    try {
+      await WeGigImageCacheManager.instance.downloadFile(url);
+    } catch (_) {}
   }
 
   @override
@@ -185,21 +208,35 @@ class _CommentLikersBottomSheetState
                   itemCount: _likers.length,
                   itemBuilder: (context, index) {
                     final liker = _likers[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        radius: avatarRadius,
-                        backgroundColor:
-                            AppColors.primary.withValues(alpha: 0.1),
-                        backgroundImage: (liker.photoUrl != null &&
-                                liker.photoUrl!.isNotEmpty)
-                            ? CachedNetworkImageProvider(liker.photoUrl!)
-                            : null,
-                        child: (liker.photoUrl == null ||
-                                liker.photoUrl!.isEmpty)
-                            ? Icon(Icons.person,
-                                size: avatarRadius, color: AppColors.primary)
-                            : null,
+                    final photoUrl = liker.photoUrl?.trim() ?? '';
+                    final avatarSize = avatarRadius * 2;
+                    final fallbackAvatar = CircleAvatar(
+                      radius: avatarRadius,
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                      child: Icon(
+                        Icons.person,
+                        size: avatarRadius,
+                        color: AppColors.primary,
                       ),
+                    );
+
+                    return ListTile(
+                      leading: photoUrl.isEmpty
+                          ? fallbackAvatar
+                          : ClipOval(
+                              child: CachedNetworkImage(
+                                cacheManager: WeGigImageCacheManager.instance,
+                                imageUrl: photoUrl,
+                                width: avatarSize,
+                                height: avatarSize,
+                                fit: BoxFit.cover,
+                                memCacheWidth: avatarSize.ceil() * 2,
+                                memCacheHeight: avatarSize.ceil() * 2,
+                                fadeInDuration: Duration.zero,
+                                placeholder: (_, __) => fallbackAvatar,
+                                errorWidget: (_, __, ___) => fallbackAvatar,
+                              ),
+                            ),
                       title: Text(
                         liker.name,
                         style: const TextStyle(

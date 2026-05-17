@@ -106,7 +106,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
 
       // O link em si
       String url = match.group(0)!;
-      
+
       // Remove caracteres de pontuação no final (., ,, ), >, etc.)
       while (url.isNotEmpty && _isTrailingPunctuation(url[url.length - 1])) {
         url = url.substring(0, url.length - 1);
@@ -116,7 +116,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       spans.add(linkSpan);
 
       lastEnd = match.start + url.length;
-      
+
       // Adiciona a pontuação removida como texto normal
       if (match.end > lastEnd) {
         spans.add(TextSpan(
@@ -157,7 +157,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     if (deepLinkInfo != null) {
       // É um deep link do WeGig
       recognizer.onTap = () => _handleWeGigDeepLink(deepLinkInfo);
-      
+
       return TextSpan(
         text: _formatDeepLinkDisplay(deepLinkInfo),
         style: _getLinkStyle(),
@@ -166,7 +166,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     } else {
       // É uma URL externa
       recognizer.onTap = () => _launchUrl(url);
-      
+
       return TextSpan(
         text: _formatExternalUrlDisplay(url),
         style: _getLinkStyle(),
@@ -223,6 +223,27 @@ class _LinkifiedTextState extends State<LinkifiedText> {
             id: segments[1],
             originalUrl: url,
           );
+        }
+        break;
+
+      case 'share.html':
+        final type = uri.queryParameters['type'];
+        final id = uri.queryParameters['id'];
+        if (id != null && id.isNotEmpty) {
+          if (type == 'profile') {
+            return _WeGigDeepLink(
+              type: _DeepLinkType.profile,
+              id: id,
+              originalUrl: url,
+            );
+          }
+          if (type == 'post') {
+            return _WeGigDeepLink(
+              type: _DeepLinkType.post,
+              id: id,
+              originalUrl: url,
+            );
+          }
         }
         break;
 

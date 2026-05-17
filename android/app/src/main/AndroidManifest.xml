@@ -16,6 +16,7 @@
     <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyA3Rq-Fmlsrwn-fywriTBp7xZsOo7i5fyQ"/>
     <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:taskAffinity="" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
       <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme"/>
+      <meta-data android:name="flutter_deeplinking_enabled" android:value="true"/>
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
@@ -24,6 +25,20 @@
       <intent-filter>
         <action android:name="FLUTTER_NOTIFICATION_CLICK"/>
         <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+      <!-- Deep Links: wegig://app/* -->
+      <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="wegig" android:host="app"/>
+      </intent-filter>
+      <!-- Universal Links: https://wegig.com.br/* -->
+      <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="https" android:host="wegig.com.br"/>
       </intent-filter>
     </activity>
     <!-- Firebase Cloud Messaging: Receiver para notificações -->

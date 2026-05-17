@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 
 /// Bottom sheet que mostra quem reagiu a uma mensagem (Instagram-style)
 ///
@@ -56,32 +59,55 @@ class _ReactorsBottomSheetState extends State<ReactorsBottomSheet>
 
   Future<void> _loadProfilesData() async {
     final profileIds = widget.reactions.keys.toList();
+    final entries = await Future.wait(
+      profileIds.map((profileId) async {
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('profiles')
+              .doc(profileId)
+              .get();
 
-    for (final profileId in profileIds) {
-      try {
-        final doc = await FirebaseFirestore.instance
-            .collection('profiles')
-            .doc(profileId)
-            .get();
-
-        if (doc.exists) {
-          final data = doc.data()!;
-          _profilesData[profileId] = _ProfileData(
-            name: data['name'] as String? ?? 'Usuário',
-            username: data['username'] as String?,
-            photoUrl: data['photoUrl'] as String?,
-          );
-        } else {
-          _profilesData[profileId] = _ProfileData(name: 'Usuário');
-        }
-      } catch (e) {
-        _profilesData[profileId] = _ProfileData(name: 'Usuário');
-      }
-    }
+          if (doc.exists) {
+            final data = doc.data()!;
+            return MapEntry(
+              profileId,
+              _ProfileData(
+                name: data['name'] as String? ?? 'Usuário',
+                username: data['username'] as String?,
+                photoUrl: data['photoUrl'] as String?,
+              ),
+            );
+          }
+        } catch (_) {}
+        return MapEntry(profileId, _ProfileData(name: 'Usuário'));
+      }),
+    );
 
     if (mounted) {
-      setState(() => _isLoading = false);
+      setState(() {
+        _profilesData = Map<String, _ProfileData>.fromEntries(entries);
+        _isLoading = false;
+      });
+      _warmProfilePhotos(_profilesData.values);
     }
+  }
+
+  void _warmProfilePhotos(Iterable<_ProfileData> profiles) {
+    final urls = profiles
+        .map((profile) => profile.photoUrl?.trim() ?? '')
+        .where((url) => url.isNotEmpty)
+        .toSet()
+        .take(12);
+
+    for (final url in urls) {
+      unawaited(_cacheProfilePhoto(url));
+    }
+  }
+
+  Future<void> _cacheProfilePhoto(String url) async {
+    try {
+      await WeGigImageCacheManager.instance.downloadFile(url);
+    } catch (_) {}
   }
 
   @override
@@ -216,7 +242,10 @@ class _ReactorsBottomSheetState extends State<ReactorsBottomSheet>
             radius: 22,
             backgroundColor: AppColors.surfaceVariant,
             backgroundImage: profile?.photoUrl != null
-                ? CachedNetworkImageProvider(profile!.photoUrl!)
+                ? CachedNetworkImageProvider(
+                    profile!.photoUrl!,
+                    cacheManager: WeGigImageCacheManager.instance,
+                  )
                 : null,
             child: profile?.photoUrl == null
                 ? Icon(Iconsax.user, size: 22, color: AppColors.textSecondary)
@@ -249,9 +278,9 @@ class _ReactorsBottomSheetState extends State<ReactorsBottomSheet>
 }
 
 class _ProfileData {
+  _ProfileData({required this.name, this.username, this.photoUrl});
+
   final String name;
   final String? username;
   final String? photoUrl;
-
-  _ProfileData({required this.name, this.username, this.photoUrl});
 }

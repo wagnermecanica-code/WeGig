@@ -13,7 +13,8 @@ import FBSDKCoreKit
     GMSServices.provideAPIKey(googleMapsApiKey)
     
     #if DEBUG
-    print("🗺️ Google Maps API Key loaded for bundle: \(Bundle.main.bundleIdentifier ?? "unknown")")
+    let mapsKeySuffix = String(googleMapsApiKey.suffix(6))
+    print("🗺️ MAP_LOAD native_ios_maps_key_loaded bundle=\(Bundle.main.bundleIdentifier ?? "unknown") keySuffix=...\(mapsKeySuffix)")
     #endif
     
     ApplicationDelegate.shared.application(

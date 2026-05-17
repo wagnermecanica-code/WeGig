@@ -17,6 +17,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:wegig_app/features/post/presentation/providers/interest_providers.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_cache_provider.dart';
 import 'package:wegig_app/features/post/presentation/widgets/interest_options_dialog.dart';
@@ -631,8 +632,9 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
           .limit(10) // Limitar para performance
           .get();
 
-      final users = <Map<String, dynamic>>[];
       final seenProfileIds = <String>{};
+      final uniqueInterestDocs =
+          <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
       for (final interestDoc in interestsSnapshot.docs) {
         final data = interestDoc.data();
@@ -643,31 +645,44 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
         if (seenProfileIds.contains(interestedProfileId)) continue;
         seenProfileIds.add(interestedProfileId);
 
-        try {
-          final profileDoc = await FirebaseFirestore.instance
-              .collection('profiles')
-              .doc(interestedProfileId)
-              .get();
-
-          if (profileDoc.exists) {
-            final profileData = profileDoc.data()!;
-            users.add({
-              'profileId': interestedProfileId,
-              'name': profileData['name'] as String? ?? 'Usuário',
-              'photoUrl': profileData['photoUrl'] as String? ?? '',
-              'isBand': profileData['isBand'] as bool? ?? false,
-            });
-          }
-        } catch (e) {
-          debugPrint('Erro ao buscar perfil: $e');
-        }
+        uniqueInterestDocs.add(interestDoc);
       }
+
+      final users = await Future.wait(
+        uniqueInterestDocs.map((interestDoc) async {
+          final data = interestDoc.data();
+          final interestedProfileId = data['interestedProfileId'] as String;
+
+          try {
+            final profileDoc = await FirebaseFirestore.instance
+                .collection('profiles')
+                .doc(interestedProfileId)
+                .get();
+
+            if (profileDoc.exists) {
+              final profileData = profileDoc.data()!;
+              return {
+                'profileId': interestedProfileId,
+                'name': profileData['name'] as String? ?? 'Usuário',
+                'photoUrl': profileData['photoUrl'] as String? ?? '',
+                'isBand': profileData['isBand'] as bool? ?? false,
+              };
+            }
+          } catch (e) {
+            debugPrint('Erro ao buscar perfil: $e');
+          }
+          return null;
+        }),
+      ).then(
+        (results) => results.whereType<Map<String, dynamic>>().toList(),
+      );
 
       if (mounted) {
         setState(() {
           _interestedUsers = users;
           _isLoadingInterests = false;
         });
+        _warmInterestedUserPhotos(users);
       }
     } catch (e) {
       debugPrint('Erro ao carregar interessados: $e');
@@ -675,6 +690,24 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
         setState(() => _isLoadingInterests = false);
       }
     }
+  }
+
+  void _warmInterestedUserPhotos(List<Map<String, dynamic>> users) {
+    final urls = users
+        .map((user) => (user['photoUrl'] as String? ?? '').trim())
+        .where((url) => url.isNotEmpty)
+        .toSet()
+        .take(12);
+
+    for (final url in urls) {
+      unawaited(_cacheInterestedUserPhoto(url));
+    }
+  }
+
+  Future<void> _cacheInterestedUserPhoto(String url) async {
+    try {
+      await WeGigImageCacheManager.instance.downloadFile(url);
+    } catch (_) {}
   }
 
   @override
@@ -945,44 +978,174 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
     required VoidCallback onPressed,
     VoidCallback? onCountTap,
   }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.5),
-            shape: BoxShape.circle,
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.5),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              onPressed: onPressed,
+              icon: Icon(icon, color: Colors.white, size: 18),
+              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(),
+              tooltip: tooltip,
+            ),
           ),
-          child: IconButton(
-            onPressed: onPressed,
-            icon: Icon(icon, color: Colors.white, size: 18),
-            padding: const EdgeInsets.all(8),
-            constraints: const BoxConstraints(),
-            tooltip: tooltip,
-          ),
-        ),
-        if (count > 0)
-          GestureDetector(
-            onTap: onCountTap,
-            behavior: onCountTap != null
-                ? HitTestBehavior.opaque
-                : HitTestBehavior.deferToChild,
-            child: Padding(
-              padding:
-                  const EdgeInsets.only(top: 2, left: 6, right: 6, bottom: 2),
-              child: Text(
-                count > 999
-                    ? '${(count / 1000).toStringAsFixed(1)}k'
-                    : '$count',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+          if (count > 0)
+            Positioned(
+              left: -10,
+              top: -10,
+              child: GestureDetector(
+                onTap: onCountTap,
+                behavior: onCountTap != null
+                    ? HitTestBehavior.opaque
+                    : HitTestBehavior.deferToChild,
+                child: SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        left: 8,
+                        top: 9,
+                        child: Container(
+                          constraints: const BoxConstraints(minWidth: 18),
+                          height: 18,
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: Colors.black.withValues(alpha: 0.72),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Text(
+                            count > 999
+                                ? '${(count / 1000).toStringAsFixed(1)}k'
+                                : '$count',
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInterestActionIcon({
+    required bool isSales,
+    required bool hasInterest,
+  }) {
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onLongPress:
+                widget.interestCount > 0 ? _showAllInterestedUsers : null,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: _isOwnPost()
+                  ? IconButton(
+                      icon: const Icon(
+                        Iconsax.more,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      constraints: const BoxConstraints(),
+                      onPressed: _showOwnPostOptions,
+                    )
+                  : IconButton(
+                      icon: Icon(
+                        hasInterest
+                            ? (isSales ? Iconsax.tag5 : Iconsax.heart5)
+                            : (isSales ? Iconsax.tag : Iconsax.heart),
+                        color: hasInterest ? Colors.pink : Colors.white,
+                        size: 18,
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      constraints: const BoxConstraints(),
+                      tooltip: isSales ? 'Tenho interesse' : 'Curtir interesse',
+                      onPressed: _showInterestOptions,
+                    ),
+            ),
           ),
-      ],
+          if (widget.interestCount > 0)
+            Positioned(
+              left: -10,
+              top: -10,
+              child: GestureDetector(
+                onTap: _showAllInterestedUsers,
+                behavior: HitTestBehavior.opaque,
+                child: SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        left: 8,
+                        top: 9,
+                        child: Container(
+                          constraints: const BoxConstraints(minWidth: 18),
+                          height: 18,
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color:
+                                hasInterest ? Colors.pink : AppColors.primary,
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: Colors.black.withValues(alpha: 0.72),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Text(
+                            widget.interestCount > 999
+                                ? '${(widget.interestCount / 1000).toStringAsFixed(1)}k'
+                                : '${widget.interestCount}',
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -1010,7 +1173,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
               CommentsBottomSheet.show(context, widget.post);
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           // Encaminhar
           _buildFeedIconWithCounter(
             icon: Iconsax.send_1,
@@ -1018,67 +1181,25 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
             tooltip: 'Enviar para conversa',
             onPressed: _sharePostToChat,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          // Compartilhar fora do app
+          _buildFeedIconWithCounter(
+            icon: Iconsax.share,
+            count: 0,
+            tooltip: 'Compartilhar fora do app',
+            onPressed: _sharePostWithDeepLink,
+          ),
+          const SizedBox(height: 12),
           // Interesse / Opções do post
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  shape: BoxShape.circle,
-                ),
-                child: _isOwnPost()
-                    ? IconButton(
-                        icon: const Icon(
-                          Iconsax.more,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                        padding: const EdgeInsets.all(8),
-                        constraints: const BoxConstraints(),
-                        onPressed: _showOwnPostOptions,
-                      )
-                    : Builder(
-                        builder: (context) {
-                          final hasInterest = ref
-                              .watch(interestNotifierProvider)
-                              .contains(widget.post.id);
-                          return IconButton(
-                            icon: Icon(
-                              hasInterest
-                                  ? (isSales ? Iconsax.tag5 : Iconsax.heart5)
-                                  : (isSales ? Iconsax.tag : Iconsax.heart),
-                              color: hasInterest ? Colors.pink : Colors.white,
-                              size: 18,
-                            ),
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(),
-                            onPressed: _showInterestOptions,
-                          );
-                        },
-                      ),
-              ),
-              if (widget.interestCount > 0)
-                GestureDetector(
-                  onTap: _showAllInterestedUsers,
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.only(
-                        top: 4, left: 8, right: 8, bottom: 4),
-                    child: Text(
-                      widget.interestCount > 999
-                          ? '${(widget.interestCount / 1000).toStringAsFixed(1)}k'
-                          : '${widget.interestCount}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+          Builder(
+            builder: (context) {
+              final hasInterest =
+                  ref.watch(interestNotifierProvider).contains(widget.post.id);
+              return _buildInterestActionIcon(
+                isSales: isSales,
+                hasInterest: hasInterest,
+              );
+            },
           ),
         ],
       ),
@@ -1585,7 +1706,10 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
       return CircleAvatar(
         radius: 22,
         backgroundColor: Colors.grey[800],
-        backgroundImage: CachedNetworkImageProvider(photoUrl),
+        backgroundImage: CachedNetworkImageProvider(
+          photoUrl,
+          cacheManager: WeGigImageCacheManager.instance,
+        ),
       );
     }
     return CircleAvatar(
@@ -1748,11 +1872,31 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
 
   Future<void> _openWhatsApp(String number) async {
     HapticFeedback.lightImpact();
-    final cleanNumber = number.replaceAll(RegExp(r'[^\d]'), '');
-    final url = Uri.parse('https://wa.me/55$cleanNumber');
+    final whatsappNumber = _formatBrazilWhatsAppNumber(number);
+    final post = widget.post;
+    final title = post.title?.trim();
+    final postLink = DeepLinkGenerator.generatePostLink(postId: post.id);
+    final message = [
+      'Olá! Vi este anúncio no WeGig e tenho interesse.',
+      if (title != null && title.isNotEmpty) 'Anúncio: $title',
+      postLink,
+    ].join('\n\n');
+    final url = Uri.https(
+      'wa.me',
+      '/$whatsappNumber',
+      {'text': message},
+    );
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
+  }
+
+  String _formatBrazilWhatsAppNumber(String phone) {
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    if (cleanPhone.startsWith('55')) {
+      return cleanPhone;
+    }
+    return '55$cleanPhone';
   }
 
   /// Abre conversa direta com o autor do post
@@ -2193,8 +2337,12 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
       child: CircleAvatar(
         radius: 12,
         backgroundColor: Colors.grey[800],
-        backgroundImage:
-            photoUrl.isNotEmpty ? CachedNetworkImageProvider(photoUrl) : null,
+        backgroundImage: photoUrl.isNotEmpty
+            ? CachedNetworkImageProvider(
+                photoUrl,
+                cacheManager: WeGigImageCacheManager.instance,
+              )
+            : null,
         child: photoUrl.isEmpty
             ? const Icon(
                 Iconsax.user,
@@ -2294,7 +2442,10 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
                           backgroundColor:
                               AppColors.primary.withValues(alpha: 0.1),
                           backgroundImage: photoUrl.isNotEmpty
-                              ? CachedNetworkImageProvider(photoUrl)
+                              ? CachedNetworkImageProvider(
+                                  photoUrl,
+                                  cacheManager: WeGigImageCacheManager.instance,
+                                )
                               : null,
                           child: photoUrl.isEmpty
                               ? const Icon(

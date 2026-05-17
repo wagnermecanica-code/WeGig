@@ -89,6 +89,8 @@ class _HomePageState extends ConsumerState<HomePage>
   Set<Marker> _markers = {};
   String? _activePostId;
   bool _isCenteringLocation = false;
+  bool _showUserLocationOnMap = false;
+  bool _isMapReadyForDisplay = false;
   bool _isRebuildingMarkers = false;
   DateTime? _lastMarkerRebuild;
   ProviderSubscription<AsyncValue<PostState>>? _postsSubscription;
@@ -101,8 +103,6 @@ class _HomePageState extends ConsumerState<HomePage>
   double? _currentVisibleRadiusKm;
   String? _mapAreaLabel;
   bool _isDisposed = false;
-  bool _isRequestingLocationPermission =
-      false; // ✅ FIX: Evita race condition de GPS
 
   // PageView Controller para carrossel horizontal
   late final PageController _pageController;
@@ -129,16 +129,131 @@ class _HomePageState extends ConsumerState<HomePage>
   DateTime? _lastMapIdleCall;
   static const _mapIdleThrottleMs = 350;
   bool _isProcessingMapIdle = false;
+  bool _hasPendingMapIdleRefresh = false;
+  bool _forceNextMapIdleProcessing = false;
   String? _lastProcessedBoundsKey;
   DateTime? _lastProcessedBoundsAt;
   bool _markerWarmupScheduled = false;
   String? _lastMarkerRenderSignature;
+  int _mapVisibleRegionRetryCount = 0;
+  final Stopwatch _mapLoadStopwatch = Stopwatch();
+  int _mapLoadLogSequence = 0;
+  Size? _lastLoggedMapSize;
+  bool _hasLoggedFirstMapIdle = false;
+  bool _hasLoggedFirstCameraMove = false;
+  LatLng? _pendingMapReadyTarget;
+
+  static const _initialMapFallback = LatLng(-23.55052, -46.633308);
+  static const _mapVisibleRegionMaxRetries = 8;
 
   ProfileEntity? get _activeProfile =>
       ref.read(profileProvider).value?.activeProfile;
 
   @override
   bool get wantKeepAlive => true;
+
+  void _logMapLoad(
+    String event, [
+    Map<String, Object?> details = const <String, Object?>{},
+  ]) {
+    if (!_mapLoadStopwatch.isRunning) {
+      _mapLoadStopwatch.start();
+    }
+
+    final elapsedMs = _mapLoadStopwatch.elapsedMilliseconds;
+    final sequence = (++_mapLoadLogSequence).toString().padLeft(3, '0');
+    final detailsText = details.entries
+        .where((entry) => entry.value != null)
+        .map((entry) => '${entry.key}=${entry.value}')
+        .join(' | ');
+
+    debugPrint(
+      detailsText.isEmpty
+          ? '🗺️ MAP_LOAD #$sequence +${elapsedMs}ms $event'
+          : '🗺️ MAP_LOAD #$sequence +${elapsedMs}ms $event | $detailsText',
+    );
+  }
+
+  String _formatLatLngForLog(LatLng value) {
+    return '${value.latitude.toStringAsFixed(6)},'
+        '${value.longitude.toStringAsFixed(6)}';
+  }
+
+  String _formatBoundsForLog(LatLngBounds bounds) {
+    return 'NE(${_formatLatLngForLog(bounds.northeast)}) '
+        'SW(${_formatLatLngForLog(bounds.southwest)})';
+  }
+
+  bool _hasUsableVisibleRegion(LatLngBounds bounds) {
+    final northeast = bounds.northeast;
+    final southwest = bounds.southwest;
+    final isGoogleMapsSentinel = northeast.latitude == -90 &&
+        northeast.longitude == -180 &&
+        southwest.latitude == -90 &&
+        southwest.longitude == -180;
+    final hasArea = (northeast.latitude - southwest.latitude).abs() > 0.00001 ||
+        (northeast.longitude - southwest.longitude).abs() > 0.00001;
+
+    return !isGoogleMapsSentinel &&
+        hasArea &&
+        northeast.latitude.isFinite &&
+        northeast.longitude.isFinite &&
+        southwest.latitude.isFinite &&
+        southwest.longitude.isFinite;
+  }
+
+  bool _boundsContainTarget(LatLngBounds bounds, LatLng target) {
+    final latitudeInside = target.latitude >= bounds.southwest.latitude &&
+        target.latitude <= bounds.northeast.latitude;
+    final longitudeInside =
+        bounds.southwest.longitude <= bounds.northeast.longitude
+            ? target.longitude >= bounds.southwest.longitude &&
+                target.longitude <= bounds.northeast.longitude
+            : target.longitude >= bounds.southwest.longitude ||
+                target.longitude <= bounds.northeast.longitude;
+
+    return latitudeInside && longitudeInside;
+  }
+
+  bool _visibleRegionMatchesPendingTarget(LatLngBounds bounds) {
+    final target = _pendingMapReadyTarget;
+    if (target == null) return true;
+    return _boundsContainTarget(bounds, target);
+  }
+
+  void _setMapReadinessTarget(LatLng target) {
+    _pendingMapReadyTarget = target;
+    _isMapReadyForDisplay = false;
+    _mapVisibleRegionRetryCount = 0;
+    _lastProcessedBoundsKey = null;
+    _lastProcessedBoundsAt = null;
+  }
+
+  void _markMapReadyForDisplay() {
+    if (_isMapReadyForDisplay || !mounted || _isDisposed) return;
+    setState(() {
+      _isMapReadyForDisplay = true;
+      _pendingMapReadyTarget = null;
+    });
+    _logMapLoad('map_ready_for_display');
+  }
+
+  void _scheduleVisibleRegionRetry() {
+    if (_mapVisibleRegionRetryCount >= _mapVisibleRegionMaxRetries) {
+      _logMapLoad(
+        'map_visible_region_retry_exhausted',
+        <String, Object?>{'retries': _mapVisibleRegionRetryCount},
+      );
+      return;
+    }
+
+    _mapVisibleRegionRetryCount += 1;
+    Future<void>.delayed(const Duration(milliseconds: 250), () {
+      if (!mounted || _isDisposed || _isProcessingMapIdle) return;
+      if (_mapControllerWrapper.controller == null) return;
+      unawaited(_onMapIdle());
+    });
+  }
 
   Future<List<Map<String, dynamic>>> _fetchAddressSuggestions(
       String query) async {
@@ -196,6 +311,17 @@ class _HomePageState extends ConsumerState<HomePage>
   @override
   void initState() {
     super.initState();
+    _mapLoadStopwatch.start();
+    _logMapLoad(
+      'home_init',
+      <String, Object?>{
+        'flavor': AppConfig.appFlavor,
+        'env': AppConfig.appEnv,
+        'platform': Platform.operatingSystem,
+        'mapIdAndroid': AppConfig.googleMapIdAndroid,
+        'mapIdIOS': AppConfig.googleMapIdIOS,
+      },
+    );
     WidgetsBinding.instance.addObserver(this);
     _pageController = PageController(viewportFraction: 0.88);
     // ✅ Listener refinado para detectar scroll do usuário via position
@@ -212,6 +338,15 @@ class _HomePageState extends ConsumerState<HomePage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted || _isDisposed) return;
+
+    _logMapLoad(
+      'lifecycle',
+      <String, Object?>{
+        'state': state.name,
+        'hasController': _mapControllerWrapper.controller != null,
+        'markers': _markers.length,
+      },
+    );
 
     // Ao entrar em background: liberar cache de markers (bitmaps custosos)
     // para reduzir `phys_footprint` e diminuir chance de jetsam no iOS 26.
@@ -265,6 +400,14 @@ class _HomePageState extends ConsumerState<HomePage>
 
   @override
   void dispose() {
+    _logMapLoad(
+      'home_dispose',
+      <String, Object?>{
+        'hasController': _mapControllerWrapper.controller != null,
+        'markers': _markers.length,
+        'visiblePosts': _visiblePosts.length,
+      },
+    );
     // ✅ FIX: Dispose all controllers to prevent memory leaks
     // NOTA: Não usar ref.read() no dispose - causa "Cannot use ref after disposed"
     WidgetsBinding.instance.removeObserver(this);
@@ -497,10 +640,34 @@ class _HomePageState extends ConsumerState<HomePage>
     _connectedProfileIds = initialIds;
   }
 
-  void _scheduleVisiblePostsRefresh() {
+  void _scheduleVisiblePostsRefresh({String reason = 'data_changed'}) {
     if (_isDisposed || !mounted) return;
+    _forceNextMapIdleProcessing = true;
+    _lastProcessedBoundsKey = null;
+    _lastProcessedBoundsAt = null;
+    _logMapLoad(
+      'visible_posts_refresh_scheduled',
+      <String, Object?>{
+        'reason': reason,
+        'isProcessing': _isProcessingMapIdle,
+        'cachedPosts': _cachedPosts.length,
+        'visiblePosts': _visiblePosts.length,
+        'markers': _markers.length,
+      },
+    );
+
+    if (_isProcessingMapIdle) {
+      _hasPendingMapIdleRefresh = true;
+      return;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || _isDisposed) return;
+      if (_isProcessingMapIdle) {
+        _hasPendingMapIdleRefresh = true;
+        _logMapLoad('visible_posts_refresh_queued_during_processing');
+        return;
+      }
       unawaited(_onMapIdle());
     });
   }
@@ -559,9 +726,7 @@ class _HomePageState extends ConsumerState<HomePage>
   void _onSearchChanged() {
     debugPrint(
         '🔍 HomePage._onSearchChanged: searchNotifier.value = ${widget.searchNotifier?.value}');
-    if (mounted) {
-      _onMapIdle();
-    }
+    _scheduleVisiblePostsRefresh(reason: 'search_changed');
   }
 
   void _onExternalRefresh() {
@@ -579,7 +744,7 @@ class _HomePageState extends ConsumerState<HomePage>
           .whenComplete(() => _isProgrammaticScroll = false);
     }
     _scheduleVisiblePostsRefresh();
-    unawaited(_centerOnUserLocation());
+    unawaited(_centerOnActiveProfileLocation());
   }
 
   /// Calcula distância entre post e perfil ativo
@@ -602,21 +767,35 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Future<void> _rebuildMarkers({bool force = false}) async {
-    if (!mounted || _isRebuildingMarkers) return;
+    if (!mounted || _isRebuildingMarkers) {
+      _logMapLoad(
+        'markers_rebuild_skipped',
+        <String, Object?>{
+          'mounted': mounted,
+          'isRebuilding': _isRebuildingMarkers,
+        },
+      );
+      return;
+    }
 
     final renderSignature = _buildMarkerRenderSignature();
     if (!force && renderSignature == _lastMarkerRenderSignature) {
       debugPrint(
           '🗺️ _rebuildMarkers: Pulando rebuild (assinatura inalterada)');
+      _logMapLoad('markers_rebuild_skipped_same_signature');
       return;
     }
 
     if (_visiblePosts.isEmpty) {
       _lastMarkerRenderSignature = renderSignature;
-      if (_markers.isEmpty) return;
+      if (_markers.isEmpty) {
+        _logMapLoad('markers_rebuild_skipped_empty_visible_posts');
+        return;
+      }
 
       setState(() => _markers = <Marker>{});
       debugPrint('🗺️ _rebuildMarkers: Limpando marcadores vazios');
+      _logMapLoad('markers_cleared_empty_visible_posts');
       return;
     }
 
@@ -627,6 +806,13 @@ class _HomePageState extends ConsumerState<HomePage>
         now.difference(_lastMarkerRebuild!).inMilliseconds < 300) {
       debugPrint(
           '🗺️ _rebuildMarkers: Pulando rebuild (debounce ${now.difference(_lastMarkerRebuild!).inMilliseconds}ms)');
+      _logMapLoad(
+        'markers_rebuild_skipped_debounce',
+        <String, Object?>{
+          'elapsedSinceLastMs':
+              now.difference(_lastMarkerRebuild!).inMilliseconds,
+        },
+      );
       return;
     }
 
@@ -634,33 +820,61 @@ class _HomePageState extends ConsumerState<HomePage>
         '🗺️ _rebuildMarkers: Iniciando rebuild de ${_visiblePosts.length} posts...');
     _isRebuildingMarkers = true;
     _lastMarkerRebuild = now;
-
-    await _markerBuilder.primeForPosts(
-      _visiblePosts,
-      activePostId: _activePostId,
-      maxPosts: 6,
+    final markerStopwatch = Stopwatch()..start();
+    _logMapLoad(
+      'markers_rebuild_start',
+      <String, Object?>{
+        'force': force,
+        'visiblePosts': _visiblePosts.length,
+        'activePostId': _activePostId,
+      },
     );
 
-    // ✅ OTIMIZAÇÃO: Cache inteligente no MarkerBuilder evita reconstruções
-    final markers = await _markerBuilder.buildMarkersForPosts(
-      _visiblePosts,
-      _activePostId,
-      _onMarkerTapped,
-    );
+    try {
+      await _markerBuilder.primeForPosts(
+        _visiblePosts,
+        activePostId: _activePostId,
+        maxPosts: 6,
+      );
 
-    if (mounted) {
-      // ✅ OTIMIZAÇÃO: Usa Future.microtask para agendar rebuild pós-frame
-      Future.microtask(() {
-        if (mounted && !_isDisposed) {
-          setState(() => _markers = markers);
-          _lastMarkerRenderSignature = renderSignature;
-          debugPrint(
-              '🗺️ _rebuildMarkers: Marcadores atualizados (${markers.length}) [cache: ${_markerBuilder.cacheStats}]');
-        }
-      });
+      // ✅ OTIMIZAÇÃO: Cache inteligente no MarkerBuilder evita reconstruções
+      final markers = await _markerBuilder.buildMarkersForPosts(
+        _visiblePosts,
+        _activePostId,
+        _onMarkerTapped,
+      );
+
+      if (mounted) {
+        // ✅ OTIMIZAÇÃO: Usa Future.microtask para agendar rebuild pós-frame
+        Future.microtask(() {
+          if (mounted && !_isDisposed) {
+            setState(() => _markers = markers);
+            _lastMarkerRenderSignature = renderSignature;
+            debugPrint(
+                '🗺️ _rebuildMarkers: Marcadores atualizados (${markers.length}) [cache: ${_markerBuilder.cacheStats}]');
+            _logMapLoad(
+              'markers_rebuild_applied',
+              <String, Object?>{
+                'markers': markers.length,
+                'durationMs': markerStopwatch.elapsedMilliseconds,
+                'cacheStats': _markerBuilder.cacheStats,
+              },
+            );
+          }
+        });
+      }
+    } catch (e) {
+      _logMapLoad(
+        'markers_rebuild_failed',
+        <String, Object?>{
+          'durationMs': markerStopwatch.elapsedMilliseconds,
+          'error': e,
+        },
+      );
+      rethrow;
+    } finally {
+      _isRebuildingMarkers = false;
     }
-
-    _isRebuildingMarkers = false;
   }
 
   Future<void> _onMarkerTapped(PostEntity post) async {
@@ -754,75 +968,50 @@ class _HomePageState extends ConsumerState<HomePage>
 
       LatLng? targetPos;
 
-      // Estratégia 1: Cache GPS (<24h) - instantâneo
-      if (_mapControllerWrapper.currentPosition != null) {
-        targetPos = _mapControllerWrapper.currentPosition;
-        debugPrint('📍 Usando posição em cache');
-      } else {
-        // Estratégia 2: GPS atual com timeout de 10s
-        final permission = await Geolocator.checkPermission();
-        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      final permission = await Geolocator.checkPermission();
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
-        if (permission != LocationPermission.denied &&
-            permission != LocationPermission.deniedForever &&
-            serviceEnabled) {
-          try {
-            debugPrint('📍 Obtendo GPS atual...');
-            final position = await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.high,
-            ).timeout(const Duration(seconds: 10));
+      if (permission != LocationPermission.denied &&
+          permission != LocationPermission.deniedForever &&
+          serviceEnabled) {
+        try {
+          debugPrint('📍 Obtendo GPS atual...');
+          final position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+          ).timeout(const Duration(seconds: 10));
 
-            targetPos = LatLng(position.latitude, position.longitude);
-            if (mounted) {
-              setState(
-                  () => _mapControllerWrapper.setCurrentPosition(targetPos!));
-            }
-            await GpsCacheService.updateCache(targetPos);
-            debugPrint('✅ GPS atual obtido');
-            AppSnackBar.showSuccess(context, 'Localização atualizada');
-          } catch (timeoutError) {
-            debugPrint('⚠️ GPS timeout, tentando fallback...');
-
-            // Estratégia 3: LastKnown do Geolocator
-            final lastPosition = await Geolocator.getLastKnownPosition();
-            if (lastPosition != null) {
-              targetPos = LatLng(lastPosition.latitude, lastPosition.longitude);
-              if (mounted) {
-                setState(
-                    () => _mapControllerWrapper.setCurrentPosition(targetPos!));
-              }
-              debugPrint('📍 Usando última posição conhecida');
-              AppSnackBar.showInfo(
-                  context, 'GPS timeout. Usando última localização.');
-            } else {
-              // Estratégia 4: Localização do perfil (sempre disponível)
-              final profile = _activeProfile;
-              final profileLocation = profile?.location;
-              if (profileLocation != null) {
-                targetPos = geoPointToLatLng(profileLocation);
-                debugPrint('📍 Usando localização do perfil');
-                AppSnackBar.showInfo(
-                    context, 'GPS indisponível. Usando local do perfil.');
-              }
-            }
+          targetPos = LatLng(position.latitude, position.longitude);
+          if (mounted) {
+            setState(() {
+              _showUserLocationOnMap = true;
+              _mapControllerWrapper.setCurrentPosition(targetPos!);
+            });
           }
-        } else {
-          // Permissões negadas ou GPS desativado - ir direto para perfil
-          final profile = _activeProfile;
-          final profileLocation = profile?.location;
-          if (profileLocation != null) {
-            targetPos = geoPointToLatLng(profileLocation);
-            debugPrint('📍 GPS não disponível, usando perfil');
+          await GpsCacheService.updateCache(targetPos);
+          debugPrint('✅ GPS atual obtido');
+        } catch (timeoutError) {
+          debugPrint('⚠️ GPS timeout, tentando fallback...');
 
-            if (!serviceEnabled) {
-              AppSnackBar.showWarning(
-                  context, 'GPS desativado. Ative nas configurações.');
-            } else {
-              AppSnackBar.showWarning(
-                  context, 'Permissão de localização necessária');
+          // Estratégia 2: LastKnown do Geolocator
+          final lastPosition = await Geolocator.getLastKnownPosition();
+          if (lastPosition != null) {
+            targetPos = LatLng(lastPosition.latitude, lastPosition.longitude);
+            if (mounted) {
+              setState(() {
+                _showUserLocationOnMap = true;
+                _mapControllerWrapper.setCurrentPosition(targetPos!);
+              });
             }
+            debugPrint('📍 Usando última posição conhecida');
+            AppSnackBar.showInfo(
+                context, 'GPS timeout. Usando última localização.');
           }
         }
+      } else if (!serviceEnabled) {
+        AppSnackBar.showWarning(
+            context, 'GPS desativado. Ative nas configurações.');
+      } else {
+        AppSnackBar.showWarning(context, 'Permissão de localização necessária');
       }
 
       // Centralizar no mapa
@@ -839,6 +1028,59 @@ class _HomePageState extends ConsumerState<HomePage>
       if (!e.toString().contains('channel-error')) {
         AppSnackBar.showError(context, 'Erro ao obter localização');
       }
+    } finally {
+      if (mounted) {
+        setState(() => _isCenteringLocation = false);
+      } else {
+        _isCenteringLocation = false;
+      }
+    }
+  }
+
+  Future<void> _centerOnActiveProfileLocation() async {
+    if (!mounted || _isCenteringLocation) return;
+
+    final activeProfile = _activeProfile ?? ref.read(activeProfileProvider);
+    if (activeProfile == null) {
+      AppSnackBar.showInfo(context, 'Perfil ativo ainda está carregando...');
+      return;
+    }
+
+    final target = geoPointToLatLng(activeProfile.location);
+
+    try {
+      setState(() {
+        _isCenteringLocation = true;
+        _showUserLocationOnMap = false;
+        _activePostId = null;
+        _setMapReadinessTarget(target);
+        _mapControllerWrapper.setCurrentPosition(target);
+      });
+
+      final controller = await _waitForMapController();
+      if (controller == null) {
+        AppSnackBar.showInfo(context, 'Aguarde o mapa carregar...');
+        return;
+      }
+
+      await controller.animateCamera(
+        CameraUpdate.newLatLngZoom(target, 14),
+      );
+      _forceNextMapIdleProcessing = true;
+      _lastProcessedBoundsKey = null;
+      _lastProcessedBoundsAt = null;
+      _scheduleVisibleRegionRetry();
+
+      _logMapLoad(
+        'center_on_active_profile_location',
+        <String, Object?>{
+          'profileId': activeProfile.profileId,
+          'target': _formatLatLngForLog(target),
+        },
+      );
+    } catch (e) {
+      debugPrint('❌ Erro ao centralizar no perfil ativo: $e');
+      AppSnackBar.showError(context, 'Erro ao centralizar no perfil ativo');
     } finally {
       if (mounted) {
         setState(() => _isCenteringLocation = false);
@@ -1358,272 +1600,304 @@ class _HomePageState extends ConsumerState<HomePage>
             ),
           ],
         ),
-        body: Stack(
-          children: [
-            _buildMapView(),
-            // Máscara Airbnb - Vinheta nas bordas com gradientes visíveis
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      radius: 1.2,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.25),
-                      ],
-                      stops: const [0.5, 1.0],
+        body: AppLoadingOverlay(
+          isLoading: !_isMapReadyForDisplay,
+          backgroundColor: Colors.white.withValues(alpha: 0.24),
+          blurSigma: 10,
+          child: Stack(
+            children: [
+              _buildMapView(),
+              // Máscara Airbnb - Vinheta nas bordas com gradientes visíveis
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        radius: 1.2,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.25),
+                        ],
+                        stops: const [0.5, 1.0],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            // Sombra superior para search bar
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 120,
-              child: IgnorePointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.white.withValues(alpha: 0.45),
-                        Colors.white.withValues(alpha: 0.20),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.5, 1.0],
+              // Sombra superior para search bar
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 120,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.45),
+                          Colors.white.withValues(alpha: 0.20),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            // Sombra inferior para carousel
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: 280,
-              child: IgnorePointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.white.withValues(alpha: 0.5),
-                        Colors.white.withValues(alpha: 0.20),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.5, 1.0],
+              // Sombra inferior para carousel
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 280,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.5),
+                          Colors.white.withValues(alpha: 0.20),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              top: 32,
-              left: 16,
-              right: 16,
-              child: Material(
-                elevation: 6,
-                borderRadius: BorderRadius.circular(24),
-                child: TypeAheadField<Map<String, dynamic>>(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  suggestionsCallback: _fetchAddressSuggestions,
-                  builder: (context, controller, focusNode) {
-                    return TextField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      decoration: InputDecoration(
-                        hintText:
-                            'Buscar localização (cidade, bairro, endereço...)',
-                        prefixIcon: const Icon(Iconsax.location,
-                            color: AppColors.primary),
-                        suffixIcon: controller.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Iconsax.close_circle,
-                                    color: AppColors.textSecondary),
-                                onPressed: () {
-                                  controller.clear();
-                                  focusNode.unfocus();
-                                },
+              Positioned(
+                top: 32,
+                left: 16,
+                right: 16,
+                child: Material(
+                  elevation: 6,
+                  borderRadius: BorderRadius.circular(24),
+                  child: TypeAheadField<Map<String, dynamic>>(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    suggestionsCallback: _fetchAddressSuggestions,
+                    builder: (context, controller, focusNode) {
+                      return TextField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        decoration: InputDecoration(
+                          hintText:
+                              'Buscar localização (cidade, bairro, endereço...)',
+                          prefixIcon: const Icon(Iconsax.location,
+                              color: AppColors.primary),
+                          suffixIcon: controller.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Iconsax.close_circle,
+                                      color: AppColors.textSecondary),
+                                  onPressed: () {
+                                    controller.clear();
+                                    focusNode.unfocus();
+                                  },
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
+                        ),
+                      );
+                    },
+                    itemBuilder: (BuildContext context,
+                        Map<String, dynamic> suggestion) {
+                      final address =
+                          suggestion['address'] as Map<String, dynamic>? ?? {};
+
+                      // Extrai os componentes com fallback
+                      final road = (address['road'] ??
+                          address['pedestrian'] ??
+                          '') as String;
+                      final houseNumber =
+                          (address['house_number'] ?? '') as String;
+                      final neighbourhood = (address['neighbourhood'] ??
+                          address['suburb'] ??
+                          address['quarter'] ??
+                          '') as String;
+                      final city = (address['city'] ??
+                          address['town'] ??
+                          address['village'] ??
+                          address['municipality'] ??
+                          '') as String;
+                      final state = (address['state'] ?? '') as String;
+
+                      // Monta a linha principal (rua + número)
+                      final streetLine = [road, houseNumber]
+                          .where((e) => e.isNotEmpty)
+                          .join(', ');
+
+                      // Monta a linha secundária (bairro • cidade • estado)
+                      final List<String> secondaryParts = [];
+                      if (neighbourhood.isNotEmpty)
+                        secondaryParts.add(neighbourhood);
+                      if (city.isNotEmpty) secondaryParts.add(city);
+                      if (state.isNotEmpty) secondaryParts.add(state);
+
+                      final secondaryLine = secondaryParts.join(' • ');
+
+                      return ListTile(
+                        leading: const Icon(Iconsax.location,
+                            color: AppColors.primary, size: 20),
+                        title: Text(
+                          streetLine.isNotEmpty
+                              ? streetLine
+                              : (suggestion['display_name'] as String?)
+                                      ?.split(',')
+                                      .first ??
+                                  'Localização',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 15),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: secondaryLine.isNotEmpty
+                            ? Text(
+                                secondaryLine,
+                                style: TextStyle(
+                                    color: Colors.grey[700], fontSize: 13),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               )
                             : null,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide.none,
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                        ),
-                      ),
-                    );
-                  },
-                  itemBuilder:
-                      (BuildContext context, Map<String, dynamic> suggestion) {
-                    final address =
-                        suggestion['address'] as Map<String, dynamic>? ?? {};
-
-                    // Extrai os componentes com fallback
-                    final road = (address['road'] ??
-                        address['pedestrian'] ??
-                        '') as String;
-                    final houseNumber =
-                        (address['house_number'] ?? '') as String;
-                    final neighbourhood = (address['neighbourhood'] ??
-                        address['suburb'] ??
-                        address['quarter'] ??
-                        '') as String;
-                    final city = (address['city'] ??
-                        address['town'] ??
-                        address['village'] ??
-                        address['municipality'] ??
-                        '') as String;
-                    final state = (address['state'] ?? '') as String;
-
-                    // Monta a linha principal (rua + número)
-                    final streetLine = [road, houseNumber]
-                        .where((e) => e.isNotEmpty)
-                        .join(', ');
-
-                    // Monta a linha secundária (bairro • cidade • estado)
-                    final List<String> secondaryParts = [];
-                    if (neighbourhood.isNotEmpty)
-                      secondaryParts.add(neighbourhood);
-                    if (city.isNotEmpty) secondaryParts.add(city);
-                    if (state.isNotEmpty) secondaryParts.add(state);
-
-                    final secondaryLine = secondaryParts.join(' • ');
-
-                    return ListTile(
-                      leading: const Icon(Iconsax.location,
-                          color: AppColors.primary, size: 20),
-                      title: Text(
-                        streetLine.isNotEmpty
-                            ? streetLine
-                            : (suggestion['display_name'] as String?)
-                                    ?.split(',')
-                                    .first ??
-                                'Localização',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 15),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: secondaryLine.isNotEmpty
-                          ? Text(
-                              secondaryLine,
-                              style: TextStyle(
-                                  color: Colors.grey[700], fontSize: 13),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            )
-                          : null,
-                    );
-                  },
-                  onSelected: _onAddressSelected,
-                  emptyBuilder: (context) => const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Text('Nenhum endereço encontrado'),
-                  ),
-                ),
-              ),
-            ),
-            // Botão de feedback discreto abaixo do campo de busca
-            Positioned(
-              top: 88,
-              left: 16,
-              child: Material(
-                elevation: 2,
-                borderRadius: BorderRadius.circular(16),
-                color: AppColors.primary.withAlpha(180),
-                child: InkWell(
-                  onTap: () => FeedbackBottomSheet.show(context),
-                  borderRadius: BorderRadius.circular(16),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    child: Text(
-                      'Feedback',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      );
+                    },
+                    onSelected: _onAddressSelected,
+                    emptyBuilder: (context) => const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Text('Nenhum endereço encontrado'),
                     ),
                   ),
                 ),
               ),
-            ),
-            if (onlyConnectionsActive)
+              // Botão de feedback discreto abaixo do campo de busca
               Positioned(
                 top: 88,
-                right: 16,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 220),
-                  child: _buildOnlyConnectionsChip(),
-                ),
-              ),
-            // Botão de centralizar na localização do usuário (alinhado com card)
-            Positioned(
-              right: 16,
-              bottom: 231, // 10% mais alto
-              child: Material(
-                elevation: 8,
-                shape: const CircleBorder(),
-                color: Colors.white,
-                child: InkWell(
-                  onTap: _isCenteringLocation ? null : _centerOnUserLocation,
-                  customBorder: const CircleBorder(),
-                  child: Container(
-                    width: 52,
-                    height: 52,
-                    padding: const EdgeInsets.all(12),
-                    child: _isCenteringLocation
-                        ? const SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: AppRadioPulseLoader(
-                              size: 28,
-                              color: AppColors.primary,
-                            ),
-                          )
-                        : const Icon(
-                            Iconsax.gps,
-                            color: AppColors.primary,
-                            size: 28,
-                          ),
+                left: 16,
+                child: Material(
+                  elevation: 2,
+                  borderRadius: BorderRadius.circular(16),
+                  color: AppColors.primary.withAlpha(180),
+                  child: InkWell(
+                    onTap: () => FeedbackBottomSheet.show(context),
+                    borderRadius: BorderRadius.circular(16),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      child: Text(
+                        'Feedback',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-            // ✅ Carrossel horizontal de cards (sempre visível quando há posts)
-            if (_visiblePosts.isNotEmpty) _buildFloatingCard(),
-          ],
+              if (onlyConnectionsActive)
+                Positioned(
+                  top: 88,
+                  right: 16,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 220),
+                    child: _buildOnlyConnectionsChip(),
+                  ),
+                ),
+              // Botão de centralizar na localização do usuário (alinhado com card)
+              Positioned(
+                right: 16,
+                bottom: 231, // 10% mais alto
+                child: Material(
+                  elevation: 8,
+                  shape: const CircleBorder(),
+                  color: Colors.white,
+                  child: InkWell(
+                    onTap: _isCenteringLocation ? null : _centerOnUserLocation,
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      padding: const EdgeInsets.all(12),
+                      child: _isCenteringLocation
+                          ? const SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: AppRadioPulseLoader(
+                                size: 28,
+                                color: AppColors.primary,
+                              ),
+                            )
+                          : const Icon(
+                              Iconsax.gps,
+                              color: AppColors.primary,
+                              size: 28,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+              // ✅ Carrossel horizontal de cards (sempre visível quando há posts)
+              if (_visiblePosts.isNotEmpty) _buildFloatingCard(),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildMapView() {
-    final initial = _mapControllerWrapper.currentPosition ??
-        const LatLng(-23.55052, -46.633308);
+    final initial =
+        _mapControllerWrapper.currentPosition ?? _initialMapFallback;
     return LayoutBuilder(
       builder: (context, constraints) {
         if (!constraints.hasBoundedWidth ||
             !constraints.hasBoundedHeight ||
             constraints.maxWidth <= 0 ||
             constraints.maxHeight <= 0) {
+          _logMapLoad(
+            'map_layout_invalid',
+            <String, Object?>{
+              'boundedWidth': constraints.hasBoundedWidth,
+              'boundedHeight': constraints.hasBoundedHeight,
+              'maxWidth': constraints.maxWidth,
+              'maxHeight': constraints.maxHeight,
+            },
+          );
           return const SizedBox.shrink();
+        }
+
+        final mapSize = Size(constraints.maxWidth, constraints.maxHeight);
+        if (_lastLoggedMapSize != mapSize) {
+          _lastLoggedMapSize = mapSize;
+          _logMapLoad(
+            'map_layout_ready',
+            <String, Object?>{
+              'width': mapSize.width.toStringAsFixed(1),
+              'height': mapSize.height.toStringAsFixed(1),
+              'initialTarget': _formatLatLngForLog(initial),
+              'initialZoom': _mapControllerWrapper.currentZoom,
+              'cloudMapId': Platform.isAndroid
+                  ? AppConfig.googleMapIdAndroid
+                  : AppConfig.googleMapIdIOS,
+              'markers': _markers.length,
+            },
+          );
         }
 
         return ClipRRect(
@@ -1640,11 +1914,22 @@ class _HomePageState extends ConsumerState<HomePage>
               cloudMapId: Platform.isAndroid
                   ? AppConfig.googleMapIdAndroid
                   : AppConfig.googleMapIdIOS,
-              myLocationEnabled: true,
+              myLocationEnabled: _showUserLocationOnMap,
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
               onMapCreated: (c) async {
+                _logMapLoad(
+                  'on_map_created_start',
+                  <String, Object?>{
+                    'cloudMapId': Platform.isAndroid
+                        ? AppConfig.googleMapIdAndroid
+                        : AppConfig.googleMapIdIOS,
+                    'initialTarget': _formatLatLngForLog(initial),
+                    'initialZoom': _mapControllerWrapper.currentZoom,
+                    'markers': _markers.length,
+                  },
+                );
                 _mapControllerWrapper.setController(c);
                 _mapControllerCompleter ??= Completer<GoogleMapController>();
                 if (!_mapControllerCompleter!.isCompleted) {
@@ -1654,23 +1939,64 @@ class _HomePageState extends ConsumerState<HomePage>
                 debugPrint('✅ Map criado com cloudMapId');
 
                 await WidgetsBinding.instance.endOfFrame;
-                if (_mapControllerWrapper.controller != null && mounted) {
-                  unawaited(_onMapIdle());
+                _logMapLoad('on_map_created_end_of_frame');
+
+                try {
+                  final styleError = await c.getStyleError();
+                  _logMapLoad(
+                    'map_style_error_check',
+                    <String, Object?>{
+                      'styleError':
+                          styleError?.isEmpty ?? true ? 'none' : styleError,
+                    },
+                  );
+                } catch (e) {
+                  _logMapLoad(
+                    'map_style_error_check_failed',
+                    <String, Object?>{'error': e},
+                  );
                 }
+
+                _logMapLoad('on_map_created_waiting_for_camera_idle');
+                _scheduleVisibleRegionRetry();
               },
               markers: _markers,
+              onCameraMoveStarted: () {
+                if (!_hasLoggedFirstCameraMove) {
+                  _hasLoggedFirstCameraMove = true;
+                  _logMapLoad('on_camera_move_started_first');
+                }
+              },
               onCameraMove: (pos) {
+                if (!_hasLoggedFirstCameraMove) {
+                  _hasLoggedFirstCameraMove = true;
+                  _logMapLoad(
+                    'on_camera_move_first',
+                    <String, Object?>{
+                      'target': _formatLatLngForLog(pos.target),
+                      'zoom': pos.zoom.toStringAsFixed(2),
+                    },
+                  );
+                }
                 _mapControllerWrapper.setCurrentZoom(pos.zoom);
               },
               onCameraIdle: () async {
+                if (!_hasLoggedFirstMapIdle) {
+                  _hasLoggedFirstMapIdle = true;
+                  _logMapLoad('on_camera_idle_first_callback');
+                }
                 // ✅ OTIMIZAÇÃO: throttle + proteção contra chamadas concorrentes
                 final now = DateTime.now();
                 if (_lastMapIdleCall != null &&
                     now.difference(_lastMapIdleCall!).inMilliseconds <
                         _mapIdleThrottleMs) {
+                  _logMapLoad('on_camera_idle_throttled');
                   return;
                 }
-                if (_isProcessingMapIdle) return;
+                if (_isProcessingMapIdle) {
+                  _logMapLoad('on_camera_idle_skipped_processing');
+                  return;
+                }
                 _lastMapIdleCall = now;
 
                 // Pequeno delay para aguardar estabilização
@@ -1682,6 +2008,10 @@ class _HomePageState extends ConsumerState<HomePage>
                     if (!e.toString().contains('channel-error')) {
                       debugPrint('Erro em onCameraIdle: $e');
                     }
+                    _logMapLoad(
+                      'on_camera_idle_error',
+                      <String, Object?>{'error': e},
+                    );
                   }
                 }
               },
@@ -1693,28 +2023,92 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Future<void> _onMapIdle() async {
-    if (_isDisposed || !mounted) return;
-    if (_isProcessingMapIdle) return;
+    if (_isDisposed || !mounted) {
+      _logMapLoad('map_idle_skipped_disposed_or_unmounted');
+      return;
+    }
+    if (_isProcessingMapIdle) {
+      _logMapLoad('map_idle_skipped_already_processing');
+      return;
+    }
     final controller = _mapControllerWrapper.controller;
-    if (controller == null) return;
+    if (controller == null) {
+      _logMapLoad('map_idle_skipped_no_controller');
+      return;
+    }
 
     _isProcessingMapIdle = true;
+    final idleStopwatch = Stopwatch()..start();
+    var result = 'started';
+    final forceProcessing = _forceNextMapIdleProcessing;
+    _forceNextMapIdleProcessing = false;
 
     final allPosts = _filterExcludedPosts(
       _filterExpiredPosts(List<PostEntity>.from(_cachedPosts)),
+    );
+    _logMapLoad(
+      'map_idle_start',
+      <String, Object?>{
+        'cachedPosts': _cachedPosts.length,
+        'eligiblePosts': allPosts.length,
+        'currentMarkers': _markers.length,
+        'forceProcessing': forceProcessing,
+      },
     );
     debugPrint(
         '🗺️ _onMapIdle: Total de posts disponíveis: ${allPosts.length}');
 
     try {
+      _logMapLoad('map_idle_get_visible_region_start');
       final bounds = await controller.getVisibleRegion();
       if (_isDisposed || !mounted) return;
+      _logMapLoad(
+        'map_idle_get_visible_region_success',
+        <String, Object?>{'bounds': _formatBoundsForLog(bounds)},
+      );
+
+      if (!_hasUsableVisibleRegion(bounds)) {
+        result = 'invalid_bounds';
+        _logMapLoad(
+          'map_idle_invalid_bounds_skipped',
+          <String, Object?>{
+            'bounds': _formatBoundsForLog(bounds),
+            'retry': _mapVisibleRegionRetryCount,
+          },
+        );
+        _scheduleVisibleRegionRetry();
+        return;
+      }
+
+      if (!_visibleRegionMatchesPendingTarget(bounds)) {
+        result = 'waiting_for_target_bounds';
+        final target = _pendingMapReadyTarget;
+        _logMapLoad(
+          'map_idle_waiting_for_target_bounds',
+          <String, Object?>{
+            'bounds': _formatBoundsForLog(bounds),
+            'target': target == null ? null : _formatLatLngForLog(target),
+            'retry': _mapVisibleRegionRetryCount,
+          },
+        );
+        _scheduleVisibleRegionRetry();
+        return;
+      }
+
+      _mapVisibleRegionRetryCount = 0;
+      _markMapReadyForDisplay();
 
       final boundsKey = _toBoundsKey(bounds);
       final now = DateTime.now();
-      if (_lastProcessedBoundsKey == boundsKey &&
+      if (!forceProcessing &&
+          _lastProcessedBoundsKey == boundsKey &&
           _lastProcessedBoundsAt != null &&
           now.difference(_lastProcessedBoundsAt!).inMilliseconds < 700) {
+        result = 'duplicate_bounds';
+        _logMapLoad(
+          'map_idle_duplicate_bounds_skipped',
+          <String, Object?>{'boundsKey': boundsKey},
+        );
         return;
       }
       _lastProcessedBoundsKey = boundsKey;
@@ -1751,6 +2145,10 @@ class _HomePageState extends ConsumerState<HomePage>
               _matchesFilters(post);
         },
       ).toList();
+      _logMapLoad(
+        'map_idle_visible_filter_done',
+        <String, Object?>{'visibleRaw': visibleRaw.length},
+      );
 
       // ✅ ORDENAÇÃO POR POSIÇÃO NA TELA: Ordena posts pela coordenada X real na viewport
       // Isso garante sincronia perfeita entre carrossel (esquerda→direita) e marcadores visuais
@@ -1764,6 +2162,14 @@ class _HomePageState extends ConsumerState<HomePage>
       // ✅ Compara ORDEM e IDs (não apenas IDs) - a ordem pode mudar mesmo com os mesmos posts
       final hasChanges =
           !const ListEquality<String>().equals(visibleIds, currentVisibleIds);
+      _logMapLoad(
+        'map_idle_visible_posts_resolved',
+        <String, Object?>{
+          'visible': visible.length,
+          'previousVisible': currentVisibleIds.length,
+          'hasChanges': hasChanges,
+        },
+      );
 
       if (hasChanges) {
         if (_isDisposed || !mounted) return;
@@ -1803,9 +2209,28 @@ class _HomePageState extends ConsumerState<HomePage>
         _updateVisiblePostsSmoothly(visible, preservedPostId);
 
         await _rebuildMarkers();
+        result = 'updated_markers';
+      } else if (_visiblePosts.isNotEmpty &&
+          (_markers.isEmpty || _markers.length != _visiblePosts.length)) {
+        _logMapLoad(
+          'markers_missing_rebuild_forced',
+          <String, Object?>{
+            'visiblePosts': _visiblePosts.length,
+            'markers': _markers.length,
+          },
+        );
+        await _rebuildMarkers(force: true);
+        result = 'rebuilt_missing_markers';
+      } else {
+        result = 'no_changes';
       }
     } catch (e) {
+      result = 'error';
       debugPrint('Erro ao obter bounds do mapa: $e');
+      _logMapLoad(
+        'map_idle_error',
+        <String, Object?>{'error': e},
+      );
       if (!mounted || _isDisposed) return;
       if (_visiblePosts.isEmpty) {
         // ✅ Fallback: ordena por longitude quando não há controller
@@ -1839,6 +2264,22 @@ class _HomePageState extends ConsumerState<HomePage>
       }
     } finally {
       _isProcessingMapIdle = false;
+      final shouldRunQueuedRefresh =
+          _hasPendingMapIdleRefresh && mounted && !_isDisposed;
+      _hasPendingMapIdleRefresh = false;
+      _logMapLoad(
+        'map_idle_end',
+        <String, Object?>{
+          'result': result,
+          'durationMs': idleStopwatch.elapsedMilliseconds,
+          'visiblePosts': _visiblePosts.length,
+          'markers': _markers.length,
+        },
+      );
+      if (shouldRunQueuedRefresh) {
+        _logMapLoad('map_idle_running_queued_refresh');
+        _scheduleVisiblePostsRefresh(reason: 'queued_after_processing');
+      }
     }
   }
 
@@ -1854,10 +2295,21 @@ class _HomePageState extends ConsumerState<HomePage>
     List<PostEntity> posts,
     GoogleMapController controller,
   ) async {
-    if (posts.isEmpty) return posts;
-    if (posts.length == 1) return posts;
+    if (posts.isEmpty) {
+      _logMapLoad('screen_projection_skipped_empty');
+      return posts;
+    }
+    if (posts.length == 1) {
+      _logMapLoad('screen_projection_skipped_single_post');
+      return posts;
+    }
 
+    final projectionStopwatch = Stopwatch()..start();
     try {
+      _logMapLoad(
+        'screen_projection_start',
+        <String, Object?>{'posts': posts.length},
+      );
       // Projeta em paralelo para reduzir custo no canal de plataforma.
       final projections = await Future.wait(
         posts.map((post) async {
@@ -1878,10 +2330,25 @@ class _HomePageState extends ConsumerState<HomePage>
       final sorted = postsWithScreenX.map((e) => e.post).toList();
       debugPrint(
           '🎠 _sortPostsByScreenPosition: ${sorted.length} posts ordenados por posição X na tela');
+      _logMapLoad(
+        'screen_projection_success',
+        <String, Object?>{
+          'posts': sorted.length,
+          'durationMs': projectionStopwatch.elapsedMilliseconds,
+        },
+      );
       return sorted;
     } catch (e) {
       debugPrint(
           '⚠️ _sortPostsByScreenPosition: Erro na projeção, usando fallback por longitude: $e');
+      _logMapLoad(
+        'screen_projection_failed',
+        <String, Object?>{
+          'posts': posts.length,
+          'durationMs': projectionStopwatch.elapsedMilliseconds,
+          'error': e,
+        },
+      );
       // Fallback: ordena por longitude se a projeção falhar
       return _sortPostsByLongitude(posts);
     }
@@ -2271,78 +2738,86 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  /// Inicializa posição do mapa na ordem: GPS atual → Perfil → Cache GPS
+  /// Inicializa a Home no contexto geográfico do perfil ativo.
   Future<void> _initializeMap() async {
-    // ✅ FIX: Evita chamadas concorrentes que causam "A request for location permissions is already running"
-    if (_isRequestingLocationPermission) {
-      debugPrint(
-          '⚠️ _initializeMap: Permissão de GPS já em andamento, aguardando...');
-      return;
-    }
-
     try {
       debugPrint('📍 _initializeMap: Iniciando...');
-      _isRequestingLocationPermission = true;
+      _logMapLoad('initialize_map_start');
 
-      // Estratégia 1: Tentar GPS atual (instantâneo, sem timeout)
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (serviceEnabled) {
-        var permission = await Geolocator.checkPermission();
-
-        if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
-        }
-
-        if (permission != LocationPermission.denied &&
-            permission != LocationPermission.deniedForever) {
-          try {
-            final position = await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.high,
-            ).timeout(const Duration(seconds: 3));
-
-            final gpsPos = LatLng(position.latitude, position.longitude);
-            if (mounted) {
-              setState(() => _mapControllerWrapper.setCurrentPosition(gpsPos));
-            }
-            await GpsCacheService.updateCache(gpsPos);
-            debugPrint('✅ _initializeMap: GPS atual obtido');
-            return;
-          } catch (e) {
-            debugPrint('⚠️ _initializeMap: GPS timeout/erro: $e');
-          }
-        }
-      }
-
-      // Estratégia 2: Usar localização do perfil (SEMPRE disponível)
-      final profile = _activeProfile;
+      final profile = _activeProfile ?? ref.read(activeProfileProvider);
       final profileLocation = profile?.location;
       if (profileLocation != null) {
         final profilePos = geoPointToLatLng(profileLocation);
         if (mounted) {
-          setState(() => _mapControllerWrapper.setCurrentPosition(profilePos));
+          setState(() {
+            _setMapReadinessTarget(profilePos);
+            _mapControllerWrapper.setCurrentPosition(profilePos);
+          });
+        } else {
+          _setMapReadinessTarget(profilePos);
+          _mapControllerWrapper.setCurrentPosition(profilePos);
         }
         debugPrint('✅ _initializeMap: Usando localização do perfil');
+        _logMapLoad(
+          'initialize_map_position_selected',
+          <String, Object?>{
+            'source': 'profile',
+            'target': _formatLatLngForLog(profilePos),
+          },
+        );
         return;
       }
 
-      // Estratégia 3: Fallback para cache GPS (<24h)
-      final cachedPos = await GpsCacheService.getLastKnownPosition();
       if (mounted) {
-        setState(() => _mapControllerWrapper.setCurrentPosition(cachedPos));
+        setState(() {
+          _setMapReadinessTarget(_initialMapFallback);
+          _mapControllerWrapper.setCurrentPosition(_initialMapFallback);
+        });
+      } else {
+        _setMapReadinessTarget(_initialMapFallback);
+        _mapControllerWrapper.setCurrentPosition(_initialMapFallback);
       }
-      debugPrint('✅ _initializeMap: Usando cache GPS');
+      debugPrint('⚠️ _initializeMap: Perfil sem localização, usando fallback');
+      _logMapLoad(
+        'initialize_map_position_selected',
+        <String, Object?>{
+          'source': 'fallback_default',
+          'target': _formatLatLngForLog(_initialMapFallback),
+        },
+      );
     } catch (e) {
       debugPrint('❌ _initializeMap: Erro inesperado: $e');
+      _logMapLoad(
+        'initialize_map_unexpected_error',
+        <String, Object?>{'error': e},
+      );
 
       // Último recurso: localização do perfil
       final profile = _activeProfile;
       final profileLocation = profile?.location;
       if (profileLocation != null && mounted) {
-        setState(() => _mapControllerWrapper
-            .setCurrentPosition(geoPointToLatLng(profileLocation)));
+        final fallbackPos = geoPointToLatLng(profileLocation);
+        setState(() {
+          _setMapReadinessTarget(fallbackPos);
+          _mapControllerWrapper.setCurrentPosition(fallbackPos);
+        });
+        _logMapLoad(
+          'initialize_map_position_selected',
+          <String, Object?>{
+            'source': 'profile_after_error',
+            'target': _formatLatLngForLog(fallbackPos),
+          },
+        );
       }
     } finally {
-      _isRequestingLocationPermission = false;
+      _logMapLoad(
+        'initialize_map_end',
+        <String, Object?>{
+          'currentPosition': _mapControllerWrapper.currentPosition == null
+              ? null
+              : _formatLatLngForLog(_mapControllerWrapper.currentPosition!),
+        },
+      );
     }
   }
 
@@ -2350,8 +2825,28 @@ class _HomePageState extends ConsumerState<HomePage>
     if (profile == null) return;
     final location = profile.location;
     if (location == null) return;
-    if (_mapControllerWrapper.currentPosition == null) {
-      _mapControllerWrapper.setCurrentPosition(geoPointToLatLng(location));
+
+    final target = geoPointToLatLng(location);
+    if (mounted && !_isDisposed) {
+      setState(() {
+        _showUserLocationOnMap = false;
+        _setMapReadinessTarget(target);
+        _mapControllerWrapper.setCurrentPosition(target);
+      });
+    } else {
+      _showUserLocationOnMap = false;
+      _setMapReadinessTarget(target);
+      _mapControllerWrapper.setCurrentPosition(target);
+    }
+
+    if (_mapControllerWrapper.controller != null) {
+      unawaited(
+        _mapControllerWrapper.animateToPosition(
+          target,
+          _mapControllerWrapper.currentZoom,
+        ),
+      );
+      _scheduleVisibleRegionRetry();
     }
   }
 

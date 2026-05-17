@@ -12,7 +12,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
-import 'package:wegig_app/core/firebase/blocked_profiles.dart';
 import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/features/auth/presentation/pages/auth_page.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
@@ -119,8 +118,7 @@ class AppRoutes {
   static const String networkActivity = '/network/activity';
 
   /// Dedicated pending received requests route path
-  static const String pendingReceivedRequests =
-      '/network/requests/received';
+  static const String pendingReceivedRequests = '/network/requests/received';
 
   /// Dedicated pending sent requests route path
   static const String pendingSentRequests = '/network/requests/sent';
@@ -184,6 +182,63 @@ CustomTransitionPage<void> _slideLeftPage(GoRouterState state, Widget child) {
   );
 }
 
+String? _internalLocationFromTrustedUri(Uri uri) {
+  if (!uri.hasScheme && !uri.hasAuthority) return uri.toString();
+
+  if (uri.scheme == 'wegig') {
+    final segments = <String>[
+      if (uri.host.isNotEmpty && uri.host != 'app') uri.host,
+      ...uri.pathSegments,
+    ];
+
+    return Uri(
+      path: segments.isEmpty ? '/' : '/${segments.join('/')}',
+      queryParameters: uri.queryParameters.isEmpty ? null : uri.queryParameters,
+      fragment: uri.fragment.isEmpty ? null : uri.fragment,
+    ).toString();
+  }
+
+  final isWeGigWebLink = (uri.scheme == 'https' || uri.scheme == 'http') &&
+      (uri.host == 'wegig.com.br' || uri.host == 'www.wegig.com.br');
+  if (!isWeGigWebLink) return null;
+
+  return Uri(
+    path: uri.path.isEmpty ? '/' : uri.path,
+    queryParameters: uri.queryParameters.isEmpty ? null : uri.queryParameters,
+    fragment: uri.fragment.isEmpty ? null : uri.fragment,
+  ).toString();
+}
+
+String? _safeInternalRedirect(String? value) {
+  if (value == null || value.isEmpty) return null;
+  final uri = Uri.tryParse(value);
+  if (uri == null) return null;
+
+  final normalized = _internalLocationFromTrustedUri(uri);
+  if (normalized == null || !normalized.startsWith('/')) return null;
+  if (normalized.startsWith('//')) return null;
+  return normalized;
+}
+
+String _routeWithRedirect(String path, GoRouterState state) {
+  final target = _safeInternalRedirect(state.uri.toString());
+  if (target == null || target == path) return path;
+  return Uri(
+    path: path,
+    queryParameters: {'redirect': target},
+  ).toString();
+}
+
+String? _shareRouteRedirect(GoRouterState state) {
+  final type = state.uri.queryParameters['type'];
+  final id = state.uri.queryParameters['id']?.trim();
+  if (id == null || id.isEmpty) return AppRoutes.home;
+
+  if (type == 'post') return AppRoutes.postDetail(id);
+  if (type == 'profile') return AppRoutes.profile(id);
+  return AppRoutes.home;
+}
+
 @riverpod
 GoRouter goRouter(Ref ref) {
   // ✅ CRÍTICO: manter UMA instância de GoRouter.
@@ -204,6 +259,18 @@ GoRouter goRouter(Ref ref) {
       final isGoingToSplash = state.matchedLocation == AppRoutes.splash;
       final isGoingToCreateProfile =
           state.matchedLocation == AppRoutes.createProfile;
+      final redirectTarget = _safeInternalRedirect(
+        state.uri.queryParameters['redirect'],
+      );
+      final normalizedDeepLink = _safeInternalRedirect(state.uri.toString());
+
+      if (normalizedDeepLink != null &&
+          normalizedDeepLink != state.uri.toString()) {
+        debugPrint(
+          'Router: normalized external deep link ${state.uri} -> $normalizedDeepLink',
+        );
+        return normalizedDeepLink;
+      }
 
       debugPrint(
           'Router: location=${state.matchedLocation}, isLoggedIn=$isLoggedIn, isGoingToAuth=$isGoingToAuth, isGoingToSplash=$isGoingToSplash, isGoingToCreateProfile=$isGoingToCreateProfile');
@@ -251,7 +318,7 @@ GoRouter goRouter(Ref ref) {
       if (shouldShowSplash) {
         if (isGoingToSplash) return null;
         debugPrint('Router: shouldShowSplash, returning splash');
-        return AppRoutes.splash;
+        return _routeWithRedirect(AppRoutes.splash, state);
       }
 
       // Se está logado mas o carregamento do profile falhou e não temos dados,
@@ -263,6 +330,19 @@ GoRouter goRouter(Ref ref) {
 
       if (!isLoggedIn) {
         debugPrint('Router: not logged in, returning auth');
+        if (isGoingToAuth) return null;
+        if (redirectTarget != null) {
+          return Uri(
+            path: AppRoutes.auth,
+            queryParameters: {'redirect': redirectTarget},
+          ).toString();
+        }
+        if (!isGoingToSplash) {
+          return Uri(
+            path: AppRoutes.auth,
+            queryParameters: {'redirect': state.uri.toString()},
+          ).toString();
+        }
         return AppRoutes.auth;
       }
 
@@ -277,7 +357,7 @@ GoRouter goRouter(Ref ref) {
         // Se está em outra rota válida, manter lá temporariamente
         if (!isGoingToAuth) return null;
         // Se está na auth, ir para splash para esperar
-        return AppRoutes.splash;
+        return _routeWithRedirect(AppRoutes.splash, state);
       }
 
       // Agora sabemos que está logado E profileState carregou com sucesso
@@ -291,6 +371,10 @@ GoRouter goRouter(Ref ref) {
       // Se está indo para auth/splash, redireciona para home
       // NOTA: createProfile é permitido para usuários que querem criar perfis adicionais
       if (isGoingToAuth || isGoingToSplash) {
+        if (redirectTarget != null) {
+          debugPrint('Router: logged in, returning redirect=$redirectTarget');
+          return redirectTarget;
+        }
         debugPrint('Router: logged in with profiles, redirecting to home');
         return AppRoutes.home;
       }
@@ -349,6 +433,43 @@ GoRouter goRouter(Ref ref) {
         },
       ),
       GoRoute(
+        path: '/profile/:userId/:profileId',
+        name: 'legacyProfileShare',
+        pageBuilder: (context, state) {
+          final profileId = state.pathParameters['profileId']!;
+          return CupertinoPage<void>(
+            key: state.pageKey,
+            child: ViewProfilePage(profileId: profileId),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/app/profile/:profileId',
+        name: 'appSchemeProfile',
+        redirect: (context, state) {
+          final profileId = state.pathParameters['profileId']!;
+          return AppRoutes.profile(profileId);
+        },
+      ),
+      GoRoute(
+        path: '/app/profile/:userId/:profileId',
+        name: 'appSchemeLegacyProfile',
+        redirect: (context, state) {
+          final profileId = state.pathParameters['profileId']!;
+          return AppRoutes.profile(profileId);
+        },
+      ),
+      GoRoute(
+        path: '/share.html',
+        name: 'sharePreview',
+        redirect: (context, state) => _shareRouteRedirect(state),
+      ),
+      GoRoute(
+        path: '/app/share.html',
+        name: 'appSchemeSharePreview',
+        redirect: (context, state) => _shareRouteRedirect(state),
+      ),
+      GoRoute(
         path: '/post/:postId',
         name: 'postDetail',
         pageBuilder: (context, state) {
@@ -357,6 +478,14 @@ GoRouter goRouter(Ref ref) {
             key: state.pageKey,
             child: PostDetailPage(postId: postId),
           );
+        },
+      ),
+      GoRoute(
+        path: '/app/post/:postId',
+        name: 'appSchemePostDetail',
+        redirect: (context, state) {
+          final postId = state.pathParameters['postId']!;
+          return AppRoutes.postDetail(postId);
         },
       ),
       GoRoute(

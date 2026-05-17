@@ -8,6 +8,7 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wegig_app/config/app_config.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../controllers/network_activity_list_controller.dart';
@@ -558,6 +559,7 @@ class _AuthorAvatar extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: CachedNetworkImage(
+        cacheManager: WeGigImageCacheManager.instance,
         imageUrl: photoUrl,
         width: 40,
         height: 40,

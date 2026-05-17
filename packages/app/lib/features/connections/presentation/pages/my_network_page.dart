@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:wegig_app/config/app_config.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:wegig_app/core/firebase/blocked_relations.dart';
 
 import '../../../../app/router/app_router.dart';
@@ -4185,6 +4186,7 @@ class _EntityAvatar extends StatelessWidget {
     if (trimmedUrl.isEmpty) return fallback;
 
     return CachedNetworkImage(
+      cacheManager: WeGigImageCacheManager.instance,
       imageUrl: trimmedUrl,
       imageBuilder: (_, imageProvider) => CircleAvatar(
         radius: radius,

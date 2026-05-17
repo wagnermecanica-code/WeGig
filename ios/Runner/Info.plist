@@ -59,9 +59,12 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>com.googleusercontent.apps.278498777601-v44sa0kclfb29cclsbrckaiicukk9kr8</string>
+          <string>wegig</string>
         </array>
       </dict>
     </array>
+    <key>FlutterDeepLinkingEnabled</key>
+    <true/>
     <key>UISupportedInterfaceOrientations</key>
     <array>
       <string>UIInterfaceOrientationPortrait</string>

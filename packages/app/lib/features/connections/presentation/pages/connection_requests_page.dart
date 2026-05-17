@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
@@ -80,9 +81,8 @@ class ConnectionRequestsPage extends ConsumerWidget {
             itemBuilder: (context, index) {
               final request = requests[index];
               final isReceived = mode == ConnectionRequestsPageMode.received;
-              final title = isReceived
-                  ? request.requesterName
-                  : request.recipientName;
+              final title =
+                  isReceived ? request.requesterName : request.recipientName;
               final subtitle = isReceived
                   ? _receivedRequestSubtitle(request)
                   : _sentRequestSubtitle(request);
@@ -257,6 +257,7 @@ class _RequestAvatar extends StatelessWidget {
     if (trimmedUrl.isEmpty) return fallback;
 
     return CachedNetworkImage(
+      cacheManager: WeGigImageCacheManager.instance,
       imageUrl: trimmedUrl,
       imageBuilder: (_, imageProvider) => CircleAvatar(
         radius: radius,

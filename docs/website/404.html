@@ -3,37 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="robots" content="index, follow" />
-    <title>WeGig - Abra no app</title>
-    <meta
-      name="description"
-      content="Abra este compartilhamento no WeGig e conecte-se com músicos, bandas, espaços musicais e oportunidades próximas."
-    />
-    <link rel="canonical" href="https://wegig.com.br/share.html" />
-
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="WeGig" />
-    <meta property="og:title" content="WeGig - Rede musical perto de você" />
-    <meta
-      property="og:description"
-      content="Abra este compartilhamento no WeGig para ver o perfil ou post enviado."
-    />
-    <meta property="og:url" content="https://wegig.com.br/share.html" />
-    <meta property="og:image" content="https://wegig.com.br/app_icon.png?v=8" />
-    <meta property="og:image:width" content="1024" />
-    <meta property="og:image:height" content="1024" />
-
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="WeGig - Rede musical perto de você" />
-    <meta
-      name="twitter:description"
-      content="Abra este compartilhamento no WeGig para ver o perfil ou post enviado."
-    />
-    <meta
-      name="twitter:image"
-      content="https://wegig.com.br/app_icon.png?v=8"
-    />
-
+    <meta name="robots" content="noindex" />
+    <title>Abrindo no WeGig...</title>
     <style>
       :root {
         color-scheme: light;
@@ -130,23 +101,23 @@
 
     <script>
       (function () {
-        var params = new URLSearchParams(window.location.search);
-        var type = params.get("type");
-        var id = params.get("id");
+        var path = window.location.pathname || "/";
+        var supported = /^\/(profile|post|conversation|chat|chat-new)\//.test(
+          path,
+        );
         var button = document.getElementById("open-app");
         var message = document.getElementById("message");
-        var supported = type === "post" || type === "profile";
 
-        if (!supported || !id) {
+        if (!supported) {
           button.href = "/";
           button.textContent = "Ir para wegig.com.br";
           message.textContent =
-            "Este compartilhamento não está mais disponível.";
+            "Este endereço não existe ou não está mais disponível.";
           return;
         }
 
-        var path = "/" + type + "/" + encodeURIComponent(id);
-        var appUrl = "wegig://app" + path;
+        var appUrl =
+          "wegig://app" + path + window.location.search + window.location.hash;
         button.href = appUrl;
 
         window.setTimeout(function () {

@@ -8,10 +8,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 import '../../domain/entities/entities.dart';
 import '../providers/mensagens_new_providers.dart';
-import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 /// Bottom sheet estilo Instagram para encaminhar um post para uma conversa.
 ///
@@ -154,8 +155,8 @@ class _SharePostBottomSheetState extends ConsumerState<SharePostBottomSheet> {
                 final filtered = _searchQuery.isEmpty
                     ? conversations
                     : conversations.where((c) {
-                        final other = c.getOtherParticipantData(
-                            activeProfile.profileId);
+                        final other =
+                            c.getOtherParticipantData(activeProfile.profileId);
                         final name = c.isGroup
                             ? (c.groupName ?? '')
                             : (other?.name ?? '');
@@ -189,7 +190,10 @@ class _SharePostBottomSheetState extends ConsumerState<SharePostBottomSheet> {
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final conv = filtered[index];
-                    return _buildConversationTile(conv, activeProfile);
+                    return _buildConversationTile(
+                      conv,
+                      activeProfile.profileId,
+                    );
                   },
                 );
               },
@@ -211,9 +215,8 @@ class _SharePostBottomSheetState extends ConsumerState<SharePostBottomSheet> {
 
   Widget _buildPostPreview() {
     final post = widget.post;
-    final firstPhoto = post.photoUrls.isNotEmpty
-        ? post.photoUrls.first
-        : post.photoUrl;
+    final firstPhoto =
+        post.photoUrls.isNotEmpty ? post.photoUrls.first : post.photoUrl;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -229,6 +232,7 @@ class _SharePostBottomSheetState extends ConsumerState<SharePostBottomSheet> {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: CachedNetworkImage(
+                cacheManager: WeGigImageCacheManager.instance,
                 imageUrl: firstPhoto,
                 width: 48,
                 height: 48,
@@ -295,13 +299,12 @@ class _SharePostBottomSheetState extends ConsumerState<SharePostBottomSheet> {
 
   Widget _buildConversationTile(
     ConversationNewEntity conv,
-    dynamic activeProfile,
+    String activeProfileId,
   ) {
     final isGroup = conv.isGroup || conv.participantProfiles.length > 2;
-    final other = conv.getOtherParticipantData(activeProfile.profileId);
-    final name = isGroup
-        ? (conv.groupName ?? 'Grupo')
-        : (other?.name ?? 'Usuário');
+    final other = conv.getOtherParticipantData(activeProfileId);
+    final name =
+        isGroup ? (conv.groupName ?? 'Grupo') : (other?.name ?? 'Usuário');
     final photoUrl = isGroup ? conv.groupPhotoUrl : other?.photoUrl;
     final isSending = _sendingToConversationId == conv.id;
 
@@ -360,6 +363,7 @@ class _SharePostBottomSheetState extends ConsumerState<SharePostBottomSheet> {
       child: photoUrl != null && photoUrl.isNotEmpty
           ? ClipOval(
               child: CachedNetworkImage(
+                cacheManager: WeGigImageCacheManager.instance,
                 imageUrl: photoUrl,
                 width: 44,
                 height: 44,
@@ -401,9 +405,8 @@ class _SharePostBottomSheetState extends ConsumerState<SharePostBottomSheet> {
 
     try {
       final post = widget.post;
-      final firstPhoto = post.photoUrls.isNotEmpty
-          ? post.photoUrls.first
-          : post.photoUrl;
+      final firstPhoto =
+          post.photoUrls.isNotEmpty ? post.photoUrls.first : post.photoUrl;
 
       final postData = <String, dynamic>{
         'postId': post.id,

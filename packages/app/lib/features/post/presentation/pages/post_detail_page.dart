@@ -1,6 +1,7 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
@@ -17,6 +18,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/features/mensagens_new/presentation/pages/chat_new_page.dart';
 import 'package:wegig_app/features/mensagens_new/presentation/providers/mensagens_new_providers.dart';
@@ -110,11 +112,13 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       // não exibe detalhes do post.
       final currentUid = FirebaseAuth.instance.currentUser?.uid;
       final activeProfile = ref.read(activeProfileProvider);
-      final isOwner = activeProfile != null && 
+      final isOwner = activeProfile != null &&
           post.authorProfileId == activeProfile.profileId;
-      
-      if (currentUid != null && currentUid.isNotEmpty && 
-          activeProfile != null && post.authorProfileId.isNotEmpty) {
+
+      if (currentUid != null &&
+          currentUid.isNotEmpty &&
+          activeProfile != null &&
+          post.authorProfileId.isNotEmpty) {
         if (!isOwner) {
           try {
             final excluded = await BlockedRelations.getExcludedProfileIds(
@@ -134,14 +138,15 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           } catch (_) {
             // Se falhar, não bloqueia o carregamento.
           }
-          
+
           // 🚫 NOVO: Bloquear visitantes de ver posts expirados
           final now = DateTime.now();
           final isExpired = post.expiresAt.isBefore(now);
           if (isExpired) {
             if (mounted) {
               Navigator.pop(context);
-              AppSnackBar.showError(context, 'Este post expirou e não está mais disponível');
+              AppSnackBar.showError(
+                  context, 'Este post expirou e não está mais disponível');
             }
             return;
           }
@@ -220,10 +225,11 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       debugPrint(
           '📊 Encontrados ${interestsSnapshot.docs.length} documentos na collection interests');
 
-      final users = <Map<String, dynamic>>[];
-      final seenProfileIds = <String>{}; // ✅ Conjunto para rastrear profileIds já vistos
+      final seenProfileIds =
+          <String>{}; // ✅ Conjunto para rastrear profileIds já vistos
+      final uniqueInterestDocs =
+          <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
-      // Para cada interesse, buscar dados do perfil
       for (final interestDoc in interestsSnapshot.docs) {
         final data = interestDoc.data();
         final interestedProfileId = data['interestedProfileId'] as String?;
@@ -236,45 +242,60 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
         // ✅ DEDUPLICAÇÃO: Pular se já processamos este perfil
         if (seenProfileIds.contains(interestedProfileId)) {
-          debugPrint('⚠️ Perfil $interestedProfileId já adicionado, pulando duplicata...');
+          debugPrint(
+              '⚠️ Perfil $interestedProfileId já adicionado, pulando duplicata...');
           continue;
         }
         seenProfileIds.add(interestedProfileId);
 
-        debugPrint('👤 Carregando perfil: $interestedProfileId');
-
-        try {
-          // Buscar perfil do interessado
-          final profileDoc = await FirebaseFirestore.instance
-              .collection('profiles')
-              .doc(interestedProfileId)
-              .get();
-
-          if (profileDoc.exists) {
-            final profileData = profileDoc.data()!;
-
-            final interestedProfileIdTrim = interestedProfileId.trim();
-            if (interestedProfileIdTrim.isNotEmpty && excludedProfileIds.contains(interestedProfileIdTrim)) {
-              debugPrint('🔒 Perfil interessado filtrado por bloqueio: $interestedProfileId');
-              continue;
-            }
-
-            users.add({
-              'profileId': interestedProfileId,
-              'userId': data['interestedUid'] as String? ?? '',
-              'name': profileData['name'] as String? ?? 'Usuário',
-              'photoUrl': profileData['photoUrl'] as String? ?? '',
-              'isBand': profileData['isBand'] as bool? ?? false,
-              'createdAt': data['createdAt'] as Timestamp?,
-            });
-            debugPrint('✅ Perfil carregado: ${profileData['name']}');
-          } else {
-            debugPrint('⚠️ Perfil não encontrado: $interestedProfileId');
-          }
-        } catch (e) {
-          debugPrint('❌ Erro ao buscar perfil do interessado: $e');
+        final interestedProfileIdTrim = interestedProfileId.trim();
+        if (interestedProfileIdTrim.isNotEmpty &&
+            excludedProfileIds.contains(interestedProfileIdTrim)) {
+          debugPrint(
+              '🔒 Perfil interessado filtrado por bloqueio: $interestedProfileId');
+          continue;
         }
+
+        uniqueInterestDocs.add(interestDoc);
       }
+
+      final users = await Future.wait(
+        uniqueInterestDocs.map((interestDoc) async {
+          final data = interestDoc.data();
+          final interestedProfileId = data['interestedProfileId'] as String;
+
+          debugPrint('👤 Carregando perfil: $interestedProfileId');
+
+          try {
+            // Buscar perfil do interessado
+            final profileDoc = await FirebaseFirestore.instance
+                .collection('profiles')
+                .doc(interestedProfileId)
+                .get();
+
+            if (profileDoc.exists) {
+              final profileData = profileDoc.data()!;
+
+              debugPrint('✅ Perfil carregado: ${profileData['name']}');
+              return {
+                'profileId': interestedProfileId,
+                'userId': data['interestedUid'] as String? ?? '',
+                'name': profileData['name'] as String? ?? 'Usuário',
+                'photoUrl': profileData['photoUrl'] as String? ?? '',
+                'isBand': profileData['isBand'] as bool? ?? false,
+                'createdAt': data['createdAt'] as Timestamp?,
+              };
+            } else {
+              debugPrint('⚠️ Perfil não encontrado: $interestedProfileId');
+            }
+          } catch (e) {
+            debugPrint('❌ Erro ao buscar perfil do interessado: $e');
+          }
+          return null;
+        }),
+      ).then(
+        (results) => results.whereType<Map<String, dynamic>>().toList(),
+      );
 
       debugPrint(
           '✅ Total de usuários interessados carregados: ${users.length}');
@@ -284,6 +305,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           _interestedUsers = users;
           _isLoadingInterests = false;
         });
+        _warmInterestedUserPhotos(users);
       }
     } catch (e) {
       debugPrint('❌ Erro ao carregar interessados: $e');
@@ -298,6 +320,24 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         setState(() => _isLoadingInterests = false);
       }
     }
+  }
+
+  void _warmInterestedUserPhotos(List<Map<String, dynamic>> users) {
+    final urls = users
+        .map((user) => (user['photoUrl'] as String? ?? '').trim())
+        .where((url) => url.isNotEmpty)
+        .toSet()
+        .take(12);
+
+    for (final url in urls) {
+      unawaited(_cacheInterestedUserPhoto(url));
+    }
+  }
+
+  Future<void> _cacheInterestedUserPhoto(String url) async {
+    try {
+      await WeGigImageCacheManager.instance.downloadFile(url);
+    } catch (_) {}
   }
 
   /// Verifica se o post está expirado
@@ -325,13 +365,13 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   /// Lida com a ação de repostar
   Future<void> _handleRepost() async {
     if (_post == null) return;
-    
+
     // Para hiring e sales, precisa abrir editor para definir novas datas
     if (_post!.type == 'hiring' || _post!.type == 'sales') {
       _openEditorForRepost();
       return;
     }
-    
+
     // Para musician e band, repostar direto com +30 dias
     await _repostWithNewExpiry();
   }
@@ -392,12 +432,12 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   /// Reposta diretamente com nova data de expiração (+30 dias)
   Future<void> _repostWithNewExpiry() async {
     if (_post == null) return;
-    
+
     setState(() => _isReposting = true);
-    
+
     try {
       final newExpiresAt = DateTime.now().add(const Duration(days: 30));
-      
+
       await FirebaseFirestore.instance
           .collection('posts')
           .doc(_post!.id)
@@ -405,9 +445,10 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         'expiresAt': Timestamp.fromDate(newExpiresAt),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      
+
       if (mounted) {
-        AppSnackBar.showSuccess(context, 'Post repostado! Válido por mais 30 dias.');
+        AppSnackBar.showSuccess(
+            context, 'Post repostado! Válido por mais 30 dias.');
         // Recarrega o post para atualizar o estado
         await _loadPost();
       }
@@ -451,7 +492,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     // 🚫 Bloquear interesse em posts expirados
     if (_isPostExpired()) {
       if (mounted) {
-        AppSnackBar.showError(context, 'Este post expirou. Não é possível demonstrar interesse.');
+        AppSnackBar.showError(
+            context, 'Este post expirou. Não é possível demonstrar interesse.');
       }
       return;
     }
@@ -464,7 +506,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
     // Usar provider global para optimistic update
     final interestNotifier = ref.read(interestNotifierProvider.notifier);
-    
+
     try {
       await interestNotifier.addInterest(
         postId: _post!.id,
@@ -475,17 +517,18 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       if (mounted) {
         // Recarregar lista silenciosamente
         _loadInterestedUsers();
-        
+
         AppSnackBar.showSuccess(
-          context, 
+          context,
           _post!.type == 'sales' ? 'Anúncio salvo!' : 'Interesse demonstrado!',
         );
       }
     } catch (e) {
       debugPrint('❌ Erro ao demonstrar interesse: $e');
-      
+
       if (mounted) {
-        AppSnackBar.showError(context, 'Erro ao salvar interesse. Verifique sua conexão.');
+        AppSnackBar.showError(
+            context, 'Erro ao salvar interesse. Verifique sua conexão.');
       }
     }
   }
@@ -496,7 +539,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
     // Usar provider global para optimistic update
     final interestNotifier = ref.read(interestNotifierProvider.notifier);
-    
+
     try {
       await interestNotifier.removeInterest(
         postId: _post!.id,
@@ -509,7 +552,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       }
     } catch (e) {
       debugPrint('❌ Erro ao remover interesse: $e');
-      
+
       if (mounted) {
         AppSnackBar.showError(context, 'Erro ao remover interesse.');
       }
@@ -555,7 +598,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     // 🚫 Bloquear conversa em posts expirados
     if (_isPostExpired()) {
       if (mounted) {
-        AppSnackBar.showError(context, 'Este post expirou. Não é possível iniciar conversa.');
+        AppSnackBar.showError(
+            context, 'Este post expirou. Não é possível iniciar conversa.');
       }
       return;
     }
@@ -600,7 +644,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
     try {
       // Busca/cria a conversa
-      final conversation = await ref.read(mensagensNewRepositoryProvider).getOrCreateConversation(
+      final conversation = await ref
+          .read(mensagensNewRepositoryProvider)
+          .getOrCreateConversation(
         currentProfileId: activeProfile.profileId,
         currentUid: currentUser.uid,
         otherProfileId: _post!.authorProfileId,
@@ -618,7 +664,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       // Navegar para a tela de chat
       if (mounted) {
         setState(() => _isOpeningConversation = false);
-        
+
         Navigator.of(context).push<void>(
           MaterialPageRoute<void>(
             builder: (_) => ChatNewPage(
@@ -634,7 +680,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     } catch (e) {
       debugPrint('Erro ao abrir conversa: $e');
       if (mounted) {
-        AppSnackBar.showError(context, 'Erro ao abrir conversa. Tente novamente.');
+        AppSnackBar.showError(
+            context, 'Erro ao abrir conversa. Tente novamente.');
       }
     } finally {
       if (mounted) {
@@ -673,9 +720,12 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                 ? HitTestBehavior.opaque
                 : HitTestBehavior.deferToChild,
             child: Padding(
-              padding: const EdgeInsets.only(top: 2, left: 6, right: 6, bottom: 2),
+              padding:
+                  const EdgeInsets.only(top: 2, left: 6, right: 6, bottom: 2),
               child: Text(
-                count > 999 ? '${(count / 1000).toStringAsFixed(1)}k' : '$count',
+                count > 999
+                    ? '${(count / 1000).toStringAsFixed(1)}k'
+                    : '$count',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -704,7 +754,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     final isSales = _post!.type == 'sales';
     return Builder(
       builder: (context) {
-        final hasInterest = ref.watch(interestNotifierProvider).contains(_post!.id);
+        final hasInterest =
+            ref.watch(interestNotifierProvider).contains(_post!.id);
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -748,8 +799,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   /// Banner de aviso para posts expirados (visível apenas para o owner)
   Widget _buildExpiredBanner() {
     final daysExpired = DateTime.now().difference(_post!.expiresAt).inDays;
-    final needsDateSelection = _post!.type == 'hiring' || _post!.type == 'sales';
-    
+    final needsDateSelection =
+        _post!.type == 'hiring' || _post!.type == 'sales';
+
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       padding: const EdgeInsets.all(16),
@@ -834,7 +886,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   /// Banner para posts prestes a expirar (≤ 1 dia)
   Widget _buildExpiringSoonBanner() {
     final hoursLeft = _post!.expiresAt.difference(DateTime.now()).inHours;
-    final needsDateSelection = _post!.type == 'hiring' || _post!.type == 'sales';
+    final needsDateSelection =
+        _post!.type == 'hiring' || _post!.type == 'sales';
     final timeText = hoursLeft > 0 ? 'em ${hoursLeft}h' : 'em breve';
 
     return Container(
@@ -1002,7 +1055,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   ),
                   children: [
                     TextSpan(
-                      text: _post!.type == 'sales' ? 'Salvaram: ' : 'Interessados: ',
+                      text: _post!.type == 'sales'
+                          ? 'Salvaram: '
+                          : 'Interessados: ',
                       style: const TextStyle(fontWeight: FontWeight.normal),
                     ),
                     TextSpan(
@@ -1051,8 +1106,12 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       child: CircleAvatar(
         radius: 14,
         backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-        backgroundImage:
-            photoUrl.isNotEmpty ? CachedNetworkImageProvider(photoUrl) : null,
+        backgroundImage: photoUrl.isNotEmpty
+            ? CachedNetworkImageProvider(
+                photoUrl,
+                cacheManager: WeGigImageCacheManager.instance,
+              )
+            : null,
         child: photoUrl.isEmpty
             ? const Icon(
                 Icons.person,
@@ -1145,10 +1204,13 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                             horizontal: 20, vertical: 4),
                         leading: CircleAvatar(
                           radius: 24,
-                            backgroundColor:
+                          backgroundColor:
                               AppColors.primary.withValues(alpha: 0.1),
                           backgroundImage: photoUrl.isNotEmpty
-                              ? CachedNetworkImageProvider(photoUrl)
+                              ? CachedNetworkImageProvider(
+                                  photoUrl,
+                                  cacheManager: WeGigImageCacheManager.instance,
+                                )
                               : null,
                           child: photoUrl.isEmpty
                               ? const Icon(
@@ -1197,8 +1259,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   /// Mostra opções do próprio post
   void _showOwnPostOptions() {
     final isExpired = _isPostExpired();
-    final needsDateSelection = _post!.type == 'hiring' || _post!.type == 'sales';
-    
+    final needsDateSelection =
+        _post!.type == 'hiring' || _post!.type == 'sales';
+
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -1211,13 +1274,19 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
             // Opção de Repostar (para posts expirados ou expirando em breve)
             if (isExpired || _isPostExpiringSoon())
               ListTile(
-                leading: Icon(Iconsax.refresh, color: isExpired ? AppColors.accent : Colors.orange.shade700),
+                leading: Icon(Iconsax.refresh,
+                    color:
+                        isExpired ? AppColors.accent : Colors.orange.shade700),
                 title: Text(isExpired
-                    ? (needsDateSelection ? 'Editar e Repostar' : 'Repostar (+30 dias)')
-                    : (needsDateSelection ? 'Editar e Renovar' : 'Renovar (+30 dias)')),
+                    ? (needsDateSelection
+                        ? 'Editar e Repostar'
+                        : 'Repostar (+30 dias)')
+                    : (needsDateSelection
+                        ? 'Editar e Renovar'
+                        : 'Renovar (+30 dias)')),
                 subtitle: Text(
                   isExpired
-                      ? (needsDateSelection 
+                      ? (needsDateSelection
                           ? 'Defina novas datas para o ${_post!.type == 'hiring' ? 'evento' : 'anúncio'}'
                           : 'Renova a validade do post')
                       : 'Post expira em breve — renove agora',
@@ -1297,18 +1366,20 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   /// Mostra modal completo de opções de interesse
   void _showInterestOptions() {
     if (_post == null) return;
-    
+
     final activeProfile = ref.read(activeProfileProvider);
     final isOwner = _post!.authorProfileId == activeProfile?.profileId;
-    final isInterestSent = ref.read(interestNotifierProvider).contains(_post!.id);
+    final isInterestSent =
+        ref.read(interestNotifierProvider).contains(_post!.id);
     final isExpired = _isPostExpired();
-    
+
     // 🚫 Se expirado e não é owner, mostra mensagem e retorna
     if (isExpired && !isOwner) {
-      AppSnackBar.showError(context, 'Este post expirou. Não é possível interagir.');
+      AppSnackBar.showError(
+          context, 'Este post expirou. Não é possível interagir.');
       return;
     }
-    
+
     showInterestOptionsDialog(
       context: context,
       post: _post!,
@@ -1325,7 +1396,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       onRepost: isOwner ? _handleRepost : null,
     );
   }
-  
+
   /// Confirma deleção do post
   void _confirmDeletePost() {
     showDialog<void>(
@@ -1351,19 +1422,19 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       ),
     );
   }
-  
+
   /// Deleta o post
   Future<void> _deletePost() async {
     if (_post == null) return;
-    
+
     try {
       AppSnackBar.showInfo(context, 'Deletando post...');
-      
+
       await FirebaseFirestore.instance
           .collection('posts')
           .doc(_post!.id)
           .delete();
-      
+
       if (mounted) {
         AppSnackBar.showSuccess(context, 'Post deletado com sucesso!');
         Navigator.of(context).pop();
@@ -1443,7 +1514,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         children: [
           PageView.builder(
             itemCount: photos.length,
-            onPageChanged: (index) => setState(() => _currentPhotoIndex = index),
+            onPageChanged: (index) =>
+                setState(() => _currentPhotoIndex = index),
             itemBuilder: (context, index) {
               return GestureDetector(
                 onTap: () => _openPhotoViewer(photos, index),
@@ -1545,7 +1617,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
     final screenWidth = MediaQuery.of(context).size.width;
     final photoHeight = screenWidth * 0.7; // Proporção ~10:7
-    final liveCommentCount = ref.watch(commentCountStreamProvider(_post!.id)).value ?? _post!.commentCount;
+    final liveCommentCount =
+        ref.watch(commentCountStreamProvider(_post!.id)).value ??
+            _post!.commentCount;
 
     return PopScope(
       canPop: true,
@@ -1554,208 +1628,213 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         _handleBackNavigation();
       },
       child: Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // Conteúdo scrollável
-          SingleChildScrollView(
-            child: Column(
-              children: [
-                // Carrossel de fotos do post
-                _buildPhotoCarousel(screenWidth, photoHeight),
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            // Conteúdo scrollável
+            SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Carrossel de fotos do post
+                  _buildPhotoCarousel(screenWidth, photoHeight),
 
-                // Overlap negativo com informações do autor
-                Transform.translate(
-                  offset: const Offset(0, -16),
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(24),
+                  // Overlap negativo com informações do autor
+                  Transform.translate(
+                    offset: const Offset(0, -16),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(24),
+                        ),
                       ),
-                    ),
-                    child: Column(
-                      children: [
-                        // Header com autor e localização
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Avatar do autor (clicável)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: GestureDetector(
-                                  onTap: () {
-                                    context.pushProfile(_post!.authorProfileId);
-                                  },
-                                  child: CircleAvatar(
-                                    radius: 28,
-                                    backgroundColor:
-                                        AppColors.primary.withValues(alpha: 0.1),
-                                    backgroundImage: _authorPhotoUrl.isNotEmpty
-                                        ? CachedNetworkImageProvider(
-                                            _authorPhotoUrl)
-                                        : null,
-                                    child: _authorPhotoUrl.isEmpty
-                                        ? const Icon(
-                                            Icons.person,
-                                            color: AppColors.primary,
-                                            size: 32,
-                                          )
-                                        : null,
+                      child: Column(
+                        children: [
+                          // Header com autor e localização
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Avatar do autor (clicável)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      context
+                                          .pushProfile(_post!.authorProfileId);
+                                    },
+                                    child: CircleAvatar(
+                                      radius: 28,
+                                      backgroundColor: AppColors.primary
+                                          .withValues(alpha: 0.1),
+                                      backgroundImage:
+                                          _authorPhotoUrl.isNotEmpty
+                                              ? CachedNetworkImageProvider(
+                                                  _authorPhotoUrl)
+                                              : null,
+                                      child: _authorPhotoUrl.isEmpty
+                                          ? const Icon(
+                                              Icons.person,
+                                              color: AppColors.primary,
+                                              size: 32,
+                                            )
+                                          : null,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              // Nome e localização
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 10),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      // Nome do perfil (clicável e destacado)
-                                      GestureDetector(
-                                        onTap: () {
-                                          context.pushProfile(_post!.authorProfileId);
-                                        },
-                                        child: Text(
-                                          _authorName,
-                                          style: const TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black87,
+                                const SizedBox(width: 12),
+                                // Nome e localização
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 10),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // Nome do perfil (clicável e destacado)
+                                        GestureDetector(
+                                          onTap: () {
+                                            context.pushProfile(
+                                                _post!.authorProfileId);
+                                          },
+                                          child: Text(
+                                            _authorName,
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black87,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                              // Ícones de ação alinhados pelo topo
-                              if (_post != null) ...[
-                                _buildIconWithCounter(
-                                  icon: Iconsax.message,
-                                  count: liveCommentCount,
-                                  tooltip: 'Comentários',
-                                  onPressed: () {
-                                    CommentsBottomSheet.show(context, _post!);
-                                  },
-                                  onCountTap: () {
-                                    CommentsBottomSheet.show(context, _post!);
-                                  },
-                                  iconColor: AppColors.textSecondary,
-                                  bgColor: AppColors.textSecondary.withValues(alpha: 0.1),
-                                ),
-                                _buildIconWithCounter(
-                                  icon: Iconsax.send_1,
-                                  count: _post!.forwardCount,
-                                  tooltip: 'Enviar para conversa',
-                                  onPressed: _sharePostToChat,
-                                  iconColor: AppColors.textSecondary,
-                                  bgColor: AppColors.textSecondary.withValues(alpha: 0.1),
-                                ),
-                                // Interesse ou Menu de opções
-                                _buildInterestOrMoreIcon(),
+                                // Ícones de ação alinhados pelo topo
+                                if (_post != null) ...[
+                                  _buildIconWithCounter(
+                                    icon: Iconsax.message,
+                                    count: liveCommentCount,
+                                    tooltip: 'Comentários',
+                                    onPressed: () {
+                                      CommentsBottomSheet.show(context, _post!);
+                                    },
+                                    onCountTap: () {
+                                      CommentsBottomSheet.show(context, _post!);
+                                    },
+                                    iconColor: AppColors.textSecondary,
+                                    bgColor: AppColors.textSecondary
+                                        .withValues(alpha: 0.1),
+                                  ),
+                                  _buildIconWithCounter(
+                                    icon: Iconsax.send_1,
+                                    count: _post!.forwardCount,
+                                    tooltip: 'Enviar para conversa',
+                                    onPressed: _sharePostToChat,
+                                    iconColor: AppColors.textSecondary,
+                                    bgColor: AppColors.textSecondary
+                                        .withValues(alpha: 0.1),
+                                  ),
+                                  // Interesse ou Menu de opções
+                                  _buildInterestOrMoreIcon(),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
-                        ),
 
-                        // Divisor
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Divider(height: 1, color: Colors.grey[300]),
-                        ),
+                          // Divisor
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Divider(height: 1, color: Colors.grey[300]),
+                          ),
 
-                        // 🚫 Banner de expiração/renovação (para owner vendo post expirado OU expirando em breve)
-                        if (_isOwnPost() && _isPostExpired())
-                          _buildExpiredBanner()
-                        else if (_isOwnPost() && _isPostExpiringSoon())
-                          _buildExpiringSoonBanner(),
+                          // 🚫 Banner de expiração/renovação (para owner vendo post expirado OU expirando em breve)
+                          if (_isOwnPost() && _isPostExpired())
+                            _buildExpiredBanner()
+                          else if (_isOwnPost() && _isPostExpiringSoon())
+                            _buildExpiringSoonBanner(),
 
-                        // Seção de interessados (visível para todos)
-                        _buildInterestedUsers(),
+                          // Seção de interessados (visível para todos)
+                          _buildInterestedUsers(),
 
-                        // ✅ Renderização condicional por tipo de post
-                        if (_post!.type == 'sales')
-                          _buildSalesContent()
-                        else if (_post!.type == 'hiring')
-                          _buildHiringContent()
-                        else
-                          _buildMusicianBandContent(),
+                          // ✅ Renderização condicional por tipo de post
+                          if (_post!.type == 'sales')
+                            _buildSalesContent()
+                          else if (_post!.type == 'hiring')
+                            _buildHiringContent()
+                          else
+                            _buildMusicianBandContent(),
 
-                        const SizedBox(height: 32),
-                      ],
+                          const SizedBox(height: 32),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // AppBar transparente sobre a foto
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Botão voltar
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        icon: const Icon(
-                          Iconsax.arrow_left_2,
-                          color: Colors.white,
-                          size: 18,
+            // AppBar transparente sobre a foto
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Botão voltar
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          shape: BoxShape.circle,
                         ),
-                        padding: const EdgeInsets.all(8),
-                        constraints: const BoxConstraints(),
-                        onPressed: _handleBackNavigation,
-                      ),
-                    ),
-                    // Botões de ação
-                    Row(
-                      children: [
-                        // Compartilhar
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            shape: BoxShape.circle,
+                        child: IconButton(
+                          icon: const Icon(
+                            Iconsax.arrow_left_2,
+                            color: Colors.white,
+                            size: 18,
                           ),
-                          child: IconButton(
-                            icon: const Icon(
-                              Iconsax.share,
-                              color: Colors.white,
-                              size: 18,
+                          padding: const EdgeInsets.all(8),
+                          constraints: const BoxConstraints(),
+                          onPressed: _handleBackNavigation,
+                        ),
+                      ),
+                      // Botões de ação
+                      Row(
+                        children: [
+                          // Compartilhar
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              shape: BoxShape.circle,
                             ),
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(),
-                            onPressed: _sharePost,
+                            child: IconButton(
+                              icon: const Icon(
+                                Iconsax.share,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              padding: const EdgeInsets.all(8),
+                              constraints: const BoxConstraints(),
+                              onPressed: _sharePost,
+                            ),
                           ),
-                        ),
-
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   /// Widget para linha de informação
   Widget _buildInfoRow(IconData icon, String label, String value) {
@@ -1837,7 +1916,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   String _formatDurationLabel(int minutes) {
     final hours = minutes ~/ 60;
     final mins = minutes % 60;
-    if (hours > 0 && mins > 0) return '${hours}h${mins.toString().padLeft(2, '0')}min';
+    if (hours > 0 && mins > 0)
+      return '${hours}h${mins.toString().padLeft(2, '0')}min';
     if (hours > 0) return '${hours}h';
     return '${minutes}min';
   }
@@ -1900,14 +1980,17 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                     'Instrumentos',
                     _post!.instruments.join(', '),
                   )
-                else if (_post!.type == 'band' && _post!.seekingMusicians.isNotEmpty)
+                else if (_post!.type == 'band' &&
+                    _post!.seekingMusicians.isNotEmpty)
                   _buildInfoRow(
                     Iconsax.search_favorite,
                     'Procurando',
                     _post!.seekingMusicians.join(', '),
                   ),
-                if ((_post!.type == 'musician' && _post!.instruments.isNotEmpty) ||
-                    (_post!.type == 'band' && _post!.seekingMusicians.isNotEmpty))
+                if ((_post!.type == 'musician' &&
+                        _post!.instruments.isNotEmpty) ||
+                    (_post!.type == 'band' &&
+                        _post!.seekingMusicians.isNotEmpty))
                   const SizedBox(height: 12),
                 // Gêneros musicais
                 if (_post!.genres.isNotEmpty)
@@ -2153,7 +2236,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                 _buildInfoRow(
                   Iconsax.clock,
                   'Horário',
-                  _formatEventTime(post.eventStartTime, post.eventEndTime, post.eventDurationMinutes),
+                  _formatEventTime(post.eventStartTime, post.eventEndTime,
+                      post.eventDurationMinutes),
                 ),
                 const SizedBox(height: 12),
                 if (post.gigFormat?.isNotEmpty == true)
@@ -2162,14 +2246,16 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                     'Formação desejada',
                     post.gigFormat!,
                   ),
-                if (post.gigFormat?.isNotEmpty == true) const SizedBox(height: 12),
+                if (post.gigFormat?.isNotEmpty == true)
+                  const SizedBox(height: 12),
                 if (post.eventType?.isNotEmpty == true)
                   _buildInfoRow(
                     Iconsax.tick_circle,
                     'Tipo de evento',
                     post.eventType!,
                   ),
-                if (post.eventType?.isNotEmpty == true) const SizedBox(height: 12),
+                if (post.eventType?.isNotEmpty == true)
+                  const SizedBox(height: 12),
                 _buildInfoRow(
                   Iconsax.location,
                   'Local',
@@ -2329,7 +2415,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         // 1. Categoria (texto simples)
         _buildSalesCategoryText(),
         const SizedBox(height: 16),
-        
+
         // 2. Badge de status da promoção
         _buildPromotionStatusBadge(),
         const SizedBox(height: 16),
@@ -2427,9 +2513,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   /// Título do anúncio
   Widget _buildSalesTitle() {
     // Usar campo 'title' da entidade ou primeira linha do content
-    final title = _post!.title ?? 
-        (_post!.content.isNotEmpty 
-            ? _post!.content.split('\n').first 
+    final title = _post!.title ??
+        (_post!.content.isNotEmpty
+            ? _post!.content.split('\n').first
             : 'Anúncio');
 
     return Padding(
@@ -2488,7 +2574,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
 
     // ✅ FORMATADOR BRASILEIRO PARA PREÇOS
-    final currencyFormatter = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ');
+    final currencyFormatter =
+        NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -2517,7 +2604,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   const SizedBox(width: 8),
                   if (priceData.discountLabel != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.red,
                         borderRadius: BorderRadius.circular(6),
@@ -2771,15 +2859,21 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
   /// Abre WhatsApp com mensagem pré-definida
   Future<void> _launchWhatsApp(String phone) async {
-    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-    final title = _post!.title ?? 'sem título';
-    final message = Uri.encodeComponent(
-      'Olá! Vi seu anúncio "$title" no WeGig e tenho interesse.',
+    final whatsappNumber = _formatBrazilWhatsAppNumber(phone);
+    final title = _post!.title?.trim();
+    final postLink = DeepLinkGenerator.generatePostLink(postId: _post!.id);
+    final message = [
+      'Olá! Vi este anúncio no WeGig e tenho interesse.',
+      if (title != null && title.isNotEmpty) 'Anúncio: $title',
+      postLink,
+    ].join('\n\n');
+    final uri = Uri.https(
+      'wa.me',
+      '/$whatsappNumber',
+      {'text': message},
     );
-    final url = 'https://wa.me/55$cleanPhone?text=$message';
 
     try {
-      final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
@@ -2795,6 +2889,14 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
+  String _formatBrazilWhatsAppNumber(String phone) {
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    if (cleanPhone.startsWith('55')) {
+      return cleanPhone;
+    }
+    return '55$cleanPhone';
+  }
+
   Future<void> _launchExternalLink(String url) async {
     try {
       final uri = Uri.parse(url);
@@ -2805,7 +2907,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       debugPrint('Erro ao abrir link externo: $e');
     }
   }
-
 }
 
 /// Widget para visualização de fotos em tela cheia com zoom e swipe
@@ -2827,7 +2928,8 @@ class _FullScreenPhotoViewer extends StatefulWidget {
 class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
   late PageController _pageController;
   late int _currentIndex;
-  final TransformationController _transformationController = TransformationController();
+  final TransformationController _transformationController =
+      TransformationController();
 
   @override
   void initState() {
@@ -2859,7 +2961,7 @@ class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
               onTap: () => Navigator.of(context).pop(),
               child: Container(color: Colors.transparent),
             ),
-            
+
             // PageView com fotos
             PageView.builder(
               controller: _pageController,
@@ -2872,7 +2974,7 @@ class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
                 final heroTag = widget.photos.length == 1
                     ? 'post-photo-${widget.postId}'
                     : 'post-photo-${widget.postId}-$index';
-                    
+
                 return Center(
                   child: Hero(
                     tag: heroTag,
@@ -2898,7 +3000,7 @@ class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
                 );
               },
             ),
-            
+
             // Botão fechar
             Positioned(
               top: 16,
@@ -2919,14 +3021,15 @@ class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
                 ),
               ),
             ),
-            
+
             // Contador de fotos (se mais de uma)
             if (widget.photos.length > 1)
               Positioned(
                 top: 16,
                 right: 16,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(16),
@@ -2941,7 +3044,7 @@ class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
                   ),
                 ),
               ),
-            
+
             // Indicadores de página (dots)
             if (widget.photos.length > 1)
               Positioned(

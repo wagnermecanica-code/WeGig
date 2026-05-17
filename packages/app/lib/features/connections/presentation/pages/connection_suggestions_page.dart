@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:wegig_app/config/app_config.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../domain/entities/entities.dart';
@@ -1844,6 +1845,7 @@ class _SuggestionAvatar extends StatelessWidget {
 
     if (photoUrl != null && photoUrl.trim().isNotEmpty) {
       return CachedNetworkImage(
+        cacheManager: WeGigImageCacheManager.instance,
         imageUrl: photoUrl,
         fit: BoxFit.cover,
         placeholder: (_, __) => fallback,
@@ -1891,6 +1893,7 @@ class _CommonConnectionAvatar extends StatelessWidget {
     }
 
     return CachedNetworkImage(
+      cacheManager: WeGigImageCacheManager.instance,
       imageUrl: trimmedUrl,
       fit: BoxFit.cover,
       placeholder: (_, __) => fallback,

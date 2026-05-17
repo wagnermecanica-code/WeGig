@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:wegig_app/config/app_config.dart';
+import 'package:wegig_app/core/cache/image_cache_manager.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../domain/entities/entities.dart';
@@ -36,6 +37,7 @@ class _ConnectionsPageState extends ConsumerState<ConnectionsPage> {
   final TextEditingController _searchController = TextEditingController();
   final Map<String, String> _profileUsernames = <String, String>{};
   final Map<String, String> _profileLocations = <String, String>{};
+  final Map<String, String> _profilePhotoUrls = <String, String>{};
   String? _lastActiveProfileId;
   bool _isFetchingUsernames = false;
   String _searchQuery = '';
@@ -121,6 +123,7 @@ class _ConnectionsPageState extends ConsumerState<ConnectionsPage> {
       _sortOption = _ConnectionsSortOption.recent;
       _profileUsernames.clear();
       _profileLocations.clear();
+      _profilePhotoUrls.clear();
       if (!hadQuery) {
         _searchQuery = '';
       }
@@ -259,19 +262,14 @@ class _ConnectionsPageState extends ConsumerState<ConnectionsPage> {
       return;
     }
 
-    final missingProfileIds = connections
+    final profileIds = connections
         .map((connection) =>
             connection.getOtherProfileId(currentProfileId).trim())
         .where((profileId) => profileId.isNotEmpty)
-        .where(
-          (profileId) =>
-              !_profileUsernames.containsKey(profileId) ||
-              !_profileLocations.containsKey(profileId),
-        )
         .toSet()
         .toList(growable: false);
 
-    if (missingProfileIds.isEmpty) {
+    if (profileIds.isEmpty) {
       return;
     }
 
@@ -280,9 +278,9 @@ class _ConnectionsPageState extends ConsumerState<ConnectionsPage> {
     try {
       final fetched = <String, String>{};
       final fetchedLocations = <String, String>{};
-      for (var index = 0; index < missingProfileIds.length; index += 10) {
-        final chunk =
-            missingProfileIds.skip(index).take(10).toList(growable: false);
+      final fetchedPhotoUrls = <String, String>{};
+      for (var index = 0; index < profileIds.length; index += 10) {
+        final chunk = profileIds.skip(index).take(10).toList(growable: false);
         final snapshot = await FirebaseFirestore.instance
             .collection('profiles')
             .where(FieldPath.documentId, whereIn: chunk)
@@ -300,16 +298,22 @@ class _ConnectionsPageState extends ConsumerState<ConnectionsPage> {
           );
           fetched[doc.id] = username;
           fetchedLocations[doc.id] = location;
+          fetchedPhotoUrls[doc.id] =
+              (data['photoUrl'] as String?)?.trim() ?? '';
         }
       }
 
-      if (!mounted || (fetched.isEmpty && fetchedLocations.isEmpty)) {
+      if (!mounted ||
+          (fetched.isEmpty &&
+              fetchedLocations.isEmpty &&
+              fetchedPhotoUrls.isEmpty)) {
         return;
       }
 
       setState(() {
         _profileUsernames.addAll(fetched);
         _profileLocations.addAll(fetchedLocations);
+        _profilePhotoUrls.addAll(fetchedPhotoUrls);
       });
     } catch (_) {
       // Search metadata failure must not affect list rendering.
@@ -533,20 +537,19 @@ class _ConnectionsPageState extends ConsumerState<ConnectionsPage> {
         final itemIndex = index - 1;
         if (itemIndex < filteredConnections.length) {
           final connection = filteredConnections[itemIndex];
+          final otherProfileId = connection.getOtherProfileId(
+            activeProfile.profileId,
+          );
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: _ConnectionListItem(
               connection: connection,
               currentProfileId: activeProfile.profileId,
               isBusy: actionState.isLoading,
-              username: _profileUsernames[
-                  connection.getOtherProfileId(activeProfile.profileId)],
-              location: _profileLocations[
-                  connection.getOtherProfileId(activeProfile.profileId)],
+              username: _profileUsernames[otherProfileId],
+              location: _profileLocations[otherProfileId],
+              photoUrl: _profilePhotoUrls[otherProfileId],
               onOpenProfile: () {
-                final otherProfileId = connection.getOtherProfileId(
-                  activeProfile.profileId,
-                );
                 if (otherProfileId.isEmpty) {
                   return;
                 }
@@ -864,6 +867,7 @@ class _ConnectionListItem extends StatelessWidget {
     required this.isBusy,
     required this.username,
     required this.location,
+    this.photoUrl,
     required this.onOpenProfile,
     required this.onMessage,
     required this.onRemove,
@@ -874,6 +878,7 @@ class _ConnectionListItem extends StatelessWidget {
   final bool isBusy;
   final String? username;
   final String? location;
+  final String? photoUrl;
   final VoidCallback onOpenProfile;
   final Future<void> Function() onMessage;
   final Future<void> Function() onRemove;
@@ -899,7 +904,9 @@ class _ConnectionListItem extends StatelessWidget {
             children: [
               _ConnectionAvatar(
                 label: name,
-                photoUrl: connection.getOtherProfilePhotoUrl(currentProfileId),
+                photoUrl: (photoUrl ?? '').trim().isNotEmpty
+                    ? photoUrl
+                    : connection.getOtherProfilePhotoUrl(currentProfileId),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -989,6 +996,7 @@ class _ConnectionAvatar extends StatelessWidget {
     }
 
     return CachedNetworkImage(
+      cacheManager: WeGigImageCacheManager.instance,
       imageUrl: trimmedUrl,
       imageBuilder: (_, imageProvider) => CircleAvatar(
         radius: 24,

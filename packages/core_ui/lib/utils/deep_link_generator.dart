@@ -1,25 +1,40 @@
-import 'location_utils.dart';
+import 'package:core_ui/utils/location_utils.dart';
 
 /// Gerador de deep links para compartilhamento
 class DeepLinkGenerator {
   // Base URL do app (domínio registrado)
   static const String baseUrl = 'https://wegig.com.br';
-  
+
+  static const int _maxPreviewTextLength = 140;
+  static const int _maxListItems = 4;
+
   /// Gera link para perfil
   static String generateProfileLink({
-    required String userId,
     required String profileId,
+    String? userId,
   }) {
-    return '$baseUrl/profile/$userId/$profileId';
+    return _generateShareLink(type: 'profile', id: profileId);
   }
-  
+
   /// Gera link para post
   static String generatePostLink({
     required String postId,
   }) {
-    return '$baseUrl/post/$postId';
+    return _generateShareLink(type: 'post', id: postId);
   }
-  
+
+  static String _generateShareLink({
+    required String type,
+    required String id,
+  }) {
+    return Uri.parse('$baseUrl/share.html').replace(
+      queryParameters: <String, String>{
+        'type': type,
+        'id': id,
+      },
+    ).toString();
+  }
+
   /// Gera mensagem de compartilhamento de perfil
   static String generateProfileShareMessage({
     required String name,
@@ -40,28 +55,21 @@ class DeepLinkGenerator {
       state: state,
       fallback: city,
     );
+    final details = <String>[
+      tipo,
+      if (locationText.isNotEmpty) locationText,
+      if (instruments.isNotEmpty) _compactList(instruments),
+      if (genres.isNotEmpty) _compactList(genres),
+    ];
 
-    String message = '🎵 Confira este perfil no WeGig!\n\n';
-    message += '📛 $name\n';
-    message += '🎸 Tipo: $tipo\n';
-    if (locationText.isNotEmpty) {
-      message += '📍 $locationText\n';
-    }
-    
-    if (instruments.isNotEmpty) {
-      message += '🎹 Instrumentos: ${instruments.join(", ")}\n';
-    }
-    
-    if (genres.isNotEmpty) {
-      message += '🎼 Gêneros: ${genres.join(", ")}\n';
-    }
-    
-    message += '\n🔗 Link:\n<$link>\n\n';
-    message += 'Baixe o app e conecte-se com músicos na sua região!';
-    
-    return message;
+    return _composeShareMessage(
+      headline: 'Conheça $name no WeGig',
+      details: details,
+      callToAction: 'Abra o perfil e conecte-se pela sua rede musical:',
+      link: link,
+    );
   }
-  
+
   /// Gera mensagem de compartilhamento de post
   static String generatePostShareMessage({
     required String postId,
@@ -87,97 +95,124 @@ class DeepLinkGenerator {
       fallback: city,
     );
 
-    String message;
-    
+    final headline = _postShareHeadline(
+      postType: postType,
+      authorName: authorName,
+      title: title,
+    );
+    final details = <String>[
+      if (locationText.isNotEmpty) locationText,
+    ];
+
+    final previewText = _compactPreviewText(content);
+    if (previewText.isNotEmpty) {
+      details.add('"$previewText"');
+    }
+
     if (postType == 'band') {
-      // Banda procurando músicos
-      message = '🎵 Banda procurando músicos no WeGig!\n\n';
-      message += '🎸 Banda: $authorName\n';
-      if (locationText.isNotEmpty) {
-        message += '📍 $locationText\n';
-      }
-      
-      if (content != null && content.isNotEmpty) {
-        message += '\n💬 "$content"\n';
-      }
-      
       if (instruments.isNotEmpty) {
-        message += '\n🔍 Procurando: ${instruments.join(", ")}';
+        details.add('Procura: ${_compactList(instruments)}');
       }
-      
       if (genres.isNotEmpty) {
-        message += '\n🎼 Gêneros: ${genres.join(", ")}';
+        details.add('Som: ${_compactList(genres)}');
       }
     } else if (postType == 'hiring') {
-      // Contratação/divulgação de oportunidade
-      message = '📣 Oportunidade de contratação no WeGig!\n\n';
-      message += '🏢 $authorName\n';
-      if (locationText.isNotEmpty) {
-        message += '📍 $locationText\n';
-      }
-
-      if (content != null && content.isNotEmpty) {
-        message += '\n💬 "$content"\n';
-      }
-
       if (instruments.isNotEmpty) {
-        message += '\n🎯 Perfil desejado: ${instruments.join(", ")}';
+        details.add('Perfil desejado: ${_compactList(instruments)}');
       }
-
       if (genres.isNotEmpty) {
-        message += '\n🎼 Gêneros: ${genres.join(", ")}';
+        details.add('Estilo: ${_compactList(genres)}');
       }
     } else if (postType == 'sales') {
-      // Anúncio/venda
-      final titleText = (title != null && title.isNotEmpty) ? title : 'Anúncio';
-      message = '🏷️ Anúncio no WeGig!\n\n';
-      message += '📦 $titleText\n';
-      message += '👤 $authorName\n';
-      if (locationText.isNotEmpty) {
-        message += '📍 $locationText\n';
-      }
-
-      if (content != null && content.isNotEmpty) {
-        message += '\n💬 "$content"\n';
-      }
-
       if (salesType != null && salesType.isNotEmpty) {
-        message += '\n🗂️ Categoria: $salesType';
+        details.add(salesType);
       }
-
       if (price != null && price > 0) {
-        message += '\n💰 Preço: ${_formatPrice(price)}';
+        details.add(_formatPrice(price));
       }
-
       final discountLabel = _formatDiscountLabel(discountMode, discountValue);
       if (discountLabel.isNotEmpty) {
-        message += '\n🏷️ Desconto: $discountLabel';
+        details.add('Desconto: $discountLabel');
       }
     } else {
-      // Músico procurando banda
-      message = '🎵 Músico procurando banda no WeGig!\n\n';
-      message += '👤 $authorName\n';
-      if (locationText.isNotEmpty) {
-        message += '📍 $locationText\n';
-      }
-      
-      if (content != null && content.isNotEmpty) {
-        message += '\n💬 "$content"\n';
-      }
-      
       if (instruments.isNotEmpty) {
-        message += '\n🎹 Instrumentos: ${instruments.join(", ")}';
+        details.add(_compactList(instruments));
       }
-      
       if (genres.isNotEmpty) {
-        message += '\n🎼 Gêneros: ${genres.join(", ")}';
+        details.add(_compactList(genres));
       }
     }
-    
-    message += '\n🔗 Link:\n<$link>\n\n';
-    message += 'Baixe o app e conecte-se com músicos na sua região!';
-    
-    return message;
+
+    return _composeShareMessage(
+      headline: headline,
+      details: details,
+      callToAction: 'Veja o post no WeGig:',
+      link: link,
+    );
+  }
+
+  static String _composeShareMessage({
+    required String headline,
+    required List<String> details,
+    required String callToAction,
+    required String link,
+  }) {
+    final visibleDetails = details
+        .map((detail) => detail.trim())
+        .where((detail) => detail.isNotEmpty)
+        .take(4)
+        .toList(growable: false);
+
+    return [
+      headline.trim(),
+      if (visibleDetails.isNotEmpty) visibleDetails.join(' • '),
+      callToAction.trim(),
+      link,
+    ].join('\n\n');
+  }
+
+  static String _postShareHeadline({
+    required String postType,
+    required String authorName,
+    String? title,
+  }) {
+    final cleanAuthor = authorName.trim().isEmpty ? 'WeGig' : authorName.trim();
+    final cleanTitle = title?.trim() ?? '';
+
+    if (postType == 'band') {
+      return '$cleanAuthor está procurando músicos';
+    }
+    if (postType == 'hiring') {
+      return '$cleanAuthor publicou uma oportunidade';
+    }
+    if (postType == 'sales') {
+      return cleanTitle.isEmpty
+          ? '$cleanAuthor publicou um anúncio'
+          : '$cleanTitle no WeGig';
+    }
+    return '$cleanAuthor está procurando banda';
+  }
+
+  static String _compactPreviewText(String? value) {
+    final normalized = (value ?? '').replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.length <= _maxPreviewTextLength) {
+      return normalized;
+    }
+    return '${normalized.substring(0, _maxPreviewTextLength - 1).trimRight()}…';
+  }
+
+  static String _compactList(List<String> values) {
+    final normalized = values
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+    if (normalized.length <= _maxListItems) {
+      return normalized.join(', ');
+    }
+
+    final visible = normalized.take(_maxListItems).join(', ');
+    final remaining = normalized.length - _maxListItems;
+    return '$visible +$remaining';
   }
 
   static String _formatPrice(double value) {
