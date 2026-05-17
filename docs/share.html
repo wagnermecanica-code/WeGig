@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="index, follow" />
+    <title>WeGig - Abra no app</title>
+    <meta
+      name="description"
+      content="Abra este compartilhamento no WeGig e conecte-se com músicos, bandas, espaços musicais e oportunidades próximas."
+    />
+    <link rel="canonical" href="https://wegig.com.br/share.html" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="WeGig" />
+    <meta property="og:title" content="WeGig - Rede musical perto de você" />
+    <meta
+      property="og:description"
+      content="Abra este compartilhamento no WeGig para ver o perfil ou post enviado."
+    />
+    <meta property="og:url" content="https://wegig.com.br/share.html" />
+    <meta property="og:image" content="https://wegig.com.br/app_icon.png?v=8" />
+    <meta property="og:image:width" content="1024" />
+    <meta property="og:image:height" content="1024" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="WeGig - Rede musical perto de você" />
+    <meta
+      name="twitter:description"
+      content="Abra este compartilhamento no WeGig para ver o perfil ou post enviado."
+    />
+    <meta name="twitter:image" content="https://wegig.com.br/app_icon.png?v=8" />
+
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f7fb;
+        --text: #17151f;
+        --muted: #5d596b;
+        --primary: #683fff;
+        --border: #dedbea;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      main {
+        width: min(100% - 32px, 420px);
+        padding: 28px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 18px 45px rgba(28, 24, 45, 0.08);
+      }
+
+      img {
+        width: 84px;
+        height: auto;
+        display: block;
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: 24px;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 0 0 22px;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+
+      a.button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        background: var(--primary);
+        color: #fff;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      a.secondary {
+        display: block;
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 14px;
+        text-align: center;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/Logo.png?v=10" alt="WeGig" />
+      <h1>Abrindo no WeGig</h1>
+      <p id="message">
+        Se o app estiver instalado, este link abre direto no conteúdo compartilhado.
+      </p>
+      <a id="open-app" class="button" href="/">Abrir no app</a>
+      <a class="secondary" href="/">Ir para wegig.com.br</a>
+    </main>
+
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var type = params.get("type");
+        var id = params.get("id");
+        var button = document.getElementById("open-app");
+        var message = document.getElementById("message");
+        var supported = type === "post" || type === "profile";
+
+        if (!supported || !id) {
+          button.href = "/";
+          button.textContent = "Ir para wegig.com.br";
+          message.textContent = "Este compartilhamento não está mais disponível.";
+          return;
+        }
+
+        var path = "/" + type + "/" + encodeURIComponent(id);
+        var appUrl = "wegig://app" + path;
+        button.href = appUrl;
+
+        window.setTimeout(function () {
+          window.location.href = appUrl;
+        }, 250);
+      })();
+    </script>
+  </body>
+</html>
