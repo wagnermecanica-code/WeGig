@@ -1,3 +1,9 @@
+### 📄 PRD, escopo de MVP e arquitetura técnica (17/05/2026)
+
+- criado `docs/project-info/PRD_MVP_SCOPE_TECH_ARCHITECTURE_2026-05-17.md` como documento integrado de Product Requirements Document, MVP Scope e Technical Architecture
+- atualizado o índice principal da documentação e o mapa técnico para incluir o novo artefato entre as leituras recomendadas
+- sincronizado `docs/project-info/MVP_DESCRIPTION.md` com a nova referência canônica de produto
+
 ### 🛡️ App Check iOS produção habilitado (21/04/2026)
 
 - plists, xcconfigs e `firebase_options_*.dart` em `packages/app/ios/` realinhados para os bundles `com.tosembanda.wegig[.dev|.staging]` e os novos App IDs registrados no Firebase

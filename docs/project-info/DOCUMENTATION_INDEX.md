@@ -6,6 +6,7 @@ Este documento organiza a documentação do projeto por finalidade e identifica 
 
 - `README.md`: visão operacional do repositório
 - `MVP_Rev0.0.md`: especificação macro do MVP
+- `docs/project-info/PRD_MVP_SCOPE_TECH_ARCHITECTURE_2026-05-17.md`: PRD, escopo de MVP e arquitetura técnica de produto
 - `docs/project-info/MVP_DESCRIPTION.md`: resumo executivo atual do produto
 - `docs/guides/MVP_CHECKLIST.md`: checklist de baseline e prontidão
 - `docs/changelog/CHANGELOG.md`: histórico incremental de mudanças
@@ -68,12 +69,13 @@ Histórico antigo mantido apenas para consulta. Não usar como fonte principal s
 
 1. `README.md`
 2. `MVP_Rev0.0.md`
-3. `docs/project-info/MVP_DESCRIPTION.md`
-4. `docs/guides/MVP_CHECKLIST.md`
-5. Documentos específicos da área em que você vai atuar
-6. Para troubleshooting recorrente, priorize `docs/troubleshooting/INTERESTED_USERS_SECTION.md` e `docs/troubleshooting/MAP_DISTANCE_FILTER.md`
-7. Para acompanhar a implementação do sistema de conexões, use `docs/tasks/CONNECTIONS_IMPLEMENTATION_ROADMAP_2026-04-19.md`
-8. Para o fechamento desta etapa e a sincronização entre app, site e documentação da IA, use `docs/sessions/SESSION_21_STAGE_CLOSURE_2026-04-21.md`
+3. `docs/project-info/PRD_MVP_SCOPE_TECH_ARCHITECTURE_2026-05-17.md`
+4. `docs/project-info/MVP_DESCRIPTION.md`
+5. `docs/guides/MVP_CHECKLIST.md`
+6. Documentos específicos da área em que você vai atuar
+7. Para troubleshooting recorrente, priorize `docs/troubleshooting/INTERESTED_USERS_SECTION.md` e `docs/troubleshooting/MAP_DISTANCE_FILTER.md`
+8. Para acompanhar a implementação do sistema de conexões, use `docs/tasks/CONNECTIONS_IMPLEMENTATION_ROADMAP_2026-04-19.md`
+9. Para o fechamento desta etapa e a sincronização entre app, site e documentação da IA, use `docs/sessions/SESSION_21_STAGE_CLOSURE_2026-04-21.md`
 
 ## Regras de manutenção
 
@@ -84,4 +86,4 @@ Histórico antigo mantido apenas para consulta. Não usar como fonte principal s
 
 ## Última atualização
 
-21 de abril de 2026, durante o fechamento da etapa de Conexões, site público e sincronização documental.
+17 de maio de 2026, com inclusão do PRD, escopo de MVP e arquitetura técnica de produto.

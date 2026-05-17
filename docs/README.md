@@ -6,6 +6,7 @@ Ponto de entrada da documentação do projeto WeGig.
 
 - `../README.md`: visão geral do repositório
 - `../MVP_Rev0.0.md`: escopo macro do MVP
+- `project-info/PRD_MVP_SCOPE_TECH_ARCHITECTURE_2026-05-17.md`: PRD, escopo de MVP e arquitetura técnica
 - `project-info/MVP_DESCRIPTION.md`: resumo executivo atual
 - `guides/MVP_CHECKLIST.md`: checklist de baseline
 - `changelog/CHANGELOG.md`: histórico incremental
@@ -32,6 +33,7 @@ Ponto de entrada da documentação do projeto WeGig.
 ### Entender o produto
 
 - `../MVP_Rev0.0.md`
+- `project-info/PRD_MVP_SCOPE_TECH_ARCHITECTURE_2026-05-17.md`
 - `project-info/MVP_DESCRIPTION.md`
 - `guides/MVP_CHECKLIST.md`
 
@@ -69,4 +71,4 @@ Pastas como `legacy/` e documentos muito específicos de correção continuam ú
 
 ## Última atualização
 
-21 de abril de 2026.
+17 de maio de 2026.

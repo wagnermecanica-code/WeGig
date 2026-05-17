@@ -60,6 +60,7 @@ O modelo central do produto é multi-perfil: uma mesma conta pode administrar pe
 ## Documentos canônicos relacionados
 
 - `MVP_Rev0.0.md`: especificação macro do MVP
+- `docs/project-info/PRD_MVP_SCOPE_TECH_ARCHITECTURE_2026-05-17.md`: PRD, escopo de MVP e arquitetura técnica de produto
 - `README.md`: visão operacional do repositório
 - `docs/guides/MVP_CHECKLIST.md`: checklist de prontidão atual
 - `docs/changelog/CHANGELOG.md`: histórico incremental de mudanças
@@ -72,9 +73,10 @@ Sempre que o escopo do MVP mudar, atualize nesta ordem:
 1. `docs/changelog/CHANGELOG.md`
 2. `docs/guides/MVP_CHECKLIST.md`
 3. `docs/project-info/MVP_DESCRIPTION.md`
-4. `MVP_Rev0.0.md` quando a mudança alterar a visão macro do produto
-5. `docs/project-info/DOCUMENTATION_INDEX.md` e `docs/README.md` se houver novos artefatos
-6. `.github/copilot-instructions.md` quando a mudança alterar convenções úteis para a IA de desenvolvimento
+4. `docs/project-info/PRD_MVP_SCOPE_TECH_ARCHITECTURE_2026-05-17.md` quando a mudança alterar decisão de produto, escopo ou arquitetura de MVP
+5. `MVP_Rev0.0.md` quando a mudança alterar a visão macro do produto
+6. `docs/project-info/DOCUMENTATION_INDEX.md` e `docs/README.md` se houver novos artefatos
+7. `.github/copilot-instructions.md` quando a mudança alterar convenções úteis para a IA de desenvolvimento
 
 ## Observação histórica
 
