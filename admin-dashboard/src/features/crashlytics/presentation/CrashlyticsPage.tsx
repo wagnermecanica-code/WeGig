@@ -46,7 +46,7 @@ const EMPTY_SUMMARY: CrashSummary = {
   totalEvents: 0,
   fatalEvents: 0,
   nonFatalEvents: 0,
-  events24h: 0,
+  events7d: 0,
   affectedVersions: 0,
   affectedPlatforms: 0,
   fatalRate: 0,
@@ -56,6 +56,7 @@ export function CrashlyticsPage() {
   const [summary, setSummary] = useState<CrashSummary>(EMPTY_SUMMARY);
   const [daily, setDaily] = useState<CrashDailyPoint[]>([]);
   const [topIssues, setTopIssues] = useState<CrashIssuePoint[]>([]);
+  const [source, setSource] = useState("sem dados");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +68,7 @@ export function CrashlyticsPage() {
       setSummary(result.summary);
       setDaily(result.daily);
       setTopIssues(result.topIssues);
+      setSource(result.source);
     } catch (err) {
       setError(
         err instanceof Error
@@ -92,6 +94,11 @@ export function CrashlyticsPage() {
           <p className="text-sm text-gray-500 dark:text-slate-400">
             Indicadores de estabilidade, severidade e tendência de erros.
           </p>
+          {!loading ? (
+            <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">
+              Fonte: {source}
+            </p>
+          ) : null}
         </div>
         <Button variant="secondary" onClick={() => void loadData()}>
           <RefreshCw className="h-4 w-4" /> Atualizar
@@ -130,8 +137,8 @@ export function CrashlyticsPage() {
               hint="Warnings e exceptions"
             />
             <StatCard
-              label="Últimas 24h"
-              value={formatNumber(summary.events24h)}
+              label="Últimos 7 dias"
+              value={formatNumber(summary.events7d)}
               icon={<Gauge className="h-5 w-5" />}
               hint="Incidentes recentes"
             />
@@ -186,12 +193,28 @@ export function CrashlyticsPage() {
                   >
                     <defs>
                       <linearGradient id="fatal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#dc2626" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#dc2626" stopOpacity={0} />
+                        <stop
+                          offset="0%"
+                          stopColor="#dc2626"
+                          stopOpacity={0.35}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor="#dc2626"
+                          stopOpacity={0}
+                        />
                       </linearGradient>
                       <linearGradient id="nonFatal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#2563eb" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
+                        <stop
+                          offset="0%"
+                          stopColor="#2563eb"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor="#2563eb"
+                          stopOpacity={0}
+                        />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -230,7 +253,7 @@ export function CrashlyticsPage() {
               <Skeleton className="h-72" />
             ) : topIssues.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-slate-400">
-                Nenhum evento de crash encontrado nas coleções monitoradas.
+                Nenhum evento encontrado no Firestore nem no fallback publicado.
               </p>
             ) : (
               <div className="h-72 w-full">

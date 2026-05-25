@@ -1,0 +1,69 @@
+{
+  "source": "docs/Crashlytics/23.05.26",
+  "generatedAt": "2026-05-25T00:00:00.000-03:00",
+  "events": [
+    {
+      "id": "0d969bb75c40884744fc5833fc89ba36",
+      "issue": "[cloud_firestore/permission-denied] The caller does not have permission to execute the specified operation.",
+      "severity": "fatal",
+      "appVersion": "1.0.17 (23)",
+      "platform": "android",
+      "eventCount": 1,
+      "createdAt": "2026-05-19T17:41:45.000-03:00"
+    },
+    {
+      "id": "39027fba9ea4812c37bc31d836ebaeef",
+      "issue": "Invalid argument(s): string is not well-formed UTF-16.",
+      "severity": "fatal",
+      "appVersion": "1.0.17 (23)",
+      "platform": "android",
+      "eventCount": 1,
+      "createdAt": "2026-05-22T18:59:05.000-03:00"
+    },
+    {
+      "id": "561435e42308a60d9ad490ae21339595",
+      "issue": "Null check operator used on a null value.",
+      "severity": "fatal",
+      "appVersion": "1.0.17 (23)",
+      "platform": "android",
+      "eventCount": 1,
+      "createdAt": "2026-05-18T22:27:02.000-03:00"
+    },
+    {
+      "id": "88faa1af0c40960e4677abd395318135",
+      "issue": "ClientException: Connection reset by peer while loading Firebase Storage profile image.",
+      "severity": "non_fatal",
+      "appVersion": "1.0.17 (23)",
+      "platform": "android",
+      "eventCount": 1,
+      "createdAt": "2026-05-22T19:46:26.000-03:00"
+    },
+    {
+      "id": "a61de400aa2da34fb4b0e8c9f65311a5",
+      "issue": "Bad state: Cannot use ref after the widget was disposed.",
+      "severity": "fatal",
+      "appVersion": "1.0.17 (23)",
+      "platform": "android",
+      "eventCount": 1,
+      "createdAt": "2026-05-20T11:28:16.000-03:00"
+    },
+    {
+      "id": "bdbfa85cb087a25a48f7d5180b7b9d8e",
+      "issue": "Firestore transaction object cannot be used after its update callback has been invoked.",
+      "severity": "fatal",
+      "appVersion": "1.0.17 (23)",
+      "platform": "android",
+      "eventCount": 1,
+      "createdAt": "2026-05-21T20:53:56.000-03:00"
+    },
+    {
+      "id": "c986f329409712d5c4b9c22f39c8c291",
+      "issue": "HTTP request failed, statusCode: 404, YouTube thumbnail image.",
+      "severity": "non_fatal",
+      "appVersion": "1.0.17 (23)",
+      "platform": "android",
+      "eventCount": 1,
+      "createdAt": "2026-05-20T18:03:49.000-03:00"
+    }
+  ]
+}

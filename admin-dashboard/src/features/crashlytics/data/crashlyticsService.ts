@@ -4,7 +4,6 @@ import {
   limit,
   orderBy,
   query,
-  where,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@core/firebase/client";
@@ -23,7 +22,7 @@ export interface CrashSummary {
   totalEvents: number;
   fatalEvents: number;
   nonFatalEvents: number;
-  events24h: number;
+  events7d: number;
   affectedVersions: number;
   affectedPlatforms: number;
   fatalRate: number;
@@ -40,6 +39,14 @@ export interface CrashIssuePoint {
   issue: string;
   total: number;
   fatal: number;
+}
+
+export interface CrashlyticsSignals {
+  events: CrashEvent[];
+  summary: CrashSummary;
+  daily: CrashDailyPoint[];
+  topIssues: CrashIssuePoint[];
+  source: string;
 }
 
 const CANDIDATE_COLLECTIONS = [
@@ -64,7 +71,17 @@ function parseTimestampLike(value: unknown): Date | null {
   return null;
 }
 
-function pickString(data: Record<string, any>, keys: string[], fallback: string) {
+function parseExternalDate(value: unknown): Date | null {
+  if (typeof value !== "string") return parseTimestampLike(value);
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function pickString(
+  data: Record<string, any>,
+  keys: string[],
+  fallback: string,
+) {
   for (const key of keys) {
     const value = data[key];
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -90,6 +107,14 @@ function parseSeverity(data: Record<string, any>): "fatal" | "non_fatal" {
   const raw = String(
     data.severity ?? data.type ?? data.eventType ?? data.level ?? "",
   ).toLowerCase();
+  if (
+    raw.includes("non_fatal") ||
+    raw.includes("non-fatal") ||
+    raw.includes("warning") ||
+    raw.includes("handled")
+  ) {
+    return "non_fatal";
+  }
   if (raw.includes("fatal") || raw.includes("critical") || raw === "crash") {
     return "fatal";
   }
@@ -98,7 +123,10 @@ function parseSeverity(data: Record<string, any>): "fatal" | "non_fatal" {
   return "non_fatal";
 }
 
-async function tryReadCollection(name: string, take = 500): Promise<CrashEvent[]> {
+async function tryReadCollection(
+  name: string,
+  take = 500,
+): Promise<CrashEvent[]> {
   const col = collection(db, name);
 
   // Prioriza ordenação temporal para tendência; em ausência de índice, faz fallback.
@@ -107,8 +135,7 @@ async function tryReadCollection(name: string, take = 500): Promise<CrashEvent[]
   ).catch(() => null);
 
   const snap =
-    ordered ??
-    (await getDocs(query(col, limit(take))).catch(() => null));
+    ordered ?? (await getDocs(query(col, limit(take))).catch(() => null));
 
   if (!snap || snap.empty) return [];
 
@@ -116,26 +143,78 @@ async function tryReadCollection(name: string, take = 500): Promise<CrashEvent[]
     const data = doc.data();
     return {
       id: doc.id,
-      issue: pickString(data, ["issue", "title", "error", "message", "exception"], "(sem título)"),
+      issue: pickString(
+        data,
+        ["issue", "title", "error", "message", "exception"],
+        "(sem título)",
+      ),
       severity: parseSeverity(data),
-      appVersion: pickString(data, ["appVersion", "version", "buildVersion"], "desconhecida"),
-      platform: pickString(data, ["platform", "os", "devicePlatform"], "desconhecido"),
+      appVersion: pickString(
+        data,
+        ["appVersion", "version", "buildVersion"],
+        "desconhecida",
+      ),
+      platform: pickString(
+        data,
+        ["platform", "os", "devicePlatform"],
+        "desconhecido",
+      ),
       eventCount: pickNumber(data, ["count", "occurrences", "eventCount"], 1),
-      createdAt: parseTimestampLike(data.createdAt ?? data.timestamp ?? data.updatedAt),
+      createdAt: parseTimestampLike(
+        data.createdAt ?? data.timestamp ?? data.updatedAt,
+      ),
     };
   });
 }
 
-export async function fetchCrashEvents(): Promise<CrashEvent[]> {
+async function fetchLocalCrashEvents(): Promise<{
+  events: CrashEvent[];
+  source: string;
+}> {
+  const response = await fetch("/admin/crashlytics-local-events.json", {
+    cache: "no-store",
+  }).catch(() => null);
+
+  if (!response?.ok) return { events: [], source: "sem dados" };
+
+  const payload = await response.json().catch(() => null);
+  if (!payload || !Array.isArray(payload.events)) {
+    return { events: [], source: "sem dados" };
+  }
+
+  return {
+    source: payload.source ?? "fallback local",
+    events: payload.events.map((event: Record<string, any>) => ({
+      id: String(event.id ?? `${event.issue ?? "issue"}-${event.createdAt ?? "unknown"}`),
+      issue: pickString(event, ["issue", "title", "message"], "(sem título)"),
+      severity: parseSeverity(event),
+      appVersion: pickString(
+        event,
+        ["appVersion", "version", "buildVersion"],
+        "desconhecida",
+      ),
+      platform: pickString(event, ["platform", "os"], "desconhecido"),
+      eventCount: pickNumber(event, ["eventCount", "count", "occurrences"], 1),
+      createdAt: parseExternalDate(event.createdAt ?? event.timestamp),
+    })),
+  };
+}
+
+export async function fetchCrashEvents(): Promise<{
+  events: CrashEvent[];
+  source: string;
+}> {
   for (const collectionName of CANDIDATE_COLLECTIONS) {
     try {
       const events = await tryReadCollection(collectionName);
-      if (events.length > 0) return events;
+      if (events.length > 0) {
+        return { events, source: `Firestore: ${collectionName}` };
+      }
     } catch (err) {
       console.warn(`[crashlyticsService] failed ${collectionName}:`, err);
     }
   }
-  return [];
+  return fetchLocalCrashEvents();
 }
 
 export function buildCrashSummary(events: CrashEvent[]): CrashSummary {
@@ -145,9 +224,9 @@ export function buildCrashSummary(events: CrashEvent[]): CrashSummary {
     .reduce((sum, e) => sum + e.eventCount, 0);
   const nonFatalEvents = totalEvents - fatalEvents;
 
-  const threshold = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const events24h = events
-    .filter((e) => e.createdAt && e.createdAt >= threshold)
+  const threshold7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const events7d = events
+    .filter((e) => e.createdAt && e.createdAt >= threshold7d)
     .reduce((sum, e) => sum + e.eventCount, 0);
 
   const affectedVersions = new Set(events.map((e) => e.appVersion)).size;
@@ -157,14 +236,17 @@ export function buildCrashSummary(events: CrashEvent[]): CrashSummary {
     totalEvents,
     fatalEvents,
     nonFatalEvents,
-    events24h,
+    events7d,
     affectedVersions,
     affectedPlatforms,
     fatalRate: totalEvents > 0 ? fatalEvents / totalEvents : 0,
   };
 }
 
-export function buildCrashDailySeries(events: CrashEvent[], days = 14): CrashDailyPoint[] {
+export function buildCrashDailySeries(
+  events: CrashEvent[],
+  days = 14,
+): CrashDailyPoint[] {
   const now = new Date();
   const seed = new Map<string, CrashDailyPoint>();
 
@@ -192,7 +274,10 @@ export function buildCrashDailySeries(events: CrashEvent[], days = 14): CrashDai
   return Array.from(seed.values());
 }
 
-export function buildTopIssues(events: CrashEvent[], top = 8): CrashIssuePoint[] {
+export function buildTopIssues(
+  events: CrashEvent[],
+  top = 8,
+): CrashIssuePoint[] {
   const agg = new Map<string, CrashIssuePoint>();
 
   for (const event of events) {
@@ -208,17 +293,13 @@ export function buildTopIssues(events: CrashEvent[], top = 8): CrashIssuePoint[]
     .slice(0, top);
 }
 
-export async function fetchCrashlyticsSignals(): Promise<{
-  events: CrashEvent[];
-  summary: CrashSummary;
-  daily: CrashDailyPoint[];
-  topIssues: CrashIssuePoint[];
-}> {
-  const events = await fetchCrashEvents();
+export async function fetchCrashlyticsSignals(): Promise<CrashlyticsSignals> {
+  const { events, source } = await fetchCrashEvents();
   return {
     events,
     summary: buildCrashSummary(events),
     daily: buildCrashDailySeries(events),
     topIssues: buildTopIssues(events),
+    source,
   };
 }
