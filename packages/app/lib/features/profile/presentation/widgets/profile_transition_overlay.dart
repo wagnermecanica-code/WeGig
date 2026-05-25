@@ -16,6 +16,7 @@ class ProfileTransitionOverlay extends StatefulWidget {
     this.photoUrl,
   });
   final String profileName;
+
   /// Tipo do perfil: 'band', 'musician' ou 'space'
   final String profileType;
   final String? photoUrl;
@@ -95,7 +96,8 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
           widget.onComplete();
         } catch (e) {
           // Falha silenciosa - widget já foi descartado
-          debugPrint('ProfileTransitionOverlay: Overlay descartado antes do pop');
+          debugPrint(
+              'ProfileTransitionOverlay: Overlay descartado antes do pop');
           widget.onComplete();
         }
       });
@@ -183,11 +185,10 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
                   child: CircleAvatar(
                     radius: 50,
                     backgroundColor: lightColor,
-                    backgroundImage:
-                        widget.photoUrl != null && widget.photoUrl!.isNotEmpty
-                            ? CachedNetworkImageProvider(widget.photoUrl!)
-                            : null,
-                    child: widget.photoUrl == null || widget.photoUrl!.isEmpty
+                    backgroundImage: _isRemoteImageUrl(widget.photoUrl)
+                        ? CachedNetworkImageProvider(widget.photoUrl!)
+                        : null,
+                    child: !_isRemoteImageUrl(widget.photoUrl)
                         ? Icon(
                             _getProfileTypeIcon(),
                             size: 50,
@@ -265,5 +266,12 @@ class _ProfileTransitionOverlayState extends State<ProfileTransitionOverlay>
         ),
       ),
     );
+  }
+
+  bool _isRemoteImageUrl(String? value) {
+    final uri = Uri.tryParse(value?.trim() ?? '');
+    return uri != null &&
+        uri.hasAuthority &&
+        (uri.scheme == 'http' || uri.scheme == 'https');
   }
 }

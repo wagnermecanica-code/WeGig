@@ -39,7 +39,9 @@ export 'utils/app_snackbar.dart';
 export 'utils/location_utils.dart';
 export 'utils/price_calculator.dart';
 export 'utils/music_constants.dart';
+export 'utils/utf16_sanitizer.dart';
 
 // Core Types
-export 'core/ui_state.dart' hide Success; // Hide Success to avoid conflict with result.dart
+export 'core/ui_state.dart'
+    hide Success; // Hide Success to avoid conflict with result.dart
 export 'core/result.dart';

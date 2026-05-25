@@ -15,10 +15,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:wegig_app/features/notifications_new/domain/entities/notification_new_entity.dart';
-import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
-import 'package:wegig_app/features/notifications_new/presentation/providers/notifications_new_providers.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
+import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
+import 'package:wegig_app/features/notifications_new/domain/entities/notification_new_entity.dart';
+import 'package:wegig_app/features/notifications_new/presentation/providers/notifications_new_providers.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 
 part 'notifications_new_controller.freezed.dart';
@@ -64,7 +64,7 @@ class NotificationsNewState with _$NotificationsNewState {
 @riverpod
 class NotificationsNewController extends _$NotificationsNewController {
   /// Tamanho da página para paginação
-  static const int _pageSize = 20;
+  static const int _pageSize = 30;
 
   @override
   FutureOr<NotificationsNewState> build(
@@ -100,7 +100,6 @@ class NotificationsNewController extends _$NotificationsNewController {
       return NotificationsNewState(
         notifications: notifications,
         hasMore: notifications.length >= _pageSize,
-        isLoadingMore: false,
       );
     } catch (e, stack) {
       debugPrint('❌ NotificationsNewController: Error loading - $e');
@@ -242,6 +241,13 @@ class NotificationsNewController extends _$NotificationsNewController {
         notificationId: notificationId,
         profileId: profileId,
       );
+
+      final latestState = state.valueOrNull;
+      if (latestState != null &&
+          latestState.notifications.length < _pageSize &&
+          latestState.hasMore) {
+        await loadMore();
+      }
     } catch (e) {
       debugPrint(
           '⚠️ NotificationsNewController: deleteNotification backend error - $e');

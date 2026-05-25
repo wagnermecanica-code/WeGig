@@ -771,6 +771,77 @@ As estimativas abaixo consideram um time enxuto e um produto já orientado por F
 
 O custo final varia conforme senioridade, país, profundidade do design, qualidade esperada do beta e quanto da base atual será reaproveitada. Para controle de risco, o MVP não deve incorporar pagamentos, IA avançada, streaming ou marketplace transacional antes de validar densidade de rede e recorrência.
 
+### Estudo de esforço aplicado na base atual
+
+Em 23 de maio de 2026 foi feita uma revisão estrutural do repositório para estimar o esforço necessário para recriar, do zero, um clone funcional do app com paridade razoável com a base atual. Esta leitura considera o produto já implementado, incluindo app mobile, backend Firebase, regras de segurança, índices, Cloud Functions, dashboard administrativo, testes e documentação operacional.
+
+#### Escopo técnico observado
+
+| Área                 | Evidência na base atual                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------- |
+| Monorepo             | Melos com app Flutter, pacote compartilhado, Functions, dashboard admin, docs e scripts           |
+| App mobile           | `packages/app`, com 10 features principais e 248 arquivos Dart em `lib`                           |
+| Pacote compartilhado | `packages/core_ui`, com 64 arquivos Dart para UI, tema, entidades, serviços e utilitários         |
+| Código Dart manual   | Aproximadamente 86 mil linhas, excluindo arquivos gerados `.g.dart` e `.freezed.dart`             |
+| Código gerado        | 50 arquivos gerados por Riverpod, Freezed e JSON serialization                                    |
+| Backend serverless   | Cloud Functions Node.js com 18 arquivos JavaScript, cerca de 6 mil linhas e 23 funções exportadas |
+| Firestore            | 434 linhas de regras de segurança e 37 índices compostos versionados                              |
+| Admin                | Dashboard Vite + React para operação/moderação, com cerca de 643 linhas em `src`                  |
+| Testes               | 34 arquivos de teste, com cerca de 6,6 mil linhas                                                 |
+
+#### Distribuição por feature mobile
+
+| Feature               | Arquivos Dart | Linhas aproximadas |
+| --------------------- | ------------- | ------------------ |
+| Auth                  | 17            | 4.366              |
+| Comentários           | 9             | 2.718              |
+| Conexões / Minha Rede | 31            | 16.683             |
+| Home / mapa / feed    | 31            | 8.578              |
+| Mensagens / chat      | 34            | 17.778             |
+| Notificações          | 24            | 6.658              |
+| Posts                 | 29            | 12.481             |
+| Perfil / multi-perfil | 19            | 10.805             |
+| Reports               | 3             | 961                |
+| Settings              | 9             | 2.169              |
+
+#### Estimativa para criar um clone do zero
+
+Para um clone com paridade funcional razoável, desenvolvido por um engenheiro senior Flutter/Firebase, a estimativa realista fica entre 4.420 e 7.280 horas. A estimativa central para planejamento é de aproximadamente 5.400 horas, com P80 em torno de 6.600 horas.
+
+| Bloco de trabalho                                         | Horas estimadas |
+| --------------------------------------------------------- | --------------- |
+| Setup monorepo, flavors, Firebase, CI e build nativo      | 160 a 280       |
+| Design system, tema e componentes compartilhados          | 160 a 280       |
+| Auth, onboarding e multi-perfil                           | 220 a 360       |
+| Perfil, edição, troca de perfil, privacidade e bloqueios  | 300 a 500       |
+| Posts, mídia, comentários, likes, filtros e cache         | 500 a 800       |
+| Home, feed, mapa, geolocalização e markers                | 280 a 480       |
+| Minha Rede, conexões, sugestões, atividades e badges      | 450 a 750       |
+| Chat em tempo real, read receipts e contador de não lidas | 450 a 750       |
+| Notificações push/in-app, badges e preferências           | 350 a 600       |
+| Cloud Functions, rate limits, limpeza e triggers sociais  | 400 a 700       |
+| Firestore schema, rules, indexes, migrações e segurança   | 180 a 320       |
+| Reports, moderação, filtro de conteúdo e App Check        | 180 a 320       |
+| Settings, permissões, deep links, share e analytics       | 180 a 320       |
+| Admin dashboard básico                                    | 80 a 160        |
+| Testes, QA, Crashlytics, hardening e correções de release | 450 a 800       |
+| Documentação operacional mínima                           | 80 a 160        |
+
+#### Leitura de calendário
+
+| Configuração de equipe                                   | Tempo aproximado |
+| -------------------------------------------------------- | ---------------- |
+| 1 engenheiro senior solo, 35 horas produtivas por semana | 31 a 42 meses    |
+| 2 engenheiros senior                                     | 16 a 22 meses    |
+| 3 engenheiros com boa coordenação                        | 11 a 15 meses    |
+| 4 a 5 pessoas incluindo QA, produto, design e backend    | 7 a 11 meses     |
+
+#### Interpretação executiva
+
+O maior custo acumulado do produto não está apenas na interface mobile. A complexidade relevante está na combinação de multi-perfil, bloqueios bidirecionais, badges por perfil, notificações contextuais, chat em tempo real, consultas Firestore com índices corretos, regras de segurança, cache, push tokens, geolocalização, flavors e hardening de release.
+
+Para planejamento financeiro ou avaliação do esforço já aplicado, recomenda-se usar 5.500 horas como número-base para um clone production-ready, adicionando margem de risco de 20% a 25% quando houver incerteza sobre requisitos, qualidade de design, cobertura de QA ou necessidade de refazer integrações nativas.
+
 ## Decisão de Produto Recomendada
 
 O MVP inicial do WeGig deve focar somente em:

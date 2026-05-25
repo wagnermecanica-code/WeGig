@@ -1,5 +1,5 @@
+import 'dart:convert';
 import 'dart:io' show Platform;
-import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/theme/app_colors.dart';
@@ -7,17 +7,23 @@ import 'package:core_ui/theme/app_typography.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:wegig_app/app/router/app_router.dart';
+import 'package:wegig_app/features/auth/domain/entities/auth_result.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/auth/presentation/widgets/age_verification_dialog.dart';
 import 'package:wegig_app/features/auth/presentation/widgets/google_sign_in_button.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+/// Mensagem padrão exibida quando o usuário tenta logar/recuperar senha
+/// com um e-mail que não possui conta cadastrada no app.
+const String _kNoAccountForEmailMessage =
+    'Não existe conta para esse endereço de e-mail. Use outro e-mail ou crie uma conta.';
 
 /// Tela única de autenticação (Login/Cadastro) com design Airbnb 2025
 /// - Email/senha como método principal
@@ -34,7 +40,7 @@ class AuthPage extends ConsumerStatefulWidget {
 class _AuthPageState extends ConsumerState<AuthPage>
     with SingleTickerProviderStateMixin {
   final _secureStorage = const FlutterSecureStorage();
-  final _formKey = GlobalKey<FormState>();
+  GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -111,14 +117,20 @@ class _AuthPageState extends ConsumerState<AuthPage>
   }
 
   String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
+    final email = value?.trim() ?? '';
+    if (email.isEmpty) {
       return 'Informe o e-mail';
     }
     final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-    if (!emailRegex.hasMatch(value)) {
-      return 'E-mail inválido';
+    if (!emailRegex.hasMatch(email)) {
+      return 'E-mail inválido. Verifique o formato.';
     }
     return null;
+  }
+
+  bool _hasInvalidEmailFormat() {
+    final emailError = _validateEmail(_emailController.text);
+    return emailError != null && emailError.startsWith('E-mail inválido');
   }
 
   String? _validatePassword(String? value) {
@@ -183,99 +195,65 @@ class _AuthPageState extends ConsumerState<AuthPage>
   }
 
   Future<void> _showForgotPasswordDialog() async {
-    final formKey = GlobalKey<FormState>();
-    final emailController = TextEditingController();
-    final pageContext = context;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Recuperar Senha'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Digite seu e-mail para receber um link de recuperação:',
-                style: AppTypography.bodyLight,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: emailController,
-                decoration: InputDecoration(
-                  labelText: 'E-mail',
-                  prefixIcon: const Icon(Icons.email_outlined,
-                      color: AppColors.primary),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  errorBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: AppColors.error, width: 2),
-                  ),
-                ),
-                keyboardType: TextInputType.emailAddress,
-                validator: _validateEmail,
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).maybePop(),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) {
-                return;
-              }
-              final email = emailController.text.trim();
-              try {
-                final useCase = ref.read(sendPasswordResetEmailUseCaseProvider);
-                await useCase(email);
+    setState(() {
+      _errorMessage = null;
+      _formKey = GlobalKey<FormState>();
+    });
 
-                if (dialogContext.mounted) {
-                  await Navigator.of(dialogContext).maybePop();
-                }
-                if (pageContext.mounted) {
-                  AppSnackBar.showSuccess(
-                    pageContext,
-                    'E-mail de recuperação enviado! Verifique sua caixa de entrada.',
-                  );
-                }
-              } catch (e) {
-                if (dialogContext.mounted) {
-                  await Navigator.of(dialogContext).maybePop();
-                }
-                if (mounted) {
-                  setState(() {
-                    _errorMessage =
-                        'Erro ao enviar e-mail. Verifique o endereço.';
-                  });
-                }
-              }
-            },
-            child: const Text('Enviar'),
-          ),
-        ],
+    final success = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ForgotPasswordDialog(
+        validateEmail: _validateEmail,
+        emailHasRegisteredAccount: _emailHasRegisteredAccount,
+        sendPasswordResetEmail: (email) =>
+            ref.read(sendPasswordResetEmailUseCaseProvider).call(email),
+        resolveFailureMessage: _resolvePasswordResetFailureMessage,
       ),
     );
-    emailController.dispose();
+
+    if (!mounted || success != true) return;
+
+    AppSnackBar.showSuccess(
+      context,
+      'E-mail de recuperação enviado! Verifique sua caixa de entrada.',
+    );
+  }
+
+  String _resolvePasswordResetFailureMessage({
+    required String message,
+    required String? code,
+    required String email,
+  }) {
+    switch (code) {
+      case 'user-not-found':
+        return _kNoAccountForEmailMessage;
+      case 'invalid-email':
+        return 'E-mail inválido. Verifique o formato.';
+      case 'network-request-failed':
+        return 'Sem conexão com a internet. Verifique sua rede.';
+      case 'too-many-requests':
+        return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+      case 'user-disabled':
+        return 'Esta conta foi desativada. Entre em contato com o suporte.';
+      default:
+        if (email.trim().isNotEmpty &&
+            message.toLowerCase().contains('não está cadastrado')) {
+          return _kNoAccountForEmailMessage;
+        }
+        return message.isNotEmpty
+            ? message
+            : 'Erro ao enviar e-mail de recuperação. Verifique o endereço.';
+    }
   }
 
   Future<void> _submitEmailPassword() async {
     if (!_formKey.currentState!.validate()) {
       debugPrint('🔐 AuthPage: Validação do formulário falhou');
+      if (_hasInvalidEmailFormat()) {
+        setState(() {
+          _errorMessage = 'E-mail inválido. Verifique o formato.';
+        });
+      }
       return;
     }
 
@@ -307,40 +285,7 @@ class _AuthPageState extends ConsumerState<AuthPage>
           return; // Sair do método sem desligar loading
         } on FirebaseAuthException catch (e) {
           debugPrint('❌ AuthPage: Erro Firebase Auth: ${e.code}');
-          String errorMsg;
-          switch (e.code) {
-            case 'user-not-found':
-              errorMsg =
-                  'Conta não encontrada. Use "Criar conta" para se cadastrar.';
-              break;
-            case 'wrong-password':
-              errorMsg =
-                  'Senha incorreta. Tente novamente ou recupere a senha.';
-              break;
-            case 'invalid-credential':
-            case 'INVALID_LOGIN_CREDENTIALS':
-              // Firebase Auth (2023+) retorna este código por segurança
-              // quando email não existe OU senha está errada
-              errorMsg =
-                  'E-mail ou senha incorretos. Verifique seus dados ou crie uma conta.';
-              break;
-            case 'invalid-email':
-              errorMsg = 'E-mail inválido. Verifique o formato.';
-              break;
-            case 'user-disabled':
-              errorMsg =
-                  'Esta conta foi desativada. Entre em contato com o suporte.';
-              break;
-            case 'too-many-requests':
-              errorMsg =
-                  'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
-              break;
-            case 'network-request-failed':
-              errorMsg = 'Sem conexão com a internet. Verifique sua rede.';
-              break;
-            default:
-              errorMsg = 'Erro ao fazer login (${e.code}). Tente novamente.';
-          }
+          final errorMsg = await _resolveEmailLoginErrorMessage(e);
           if (mounted) {
             setState(() {
               _errorMessage = errorMsg;
@@ -448,6 +393,129 @@ class _AuthPageState extends ConsumerState<AuthPage>
     }
     // Não desliga loading aqui - só em caso de erro
     // Em caso de sucesso, o widget será desmontado quando authState mudar
+  }
+
+  Future<String> _resolveEmailLoginErrorMessage(
+    FirebaseAuthException exception,
+  ) async {
+    switch (exception.code) {
+      case 'user-not-found':
+        return _kNoAccountForEmailMessage;
+      case 'wrong-password':
+        final hasRegisteredAccount = await _emailHasRegisteredAccount(
+          _emailController.text.trim(),
+        );
+        if (hasRegisteredAccount == false) {
+          return _kNoAccountForEmailMessage;
+        }
+        if (hasRegisteredAccount == null) {
+          return 'Nao foi possivel validar o e-mail. Confira o e-mail e a senha e tente novamente.';
+        }
+        return 'Senha incorreta. Tente novamente ou recupere a senha.';
+      case 'invalid-credential':
+      case 'INVALID_LOGIN_CREDENTIALS':
+        final hasRegisteredAccount = await _emailHasRegisteredAccount(
+          _emailController.text.trim(),
+        );
+        if (hasRegisteredAccount == false) {
+          return _kNoAccountForEmailMessage;
+        }
+        if (hasRegisteredAccount == null) {
+          return 'E-mail ou senha invalidos. Verifique os dados e tente novamente.';
+        }
+        return 'Senha incorreta. Tente novamente ou recupere a senha.';
+      case 'invalid-email':
+        return 'E-mail inválido. Verifique o formato.';
+      case 'user-disabled':
+        return 'Esta conta foi desativada. Entre em contato com o suporte.';
+      case 'too-many-requests':
+        return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+      case 'network-request-failed':
+        return 'Sem conexão com a internet. Verifique sua rede.';
+      default:
+        return 'Erro ao fazer login (${exception.code}). Tente novamente.';
+    }
+  }
+
+  Future<bool?> _emailHasRegisteredAccount(String email) async {
+    final trimmedEmail = email.trim();
+    if (trimmedEmail.isEmpty) {
+      return false;
+    }
+
+    final registrationStatus = await _lookupEmailRegistration(trimmedEmail);
+    if (registrationStatus != null) {
+      return registrationStatus;
+    }
+
+    debugPrint(
+      '⚠️ AuthPage: Nao foi possivel verificar se o e-mail possui conta cadastrada.',
+    );
+    return null;
+  }
+
+  Future<bool?> _lookupEmailRegistration(String email) async {
+    final apiKey = Firebase.app().options.apiKey;
+    if (apiKey.isEmpty) {
+      debugPrint('⚠️ AuthPage: Firebase API key ausente para lookup de e-mail.');
+      return null;
+    }
+
+    final uri = Uri.https(
+      'identitytoolkit.googleapis.com',
+      '/v1/accounts:createAuthUri',
+      {'key': apiKey},
+    );
+
+    try {
+      final response = await http.post(
+        uri,
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'identifier': email.toLowerCase(),
+          'continueUri': 'https://wegig.com.br/login',
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        debugPrint(
+          '⚠️ AuthPage: createAuthUri retornou ${response.statusCode}: ${response.body}',
+        );
+        return null;
+      }
+
+      final responseBody = jsonDecode(response.body);
+      if (responseBody is! Map<String, dynamic>) {
+        return null;
+      }
+
+      final registered = responseBody['registered'];
+      if (registered is bool) {
+        return registered;
+      }
+
+      final signInMethods = responseBody['signinMethods'];
+      if (signInMethods is List) {
+        return signInMethods.isNotEmpty;
+      }
+
+      final allProviders = responseBody['allProviders'];
+      if (allProviders is List) {
+        return allProviders.isNotEmpty;
+      }
+
+      return false;
+    } on FirebaseException catch (lookupError) {
+      debugPrint(
+        '⚠️ AuthPage: lookup de e-mail falhou (${lookupError.code}).',
+      );
+    } catch (lookupError) {
+      debugPrint(
+        '⚠️ AuthPage: lookup de e-mail erro inesperado: $lookupError',
+      );
+    }
+
+    return null;
   }
 
   Future<void> _signInWithGoogle() async {
@@ -949,7 +1017,7 @@ class _AuthPageState extends ConsumerState<AuthPage>
                     Padding(
                       padding: const EdgeInsets.only(top: 24, bottom: 16),
                       child: Image.asset(
-                        'assets/Logo/WeGigSloganTransparente.png',
+                        'assets/Logo/LogoAuth.png',
                         height: 158,
                         fit: BoxFit.contain,
                         filterQuality: FilterQuality.high,
@@ -1403,6 +1471,213 @@ class _AuthPageState extends ConsumerState<AuthPage>
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Diálogo de recuperação de senha.
+///
+/// Encapsulado num `StatefulWidget` próprio para que o `TextEditingController`
+/// viva no ciclo de vida do State e seja descartado pelo Flutter no momento
+/// correto, evitando erros de "controller used after dispose" e
+/// `_dependents.isEmpty` no Overlay quando o diálogo está animando a saída.
+class _ForgotPasswordDialog extends StatefulWidget {
+  const _ForgotPasswordDialog({
+    required this.validateEmail,
+    required this.emailHasRegisteredAccount,
+    required this.sendPasswordResetEmail,
+    required this.resolveFailureMessage,
+  });
+
+  final String? Function(String?) validateEmail;
+  final Future<bool?> Function(String email) emailHasRegisteredAccount;
+  final Future<AuthResult> Function(String email) sendPasswordResetEmail;
+  final String Function({
+    required String message,
+    required String? code,
+    required String email,
+  }) resolveFailureMessage;
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  bool _isSubmitting = false;
+  String? _inlineError;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      final emailError = widget.validateEmail(_emailController.text);
+      if (emailError != null && emailError.startsWith('E-mail inválido')) {
+        setState(() {
+          _inlineError = 'E-mail inválido. Verifique o formato.';
+        });
+      }
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isSubmitting = true;
+      _inlineError = null;
+    });
+
+    final email = _emailController.text.trim();
+    final hasRegisteredAccount = await widget.emailHasRegisteredAccount(email);
+
+    if (hasRegisteredAccount == false) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _inlineError = _kNoAccountForEmailMessage;
+      });
+      return;
+    }
+
+    final result = await widget.sendPasswordResetEmail(email);
+    if (!mounted) return;
+
+    result.when(
+      success: (_, __, ___) {
+        Navigator.of(context).pop(true);
+      },
+      failure: (message, code) {
+        setState(() {
+          _isSubmitting = false;
+          _inlineError = widget.resolveFailureMessage(
+            message: message,
+            code: code,
+            email: email,
+          );
+        });
+      },
+      cancelled: () {
+        // No fluxo de recuperação, não há usuário autenticado: o repositório
+        // retorna AuthCancelled quando a operação foi concluída com sucesso
+        // mas não há `User` a anexar. Tratamos como sucesso.
+        Navigator.of(context).pop(true);
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: 24,
+        vertical: 24,
+      ),
+      scrollable: true,
+      title: const Text('Recuperar Senha'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Digite seu e-mail para receber um link de recuperação:',
+              style: AppTypography.bodyLight,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _emailController,
+              enabled: !_isSubmitting,
+              decoration: InputDecoration(
+                labelText: 'E-mail',
+                prefixIcon: const Icon(
+                  Icons.email_outlined,
+                  color: AppColors.primary,
+                ),
+                filled: true,
+                fillColor: AppColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: AppColors.error,
+                    width: 2,
+                  ),
+                ),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              validator: widget.validateEmail,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              onChanged: (_) {
+                if (_inlineError != null) {
+                  setState(() => _inlineError = null);
+                }
+              },
+            ),
+            if (_inlineError != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: AppColors.error,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _inlineError!,
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed:
+              _isSubmitting ? null : () => Navigator.of(context).maybePop(),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: _isSubmitting ? null : _submit,
+          child: _isSubmitting
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Text('Enviar'),
+        ),
+      ],
     );
   }
 }

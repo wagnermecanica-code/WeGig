@@ -246,7 +246,7 @@ void _configureErrorHandling({
 }) {
   if (enableCrashlytics) {
     FlutterError.onError = (details) {
-      if (_isNonFatalImageFailure(details.exception, details.stack)) {
+      if (_isNonFatalFlutterError(details.exception, details.stack)) {
         FirebaseCrashlytics.instance.recordFlutterError(details);
         FlutterError.presentError(details);
         return;
@@ -258,7 +258,7 @@ void _configureErrorHandling({
       FirebaseCrashlytics.instance.recordError(
         error,
         stack,
-        fatal: !_isNonFatalImageFailure(error, stack),
+        fatal: !_isNonFatalFlutterError(error, stack),
       );
       return true;
     };
@@ -277,6 +277,11 @@ void _configureErrorHandling({
   };
 }
 
+bool _isNonFatalFlutterError(Object error, StackTrace? stack) {
+  return _isNonFatalImageFailure(error, stack) ||
+      _isNonFatalLayoutOrFrameworkError(error, stack);
+}
+
 bool _isNonFatalImageFailure(Object error, StackTrace? stack) {
   final message = error.toString();
   final stackText = stack?.toString() ?? '';
@@ -291,6 +296,35 @@ bool _isNonFatalImageFailure(Object error, StackTrace? stack) {
   if (!isImageStack) return false;
 
   return message.contains('HandshakeException') ||
+      message.contains('ClientException') ||
+      message.contains('SocketException') ||
+      message.contains('HttpException') ||
+      message.contains('HTTP request failed') ||
+      message.contains('statusCode: 404') ||
+      message.contains('Invalid image data') ||
+      message.contains('Connection closed') ||
+      message.contains('Failed host lookup') ||
       message.contains('PathNotFoundException') ||
       message.contains('No host specified in URI');
+}
+
+bool _isNonFatalLayoutOrFrameworkError(Object error, StackTrace? stack) {
+  final message = error.toString();
+  final stackText = stack?.toString() ?? '';
+  final isFrameworkStack = stackText.contains('framework.dart') ||
+      stackText.contains('binding.dart') ||
+      stackText.contains('flex.dart') ||
+      stackText.contains('platform_view.dart') ||
+      stackText.contains('debug_overflow_indicator.dart');
+
+  if (!isFrameworkStack) return false;
+
+  return message.contains('RenderFlex overflowed') ||
+      message.contains('RenderBox was not laid out') ||
+      message.contains('Duplicate GlobalKeys detected') ||
+      message.contains('Tried to build dirty widget') ||
+      message.contains('TextEditingController was used after being disposed') ||
+      message.contains(
+          'Tried to modify a provider while the widget tree was building') ||
+      message.contains("'_dependents.isEmpty': is not true");
 }

@@ -991,7 +991,7 @@ class _ConnectionAvatar extends StatelessWidget {
       ),
     );
 
-    if (trimmedUrl.isEmpty) {
+    if (trimmedUrl.isEmpty || !_isRemoteImageUrl(trimmedUrl)) {
       return fallback;
     }
 
@@ -1005,6 +1005,13 @@ class _ConnectionAvatar extends StatelessWidget {
       placeholder: (_, __) => fallback,
       errorWidget: (_, __, ___) => fallback,
     );
+  }
+
+  bool _isRemoteImageUrl(String value) {
+    final uri = Uri.tryParse(value);
+    return uri != null &&
+        uri.hasAuthority &&
+        (uri.scheme == 'http' || uri.scheme == 'https');
   }
 }
 

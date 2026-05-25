@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:core_ui/core/json_converters.dart';
+import 'package:core_ui/utils/utf16_sanitizer.dart';
 
 part 'post_entity.freezed.dart';
 part 'post_entity.g.dart';
@@ -71,55 +72,63 @@ class PostEntity with _$PostEntity {
 
     return PostEntity(
       id: snapshot.id,
-      authorProfileId: data['authorProfileId'] as String? ?? '',
-      authorUid: data['authorUid'] as String? ?? '',
-      content: (data['content'] ?? data['message']) as String? ?? '',
+      authorProfileId: _safe(data['authorProfileId'] as String? ?? ''),
+      authorUid: _safe(data['authorUid'] as String? ?? ''),
+      content: _safe((data['content'] ?? data['message']) as String? ?? ''),
       location: _parseGeoPoint(data['location']),
-      city: data['city'] as String? ?? '',
-      neighborhood: data['neighborhood'] as String?,
-      state: data['state'] as String?,
-      photoUrl: data['photoUrl'] as String?,
-      photoUrls: (data['photoUrls'] as List<dynamic>?)?.cast<String>() ?? 
-          (data['photoUrl'] != null ? [data['photoUrl'] as String] : []), // Compatibilidade
-      youtubeLink: data['youtubeLink'] as String?,
-        spotifyLink: data['spotifyLink'] as String?,
-        deezerLink: data['deezerLink'] as String?,
-      type: data['type'] as String? ?? 'musician',
-      level: data['level'] as String? ?? '',
-      instruments:
-          (data['instruments'] as List<dynamic>?)?.cast<String>() ?? [],
-      genres: (data['genres'] as List<dynamic>?)?.cast<String>() ?? [],
-      seekingMusicians:
-          (data['seekingMusicians'] as List<dynamic>?)?.cast<String>() ?? [],
-      availableFor:
-          (data['availableFor'] as List<dynamic>?)?.cast<String>() ?? [],
-        eventDate: (data['eventDate'] as Timestamp?)?.toDate(),
-        eventType: data['eventType'] as String?,
-        gigFormat: data['gigFormat'] as String?,
-        venueSetup:
-          (data['venueSetup'] as List<dynamic>?)?.cast<String>() ?? [],
-        budgetRange: data['budgetRange'] as String?,
-        eventStartTime: data['eventStartTime'] as String?,
-        eventEndTime: data['eventEndTime'] as String?,
-        eventDurationMinutes: (data['eventDurationMinutes'] as num?)?.toInt(),
-        guestCount: (data['guestCount'] as num?)?.toInt(),
+      city: _safe(data['city'] as String? ?? ''),
+      neighborhood: _safeOrNull(data['neighborhood'] as String?),
+      state: _safeOrNull(data['state'] as String?),
+      photoUrl: _safeOrNull(data['photoUrl'] as String?),
+      photoUrls: _safeList(
+        (data['photoUrls'] as List<dynamic>?)?.cast<String>() ??
+            (data['photoUrl'] != null ? [data['photoUrl'] as String] : []),
+      ), // Compatibilidade
+      youtubeLink: _safeOrNull(data['youtubeLink'] as String?),
+      spotifyLink: _safeOrNull(data['spotifyLink'] as String?),
+      deezerLink: _safeOrNull(data['deezerLink'] as String?),
+      type: _safe(data['type'] as String? ?? 'musician'),
+      level: _safe(data['level'] as String? ?? ''),
+      instruments: _safeList(
+        (data['instruments'] as List<dynamic>?)?.cast<String>() ?? [],
+      ),
+      genres:
+          _safeList((data['genres'] as List<dynamic>?)?.cast<String>() ?? []),
+      seekingMusicians: _safeList(
+        (data['seekingMusicians'] as List<dynamic>?)?.cast<String>() ?? [],
+      ),
+      availableFor: _safeList(
+        (data['availableFor'] as List<dynamic>?)?.cast<String>() ?? [],
+      ),
+      eventDate: (data['eventDate'] as Timestamp?)?.toDate(),
+      eventType: _safeOrNull(data['eventType'] as String?),
+      gigFormat: _safeOrNull(data['gigFormat'] as String?),
+      venueSetup: _safeList(
+        (data['venueSetup'] as List<dynamic>?)?.cast<String>() ?? [],
+      ),
+      budgetRange: _safeOrNull(data['budgetRange'] as String?),
+      eventStartTime: _safeOrNull(data['eventStartTime'] as String?),
+      eventEndTime: _safeOrNull(data['eventEndTime'] as String?),
+      eventDurationMinutes: (data['eventDurationMinutes'] as num?)?.toInt(),
+      guestCount: (data['guestCount'] as num?)?.toInt(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       expiresAt: (data['expiresAt'] as Timestamp?)?.toDate() ??
           DateTime.now().add(const Duration(days: 30)),
       distanceKm: (data['distanceKm'] as num?)?.toDouble(),
-      authorName: data['authorName'] as String?,
-      authorPhotoUrl: data['authorPhotoUrl'] as String?,
-      activeProfileName: data['activeProfileName'] as String?,
-      activeProfilePhotoUrl: data['activeProfilePhotoUrl'] as String?,
+      authorName: _safeOrNull(data['authorName'] as String?),
+      authorPhotoUrl: _safeOrNull(data['authorPhotoUrl'] as String?),
+      activeProfileName: _safeOrNull(data['activeProfileName'] as String?),
+      activeProfilePhotoUrl:
+          _safeOrNull(data['activeProfilePhotoUrl'] as String?),
       // Sales-specific fields
-      title: data['title'] as String?,
-      salesType: data['salesType'] as String?,
+      title: _safeOrNull(data['title'] as String?),
+      salesType: _safeOrNull(data['salesType'] as String?),
       price: (data['price'] as num?)?.toDouble(),
-      discountMode: data['discountMode'] as String?,
+      discountMode: _safeOrNull(data['discountMode'] as String?),
       discountValue: (data['discountValue'] as num?)?.toDouble(),
       promoStartDate: (data['promoStartDate'] as Timestamp?)?.toDate(),
       promoEndDate: (data['promoEndDate'] as Timestamp?)?.toDate(),
-      whatsappNumber: data['whatsappNumber'] as String?,
+      whatsappNumber: _safeOrNull(data['whatsappNumber'] as String?),
       commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,
       forwardCount: (data['forwardCount'] as num?)?.toInt() ?? 0,
     );
@@ -133,12 +142,14 @@ class PostEntity with _$PostEntity {
   double get latitude => location.latitude;
   double get longitude => location.longitude;
 
-  bool get hasPhoto => photoUrls.isNotEmpty || (photoUrl != null && photoUrl!.isNotEmpty);
+  bool get hasPhoto =>
+      photoUrls.isNotEmpty || (photoUrl != null && photoUrl!.isNotEmpty);
   bool get hasYouTube => youtubeLink != null && youtubeLink!.isNotEmpty;
   bool get isExpired => DateTime.now().isAfter(expiresAt);
-  
+
   /// Retorna primeira foto (para compatibilidade com código existente)
-  String? get firstPhotoUrl => photoUrls.isNotEmpty ? photoUrls.first : photoUrl;
+  String? get firstPhotoUrl =>
+      photoUrls.isNotEmpty ? photoUrls.first : photoUrl;
 
   /// To Firestore Document
   Map<String, dynamic> toFirestore() {
@@ -168,7 +179,8 @@ class PostEntity with _$PostEntity {
       if (budgetRange != null) 'budgetRange': budgetRange,
       if (eventStartTime != null) 'eventStartTime': eventStartTime,
       if (eventEndTime != null) 'eventEndTime': eventEndTime,
-      if (eventDurationMinutes != null) 'eventDurationMinutes': eventDurationMinutes,
+      if (eventDurationMinutes != null)
+        'eventDurationMinutes': eventDurationMinutes,
       if (guestCount != null) 'guestCount': guestCount,
       if (authorName != null) 'authorName': authorName,
       if (authorPhotoUrl != null) 'authorPhotoUrl': authorPhotoUrl,
@@ -183,8 +195,10 @@ class PostEntity with _$PostEntity {
       if (price != null) 'price': price,
       if (discountMode != null) 'discountMode': discountMode,
       if (discountValue != null) 'discountValue': discountValue,
-      if (promoStartDate != null) 'promoStartDate': Timestamp.fromDate(promoStartDate!),
-      if (promoEndDate != null) 'promoEndDate': Timestamp.fromDate(promoEndDate!),
+      if (promoStartDate != null)
+        'promoStartDate': Timestamp.fromDate(promoStartDate!),
+      if (promoEndDate != null)
+        'promoEndDate': Timestamp.fromDate(promoEndDate!),
       if (whatsappNumber != null) 'whatsappNumber': whatsappNumber,
       'commentCount': commentCount,
       'forwardCount': forwardCount,
@@ -195,6 +209,14 @@ class PostEntity with _$PostEntity {
   // toJson() is already generated by freezed
 }
 
+String _safe(String value) => Utf16Sanitizer.removeInvalidSurrogates(value);
+
+String? _safeOrNull(String? value) =>
+    Utf16Sanitizer.removeInvalidSurrogatesOrNull(value);
+
+List<String> _safeList(List<String> values) =>
+    Utf16Sanitizer.removeInvalidSurrogatesFromList(values) ?? const <String>[];
+
 /// Accepts both GeoPoint and legacy map representations from older documents.
 GeoPoint _parseGeoPoint(dynamic rawLocation) {
   if (rawLocation is GeoPoint) {
@@ -203,9 +225,7 @@ GeoPoint _parseGeoPoint(dynamic rawLocation) {
 
   if (rawLocation is Map<String, dynamic>) {
     final lat = _tryParseCoordinate(
-      rawLocation['latitude'] ??
-          rawLocation['_latitude'] ??
-          rawLocation['lat'],
+      rawLocation['latitude'] ?? rawLocation['_latitude'] ?? rawLocation['lat'],
     );
     final lng = _tryParseCoordinate(
       rawLocation['longitude'] ??

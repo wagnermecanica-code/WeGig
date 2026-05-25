@@ -1,3 +1,4 @@
+import 'package:core_ui/utils/music_constants.dart';
 import 'package:core_ui/widgets/multi_select_field.dart';
 import 'package:flutter/material.dart';
 
@@ -38,63 +39,7 @@ class InstrumentSelector extends StatelessWidget {
   final String placeholder;
 
   /// Lista completa de instrumentos disponíveis
-  static const List<String> instrumentOptions = <String>[
-    'Violão',
-    'Guitarra',
-    'Baixo',
-    'Bateria',
-    'Teclado',
-    'Piano',
-    'Canto',
-    'DJ',
-    'Saxofone',
-    'Trompete',
-    'Trombone',
-    'Trompa',
-    'Flauta',
-    'Clarinete',
-    'Oboé',
-    'Fagote',
-    'Contrabaixo',
-    'Percussão',
-    'Cajón',
-    'Congas',
-    'Bongô',
-    'Pandeiro',
-    'Surdo',
-    'Tamborim',
-    'Repique',
-    'Cuíca',
-    'Zabumba',
-    'Triângulo',
-    'Acordeon',
-    'Bandolim',
-    'Cavaquinho',
-    'Ukulele',
-    'Banjo',
-    'Harp',
-    'Viola Caipira',
-    'Sitar',
-    'Lira',
-    'Cello',
-    'Violino',
-    'Viola',
-    'Gaita',
-    'Harmônica',
-    'Sintetizador',
-    'Sampler',
-    'Programação',
-    'Beatmaker',
-    'Regência',
-    'Arranjo',
-    'Produção',
-    'Backing vocal',
-    'Maestro',
-    'Técnico de som',
-    'Roadie',
-    'Luthier',
-    'Outro',
-  ];
+  static List<String> get instrumentOptions => MusicConstants.instrumentOptions;
 
   @override
   Widget build(BuildContext context) {

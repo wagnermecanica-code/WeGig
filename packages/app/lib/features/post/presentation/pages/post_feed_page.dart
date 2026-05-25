@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
+import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
 import 'package:core_ui/utils/price_calculator.dart';
@@ -172,7 +173,7 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
     if (!mounted) return;
     if (index < 0 || index >= widget.posts.length) return;
     final post = widget.posts[index];
-    final activeProfile = ref.read(activeProfileProvider);
+    final activeProfile = _readActiveProfileOrNull();
 
     // Carregar contagem de interessados se ainda não tiver
     if (!_interestCountCache.containsKey(post.id)) {
@@ -218,7 +219,7 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
     if (_isProcessingInterest) return;
 
     final currentUser = FirebaseAuth.instance.currentUser;
-    final activeProfile = ref.read(activeProfileProvider);
+    final activeProfile = _readActiveProfileOrNull();
     if (currentUser == null || activeProfile == null) return;
     if (post.authorProfileId == activeProfile.profileId) return;
 
@@ -271,6 +272,16 @@ class _PostFeedPageState extends ConsumerState<PostFeedPage>
       }
     } finally {
       if (mounted) setState(() => _isProcessingInterest = false);
+    }
+  }
+
+  ProfileEntity? _readActiveProfileOrNull() {
+    if (!mounted) return null;
+
+    try {
+      return ref.read(activeProfileProvider);
+    } catch (_) {
+      return null;
     }
   }
 

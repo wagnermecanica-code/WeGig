@@ -283,13 +283,23 @@ export function CrashlyticsPage() {
             {loading ? (
               <Skeleton className="h-32" />
             ) : platforms.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-slate-400">Sem plataformas.</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400">
+                Sem plataformas.
+              </p>
             ) : (
               <div className="space-y-2 text-sm">
                 {platforms.map((item) => (
-                  <div key={item.label} className="flex items-center justify-between gap-3 rounded border border-gray-100 px-3 py-2 dark:border-slate-800">
-                    <span className="font-medium text-gray-700 dark:text-slate-200">{item.label}</span>
-                    <span className="text-xs text-gray-500 dark:text-slate-400">{item.total} total · {item.fatal} fatal · {item.nonFatal} não fatal</span>
+                  <div
+                    key={item.label}
+                    className="flex items-center justify-between gap-3 rounded border border-gray-100 px-3 py-2 dark:border-slate-800"
+                  >
+                    <span className="font-medium text-gray-700 dark:text-slate-200">
+                      {item.label}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-slate-400">
+                      {item.total} total · {item.fatal} fatal · {item.nonFatal}{" "}
+                      não fatal
+                    </span>
                   </div>
                 ))}
               </div>
@@ -305,13 +315,23 @@ export function CrashlyticsPage() {
             {loading ? (
               <Skeleton className="h-32" />
             ) : versions.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-slate-400">Sem versões.</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400">
+                Sem versões.
+              </p>
             ) : (
               <div className="space-y-2 text-sm">
                 {versions.map((item) => (
-                  <div key={item.label} className="flex items-center justify-between gap-3 rounded border border-gray-100 px-3 py-2 dark:border-slate-800">
-                    <span className="font-medium text-gray-700 dark:text-slate-200">{item.label}</span>
-                    <span className="text-xs text-gray-500 dark:text-slate-400">{item.total} total · {item.fatal} fatal · {item.nonFatal} não fatal</span>
+                  <div
+                    key={item.label}
+                    className="flex items-center justify-between gap-3 rounded border border-gray-100 px-3 py-2 dark:border-slate-800"
+                  >
+                    <span className="font-medium text-gray-700 dark:text-slate-200">
+                      {item.label}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-slate-400">
+                      {item.total} total · {item.fatal} fatal · {item.nonFatal}{" "}
+                      não fatal
+                    </span>
                   </div>
                 ))}
               </div>

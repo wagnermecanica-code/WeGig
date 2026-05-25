@@ -16,6 +16,9 @@ abstract class CommentRepository {
     String? parentCommentId,
     String? replyToName,
     String? replyToProfileId,
+    List<String> mentionedProfileIds = const [],
+    List<String> mentionedUids = const [],
+    List<String> mentionedUsernames = const [],
   });
 
   /// Deleta um comentário

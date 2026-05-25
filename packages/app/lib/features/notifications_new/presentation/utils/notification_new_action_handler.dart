@@ -263,9 +263,39 @@ class NotificationNewActionHandler {
       return false;
     }
 
-    router.push('/post/$postId');
+    router.push(_buildPostDeepLink(postId, notification));
     debugPrint('✅ NotificationNewHandler: Navigated to post $postId');
     return true;
+  }
+
+  /// Monta o deep link `/post/:postId` propagando `commentId` e
+  /// `parentCommentId` quando presentes em `actionData`/`data`
+  /// (notificações de comentário/menção/resposta).
+  String _buildPostDeepLink(
+    String postId,
+    NotificationEntity notification,
+  ) {
+    String? readId(String key) {
+      final fromAction = notification.actionData?[key];
+      if (fromAction is String && fromAction.trim().isNotEmpty) {
+        return fromAction.trim();
+      }
+      final fromData = notification.data[key];
+      if (fromData is String && fromData.trim().isNotEmpty) {
+        return fromData.trim();
+      }
+      return null;
+    }
+
+    final commentId = readId('commentId');
+    final parentCommentId = readId('parentCommentId');
+
+    final qp = <String, String>{
+      if (commentId != null) 'commentId': commentId,
+      if (parentCommentId != null) 'parentCommentId': parentCommentId,
+    };
+    if (qp.isEmpty) return '/post/$postId';
+    return Uri(path: '/post/$postId', queryParameters: qp).toString();
   }
 
   /// Abre tela de renovação de post
@@ -353,7 +383,7 @@ class NotificationNewActionHandler {
       case NotificationType.savedPost:
         final postId = notification.data['postId'] as String?;
         if (postId != null && postId.isNotEmpty) {
-          router.push('/post/$postId');
+          router.push(_buildPostDeepLink(postId, notification));
           return true;
         }
 

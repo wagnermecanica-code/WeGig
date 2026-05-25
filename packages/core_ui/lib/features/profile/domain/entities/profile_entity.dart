@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:core_ui/core/json_converters.dart';
+import 'package:core_ui/utils/utf16_sanitizer.dart';
 import 'profile_type.dart';
 
 part 'profile_entity.freezed.dart';
@@ -102,43 +103,46 @@ class ProfileEntity with _$ProfileEntity {
 
     return ProfileEntity(
       profileId: snapshot.id,
-      uid: (data['uid'] as String?) ?? '',
-      name: (data['name'] as String?) ?? '',
-      username: data['username'] as String?,
+      uid: _safe(data['uid'] as String? ?? ''),
+      name: _safe(data['name'] as String? ?? ''),
+      username: _safeOrNull(data['username'] as String?),
       isBand: (data['isBand'] as bool?) ?? false,
       profileType: parseProfileType(),
-      city: (data['city'] as String?) ?? '',
+      city: _safe(data['city'] as String? ?? ''),
       location: parseGeoPoint(data['location']),
       createdAt: parseTimestamp(data['createdAt']),
       notificationRadius:
           (data['notificationRadius'] as num?)?.toDouble() ?? 20.0,
       notificationRadiusEnabled:
           (data['notificationRadiusEnabled'] as bool?) ?? true,
-        allowConnectionSuggestions:
+      allowConnectionSuggestions:
           (data['allowConnectionSuggestions'] as bool?) ?? true,
-        allowConnectionRequests:
+      allowConnectionRequests:
           (data['allowConnectionRequests'] as bool?) ?? true,
-      photoUrl: data['photoUrl'] as String?,
+      photoUrl: _safeOrNull(data['photoUrl'] as String?),
       birthYear: data['birthYear'] as int?,
-      bio: data['bio'] as String?,
-      instruments: (data['instruments'] as List<dynamic>?)?.cast<String>(),
-      genres: (data['genres'] as List<dynamic>?)?.cast<String>(),
-      level: data['level'] as String?,
-      instagramLink: data['instagramLink'] as String?,
-      tiktokLink: data['tiktokLink'] as String?,
-      youtubeLink: data['youtubeLink'] as String?,
-      spotifyLink: data['spotifyLink'] as String?,
-      deezerLink: data['deezerLink'] as String?,
-      neighborhood: data['neighborhood'] as String?,
-      state: data['state'] as String?,
-      bandMembers: (data['bandMembers'] as List<dynamic>?)?.cast<String>(),
-      spaceType: data['spaceType'] as String?,
-      phone: data['phone'] as String?,
-      operatingHours: data['operatingHours'] as String?,
-      website: data['website'] as String?,
-      amenities: (data['amenities'] as List<dynamic>?)?.cast<String>(),
-      technicianSpecialty: data['technicianSpecialty'] as String?,
-      experienceRange: data['experienceRange'] as String?,
+      bio: _safeOrNull(data['bio'] as String?),
+      instruments:
+          _safeList((data['instruments'] as List<dynamic>?)?.cast<String>()),
+      genres: _safeList((data['genres'] as List<dynamic>?)?.cast<String>()),
+      level: _safeOrNull(data['level'] as String?),
+      instagramLink: _safeOrNull(data['instagramLink'] as String?),
+      tiktokLink: _safeOrNull(data['tiktokLink'] as String?),
+      youtubeLink: _safeOrNull(data['youtubeLink'] as String?),
+      spotifyLink: _safeOrNull(data['spotifyLink'] as String?),
+      deezerLink: _safeOrNull(data['deezerLink'] as String?),
+      neighborhood: _safeOrNull(data['neighborhood'] as String?),
+      state: _safeOrNull(data['state'] as String?),
+      bandMembers:
+          _safeList((data['bandMembers'] as List<dynamic>?)?.cast<String>()),
+      spaceType: _safeOrNull(data['spaceType'] as String?),
+      phone: _safeOrNull(data['phone'] as String?),
+      operatingHours: _safeOrNull(data['operatingHours'] as String?),
+      website: _safeOrNull(data['website'] as String?),
+      amenities:
+          _safeList((data['amenities'] as List<dynamic>?)?.cast<String>()),
+      technicianSpecialty: _safeOrNull(data['technicianSpecialty'] as String?),
+      experienceRange: _safeOrNull(data['experienceRange'] as String?),
       updatedAt:
           data['updatedAt'] != null ? parseTimestamp(data['updatedAt']) : null,
     );
@@ -152,13 +156,13 @@ class ProfileEntity with _$ProfileEntity {
   Map<String, dynamic> toFirestore() {
     final json = toJson();
     json.remove('profileId'); // ID vai no documento, não no data
-    
+
     // Add profileType as string
     json['profileType'] = profileType.value;
-    
+
     // Maintain backward compatibility
     json['isBand'] = profileType == ProfileType.band;
-    
+
     if (json['username'] is String &&
         (json['username'] as String).trim().isNotEmpty) {
       json['usernameLowercase'] =
@@ -210,9 +214,13 @@ class ProfileEntity with _$ProfileEntity {
     if (years == null) return null;
     switch (profileType) {
       case ProfileType.band:
-        return years == 1 ? '$years ano de formação' : '$years anos de formação';
+        return years == 1
+            ? '$years ano de formação'
+            : '$years anos de formação';
       case ProfileType.space:
-        return years == 1 ? '$years ano de fundação' : '$years anos de fundação';
+        return years == 1
+            ? '$years ano de fundação'
+            : '$years anos de fundação';
       case ProfileType.musician:
       default:
         return years == 1 ? '$years ano' : '$years anos';
@@ -237,3 +245,11 @@ class ProfileEntity with _$ProfileEntity {
   double get latitude => location.latitude;
   double get longitude => location.longitude;
 }
+
+String _safe(String value) => Utf16Sanitizer.removeInvalidSurrogates(value);
+
+String? _safeOrNull(String? value) =>
+    Utf16Sanitizer.removeInvalidSurrogatesOrNull(value);
+
+List<String>? _safeList(List<String>? values) =>
+    Utf16Sanitizer.removeInvalidSurrogatesFromList(values);

@@ -21,6 +21,9 @@ abstract class CommentRemoteDatasource {
     String? parentCommentId,
     String? replyToName,
     String? replyToProfileId,
+    List<String> mentionedProfileIds = const [],
+    List<String> mentionedUids = const [],
+    List<String> mentionedUsernames = const [],
   });
 
   /// Deleta um comentário e decrementa commentCount no post
@@ -85,6 +88,9 @@ class CommentRemoteDatasourceImpl implements CommentRemoteDatasource {
     String? parentCommentId,
     String? replyToName,
     String? replyToProfileId,
+    List<String> mentionedProfileIds = const [],
+    List<String> mentionedUids = const [],
+    List<String> mentionedUsernames = const [],
   }) async {
     final now = DateTime.now();
     final comment = CommentEntity(
@@ -99,6 +105,9 @@ class CommentRemoteDatasourceImpl implements CommentRemoteDatasource {
       parentCommentId: parentCommentId,
       replyToName: replyToName,
       replyToProfileId: replyToProfileId,
+      mentionedProfileIds: mentionedProfileIds,
+      mentionedUids: mentionedUids,
+      mentionedUsernames: mentionedUsernames,
     );
 
     // Batch: criar comentário + incrementar commentCount
@@ -136,7 +145,8 @@ class CommentRemoteDatasourceImpl implements CommentRemoteDatasource {
     await batch.commit();
     await _reconcileCommentCount(postId);
 
-    debugPrint('✅ CommentDatasource: Comentário deletado (commentId: $commentId)');
+    debugPrint(
+        '✅ CommentDatasource: Comentário deletado (commentId: $commentId)');
   }
 
   @override
@@ -149,7 +159,8 @@ class CommentRemoteDatasourceImpl implements CommentRemoteDatasource {
     final doc = await commentRef.get();
     if (!doc.exists) return;
 
-    final likedBy = (doc.data()?['likedBy'] as List<dynamic>?)?.cast<String>() ?? [];
+    final likedBy =
+        (doc.data()?['likedBy'] as List<dynamic>?)?.cast<String>() ?? [];
     final isLiked = likedBy.contains(profileId);
 
     await commentRef.update({
@@ -159,7 +170,8 @@ class CommentRemoteDatasourceImpl implements CommentRemoteDatasource {
       'likeCount': FieldValue.increment(isLiked ? -1 : 1),
     });
 
-    debugPrint('✅ CommentDatasource: Like toggled (commentId: $commentId, liked: ${!isLiked})');
+    debugPrint(
+        '✅ CommentDatasource: Like toggled (commentId: $commentId, liked: ${!isLiked})');
   }
 
   @override

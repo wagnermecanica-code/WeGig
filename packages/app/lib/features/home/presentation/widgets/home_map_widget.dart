@@ -49,7 +49,7 @@ class HomeMapWidget extends StatelessWidget {
             markers: markers,
             onCameraIdle: onMapIdle,
             onCameraMove: onCameraMove,
-            myLocationEnabled: true,
+            myLocationEnabled: false,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,

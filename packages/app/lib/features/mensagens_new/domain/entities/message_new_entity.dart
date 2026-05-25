@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:core_ui/utils/utf16_sanitizer.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'message_new_entity.freezed.dart';
@@ -134,13 +135,16 @@ class MessageNewEntity with _$MessageNewEntity {
 
     return MessageNewEntity(
       id: snapshot.id,
-      conversationId: conversationId ?? data['conversationId'] as String? ?? '',
-      senderId: data['senderId'] as String? ?? '',
-      senderProfileId: data['senderProfileId'] as String? ?? data['senderId'] as String? ?? '',
-      senderName: data['senderName'] as String?,
-      senderPhotoUrl: data['senderPhotoUrl'] as String?,
-      text: data['text'] as String? ?? '',
-      imageUrl: data['imageUrl'] as String?,
+      conversationId:
+          _safe(conversationId ?? data['conversationId'] as String? ?? ''),
+      senderId: _safe(data['senderId'] as String? ?? ''),
+      senderProfileId: _safe(data['senderProfileId'] as String? ??
+          data['senderId'] as String? ??
+          ''),
+      senderName: _safeOrNull(data['senderName'] as String?),
+      senderPhotoUrl: _safeOrNull(data['senderPhotoUrl'] as String?),
+      text: _safe(data['text'] as String? ?? ''),
+      imageUrl: _safeOrNull(data['imageUrl'] as String?),
       type: _parseMessageType(data['type']),
       status: _parseDeliveryStatus(data['status']),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -153,8 +157,8 @@ class MessageNewEntity with _$MessageNewEntity {
       deletedForProfiles:
           (data['deletedForProfiles'] as List<dynamic>?)?.cast<String>() ?? [],
       deletedForEveryone: data['deletedForEveryone'] as bool? ?? false,
-      originalText: data['originalText'] as String?,
-      metadata: (data['metadata'] as Map<String, dynamic>?) ?? {},
+      originalText: _safeOrNull(data['originalText'] as String?),
+      metadata: _safeMap((data['metadata'] as Map<String, dynamic>?) ?? {}),
       receivedBy: (data['receivedBy'] as List<dynamic>?)?.cast<String>() ?? [],
       readBy: (data['readBy'] as List<dynamic>?)?.cast<String>() ?? [],
     );
@@ -220,7 +224,8 @@ class MessageNewEntity with _$MessageNewEntity {
   bool get isSharedPost => type == MessageType.sharedPost;
 
   /// Verifica se está deletada para todos
-  bool get isDeletedForEveryone => deletedForEveryone || type == MessageType.deleted;
+  bool get isDeletedForEveryone =>
+      deletedForEveryone || type == MessageType.deleted;
 
   /// Verifica se está deletada para um perfil específico
   bool isDeletedForProfile(String profileId) {
@@ -276,13 +281,13 @@ class MessageNewEntity with _$MessageNewEntity {
   bool canEdit(String currentProfileId) {
     // Apenas o autor pode editar
     if (senderProfileId != currentProfileId) return false;
-    
+
     // Mensagens deletadas não podem ser editadas
     if (isDeletedForEveryone) return false;
-    
+
     // Mensagens de sistema não podem ser editadas
     if (isSystemMessage) return false;
-    
+
     // Limite de 15 minutos
     final now = DateTime.now();
     final timeSinceCreation = now.difference(createdAt);
@@ -292,7 +297,7 @@ class MessageNewEntity with _$MessageNewEntity {
   /// ✅ Retorna o tempo restante para edição em minutos (null se não pode editar)
   int? editTimeRemainingMinutes(String currentProfileId) {
     if (!canEdit(currentProfileId)) return null;
-    
+
     final now = DateTime.now();
     final elapsed = now.difference(createdAt).inMinutes;
     return 15 - elapsed;
@@ -321,7 +326,7 @@ class MessageNewEntity with _$MessageNewEntity {
     // Remove caracteres de controle C0 (exceto \n e \t)
     sanitized =
         sanitized.replaceAll(RegExp(r'[\u0000-\u0008\u000B-\u001F\u007F]'), '');
-    return sanitized;
+    return Utf16Sanitizer.removeInvalidSurrogates(sanitized);
   }
 
   // ============================================
@@ -363,17 +368,19 @@ class MessageNewEntity with _$MessageNewEntity {
   MessageDeliveryStatus getGroupStatus(List<String> otherParticipantIds) {
     // Se não há outros participantes, usa status padrão
     if (otherParticipantIds.isEmpty) return status;
-    
+
     // Verifica se TODOS leram
     final allRead = otherParticipantIds.every((id) => readBy.contains(id));
     if (allRead) return MessageDeliveryStatus.read;
-    
+
     // Verifica se TODOS receberam
-    final allReceived = otherParticipantIds.every((id) => receivedBy.contains(id));
+    final allReceived =
+        otherParticipantIds.every((id) => receivedBy.contains(id));
     if (allReceived) return MessageDeliveryStatus.delivered;
-    
+
     // Caso contrário, usa status padrão (sent)
-    return status == MessageDeliveryStatus.read || status == MessageDeliveryStatus.delivered
+    return status == MessageDeliveryStatus.read ||
+            status == MessageDeliveryStatus.delivered
         ? MessageDeliveryStatus.sent
         : status;
   }
@@ -387,6 +394,31 @@ class MessageNewEntity with _$MessageNewEntity {
   bool allReadBy(List<String> otherParticipantIds) {
     return otherParticipantIds.every((id) => readBy.contains(id));
   }
+}
+
+String _safe(String value) => Utf16Sanitizer.removeInvalidSurrogates(value);
+
+String? _safeOrNull(String? value) =>
+    Utf16Sanitizer.removeInvalidSurrogatesOrNull(value);
+
+Map<String, dynamic> _safeMap(Map<String, dynamic> values) {
+  return values.map((key, value) {
+    final safeKey = Utf16Sanitizer.removeInvalidSurrogates(key);
+    if (value is String) {
+      return MapEntry(safeKey, Utf16Sanitizer.removeInvalidSurrogates(value));
+    }
+    if (value is List) {
+      return MapEntry(
+        safeKey,
+        value
+            .map((item) => item is String
+                ? Utf16Sanitizer.removeInvalidSurrogates(item)
+                : item)
+            .toList(growable: false),
+      );
+    }
+    return MapEntry(safeKey, value);
+  });
 }
 
 /// Dados da mensagem que está sendo respondida
@@ -415,10 +447,10 @@ class MessageReplyData with _$MessageReplyData {
   factory MessageReplyData.fromMap(Map<String, dynamic> map) {
     return MessageReplyData(
       messageId: map['messageId'] as String? ?? '',
-      text: map['text'] as String? ?? '',
-      senderProfileId: map['senderProfileId'] as String? ?? '',
-      senderName: map['senderName'] as String?,
-      imageUrl: map['imageUrl'] as String?,
+      text: _safe(map['text'] as String? ?? ''),
+      senderProfileId: _safe(map['senderProfileId'] as String? ?? ''),
+      senderName: _safeOrNull(map['senderName'] as String?),
+      imageUrl: _safeOrNull(map['imageUrl'] as String?),
     );
   }
 

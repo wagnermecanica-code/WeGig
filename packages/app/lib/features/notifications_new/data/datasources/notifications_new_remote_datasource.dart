@@ -9,8 +9,8 @@ library;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rxdart/rxdart.dart';
-import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/core/firebase/blocked_profiles.dart';
+import 'package:wegig_app/core/firebase/blocked_relations.dart';
 import 'package:wegig_app/features/notifications_new/domain/entities/notification_new_entity.dart';
 
 /// Interface do DataSource de notificações
@@ -68,6 +68,8 @@ class NotificationsNewRemoteDataSource
   NotificationsNewRemoteDataSource({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
+  static const int _maxNotificationBackfillPages = 5;
+
   final FirebaseFirestore _firestore;
 
   /// Referência à collection de notificações
@@ -82,16 +84,19 @@ class NotificationsNewRemoteDataSource
     if (trimmed.isEmpty) return (blocked: <String>{}, blockedBy: <String>{});
 
     try {
-      final blocked = await BlockedProfiles.get(firestore: _firestore, profileId: trimmed);
+      final blocked =
+          await BlockedProfiles.get(firestore: _firestore, profileId: trimmed);
       final blockedBy = await BlockedRelations.getBlockedByProfileIds(
         firestore: _firestore,
         profileId: trimmed,
         uid: uid,
       );
-      debugPrint('🔒 [BLOCK_SETS] profileId=$trimmed | blocked=${blocked.length} profiles: $blocked | blockedBy=${blockedBy.length} profiles: $blockedBy');
+      debugPrint(
+          '🔒 [BLOCK_SETS] profileId=$trimmed | blocked=${blocked.length} profiles: $blocked | blockedBy=${blockedBy.length} profiles: $blockedBy');
       return (blocked: blocked.toSet(), blockedBy: blockedBy.toSet());
     } catch (e) {
-      debugPrint('⚠️ NotificationsNewDataSource: Falha ao carregar block sets (non-critical): $e');
+      debugPrint(
+          '⚠️ NotificationsNewDataSource: Falha ao carregar block sets (non-critical): $e');
       return (blocked: <String>{}, blockedBy: <String>{});
     }
   }
@@ -105,9 +110,10 @@ class NotificationsNewRemoteDataSource
       return Stream.value((blocked: <String>{}, blockedBy: <String>{}));
     }
 
-    final blocked$ = BlockedProfiles.watch(firestore: _firestore, profileId: trimmed)
-        .map((l) => l.toSet())
-        .onErrorReturn(<String>{});
+    final blocked$ =
+        BlockedProfiles.watch(firestore: _firestore, profileId: trimmed)
+            .map((l) => l.toSet())
+            .onErrorReturn(<String>{});
 
     final blockedBy$ = BlockedRelations.watchBlockedByProfileIds(
       firestore: _firestore,
@@ -115,7 +121,8 @@ class NotificationsNewRemoteDataSource
       uid: uid,
     ).map((l) => l.toSet()).onErrorReturn(<String>{});
 
-    return Rx.combineLatest2<Set<String>, Set<String>, ({Set<String> blocked, Set<String> blockedBy})>(
+    return Rx.combineLatest2<Set<String>, Set<String>,
+        ({Set<String> blocked, Set<String> blockedBy})>(
       blocked$,
       blockedBy$,
       (a, b) => (blocked: a, blockedBy: b),
@@ -123,10 +130,10 @@ class NotificationsNewRemoteDataSource
   }
 
   /// Extrai todos os profileIds candidatos de uma notificação para verificar bloqueio.
-  /// 
+  ///
   /// Verifica múltiplas fontes pois diferentes tipos de notificação usam campos diferentes:
   /// - nearbyPost: actionData.authorProfileId
-  /// - interest: actionData.interestedProfileId  
+  /// - interest: actionData.interestedProfileId
   /// - newMessage: data.senderProfileId ou senderProfileId direto
   Iterable<String> _candidateProfileIds(NotificationEntity n) sync* {
     // 1. Campo direto senderProfileId (todas as notificações)
@@ -135,51 +142,53 @@ class NotificationsNewRemoteDataSource
 
     // 2. Verificar em actionData (nearbyPost, interest, etc.)
     final actionData = n.actionData ?? {};
-    
+
     // actionData.authorProfileId (nearbyPost)
-    final actionAuthorProfileId = (actionData['authorProfileId'] is String) 
-        ? (actionData['authorProfileId'] as String).trim() 
+    final actionAuthorProfileId = (actionData['authorProfileId'] is String)
+        ? (actionData['authorProfileId'] as String).trim()
         : '';
     if (actionAuthorProfileId.isNotEmpty) yield actionAuthorProfileId;
-    
+
     // actionData.interestedProfileId (interest)
-    final actionInterestedProfileId = (actionData['interestedProfileId'] is String) 
-        ? (actionData['interestedProfileId'] as String).trim() 
-        : '';
+    final actionInterestedProfileId =
+        (actionData['interestedProfileId'] is String)
+            ? (actionData['interestedProfileId'] as String).trim()
+            : '';
     if (actionInterestedProfileId.isNotEmpty) yield actionInterestedProfileId;
-    
+
     // actionData.senderProfileId (newMessage)
-    final actionSenderProfileId = (actionData['senderProfileId'] is String) 
-        ? (actionData['senderProfileId'] as String).trim() 
+    final actionSenderProfileId = (actionData['senderProfileId'] is String)
+        ? (actionData['senderProfileId'] as String).trim()
         : '';
     if (actionSenderProfileId.isNotEmpty) yield actionSenderProfileId;
 
     // actionData.commenterProfileId (comment)
-    final actionCommenterProfileId = (actionData['commenterProfileId'] is String) 
-        ? (actionData['commenterProfileId'] as String).trim() 
-        : '';
+    final actionCommenterProfileId =
+        (actionData['commenterProfileId'] is String)
+            ? (actionData['commenterProfileId'] as String).trim()
+            : '';
     if (actionCommenterProfileId.isNotEmpty) yield actionCommenterProfileId;
 
     // 3. Verificar em data (fallback para compatibilidade)
     final data = n.data;
-    
-    final dataActionProfileId = (data['actionProfileId'] is String) 
-        ? (data['actionProfileId'] as String).trim() 
+
+    final dataActionProfileId = (data['actionProfileId'] is String)
+        ? (data['actionProfileId'] as String).trim()
         : '';
     if (dataActionProfileId.isNotEmpty) yield dataActionProfileId;
 
-    final dataAuthorProfileId = (data['authorProfileId'] is String) 
-        ? (data['authorProfileId'] as String).trim() 
+    final dataAuthorProfileId = (data['authorProfileId'] is String)
+        ? (data['authorProfileId'] as String).trim()
         : '';
     if (dataAuthorProfileId.isNotEmpty) yield dataAuthorProfileId;
 
-    final dataInterestedProfileId = (data['interestedProfileId'] is String) 
-        ? (data['interestedProfileId'] as String).trim() 
+    final dataInterestedProfileId = (data['interestedProfileId'] is String)
+        ? (data['interestedProfileId'] as String).trim()
         : '';
     if (dataInterestedProfileId.isNotEmpty) yield dataInterestedProfileId;
-    
-    final dataSenderProfileId = (data['senderProfileId'] is String) 
-        ? (data['senderProfileId'] as String).trim() 
+
+    final dataSenderProfileId = (data['senderProfileId'] is String)
+        ? (data['senderProfileId'] as String).trim()
         : '';
     if (dataSenderProfileId.isNotEmpty) yield dataSenderProfileId;
   }
@@ -189,7 +198,8 @@ class NotificationsNewRemoteDataSource
     final candidates = _candidateProfileIds(n).toList();
     final matches = candidates.any(profileSet.contains);
     if (matches) {
-      debugPrint('🚫 [BLOCK_FILTER] Notificação ${n.notificationId} (type=${n.type.name}) '
+      debugPrint(
+          '🚫 [BLOCK_FILTER] Notificação ${n.notificationId} (type=${n.type.name}) '
           'filtrada. candidates=$candidates, blockedSet=$profileSet');
     }
     return matches;
@@ -208,10 +218,9 @@ class NotificationsNewRemoteDataSource
   }
 
   bool _isConnectionActivityNotification(NotificationEntity notification) {
-    final eventType =
-        ((notification.actionData?['eventType'] ?? notification.data['eventType'])
-                as String?)
-            ?.trim();
+    final eventType = ((notification.actionData?['eventType'] ??
+            notification.data['eventType']) as String?)
+        ?.trim();
     if (eventType == null || eventType.isEmpty) {
       return false;
     }
@@ -239,94 +248,105 @@ class NotificationsNewRemoteDataSource
 
       // Query base: recipientUid (CRÍTICO para Security Rules)
       // IMPORTANTE: Ordem dos filtros deve seguir índices em firestore.indexes.json
-      var query = _notificationsRef
-          .where('recipientUid', isEqualTo: recipientUid);
+      var query =
+          _notificationsRef.where('recipientUid', isEqualTo: recipientUid);
 
       // Filtro opcional por tipo de notificação
       if (type != null) {
         query = query.where('type', isEqualTo: type.name);
       }
 
-      // Ordenação: createdAt DESC (mais recentes primeiro)
-      // Usa índice: recipientUid + type + createdAt OU recipientUid + createdAt
-      query = query
-          .orderBy('createdAt', descending: true)
-          .limit(limit * 3); // Margem maior para filtros client-side
-
-      // Paginação cursor-based
-      if (startAfter != null) {
-        query = query.startAfter([
-          Timestamp.fromDate(startAfter.createdAt),
-        ]);
-      }
-
-      final snapshot = await query.get();
-      debugPrint(
-          '📝 NotificationsNewDataSource: ${snapshot.docs.length} docs retornados do Firestore');
-
-      // Log dos documentos para debug
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        debugPrint(
-            '📋 Doc ${doc.id}: recipientProfileId=${data['recipientProfileId']}, type=${data['type']}, title=${data['title']}');
-      }
-
       final now = DateTime.now();
-      final blockSets = await _getBlockSets(profileId: profileId, uid: recipientUid);
-      
-      // Filtros client-side:
-      // 1. Por profileId (isolamento multi-perfil)
-      // 2. Por expiração (remove notificações expiradas)
-      // 3. Exclui newMessage (já notificado na MessagesNewPage)
-      final notifications = snapshot.docs
-          .map(NotificationEntity.fromFirestore)
-          .map((n) {
-            // Se o autor me bloqueou, manter a notificação mas renderizar como "perfil vazio".
-            if (_matchesProfileSet(n, blockSets.blockedBy)) {
-              return _asEmptyProfile(n);
-            }
-            return n;
-          })
-          .where((n) {
-            // Filtro por profileId
-            if (n.recipientProfileId != profileId) {
-              debugPrint(
-                  '🚫 Filtrado por profileId: doc.recipientProfileId=${n.recipientProfileId} != profileId=$profileId');
-              return false;
-            }
-            
-            // Filtro por expiração
-            if (n.expiresAt != null && n.expiresAt!.isBefore(now)) {
-              debugPrint(
-                  '🚫 Filtrado por expiração: expiresAt=${n.expiresAt} < now=$now');
-              return false;
-            }
-            
-            // Filtro: Excluir notificações de mensagem (já aparecem no chat)
-            if (n.type == NotificationType.newMessage) {
-              debugPrint(
-                  '🚫 Filtrado tipo newMessage: já notificado na MessagesNewPage');
-              return false;
-            }
+      final blockSets =
+          await _getBlockSets(profileId: profileId, uid: recipientUid);
 
-            if (_isConnectionActivityNotification(n)) {
-              debugPrint(
-                  '🚫 Filtrado tipo connection: exibido apenas em Minha Rede');
-              return false;
-            }
+      final notifications = <NotificationEntity>[];
+      final rawPageSize = limit * 3;
+      var cursor =
+          startAfter == null ? null : Timestamp.fromDate(startAfter.createdAt);
+      var fetchedRawCount = 0;
 
-            // Filtro: se EU bloqueei, remover completamente.
-            if (_matchesProfileSet(n, blockSets.blocked)) {
-              return false;
-            }
-            
-            return true;
-          })
-          .take(limit)
-          .toList();
+      for (var page = 0;
+          page < _maxNotificationBackfillPages && notifications.length < limit;
+          page++) {
+        var pagedQuery =
+            query.orderBy('createdAt', descending: true).limit(rawPageSize);
+
+        if (cursor != null) {
+          pagedQuery = pagedQuery.startAfter([cursor]);
+        }
+
+        final snapshot = await pagedQuery.get();
+        fetchedRawCount += snapshot.docs.length;
+
+        debugPrint(
+          '📝 NotificationsNewDataSource: ${snapshot.docs.length} docs '
+          'retornados do Firestore na página interna ${page + 1}',
+        );
+
+        if (snapshot.docs.isEmpty) {
+          break;
+        }
+
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          debugPrint(
+              '📋 Doc ${doc.id}: recipientProfileId=${data['recipientProfileId']}, type=${data['type']}, title=${data['title']}');
+
+          var notification = NotificationEntity.fromFirestore(doc);
+
+          // Se o autor me bloqueou, manter a notificação mas renderizar como "perfil vazio".
+          if (_matchesProfileSet(notification, blockSets.blockedBy)) {
+            notification = _asEmptyProfile(notification);
+          }
+
+          // Filtro por profileId
+          if (notification.recipientProfileId != profileId) {
+            debugPrint(
+                '🚫 Filtrado por profileId: doc.recipientProfileId=${notification.recipientProfileId} != profileId=$profileId');
+            continue;
+          }
+
+          // Filtro por expiração
+          if (notification.expiresAt != null &&
+              notification.expiresAt!.isBefore(now)) {
+            debugPrint(
+                '🚫 Filtrado por expiração: expiresAt=${notification.expiresAt} < now=$now');
+            continue;
+          }
+
+          // Filtro: Excluir notificações de mensagem (já aparecem no chat)
+          if (notification.type == NotificationType.newMessage) {
+            debugPrint(
+                '🚫 Filtrado tipo newMessage: já notificado na MessagesNewPage');
+            continue;
+          }
+
+          if (_isConnectionActivityNotification(notification)) {
+            debugPrint(
+                '🚫 Filtrado tipo connection: exibido apenas em Minha Rede');
+            continue;
+          }
+
+          // Filtro: se EU bloqueei, remover completamente.
+          if (_matchesProfileSet(notification, blockSets.blocked)) {
+            continue;
+          }
+
+          notifications.add(notification);
+          if (notifications.length >= limit) {
+            break;
+          }
+        }
+
+        cursor = snapshot.docs.last.data()['createdAt'] as Timestamp?;
+        if (snapshot.docs.length < rawPageSize) {
+          break;
+        }
+      }
 
       debugPrint(
-          '✅ NotificationsNewDataSource: ${notifications.length} notificações após filtro');
+          '✅ NotificationsNewDataSource: ${notifications.length} notificações após filtro ($fetchedRawCount docs brutos lidos)');
 
       return notifications;
     } catch (e, stack) {
@@ -337,8 +357,7 @@ class NotificationsNewRemoteDataSource
   }
 
   @override
-  Future<NotificationEntity?> getNotificationById(
-      String notificationId) async {
+  Future<NotificationEntity?> getNotificationById(String notificationId) async {
     try {
       debugPrint(
           '📝 NotificationsNewDataSource: getNotificationById $notificationId');
@@ -403,7 +422,7 @@ class NotificationsNewRemoteDataSource
       if (docsToUpdate.isEmpty) return;
 
       // Batch write (limite 500 por batch)
-      const int batchSize = 500;
+      const batchSize = 500;
       for (var i = 0; i < docsToUpdate.length; i += batchSize) {
         final batch = _firestore.batch();
         final end = (i + batchSize < docsToUpdate.length)
@@ -459,20 +478,19 @@ class NotificationsNewRemoteDataSource
           .where('read', isEqualTo: false)
           .get();
 
-        final blockSets = await _getBlockSets(profileId: profileId, uid: recipientUid);
-        final now = DateTime.now();
+      final blockSets =
+          await _getBlockSets(profileId: profileId, uid: recipientUid);
+      final now = DateTime.now();
 
       // Filtros client-side: profileId + expiração + tipo + bloqueios
-      final count = snapshot.docs
-          .map(NotificationEntity.fromFirestore)
-          .where((n) {
-            if (n.recipientProfileId != profileId) return false;
-            if (n.expiresAt != null && n.expiresAt!.isBefore(now)) return false;
-            if (n.type == NotificationType.newMessage) return false;
-            if (_matchesProfileSet(n, blockSets.blocked)) return false;
-            return true;
-          })
-          .length;
+      final count =
+          snapshot.docs.map(NotificationEntity.fromFirestore).where((n) {
+        if (n.recipientProfileId != profileId) return false;
+        if (n.expiresAt != null && n.expiresAt!.isBefore(now)) return false;
+        if (n.type == NotificationType.newMessage) return false;
+        if (_matchesProfileSet(n, blockSets.blocked)) return false;
+        return true;
+      }).length;
 
       debugPrint('✅ NotificationsNewDataSource: $count não lidas');
       return count;
@@ -496,62 +514,62 @@ class NotificationsNewRemoteDataSource
       return Stream.value([]);
     }
 
-    return _watchBlockSets(profileId: profileId, uid: recipientUid).switchMap((blockSets) {
+    return _watchBlockSets(profileId: profileId, uid: recipientUid)
+        .switchMap((blockSets) {
       return _notificationsRef
-        .where('recipientUid', isEqualTo: recipientUid)
-        .orderBy('createdAt', descending: true)
-        .limit(limit * 2)
-        .snapshots()
-        .map((snapshot) {
-      debugPrint(
-          '📡 Stream: ${snapshot.docs.length} docs do Firestore');
-      
-      final now = DateTime.now();
-      
-      // Filtros client-side: profileId + expiração + tipo
-      final notifications = snapshot.docs
-          .map(NotificationEntity.fromFirestore)
-          .map((n) {
-            if (_matchesProfileSet(n, blockSets.blockedBy)) {
-              return _asEmptyProfile(n);
-            }
-            return n;
-          })
-          .where((n) {
-            // Filtro por profileId
-            if (n.recipientProfileId != profileId) {
-              debugPrint(
-                  '🚫 Stream filtrado: doc.recipientProfileId=${n.recipientProfileId} != profileId=$profileId');
-              return false;
-            }
-            
-            // Filtro por expiração
-            if (n.expiresAt != null && n.expiresAt!.isBefore(now)) {
-              return false;
-            }
-            
-            // Filtro: Excluir notificações de mensagem (já aparecem no chat)
-            if (n.type == NotificationType.newMessage) {
-              return false;
-            }
+          .where('recipientUid', isEqualTo: recipientUid)
+          .orderBy('createdAt', descending: true)
+          .limit(limit * 2)
+          .snapshots()
+          .map((snapshot) {
+        debugPrint('📡 Stream: ${snapshot.docs.length} docs do Firestore');
 
-            if (_isConnectionActivityNotification(n)) {
-              return false;
-            }
+        final now = DateTime.now();
 
-            // Filtro: se EU bloqueei, remover completamente.
-            if (_matchesProfileSet(n, blockSets.blocked)) {
-              return false;
-            }
-            
-            return true;
-          })
-          .take(limit)
-          .toList();
+        // Filtros client-side: profileId + expiração + tipo
+        final notifications = snapshot.docs
+            .map(NotificationEntity.fromFirestore)
+            .map((n) {
+              if (_matchesProfileSet(n, blockSets.blockedBy)) {
+                return _asEmptyProfile(n);
+              }
+              return n;
+            })
+            .where((n) {
+              // Filtro por profileId
+              if (n.recipientProfileId != profileId) {
+                debugPrint(
+                    '🚫 Stream filtrado: doc.recipientProfileId=${n.recipientProfileId} != profileId=$profileId');
+                return false;
+              }
 
-      debugPrint(
-          '📡 Stream emitiu ${notifications.length} notificações após filtro');
-      return notifications;
+              // Filtro por expiração
+              if (n.expiresAt != null && n.expiresAt!.isBefore(now)) {
+                return false;
+              }
+
+              // Filtro: Excluir notificações de mensagem (já aparecem no chat)
+              if (n.type == NotificationType.newMessage) {
+                return false;
+              }
+
+              if (_isConnectionActivityNotification(n)) {
+                return false;
+              }
+
+              // Filtro: se EU bloqueei, remover completamente.
+              if (_matchesProfileSet(n, blockSets.blocked)) {
+                return false;
+              }
+
+              return true;
+            })
+            .take(limit)
+            .toList();
+
+        debugPrint(
+            '📡 Stream emitiu ${notifications.length} notificações após filtro');
+        return notifications;
       });
     });
   }
@@ -568,7 +586,8 @@ class NotificationsNewRemoteDataSource
       return Stream.value(0);
     }
 
-    return _watchBlockSets(profileId: profileId, uid: recipientUid).switchMap((blockSets) {
+    return _watchBlockSets(profileId: profileId, uid: recipientUid)
+        .switchMap((blockSets) {
       return _notificationsRef
           .where('recipientUid', isEqualTo: recipientUid)
           .where('read', isEqualTo: false)
@@ -577,17 +596,15 @@ class NotificationsNewRemoteDataSource
         final now = DateTime.now();
 
         // Filtro: exclui newMessage do contador (já contamos em MessagesNewPage)
-        final count = snapshot.docs
-            .map(NotificationEntity.fromFirestore)
-            .where((n) {
-              if (n.recipientProfileId != profileId) return false;
-              if (n.type == NotificationType.newMessage) return false;
-              if (_isConnectionActivityNotification(n)) return false;
-              if (n.expiresAt != null && n.expiresAt!.isBefore(now)) return false;
-              if (_matchesProfileSet(n, blockSets.blocked)) return false;
-              return true;
-            })
-            .length;
+        final count =
+            snapshot.docs.map(NotificationEntity.fromFirestore).where((n) {
+          if (n.recipientProfileId != profileId) return false;
+          if (n.type == NotificationType.newMessage) return false;
+          if (_isConnectionActivityNotification(n)) return false;
+          if (n.expiresAt != null && n.expiresAt!.isBefore(now)) return false;
+          if (_matchesProfileSet(n, blockSets.blocked)) return false;
+          return true;
+        }).length;
 
         debugPrint(
             '📝 NotificationsNewDataSource: Stream unread count = $count (excluindo newMessage + bloqueios)');

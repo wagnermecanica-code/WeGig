@@ -339,16 +339,25 @@ export function UserDetailPage() {
               </p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-slate-400">Cidade / Estado</p>
-              <p>{[profile.city, profile.state].filter(Boolean).join(" / ") || "Não registrado"}</p>
+              <p className="text-gray-500 dark:text-slate-400">
+                Cidade / Estado
+              </p>
+              <p>
+                {[profile.city, profile.state].filter(Boolean).join(" / ") ||
+                  "Não registrado"}
+              </p>
             </div>
             <div>
               <p className="text-gray-500 dark:text-slate-400">Bairro</p>
               <p>{renderText(profile.neighborhood)}</p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-slate-400">Perfil ativo da conta</p>
-              <p className="font-mono text-xs break-all">{renderText(profile.activeProfileId)}</p>
+              <p className="text-gray-500 dark:text-slate-400">
+                Perfil ativo da conta
+              </p>
+              <p className="font-mono text-xs break-all">
+                {renderText(profile.activeProfileId)}
+              </p>
             </div>
             <div>
               <p className="text-gray-500 dark:text-slate-400">Verificado</p>
@@ -364,7 +373,9 @@ export function UserDetailPage() {
               <p>{renderText(profile.moderationStatus)}</p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-slate-400">Ano de nascimento/formação</p>
+              <p className="text-gray-500 dark:text-slate-400">
+                Ano de nascimento/formação
+              </p>
               <p>{renderText(profile.birthYear)}</p>
             </div>
             <div>
@@ -384,11 +395,19 @@ export function UserDetailPage() {
               <p>{formatDate(profile.lastSeenAt)}</p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-slate-400">Raio de notificação</p>
-              <p>{profile.notificationRadius ? `${profile.notificationRadius} km` : "Não registrado"}</p>
+              <p className="text-gray-500 dark:text-slate-400">
+                Raio de notificação
+              </p>
+              <p>
+                {profile.notificationRadius
+                  ? `${profile.notificationRadius} km`
+                  : "Não registrado"}
+              </p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-slate-400">Notificações por raio</p>
+              <p className="text-gray-500 dark:text-slate-400">
+                Notificações por raio
+              </p>
               <p>{renderFlag(profile.notificationRadiusEnabled)}</p>
             </div>
             <div>
@@ -437,11 +456,15 @@ export function UserDetailPage() {
               <p className="break-all">{renderText(profile.deezerLink)}</p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-slate-400">Tipo de espaço</p>
+              <p className="text-gray-500 dark:text-slate-400">
+                Tipo de espaço
+              </p>
               <p>{renderText(profile.spaceType)}</p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-slate-400">Horário de funcionamento</p>
+              <p className="text-gray-500 dark:text-slate-400">
+                Horário de funcionamento
+              </p>
               <p>{renderText(profile.operatingHours)}</p>
             </div>
             <div>
@@ -449,11 +472,15 @@ export function UserDetailPage() {
               <p>{renderList(profile.amenities)}</p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-slate-400">Integrantes da banda</p>
+              <p className="text-gray-500 dark:text-slate-400">
+                Integrantes da banda
+              </p>
               <p>{renderList(profile.bandMembers)}</p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-slate-400">Especialidade técnica</p>
+              <p className="text-gray-500 dark:text-slate-400">
+                Especialidade técnica
+              </p>
               <p>{renderText(profile.technicianSpecialty)}</p>
             </div>
             <div>

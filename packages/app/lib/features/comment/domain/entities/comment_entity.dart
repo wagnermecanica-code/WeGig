@@ -18,6 +18,9 @@ class CommentEntity {
     this.replyToProfileId,
     this.likeCount = 0,
     this.likedBy = const [],
+    this.mentionedProfileIds = const [],
+    this.mentionedUids = const [],
+    this.mentionedUsernames = const [],
   });
 
   final String id;
@@ -44,6 +47,15 @@ class CommentEntity {
   /// Lista de profileIds que curtiram este comentário
   final List<String> likedBy;
 
+  /// ProfileIds mencionados no texto via @username.
+  final List<String> mentionedProfileIds;
+
+  /// UIDs dos perfis mencionados no texto via @username.
+  final List<String> mentionedUids;
+
+  /// Usernames mencionados no texto, sem o prefixo @.
+  final List<String> mentionedUsernames;
+
   /// Indica se é uma resposta a outro comentário
   bool get isReply => parentCommentId != null && parentCommentId!.isNotEmpty;
 
@@ -68,13 +80,20 @@ class CommentEntity {
       authorName: data['authorName'] as String? ?? 'Anônimo',
       authorPhotoUrl: data['authorPhotoUrl'] as String?,
       text: data['text'] as String? ?? '',
-      createdAt:
-          (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       parentCommentId: data['parentCommentId'] as String?,
       replyToName: data['replyToName'] as String?,
       replyToProfileId: data['replyToProfileId'] as String?,
       likeCount: (data['likeCount'] as num?)?.toInt() ?? 0,
       likedBy: (data['likedBy'] as List<dynamic>?)?.cast<String>() ?? const [],
+      mentionedProfileIds:
+          (data['mentionedProfileIds'] as List<dynamic>?)?.cast<String>() ??
+              const [],
+      mentionedUids:
+          (data['mentionedUids'] as List<dynamic>?)?.cast<String>() ?? const [],
+      mentionedUsernames:
+          (data['mentionedUsernames'] as List<dynamic>?)?.cast<String>() ??
+              const [],
     );
   }
 
@@ -90,6 +109,11 @@ class CommentEntity {
       if (parentCommentId != null) 'parentCommentId': parentCommentId,
       if (replyToName != null) 'replyToName': replyToName,
       if (replyToProfileId != null) 'replyToProfileId': replyToProfileId,
+      if (mentionedProfileIds.isNotEmpty)
+        'mentionedProfileIds': mentionedProfileIds,
+      if (mentionedUids.isNotEmpty) 'mentionedUids': mentionedUids,
+      if (mentionedUsernames.isNotEmpty)
+        'mentionedUsernames': mentionedUsernames,
     };
   }
 
@@ -107,6 +131,9 @@ class CommentEntity {
     String? replyToProfileId,
     int? likeCount,
     List<String>? likedBy,
+    List<String>? mentionedProfileIds,
+    List<String>? mentionedUids,
+    List<String>? mentionedUsernames,
   }) {
     return CommentEntity(
       id: id ?? this.id,
@@ -122,6 +149,9 @@ class CommentEntity {
       replyToProfileId: replyToProfileId ?? this.replyToProfileId,
       likeCount: likeCount ?? this.likeCount,
       likedBy: likedBy ?? this.likedBy,
+      mentionedProfileIds: mentionedProfileIds ?? this.mentionedProfileIds,
+      mentionedUids: mentionedUids ?? this.mentionedUids,
+      mentionedUsernames: mentionedUsernames ?? this.mentionedUsernames,
     );
   }
 }

@@ -66,7 +66,16 @@ Future<void> handlePushNotificationTap({
         router.go('/home?index=1');
         return;
       }
-      goHomeThenPush('/post/$postId');
+      final commentId = _trimString(data['commentId']);
+      final parentCommentId = _trimString(data['parentCommentId']);
+      final qp = <String, String>{
+        if (commentId.isNotEmpty) 'commentId': commentId,
+        if (parentCommentId.isNotEmpty) 'parentCommentId': parentCommentId,
+      };
+      final location = qp.isEmpty
+          ? '/post/$postId'
+          : Uri(path: '/post/$postId', queryParameters: qp).toString();
+      goHomeThenPush(location);
       return;
 
     case 'newMessage':

@@ -149,22 +149,31 @@ class MessageNewBubble extends StatelessWidget {
   Widget _buildAvatar() {
     final photoUrl = senderPhotoUrl ?? message.senderPhotoUrl;
     final name = senderName ?? message.senderName ?? '?';
+    final canOpenProfile = message.senderProfileId.trim().isNotEmpty &&
+        message.senderProfileId != currentProfileId &&
+        onProfileTap != null;
 
-    return SizedBox(
-      width: 28,
-      height: 28,
-      child: ClipOval(
-        child: photoUrl != null && photoUrl.isNotEmpty
-            ? CachedNetworkImage(
-                imageUrl: photoUrl,
-                memCacheWidth: 56,
-                memCacheHeight: 56,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => _buildAvatarPlaceholder(name),
-                errorWidget: (context, url, error) =>
-                    _buildAvatarPlaceholder(name),
-              )
-            : _buildAvatarPlaceholder(name),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: canOpenProfile
+          ? () => onProfileTap!(message.senderProfileId.trim())
+          : null,
+      child: SizedBox(
+        width: 28,
+        height: 28,
+        child: ClipOval(
+          child: photoUrl != null && photoUrl.isNotEmpty
+              ? CachedNetworkImage(
+                  imageUrl: photoUrl,
+                  memCacheWidth: 56,
+                  memCacheHeight: 56,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => _buildAvatarPlaceholder(name),
+                  errorWidget: (context, url, error) =>
+                      _buildAvatarPlaceholder(name),
+                )
+              : _buildAvatarPlaceholder(name),
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/mention_text.dart';
 import 'package:flutter/material.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:wegig_app/features/comment/domain/entities/comment_entity.dart';
@@ -19,6 +20,7 @@ class CommentItemWidget extends StatelessWidget {
     this.onViewLikers,
     this.onLongPress,
     this.onTapProfile,
+    this.onMentionTap,
     super.key,
   });
 
@@ -34,6 +36,7 @@ class CommentItemWidget extends StatelessWidget {
   final VoidCallback? onViewLikers;
   final VoidCallback? onLongPress;
   final VoidCallback? onTapProfile;
+  final void Function(String username)? onMentionTap;
 
   @override
   Widget build(BuildContext context) {
@@ -123,13 +126,14 @@ class CommentItemWidget extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                   ],
-                  Text(
-                    comment.text,
+                  MentionText(
+                    text: comment.text,
                     style: TextStyle(
                       fontSize: isReply ? 13 : 14,
                       color: Colors.black87,
                       height: 1.3,
                     ),
+                    onMentionTap: onMentionTap,
                   ),
                   const SizedBox(height: 4),
                   Wrap(

@@ -265,7 +265,6 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
   @override
   void dispose() {
-    if (!mounted) return;
     _nameController.dispose();
     _bioController.dispose();
     _birthYearController.dispose();
@@ -287,6 +286,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   }
 
   Future<void> _loadProfile() async {
+    if (!mounted) return;
     setState(() => _isLoadingProfile = true);
 
     try {
@@ -296,6 +296,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             .collection('users')
             .doc(currentUser.uid)
             .get();
+        if (!mounted) return;
+
         final username = (userDoc.data()?['username'] as String?)?.trim();
         if (username != null && username.isNotEmpty) {
           _accountUsername = username;
@@ -309,6 +311,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   _generateUsernameSuggestionsFromUsername(base);
               _usernameSuggestions = suggestions;
               await _autoPickFirstAvailableUsernameSuggestion(suggestions);
+              if (!mounted) return;
             }
           }
         }
@@ -333,6 +336,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             .collection('profiles')
             .doc(widget.profileIdToEdit)
             .get();
+        if (!mounted) return;
 
         if (doc.exists) {
           final profile = ProfileEntity.fromFirestore(doc);
@@ -621,14 +625,14 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
     // ✅ Limpar providers de login social após salvar com sucesso
     // Isso evita que os dados sejam reutilizados em futuras criações de perfil
+    if (!mounted) return;
+
     if (isCreation && widget.isNewProfile) {
       debugPrint(
           'EditProfile: 🧹 Limpando providers de login social após salvar');
       ref.read(socialLoginDataProvider.notifier).state = null;
       ref.read(verifiedBirthYearProvider.notifier).state = null;
     }
-
-    if (!mounted) return;
 
     final navigator = Navigator.of(context);
     final router = GoRouter.of(context);
@@ -712,7 +716,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   }
 
   Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isSaving || !mounted) return;
+
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) return;
 
     // Validar tipo de perfil (obrigatório na primeira edição)
     if (_profileType == null) {
@@ -925,6 +932,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         // ✅ Usar profileProvider.notifier (Clean Architecture)
         final result = await profileNotifier.createProfile(newProfile);
 
+        if (!mounted) return;
+
         switch (result) {
           case ProfileSuccess(:final profile):
             debugPrint(
@@ -1042,6 +1051,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         // ✅ Usar profileProvider.notifier (Clean Architecture)
         final result =
             await profileNotifierUpdate.updateProfile(updatedProfile);
+
+        if (!mounted) return;
 
         switch (result) {
           case ProfileSuccess(:final profile):

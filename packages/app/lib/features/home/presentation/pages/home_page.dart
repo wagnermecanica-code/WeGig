@@ -952,91 +952,6 @@ class _HomePageState extends ConsumerState<HomePage>
     });
   }
 
-  /// Centraliza mapa no GPS do usuário com fallbacks
-  /// Ordem: Cache → GPS atual (10s) → LastKnown → Perfil
-  Future<void> _centerOnUserLocation() async {
-    if (!mounted || _isCenteringLocation) return;
-
-    try {
-      setState(() => _isCenteringLocation = true);
-
-      final controller = await _waitForMapController();
-      if (controller == null) {
-        AppSnackBar.showInfo(context, 'Aguarde o mapa carregar...');
-        return;
-      }
-
-      LatLng? targetPos;
-
-      final permission = await Geolocator.checkPermission();
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-
-      if (permission != LocationPermission.denied &&
-          permission != LocationPermission.deniedForever &&
-          serviceEnabled) {
-        try {
-          debugPrint('📍 Obtendo GPS atual...');
-          final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high,
-          ).timeout(const Duration(seconds: 10));
-
-          targetPos = LatLng(position.latitude, position.longitude);
-          if (mounted) {
-            setState(() {
-              _showUserLocationOnMap = true;
-              _mapControllerWrapper.setCurrentPosition(targetPos!);
-            });
-          }
-          await GpsCacheService.updateCache(targetPos);
-          debugPrint('✅ GPS atual obtido');
-        } catch (timeoutError) {
-          debugPrint('⚠️ GPS timeout, tentando fallback...');
-
-          // Estratégia 2: LastKnown do Geolocator
-          final lastPosition = await Geolocator.getLastKnownPosition();
-          if (lastPosition != null) {
-            targetPos = LatLng(lastPosition.latitude, lastPosition.longitude);
-            if (mounted) {
-              setState(() {
-                _showUserLocationOnMap = true;
-                _mapControllerWrapper.setCurrentPosition(targetPos!);
-              });
-            }
-            debugPrint('📍 Usando última posição conhecida');
-            AppSnackBar.showInfo(
-                context, 'GPS timeout. Usando última localização.');
-          }
-        }
-      } else if (!serviceEnabled) {
-        AppSnackBar.showWarning(
-            context, 'GPS desativado. Ative nas configurações.');
-      } else {
-        AppSnackBar.showWarning(context, 'Permissão de localização necessária');
-      }
-
-      // Centralizar no mapa
-      if (targetPos != null) {
-        await controller.animateCamera(
-          CameraUpdate.newLatLngZoom(targetPos, 14),
-        );
-      } else {
-        AppSnackBar.showError(context, 'Não foi possível obter localização');
-      }
-    } catch (e) {
-      debugPrint('❌ Erro ao centralizar: $e');
-
-      if (!e.toString().contains('channel-error')) {
-        AppSnackBar.showError(context, 'Erro ao obter localização');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isCenteringLocation = false);
-      } else {
-        _isCenteringLocation = false;
-      }
-    }
-  }
-
   Future<void> _centerOnActiveProfileLocation() async {
     if (!mounted || _isCenteringLocation) return;
 
@@ -1081,6 +996,99 @@ class _HomePageState extends ConsumerState<HomePage>
     } catch (e) {
       debugPrint('❌ Erro ao centralizar no perfil ativo: $e');
       AppSnackBar.showError(context, 'Erro ao centralizar no perfil ativo');
+    } finally {
+      if (mounted) {
+        setState(() => _isCenteringLocation = false);
+      } else {
+        _isCenteringLocation = false;
+      }
+    }
+  }
+
+  Future<void> _centerOnDeviceLocation() async {
+    if (!mounted || _isCenteringLocation) return;
+
+    try {
+      setState(() => _isCenteringLocation = true);
+
+      final controller = await _waitForMapController();
+      if (controller == null) {
+        AppSnackBar.showInfo(context, 'Aguarde o mapa carregar...');
+        return;
+      }
+
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        AppSnackBar.showWarning(
+          context,
+          'GPS desativado. Ative a localização do dispositivo.',
+        );
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied) {
+        AppSnackBar.showWarning(
+          context,
+          'Permissão de localização necessária para usar sua posição atual.',
+        );
+        return;
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        AppSnackBar.showWarning(
+          context,
+          'Permissão de localização bloqueada. Ative nas configurações do app.',
+        );
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      ).timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+
+      final target = LatLng(position.latitude, position.longitude);
+      setState(() {
+        _showUserLocationOnMap = true;
+        _activePostId = null;
+        _setMapReadinessTarget(target);
+        _mapControllerWrapper.setCurrentPosition(target);
+      });
+
+      await GpsCacheService.updateCache(target);
+      await controller.animateCamera(
+        CameraUpdate.newLatLngZoom(target, 14),
+      );
+      _forceNextMapIdleProcessing = true;
+      _lastProcessedBoundsKey = null;
+      _lastProcessedBoundsAt = null;
+      _scheduleVisibleRegionRetry();
+
+      _logMapLoad(
+        'center_on_device_location',
+        <String, Object?>{
+          'target': _formatLatLngForLog(target),
+        },
+      );
+    } on TimeoutException {
+      debugPrint('⚠️ Timeout ao obter localização atual do dispositivo');
+      if (mounted) {
+        AppSnackBar.showWarning(
+          context,
+          'Não foi possível obter sua localização atual agora.',
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Erro ao centralizar no dispositivo: $e');
+      if (mounted && !e.toString().contains('channel-error')) {
+        AppSnackBar.showError(context, 'Erro ao obter localização atual');
+      }
     } finally {
       if (mounted) {
         setState(() => _isCenteringLocation = false);
@@ -1819,7 +1827,7 @@ class _HomePageState extends ConsumerState<HomePage>
                     child: _buildOnlyConnectionsChip(),
                   ),
                 ),
-              // Botão de centralizar na localização do usuário (alinhado com card)
+              // Botão de centralizar na localização atual do dispositivo.
               Positioned(
                 right: 16,
                 bottom: 231, // 10% mais alto
@@ -1828,7 +1836,8 @@ class _HomePageState extends ConsumerState<HomePage>
                   shape: const CircleBorder(),
                   color: Colors.white,
                   child: InkWell(
-                    onTap: _isCenteringLocation ? null : _centerOnUserLocation,
+                    onTap:
+                        _isCenteringLocation ? null : _centerOnDeviceLocation,
                     customBorder: const CircleBorder(),
                     child: Container(
                       width: 52,

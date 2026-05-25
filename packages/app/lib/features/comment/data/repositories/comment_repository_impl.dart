@@ -1,3 +1,4 @@
+import 'package:core_ui/utils/objectionable_content_filter.dart';
 import 'package:wegig_app/features/comment/data/datasources/comment_remote_datasource.dart';
 import 'package:wegig_app/features/comment/domain/entities/comment_entity.dart';
 import 'package:wegig_app/features/comment/domain/repositories/comment_repository.dart';
@@ -26,7 +27,18 @@ class CommentRepositoryImpl implements CommentRepository {
     String? parentCommentId,
     String? replyToName,
     String? replyToProfileId,
+    List<String> mentionedProfileIds = const [],
+    List<String> mentionedUids = const [],
+    List<String> mentionedUsernames = const [],
   }) {
+    final contentError = ObjectionableContentFilter.validate(
+      'comentário',
+      text,
+    );
+    if (contentError != null) {
+      throw ArgumentError(contentError);
+    }
+
     return _remoteDatasource.addComment(
       postId: postId,
       authorProfileId: authorProfileId,
@@ -37,6 +49,9 @@ class CommentRepositoryImpl implements CommentRepository {
       parentCommentId: parentCommentId,
       replyToName: replyToName,
       replyToProfileId: replyToProfileId,
+      mentionedProfileIds: mentionedProfileIds,
+      mentionedUids: mentionedUids,
+      mentionedUsernames: mentionedUsernames,
     );
   }
 

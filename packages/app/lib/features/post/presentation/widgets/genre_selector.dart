@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/utils/music_constants.dart';
+import 'package:flutter/material.dart';
 
 class GenreSelector extends StatelessWidget {
   final Set<String> selectedGenres;
@@ -11,12 +12,7 @@ class GenreSelector extends StatelessWidget {
     required this.onSelectionChanged,
   });
 
-  static const List<String> genreOptions = [
-    'Rock', 'Pop', 'Jazz', 'Blues', 'Metal', 'Reggae',
-    'MPB', 'Samba', 'Pagode', 'Forró', 'Sertanejo',
-    'Eletrônica', 'Hip Hop', 'Rap', 'Funk', 'Clássica',
-    'Gospel', 'Soul', 'R&B', 'Indie', 'Punk', 'Outro'
-  ];
+  static List<String> get genreOptions => MusicConstants.genreOptions;
 
   static String? validateRequired(Set<String> genres) {
     if (genres.isEmpty) return 'Selecione pelo menos um gênero';

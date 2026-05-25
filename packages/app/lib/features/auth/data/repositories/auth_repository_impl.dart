@@ -212,9 +212,14 @@ class AuthRepositoryImpl implements AuthRepository {
       await _remoteDataSource.sendPasswordResetEmail(email);
 
       debugPrint('✅ AuthRepository: Password reset email sent');
-      return AuthSuccess(
-        user: currentUser!, // Não vai ser usado, mas precisa retornar
-      );
+      final user = currentUser;
+      if (user != null) {
+        return AuthSuccess(user: user);
+      }
+      // Fluxo de "esqueci minha senha": não há usuário autenticado no momento
+      // do envio. Sinalizamos sucesso através de AuthCancelled para que a UI
+      // (que não consome `user` neste fluxo) trate como conclusão sem erro.
+      return const AuthResult.cancelled();
     } on FirebaseAuthException catch (e) {
       debugPrint('❌ AuthRepository: FirebaseAuthException - ${e.code}');
 
@@ -239,7 +244,11 @@ class AuthRepositoryImpl implements AuthRepository {
       await _remoteDataSource.sendEmailVerification();
 
       debugPrint('✅ AuthRepository: Email verification sent');
-      return AuthSuccess(user: currentUser!);
+      final user = currentUser;
+      if (user != null) {
+        return AuthSuccess(user: user);
+      }
+      return const AuthResult.cancelled();
     } on FirebaseAuthException catch (e) {
       debugPrint('❌ AuthRepository: FirebaseAuthException - ${e.code}');
 

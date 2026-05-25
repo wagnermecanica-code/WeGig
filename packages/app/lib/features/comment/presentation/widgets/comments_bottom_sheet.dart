@@ -1,26 +1,29 @@
+import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
+import 'package:core_ui/utils/debouncer.dart';
+import 'package:core_ui/utils/objectionable_content_filter.dart';
 import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
-
-import '../../domain/entities/comment_entity.dart';
-import '../providers/comment_providers.dart';
-import '../widgets/comment_item_widget.dart';
-import '../widgets/comment_likers_bottom_sheet.dart';
-import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
 import 'package:wegig_app/app/router/app_router.dart';
-import 'package:wegig_app/features/report/presentation/widgets/report_dialog.dart';
-import 'package:wegig_app/features/report/presentation/providers/report_providers.dart';
 import 'package:wegig_app/core/firebase/blocked_profiles.dart';
 import 'package:wegig_app/core/firebase/blocked_relations.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wegig_app/features/comment/domain/entities/comment_entity.dart';
+import 'package:wegig_app/features/comment/presentation/providers/comment_providers.dart';
+import 'package:wegig_app/features/comment/presentation/widgets/comment_item_widget.dart';
+import 'package:wegig_app/features/comment/presentation/widgets/comment_likers_bottom_sheet.dart';
+import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:wegig_app/features/report/presentation/providers/report_providers.dart';
+import 'package:wegig_app/features/report/presentation/widgets/report_dialog.dart';
 
 /// Bottom sheet estilo TikTok para exibir e adicionar comentários em um post.
 ///
@@ -29,20 +32,39 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class CommentsBottomSheet extends ConsumerStatefulWidget {
   const CommentsBottomSheet({
     required this.post,
+    this.highlightCommentId,
+    this.parentCommentId,
     super.key,
   });
 
   /// O post cujos comentários serão exibidos
   final PostEntity post;
 
+  /// Quando definido, o sheet rola até o comentário com esse id e aplica
+  /// um destaque temporário (deep link de notificação).
+  final String? highlightCommentId;
+
+  /// Id do comentário pai, quando [highlightCommentId] aponta para uma
+  /// resposta. Mantido para futuras melhorias de expansão/ordenação.
+  final String? parentCommentId;
+
   /// Abre o bottom sheet de comentários
-  static Future<void> show(BuildContext context, PostEntity post) {
+  static Future<void> show(
+    BuildContext context,
+    PostEntity post, {
+    String? highlightCommentId,
+    String? parentCommentId,
+  }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: false,
       backgroundColor: Colors.transparent,
-      builder: (_) => CommentsBottomSheet(post: post),
+      builder: (_) => CommentsBottomSheet(
+        post: post,
+        highlightCommentId: highlightCommentId,
+        parentCommentId: parentCommentId,
+      ),
     );
   }
 
@@ -52,15 +74,45 @@ class CommentsBottomSheet extends ConsumerStatefulWidget {
 }
 
 class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
+  static final RegExp _mentionTokenRegex = RegExp(r'^[a-zA-Z0-9._]*$');
+  static final RegExp _mentionRegex = RegExp(r'@([a-zA-Z0-9._]+)');
+
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
+  final _mentionSearchDebouncer = Debouncer(milliseconds: 250);
   bool _isSending = false;
+  bool _isMentionSearching = false;
+  int _mentionSearchGeneration = 0;
+  _ActiveMention? _activeMention;
+  List<_MentionSuggestion> _mentionSuggestions = const [];
 
   /// Comentário ao qual estamos respondendo (null = comentário normal)
   CommentEntity? _replyingTo;
 
+  /// Chaves por id de comentário para permitir [Scrollable.ensureVisible].
+  final Map<String, GlobalKey> _itemKeys = <String, GlobalKey>{};
+
+  /// Id do comentário atualmente destacado (deep link). Limpado após o
+  /// período de destaque.
+  String? _highlightedCommentId;
+
+  /// Garante que a rolagem para o comentário destacado aconteça apenas
+  /// uma vez por abertura.
+  bool _didScrollToHighlight = false;
+  Timer? _highlightClearTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController.addListener(_handleCommentTextChanged);
+    _highlightedCommentId = widget.highlightCommentId;
+  }
+
   @override
   void dispose() {
+    _highlightClearTimer?.cancel();
+    _textController.removeListener(_handleCommentTextChanged);
+    _mentionSearchDebouncer.dispose();
     _textController.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -80,16 +132,247 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
     setState(() => _replyingTo = null);
   }
 
+  void _handleCommentTextChanged() {
+    final activeMention = _extractActiveMention(_textController.value);
+    final previousMention = _activeMention;
+    _activeMention = activeMention;
+
+    if (activeMention == null) {
+      _mentionSearchDebouncer.cancel();
+      if (_mentionSuggestions.isNotEmpty || _isMentionSearching) {
+        setState(() {
+          _mentionSuggestions = const [];
+          _isMentionSearching = false;
+        });
+      }
+      return;
+    }
+
+    if (previousMention?.query == activeMention.query &&
+        _mentionSuggestions.isNotEmpty) {
+      return;
+    }
+
+    if (!_isMentionSearching) {
+      setState(() => _isMentionSearching = true);
+    }
+
+    _mentionSearchDebouncer.run(() {
+      _searchMentionSuggestions(activeMention.query);
+    });
+  }
+
+  _ActiveMention? _extractActiveMention(TextEditingValue value) {
+    final selection = value.selection;
+    if (!selection.isValid || !selection.isCollapsed) return null;
+
+    final cursor = selection.baseOffset;
+    if (cursor < 0 || cursor > value.text.length) return null;
+
+    final beforeCursor = value.text.substring(0, cursor);
+    final atIndex = beforeCursor.lastIndexOf('@');
+    if (atIndex < 0) return null;
+
+    if (atIndex > 0) {
+      final previous = beforeCursor[atIndex - 1];
+      if (!RegExp(r'\s').hasMatch(previous)) return null;
+    }
+
+    final query = beforeCursor.substring(atIndex + 1);
+    if (query.contains(RegExp(r'\s'))) return null;
+    if (!_mentionTokenRegex.hasMatch(query)) return null;
+
+    return _ActiveMention(start: atIndex, end: cursor, query: query);
+  }
+
+  Future<void> _searchMentionSuggestions(String rawQuery) async {
+    final generation = ++_mentionSearchGeneration;
+    final query = rawQuery.trim().toLowerCase();
+
+    try {
+      final activeProfile = ref.read(profileProvider).value?.activeProfile;
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final activeProfileId = activeProfile?.profileId ?? '';
+      final excludedProfileIds = activeProfile == null || currentUser == null
+          ? const <String>[]
+          : await BlockedRelations.getExcludedProfileIds(
+              firestore: FirebaseFirestore.instance,
+              profileId: activeProfile.profileId,
+              uid: currentUser.uid,
+            );
+
+      final results = <_MentionSuggestion>[];
+      final seenProfileIds = <String>{};
+
+      void addIfValid(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+        if (results.length >= 8) return;
+        final suggestion = _MentionSuggestion.fromFirestore(doc);
+        if (suggestion == null) return;
+        if (seenProfileIds.contains(suggestion.profileId)) return;
+        if (suggestion.profileId == activeProfileId) return;
+        if (excludedProfileIds.contains(suggestion.profileId)) return;
+
+        seenProfileIds.add(suggestion.profileId);
+        results.add(suggestion);
+      }
+
+      final profilesRef = FirebaseFirestore.instance.collection('profiles');
+
+      if (query.isEmpty) {
+        final recentSnapshot = await profilesRef
+            .orderBy('createdAt', descending: true)
+            .limit(30)
+            .get();
+        for (final doc in recentSnapshot.docs) {
+          addIfValid(doc);
+        }
+      } else {
+        final exactSnapshot = await profilesRef
+            .where('usernameLowercase', isEqualTo: query)
+            .limit(4)
+            .get();
+        for (final doc in exactSnapshot.docs) {
+          addIfValid(doc);
+        }
+
+        if (results.length < 8) {
+          final prefixSnapshot = await profilesRef
+              .orderBy('usernameLowercase')
+              .startAt([query])
+              .endAt(['$query\uf8ff'])
+              .limit(12)
+              .get();
+          for (final doc in prefixSnapshot.docs) {
+            addIfValid(doc);
+          }
+        }
+      }
+
+      if (!mounted || generation != _mentionSearchGeneration) return;
+      setState(() {
+        _mentionSuggestions = results;
+        _isMentionSearching = false;
+      });
+    } catch (error, stackTrace) {
+      debugPrint('❌ Mention search failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted || generation != _mentionSearchGeneration) return;
+      setState(() {
+        _mentionSuggestions = const [];
+        _isMentionSearching = false;
+      });
+    }
+  }
+
+  void _insertMention(_MentionSuggestion suggestion) {
+    final value = _textController.value;
+    final activeMention = _activeMention ?? _extractActiveMention(value);
+    if (activeMention == null) return;
+
+    final replacement = '@${suggestion.username} ';
+    final newText = value.text.replaceRange(
+      activeMention.start,
+      activeMention.end,
+      replacement,
+    );
+    final selectionOffset = activeMention.start + replacement.length;
+
+    _textController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: selectionOffset),
+    );
+    _focusNode.requestFocus();
+    setState(() {
+      _activeMention = null;
+      _mentionSuggestions = const [];
+      _isMentionSearching = false;
+    });
+  }
+
+  Future<_ResolvedCommentMentions> _resolveCommentMentions({
+    required String text,
+    required String activeProfileId,
+    required String activeUid,
+  }) async {
+    final usernames = _mentionRegex
+        .allMatches(text)
+        .map((match) => match.group(1)?.trim().toLowerCase() ?? '')
+        .where((username) => username.isNotEmpty)
+        .toSet()
+        .take(10)
+        .toList(growable: false);
+
+    if (usernames.isEmpty) return const _ResolvedCommentMentions.empty();
+
+    try {
+      final excludedProfileIds = await BlockedRelations.getExcludedProfileIds(
+        firestore: FirebaseFirestore.instance,
+        profileId: activeProfileId,
+        uid: activeUid,
+      );
+      final profilesRef = FirebaseFirestore.instance.collection('profiles');
+      final profileIds = <String>[];
+      final uids = <String>[];
+      final resolvedUsernames = <String>[];
+      final seenProfileIds = <String>{};
+
+      for (final username in usernames) {
+        var snapshot = await profilesRef
+            .where('usernameLowercase', isEqualTo: username)
+            .limit(1)
+            .get();
+
+        if (snapshot.docs.isEmpty) {
+          snapshot = await profilesRef
+              .where('username', isEqualTo: username)
+              .limit(1)
+              .get();
+        }
+
+        if (snapshot.docs.isEmpty) continue;
+        final doc = snapshot.docs.first;
+        final suggestion = _MentionSuggestion.fromFirestore(doc);
+        if (suggestion == null) continue;
+        if (suggestion.profileId == activeProfileId) continue;
+        if (excludedProfileIds.contains(suggestion.profileId)) continue;
+        if (!seenProfileIds.add(suggestion.profileId)) continue;
+
+        profileIds.add(suggestion.profileId);
+        uids.add(suggestion.uid);
+        resolvedUsernames.add(suggestion.username);
+      }
+
+      return _ResolvedCommentMentions(
+        profileIds: profileIds,
+        uids: uids,
+        usernames: resolvedUsernames,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('❌ Comment mention resolution failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return const _ResolvedCommentMentions.empty();
+    }
+  }
+
   Future<void> _sendComment() async {
     final text = _textController.text.trim();
     if (text.isEmpty || _isSending) return;
+
+    final contentError = ObjectionableContentFilter.validate(
+      'comentário',
+      text,
+    );
+    if (contentError != null) {
+      AppSnackBar.showOverlayError(context, contentError);
+      return;
+    }
 
     final currentUser = FirebaseAuth.instance.currentUser;
     final activeProfile = ref.read(profileProvider).value?.activeProfile;
 
     if (currentUser == null || activeProfile == null) {
       if (mounted) {
-        AppSnackBar.showError(context, 'Faça login para comentar');
+        AppSnackBar.showOverlayError(context, 'Faça login para comentar');
       }
       return;
     }
@@ -111,6 +394,11 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
     }
 
     try {
+      final mentions = await _resolveCommentMentions(
+        text: text,
+        activeProfileId: activeProfile.profileId,
+        activeUid: currentUser.uid,
+      );
       final repository = ref.read(commentRepositoryProvider);
       await repository.addComment(
         postId: widget.post.id,
@@ -122,6 +410,9 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
         parentCommentId: parentCommentId,
         replyToName: replyToName,
         replyToProfileId: replyToProfileId,
+        mentionedProfileIds: mentions.profileIds,
+        mentionedUids: mentions.uids,
+        mentionedUsernames: mentions.usernames,
       );
 
       // Notificação in-app + push é criada pela Cloud Function
@@ -133,7 +424,10 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
       HapticFeedback.lightImpact();
     } catch (e) {
       if (mounted) {
-        AppSnackBar.showError(context, 'Erro ao enviar comentário');
+        final message = e is ArgumentError
+            ? (e.message?.toString() ?? 'Erro ao enviar comentário')
+            : 'Erro ao enviar comentário';
+        AppSnackBar.showOverlayError(context, message);
         // Restaurar texto e modo de resposta se falhou
         _textController.text = text;
         setState(() => _replyingTo = replyingTo);
@@ -269,14 +563,17 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
       if (mounted) {
-        AppSnackBar.showError(context, 'Você precisa estar logado.');
+        AppSnackBar.showOverlayError(context, 'Você precisa estar logado.');
       }
       return;
     }
 
     if (comment.authorProfileId == activeProfileId) {
       if (mounted) {
-        AppSnackBar.showError(context, 'Não é possível bloquear a si mesmo.');
+        AppSnackBar.showOverlayError(
+          context,
+          'Não é possível bloquear a si mesmo.',
+        );
       }
       return;
     }
@@ -303,11 +600,14 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
       }
 
       if (mounted) {
-        AppSnackBar.showSuccess(context, 'Perfil bloqueado com sucesso.');
+        AppSnackBar.showOverlaySuccess(
+          context,
+          'Perfil bloqueado com sucesso.',
+        );
       }
     } catch (e) {
       if (mounted) {
-        AppSnackBar.showError(context, 'Erro ao bloquear perfil.');
+        AppSnackBar.showOverlayError(context, 'Erro ao bloquear perfil.');
       }
     }
   }
@@ -373,7 +673,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
       HapticFeedback.lightImpact();
     } catch (e) {
       if (mounted) {
-        AppSnackBar.showError(context, 'Erro ao excluir comentário');
+        AppSnackBar.showOverlayError(context, 'Erro ao excluir comentário');
       }
     }
   }
@@ -393,7 +693,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
       HapticFeedback.lightImpact();
     } catch (e) {
       if (mounted) {
-        AppSnackBar.showError(context, 'Erro ao curtir comentário');
+        AppSnackBar.showOverlayError(context, 'Erro ao curtir comentário');
       }
     }
   }
@@ -407,9 +707,7 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
 
     for (final c in comments) {
       if (c.isReply && c.parentCommentId != null) {
-        repliesByParent
-            .putIfAbsent(c.parentCommentId!, () => [])
-            .add(c);
+        repliesByParent.putIfAbsent(c.parentCommentId!, () => []).add(c);
       } else {
         parents.add(c);
       }
@@ -439,6 +737,39 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
     }
 
     return result;
+  }
+
+  /// Agenda rolagem até o comentário destacado (deep link) na primeira vez
+  /// em que ele estiver presente na lista renderizada.
+  void _scheduleHighlightScroll(List<CommentEntity> threaded) {
+    if (_didScrollToHighlight) return;
+    final target = widget.highlightCommentId;
+    if (target == null || target.isEmpty) return;
+    if (!threaded.any((c) => c.id == target)) return;
+
+    _didScrollToHighlight = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final key = _itemKeys[target];
+      final ctx = key?.currentContext;
+      if (ctx == null) return;
+      try {
+        await Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+          alignment: 0.2,
+        );
+      } catch (_) {
+        // Lista pode não estar pronta ainda; o destaque ainda fica visível
+        // por alguns segundos para o usuário localizar o comentário.
+      }
+      _highlightClearTimer?.cancel();
+      _highlightClearTimer = Timer(const Duration(seconds: 3), () {
+        if (!mounted) return;
+        setState(() => _highlightedCommentId = null);
+      });
+    });
   }
 
   @override
@@ -556,6 +887,10 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
 
                       final threaded = _buildThreadedList(comments);
 
+                      // Deep link: agendar rolagem até o comentário alvo
+                      // assim que a lista estiver na tela.
+                      _scheduleHighlightScroll(threaded);
+
                       return ListView.builder(
                         // Espaço extra para a barra de input não cobrir o botão "Responder"
                         padding: const EdgeInsets.only(bottom: 120),
@@ -569,36 +904,57 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                           final isPostOwner = activeProfileId.isNotEmpty &&
                               widget.post.authorProfileId == activeProfileId;
                           final canDelete = isOwn || isPostOwner;
-
-                          return CommentItemWidget(
-                            comment: comment,
-                            isOwnComment: isOwn,
-                            canDelete: canDelete,
-                            isReply: comment.isReply,
-                            isLiked: activeProfileId.isNotEmpty &&
-                                comment.isLikedBy(activeProfileId),
-                            likeCount: comment.likeCount,
-                            onDelete:
-                                canDelete ? () => _deleteComment(comment) : null,
-                            onReply: () => _startReply(comment),
-                            onToggleLike: activeProfileId.isNotEmpty
-                                ? () => _toggleLike(comment, activeProfileId)
-                                : null,
-                            onViewLikers: comment.likeCount > 0
-                                ? () => CommentLikersBottomSheet.show(
-                                      context,
-                                      comment.likedBy,
-                                    )
-                                : null,
-                            onLongPress: () => _showCommentOptions(
-                              comment,
-                              canDelete: canDelete,
-                              isOwnComment: isOwn,
+                          final itemKey = _itemKeys.putIfAbsent(
+                            comment.id,
+                            () => GlobalKey(
+                              debugLabel: 'comment_${comment.id}',
                             ),
-                            onTapProfile: () {
-                              Navigator.pop(context);
-                              context.pushProfile(comment.authorProfileId);
-                            },
+                          );
+                          final isHighlighted =
+                              _highlightedCommentId == comment.id;
+
+                          return AnimatedContainer(
+                            key: itemKey,
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeOut,
+                            color: isHighlighted
+                                ? AppColors.primary.withValues(alpha: 0.12)
+                                : Colors.transparent,
+                            child: CommentItemWidget(
+                              comment: comment,
+                              isOwnComment: isOwn,
+                              canDelete: canDelete,
+                              isReply: comment.isReply,
+                              isLiked: activeProfileId.isNotEmpty &&
+                                  comment.isLikedBy(activeProfileId),
+                              likeCount: comment.likeCount,
+                              onDelete: canDelete
+                                  ? () => _deleteComment(comment)
+                                  : null,
+                              onReply: () => _startReply(comment),
+                              onToggleLike: activeProfileId.isNotEmpty
+                                  ? () => _toggleLike(comment, activeProfileId)
+                                  : null,
+                              onViewLikers: comment.likeCount > 0
+                                  ? () => CommentLikersBottomSheet.show(
+                                        context,
+                                        comment.likedBy,
+                                      )
+                                  : null,
+                              onLongPress: () => _showCommentOptions(
+                                comment,
+                                canDelete: canDelete,
+                                isOwnComment: isOwn,
+                              ),
+                              onTapProfile: () {
+                                Navigator.pop(context);
+                                context.pushProfile(comment.authorProfileId);
+                              },
+                              onMentionTap: (username) {
+                                Navigator.pop(context);
+                                context.pushProfileByUsername(username);
+                              },
+                            ),
                           );
                         },
                       );
@@ -644,6 +1000,13 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (_activeMention != null &&
+                        (_mentionSuggestions.isNotEmpty || _isMentionSearching))
+                      _MentionSuggestionsPanel(
+                        suggestions: _mentionSuggestions,
+                        isLoading: _isMentionSearching,
+                        onSelect: _insertMention,
+                      ),
                     // ── Indicador de resposta ──
                     if (_replyingTo != null)
                       Container(
@@ -708,11 +1071,13 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                                 ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide: BorderSide(color: Colors.grey[300]!),
+                                  borderSide:
+                                      BorderSide(color: Colors.grey[300]!),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide: BorderSide(color: Colors.grey[300]!),
+                                  borderSide:
+                                      BorderSide(color: Colors.grey[300]!),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
@@ -771,5 +1136,174 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
   void debugPrint(String message) {
     // ignore: avoid_print
     print(message);
+  }
+}
+
+class _ActiveMention {
+  const _ActiveMention({
+    required this.start,
+    required this.end,
+    required this.query,
+  });
+
+  final int start;
+  final int end;
+  final String query;
+}
+
+class _MentionSuggestion {
+  const _MentionSuggestion({
+    required this.profileId,
+    required this.uid,
+    required this.name,
+    required this.username,
+    this.photoUrl,
+  });
+
+  final String profileId;
+  final String uid;
+  final String name;
+  final String username;
+  final String? photoUrl;
+
+  static _MentionSuggestion? fromFirestore(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    final username = (data['username'] as String? ?? '').trim();
+    if (username.isEmpty) return null;
+
+    return _MentionSuggestion(
+      profileId: doc.id,
+      uid: data['uid'] as String? ?? '',
+      name: data['name'] as String? ?? 'Usuário',
+      username: username.replaceAll('@', ''),
+      photoUrl: data['photoUrl'] as String?,
+    );
+  }
+}
+
+class _ResolvedCommentMentions {
+  const _ResolvedCommentMentions({
+    required this.profileIds,
+    required this.uids,
+    required this.usernames,
+  });
+
+  const _ResolvedCommentMentions.empty()
+      : profileIds = const [],
+        uids = const [],
+        usernames = const [];
+
+  final List<String> profileIds;
+  final List<String> uids;
+  final List<String> usernames;
+}
+
+class _MentionSuggestionsPanel extends StatelessWidget {
+  const _MentionSuggestionsPanel({
+    required this.suggestions,
+    required this.isLoading,
+    required this.onSelect,
+  });
+
+  final List<_MentionSuggestion> suggestions;
+  final bool isLoading;
+  final ValueChanged<_MentionSuggestion> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 220),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade200),
+        ),
+      ),
+      child: isLoading && suggestions.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: AppRadioPulseLoader(
+                  size: 24,
+                  color: AppColors.primary,
+                ),
+              ),
+            )
+          : ListView.separated(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: suggestions.length,
+              separatorBuilder: (_, __) => Divider(
+                height: 1,
+                color: Colors.grey.shade100,
+              ),
+              itemBuilder: (context, index) {
+                final suggestion = suggestions[index];
+                final photoUrl = suggestion.photoUrl?.trim() ?? '';
+                final hasRemotePhoto = photoUrl.startsWith('http://') ||
+                    photoUrl.startsWith('https://');
+
+                return InkWell(
+                  onTap: () => onSelect(suggestion),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor:
+                              AppColors.primary.withValues(alpha: 0.1),
+                          backgroundImage: hasRemotePhoto
+                              ? CachedNetworkImageProvider(photoUrl)
+                              : null,
+                          child: hasRemotePhoto
+                              ? null
+                              : const Icon(
+                                  Icons.person,
+                                  color: AppColors.primary,
+                                  size: 18,
+                                ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                suggestion.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '@${suggestion.username}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
   }
 }

@@ -474,9 +474,19 @@ GoRouter goRouter(Ref ref) {
         name: 'postDetail',
         pageBuilder: (context, state) {
           final postId = state.pathParameters['postId']!;
+          final commentId = state.uri.queryParameters['commentId'];
+          final parentCommentId = state.uri.queryParameters['parentCommentId'];
           return CupertinoPage<void>(
             key: state.pageKey,
-            child: PostDetailPage(postId: postId),
+            child: PostDetailPage(
+              postId: postId,
+              highlightCommentId:
+                  (commentId != null && commentId.isNotEmpty) ? commentId : null,
+              highlightParentCommentId:
+                  (parentCommentId != null && parentCommentId.isNotEmpty)
+                      ? parentCommentId
+                      : null,
+            ),
           );
         },
       ),
@@ -715,9 +725,33 @@ extension TypedNavigationExtension on BuildContext {
   }
 
   /// Push to post detail page (adds to stack)
-  void pushPostDetail(String postId) {
-    _logNavigation('post_detail', {'postId': postId});
-    push(AppRoutes.postDetail(postId));
+  ///
+  /// Optionally pass [commentId] (and [parentCommentId]) to deep-link directly
+  /// to a specific comment — the post page will auto-open the comments bottom
+  /// sheet and scroll/highlight the target item.
+  void pushPostDetail(
+    String postId, {
+    String? commentId,
+    String? parentCommentId,
+  }) {
+    _logNavigation('post_detail', {
+      'postId': postId,
+      if (commentId != null && commentId.isNotEmpty) 'commentId': commentId,
+      if (parentCommentId != null && parentCommentId.isNotEmpty)
+        'parentCommentId': parentCommentId,
+    });
+    final qp = <String, String>{
+      if (commentId != null && commentId.isNotEmpty) 'commentId': commentId,
+      if (parentCommentId != null && parentCommentId.isNotEmpty)
+        'parentCommentId': parentCommentId,
+    };
+    final location = qp.isEmpty
+        ? AppRoutes.postDetail(postId)
+        : Uri(
+            path: AppRoutes.postDetail(postId),
+            queryParameters: qp,
+          ).toString();
+    push(location);
   }
 
   /// Push vertical post feed (carrossel)

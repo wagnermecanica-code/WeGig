@@ -70,6 +70,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
 
   YoutubePlayerController? _youtubeController;
   TabController? _tabController;
+  late final AnimationController _deepLinkExitController;
+  late final Animation<Offset> _deepLinkExitOffset;
+  bool _isReturningFromDeepLink = false;
 
   // Estado de loading para o botão de mensagem (evita cliques múltiplos)
   bool _isOpeningConversation = false;
@@ -126,8 +129,7 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         return;
       }
 
-      if (refreshedStatus.status ==
-          ConnectionRelationshipStatus.pendingSent) {
+      if (refreshedStatus.status == ConnectionRelationshipStatus.pendingSent) {
         debugPrint(
           '✅ ViewProfile: convite registrado com sucesso para ${profile.profileId}',
         );
@@ -162,6 +164,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
   @override
   void initState() {
     super.initState();
+    _deepLinkExitController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+      reverseDuration: const Duration(milliseconds: 180),
+    );
+    _deepLinkExitOffset = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(0.22, 0),
+    ).chain(CurveTween(curve: Curves.easeOutCubic)).animate(
+          _deepLinkExitController,
+        );
     _tabController = TabController(
         length: 4, vsync: this); // 4 tabs: Gallery, YouTube, Posts, Interests
     _loadProfileFromFirestore();
@@ -483,7 +496,35 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     if (!mounted) return;
     _youtubeController?.dispose();
     _tabController?.dispose();
+    _deepLinkExitController.dispose();
     super.dispose();
+  }
+
+  Future<void> _returnToHomeFromDeepLink() async {
+    if (_isReturningFromDeepLink) {
+      return;
+    }
+
+    _isReturningFromDeepLink = true;
+    HapticFeedback.selectionClick();
+
+    if (_deepLinkExitController.value < 1) {
+      await _deepLinkExitController.forward();
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    context.go(AppRoutes.home);
+  }
+
+  Future<void> _cancelDeepLinkBackGesture() async {
+    if (_isReturningFromDeepLink || _deepLinkExitController.value == 0) {
+      return;
+    }
+
+    await _deepLinkExitController.reverse();
   }
 
   /// Verifica se o perfil visualizado é o perfil ativo do usuário
@@ -604,7 +645,9 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         return _buildActionButton(
           label: 'Conectar',
           icon: Iconsax.user_add,
-          onPressed: effectiveBusy ? null : () => _handleSendConnectionRequest(profile),
+          onPressed: effectiveBusy
+              ? null
+              : () => _handleSendConnectionRequest(profile),
           isPrimary: false,
           isLoading: isBusy,
         );
@@ -1583,8 +1626,15 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     // Não usa Navigator.canPop() diretamente porque ele fica true quando há
     // bottom sheets/dialogs abertos na mesma Navigator. Aqui queremos mostrar
     // "voltar" apenas quando esta página não é a rota inicial.
-    final shouldShowBackButton =
+    final canGoBackInHistory =
         route != null ? !route.isFirst : Navigator.canPop(context);
+    // Detecta entrada via deep link: a rota atual é /profile/... no GoRouter
+    // (não está embutida dentro do BottomNavScaffold / home tab) mas não há
+    // histórico de navegação para fazer pop.
+    final routerLocation = GoRouterState.of(context).matchedLocation;
+    final isStandaloneProfileRoute = routerLocation.startsWith('/profile/');
+    final isDeepLinkEntry = isStandaloneProfileRoute && !canGoBackInHistory;
+    final shouldShowBackButton = canGoBackInHistory;
 
     // ✅ FIX: Listener para detectar mudanças no perfil ativo
     // Após trocar de perfil, recarrega ViewProfilePage ao invés de ir para Home
@@ -1660,17 +1710,23 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
             ],
     );
 
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: shouldShowBackButton
+        leading: isDeepLinkEntry
             ? IconButton(
                 icon: const Icon(Iconsax.arrow_left_2, color: Colors.black),
-                onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Voltar',
+                onPressed: _returnToHomeFromDeepLink,
               )
-            : null,
+            : shouldShowBackButton
+                ? IconButton(
+                    icon: const Icon(Iconsax.arrow_left_2, color: Colors.black),
+                    onPressed: () => Navigator.of(context).pop(),
+                  )
+                : null,
         actions: isOwnProfile
             ? [
                 IconButton(
@@ -2186,6 +2242,69 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   ),
                 ),
     );
+
+    if (!isDeepLinkEntry) {
+      return scaffold;
+    }
+
+    // Entrada via deep link: a rota é a primeira do stack do Navigator, então
+    // o gesto de iOS "swipe-from-left" e o botão back do Android não teriam
+    // para onde voltar. Interceptamos ambos e navegamos para a home, e ainda
+    // adicionamos um detector de swipe pela borda esquerda para emular o
+    // comportamento nativo do iOS de "deslizar para voltar".
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && mounted) {
+          _returnToHomeFromDeepLink();
+        }
+      },
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ColoredBox(color: theme.scaffoldBackgroundColor),
+          ),
+          SlideTransition(
+            position: _deepLinkExitOffset,
+            child: Stack(
+              children: [
+                scaffold,
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 32,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onHorizontalDragUpdate: (details) {
+                      if (_isReturningFromDeepLink) {
+                        return;
+                      }
+
+                      final nextValue = _deepLinkExitController.value +
+                          (details.delta.dx / 180);
+                      _deepLinkExitController.value = nextValue.clamp(0, 1);
+                    },
+                    onHorizontalDragEnd: (details) {
+                      final velocity = details.primaryVelocity ?? 0;
+                      final didCommit = velocity > 200 ||
+                          _deepLinkExitController.value > 0.35;
+
+                      if (didCommit && mounted) {
+                        _returnToHomeFromDeepLink();
+                      } else {
+                        _cancelDeepLinkBackGesture();
+                      }
+                    },
+                    onHorizontalDragCancel: _cancelDeepLinkBackGesture,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _wrapWithPrimaryScrollController(
@@ -2295,12 +2414,13 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     return (_profile!.level != null && _profile!.level!.isNotEmpty) ||
         (_profile!.instruments?.isNotEmpty ?? false) ||
         (_profile!.genres?.isNotEmpty ?? false) ||
-      (_profile!.isBand && (_profile!.bandMembers?.isNotEmpty ?? false)) ||
-      (_profile!.isTechnician &&
-        ((_profile!.technicianSpecialty?.isNotEmpty ?? false) ||
-          (_profile!.experienceRange?.isNotEmpty ?? false) ||
-          (_profile!.phone?.trim().isNotEmpty ?? false))) ||
-      (_profile!.isContractor && (_profile!.phone?.trim().isNotEmpty ?? false));
+        (_profile!.isBand && (_profile!.bandMembers?.isNotEmpty ?? false)) ||
+        (_profile!.isTechnician &&
+            ((_profile!.technicianSpecialty?.isNotEmpty ?? false) ||
+                (_profile!.experienceRange?.isNotEmpty ?? false) ||
+                (_profile!.phone?.trim().isNotEmpty ?? false))) ||
+        (_profile!.isContractor &&
+            (_profile!.phone?.trim().isNotEmpty ?? false));
   }
 
   Widget _buildProfileInfoSection() {
@@ -2367,17 +2487,17 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
         crossAxisAlignment: CrossAxisAlignment.start, // Alinhamento à esquerda
         children: [
           Text(
-          _profile!.isSpace
-            ? 'Sobre o Espaço'
-            : _profile!.isBand
-              ? 'Sobre a Banda'
-              : _profile!.isTechnician
-                ? 'Sobre o Técnico'
-                : _profile!.isContractor
-                  ? 'Sobre o Contratante'
-                  : 'Sobre o Músico',
+            _profile!.isSpace
+                ? 'Sobre o Espaço'
+                : _profile!.isBand
+                    ? 'Sobre a Banda'
+                    : _profile!.isTechnician
+                        ? 'Sobre o Técnico'
+                        : _profile!.isContractor
+                            ? 'Sobre o Contratante'
+                            : 'Sobre o Músico',
             style: sectionTitleStyle,
-          textAlign: TextAlign.left,
+            textAlign: TextAlign.left,
           ),
           const SizedBox(height: 12),
 
@@ -2540,7 +2660,8 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                         textAlign: TextAlign.left,
                         text: TextSpan(
                           children: [
-                            TextSpan(text: 'Especialidade: ', style: labelStyle),
+                            TextSpan(
+                                text: 'Especialidade: ', style: labelStyle),
                             TextSpan(
                               text: _profile!.technicianSpecialty!,
                               style: valueStyle,
@@ -2552,7 +2673,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   ],
                 ),
               ),
-
             if (_profile!.experienceRange != null &&
                 _profile!.experienceRange!.isNotEmpty)
               Padding(
@@ -2579,7 +2699,6 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
                   ],
                 ),
               ),
-
             if (_profile!.phone != null && _profile!.phone!.trim().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),

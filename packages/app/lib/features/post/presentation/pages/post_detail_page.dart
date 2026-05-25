@@ -45,11 +45,22 @@ class PostDetailPage extends ConsumerStatefulWidget {
   /// Construtor da página de detalhes
   const PostDetailPage({
     required this.postId,
+    this.highlightCommentId,
+    this.highlightParentCommentId,
     super.key,
   });
 
   /// ID do post a ser exibido
   final String postId;
+
+  /// ID do comentário a destacar/rolar ao abrir (deep link de notificação).
+  /// Quando definido, a tela abre automaticamente o bottom sheet de
+  /// comentários e tenta posicionar o item correspondente.
+  final String? highlightCommentId;
+
+  /// ID do comentário pai, quando [highlightCommentId] aponta para uma
+  /// resposta. Usado para garantir ordenação correta no bottom sheet.
+  final String? highlightParentCommentId;
 
   @override
   ConsumerState<PostDetailPage> createState() => _PostDetailPageState();
@@ -67,6 +78,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   int _currentPhotoIndex = 0;
   bool _isOpeningConversation = false; // Loading ao abrir chat
   bool _isReposting = false; // Loading ao repostar
+  bool _didAutoOpenHighlightComments = false;
 
   void _handleBackNavigation() {
     if (!mounted) return;
@@ -176,6 +188,9 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         });
       }
 
+      // Deep link para comentário específico (notificações).
+      _maybeAutoOpenHighlightedComment();
+
       // Carregar interessados (visível para todos) (APÓS definir _post)
       await _loadInterestedUsers();
     } catch (e) {
@@ -185,6 +200,27 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
         AppSnackBar.showError(context, 'Erro ao carregar post');
       }
     }
+  }
+
+  /// Abre automaticamente o bottom sheet de comentários quando a página foi
+  /// aberta via deep link de notificação apontando para um comentário.
+  void _maybeAutoOpenHighlightedComment() {
+    if (_didAutoOpenHighlightComments) return;
+    final commentId = widget.highlightCommentId;
+    if (commentId == null || commentId.isEmpty) return;
+    final post = _post;
+    if (post == null) return;
+
+    _didAutoOpenHighlightComments = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      CommentsBottomSheet.show(
+        context,
+        post,
+        highlightCommentId: commentId,
+        parentCommentId: widget.highlightParentCommentId,
+      );
+    });
   }
 
   /// Carrega lista de usuários que demonstraram interesse neste post

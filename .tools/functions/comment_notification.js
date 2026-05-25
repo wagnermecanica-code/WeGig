@@ -16,6 +16,25 @@ function parseFirestoreDate(value) {
   return null;
 }
 
+function normalizeStringArray(value, limit = 20) {
+  if (!Array.isArray(value)) return [];
+
+  const normalized = [];
+  const seen = new Set();
+
+  for (const item of value) {
+    const text = String(item || "").trim();
+    if (!text || seen.has(text)) continue;
+
+    seen.add(text);
+    normalized.push(text);
+
+    if (normalized.length >= limit) break;
+  }
+
+  return normalized;
+}
+
 async function getProfileBadgeContext(profileId) {
   try {
     const profileDoc = await db.collection("profiles").doc(profileId).get();
@@ -559,7 +578,8 @@ async function checkRateLimit(profileId, action, limit, windowMs) {
  * Trigger: onCreate em posts/{postId}/comments/{commentId}
  * Cria notificação in-app + push notification para:
  * 1. Se for resposta: notifica quem foi respondido
- * 2. Sempre: notifica o dono do post (se não for o próprio comentarista)
+ * 2. Se houver menções: notifica os perfis marcados com @username
+ * 3. Sempre: notifica o dono do post (se não for o próprio comentarista)
  */
 exports.sendCommentNotification = functions
   .runWith({
@@ -587,6 +607,14 @@ exports.sendCommentNotification = functions
     const replyToProfileId = (comment.replyToProfileId || "").trim();
     const replyToName = comment.replyToName || "";
     const isReply = parentCommentId !== "";
+    const mentionedProfileIds = normalizeStringArray(
+      comment.mentionedProfileIds,
+      10,
+    );
+    const mentionedUsernames = normalizeStringArray(
+      comment.mentionedUsernames,
+      10,
+    );
 
     if (!postId || !commenterProfileId) {
       console.log(
@@ -639,7 +667,12 @@ exports.sendCommentNotification = functions
       targetProfileId,
       notificationTitle,
       notificationBody,
+      options = {},
     ) => {
+      const eventType =
+        options.eventType || (isReply ? "commentReply" : "comment");
+      const mentionUsername = options.mentionUsername || null;
+
       // Não notificar a si mesmo
       if (commenterProfileId === targetProfileId) return;
 
@@ -698,7 +731,7 @@ exports.sendCommentNotification = functions
         recipientUid: targetUid,
         profileUid: targetProfileId,
         type: "comment",
-        priority: "medium",
+        priority: options.priority || "medium",
         title: notificationTitle,
         body: notificationBody,
         actionType: "viewPost",
@@ -710,7 +743,11 @@ exports.sendCommentNotification = functions
           parentCommentId: parentCommentId || null,
           postType: postType,
           city: postCity,
+          eventType: eventType,
+          ...(mentionUsername ? { mentionUsername: mentionUsername } : {}),
         },
+        senderUid: commenterUid,
+        senderProfileId: commenterProfileId,
         senderName: commenterName,
         senderPhoto: commenterPhoto,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -730,12 +767,15 @@ exports.sendCommentNotification = functions
         },
         {
           type: "comment",
+          eventType: eventType,
           postId: postId,
           commentId: commentId,
+          ...(parentCommentId ? { parentCommentId: parentCommentId } : {}),
           commenterProfileId: commenterProfileId,
           commenterUid: commenterUid,
           recipientProfileId: targetProfileId,
           postType: postType,
+          ...(mentionUsername ? { mentionUsername: mentionUsername } : {}),
         },
       );
 
@@ -747,19 +787,56 @@ exports.sendCommentNotification = functions
     // ─── Notificar destinatários ───
     const notifiedProfiles = new Set();
 
+    const notifyOnce = async (
+      targetProfileId,
+      notificationTitle,
+      notificationBody,
+      options = {},
+    ) => {
+      const normalizedTarget = String(targetProfileId || "").trim();
+      if (!normalizedTarget || notifiedProfiles.has(normalizedTarget)) return;
+
+      notifiedProfiles.add(normalizedTarget);
+      await notifyProfile(
+        normalizedTarget,
+        notificationTitle,
+        notificationBody,
+        options,
+      );
+    };
+
     if (isReply && replyToProfileId) {
       // 1. Resposta: notificar quem foi respondido
       const replyTitle = `${commenterName} respondeu seu comentário`;
       const replyBody = `Respondeu: ${commentPreview}`;
-      await notifyProfile(replyToProfileId, replyTitle, replyBody);
-      notifiedProfiles.add(replyToProfileId);
+      await notifyOnce(replyToProfileId, replyTitle, replyBody, {
+        eventType: "commentReply",
+      });
 
       console.log(
         `💬 Resposta: ${commenterName} → ${replyToName} (${replyToProfileId}) no post ${postId}`,
       );
     }
 
-    // 2. Sempre notificar o dono do post (se não foi já notificado como replyTo)
+    // 2. Menções: notificar perfis marcados no comentário.
+    for (let i = 0; i < mentionedProfileIds.length; i++) {
+      const mentionedProfileId = mentionedProfileIds[i];
+      const mentionUsername = mentionedUsernames[i] || "";
+      const mentionTitle = `${commenterName} mencionou você em um comentário`;
+      const mentionBody = `Mencionou você: ${commentPreview}`;
+
+      await notifyOnce(mentionedProfileId, mentionTitle, mentionBody, {
+        eventType: "commentMention",
+        mentionUsername: mentionUsername,
+        priority: "high",
+      });
+
+      console.log(
+        `🏷️ Menção: ${commenterName} → ${mentionedProfileId} no post ${postId}`,
+      );
+    }
+
+    // 3. Sempre notificar o dono do post (se não foi já notificado)
     if (!notifiedProfiles.has(postAuthorProfileId)) {
       const postOwnerTitle = isReply
         ? `${commenterName} respondeu um comentário no seu post`
@@ -767,7 +844,9 @@ exports.sendCommentNotification = functions
       const postOwnerBody = isReply
         ? `Respondeu: ${commentPreview}`
         : `Comentou: ${commentPreview}`;
-      await notifyProfile(postAuthorProfileId, postOwnerTitle, postOwnerBody);
+      await notifyOnce(postAuthorProfileId, postOwnerTitle, postOwnerBody, {
+        eventType: isReply ? "commentReplyOnPost" : "commentOnPost",
+      });
 
       console.log(`💬 Notificação para dono do post: ${postAuthorProfileId}`);
     }

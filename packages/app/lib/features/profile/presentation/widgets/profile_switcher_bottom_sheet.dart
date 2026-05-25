@@ -172,7 +172,8 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                               ),
                             );
                             if (result == true && context.mounted) {
-                              AppSnackBar.showSuccess(context, 'Perfil criado com sucesso!');
+                              AppSnackBar.showSuccess(
+                                  context, 'Perfil criado com sucesso!');
                             }
                           },
                           icon: const Icon(Iconsax.add),
@@ -200,10 +201,11 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                     final profile = profiles[index];
                     // ✅ FIX: Comparação correta do perfil ativo
                     final isActive = profile.profileId == activeProfileId;
-                    
+
                     // Debug para verificar se comparação está correta
                     if (isActive) {
-                      debugPrint('✅ ProfileSwitcher: Perfil ATIVO - ${profile.name} (${profile.profileId})');
+                      debugPrint(
+                          '✅ ProfileSwitcher: Perfil ATIVO - ${profile.name} (${profile.profileId})');
                     }
 
                     // Card com animação FadeIn
@@ -223,13 +225,13 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                             tag: 'profile-avatar-${profile.profileId}',
                             child: CircleAvatar(
                               radius: 28,
-                              backgroundImage: profile.photoUrl != null &&
-                                      profile.photoUrl!.isNotEmpty
+                              backgroundImage: _isRemoteImageUrl(
+                                profile.photoUrl,
+                              )
                                   ? CachedNetworkImageProvider(
                                       profile.photoUrl!) as ImageProvider
                                   : null,
-                              child: profile.photoUrl == null ||
-                                      profile.photoUrl!.isEmpty
+                              child: !_isRemoteImageUrl(profile.photoUrl)
                                   ? const Icon(Iconsax.user, size: 30)
                                   : null,
                             ),
@@ -323,7 +325,8 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                   ),
                                   PopupMenuItem(
                                     value: 'delete',
-                                    enabled: !isActive, // ✅ Não permite excluir perfil ativo
+                                    enabled:
+                                        !isActive, // ✅ Não permite excluir perfil ativo
                                     child: Row(
                                       children: [
                                         Icon(
@@ -381,7 +384,9 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                                     // ✅ NOVO: Usar ProfileSwitcherNotifier centralizado
                                     // Troca perfil + invalida TODOS os caches automaticamente
                                     await Future.wait(<Future<dynamic>>[
-                                      ref.read(profileSwitcherNotifierProvider.notifier)
+                                      ref
+                                          .read(profileSwitcherNotifierProvider
+                                              .notifier)
                                           .switchToProfile(profile.profileId),
                                       Future<void>.delayed(const Duration(
                                         milliseconds: 1300,
@@ -420,7 +425,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                 .snapshots(),
             builder: (context, snapshot) {
               final profileCount = snapshot.data?.docs.length ?? 0;
-              
+
               // Esconder botão se já tem 5 perfis
               if (profileCount >= 5) {
                 return Padding(
@@ -434,7 +439,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                   ),
                 );
               }
-              
+
               return Padding(
                 padding: const EdgeInsets.all(16),
                 child: Semantics(
@@ -467,7 +472,8 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 16),
                     ),
                   ),
                 ),
@@ -640,8 +646,9 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
     final profileIdToDelete = profile.profileId;
 
     try {
-      debugPrint('🗑️ ProfileSwitcher: Iniciando deleção do perfil $profileIdToDelete');
-      
+      debugPrint(
+          '🗑️ ProfileSwitcher: Iniciando deleção do perfil $profileIdToDelete');
+
       // ✅ CORREÇÃO: Executar deleção ANTES de fechar o bottom sheet
       await profileNotifier.deleteProfile(profileIdToDelete);
 
@@ -660,7 +667,7 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
       );
     } catch (e) {
       debugPrint('❌ ProfileSwitcher: Erro ao deletar perfil - $e');
-      
+
       // ✅ CORREÇÃO: Usar scaffoldMessenger salvo anteriormente
       scaffoldMessenger.showSnackBar(
         SnackBar(
@@ -687,6 +694,13 @@ class ProfileSwitcherBottomSheet extends ConsumerWidget {
         onProfileSelected: onProfileSelected,
       ),
     );
+  }
+
+  bool _isRemoteImageUrl(String? value) {
+    final uri = Uri.tryParse(value?.trim() ?? '');
+    return uri != null &&
+        uri.hasAuthority &&
+        (uri.scheme == 'http' || uri.scheme == 'https');
   }
 }
 
@@ -726,21 +740,21 @@ class _UnifiedBadgeCounter extends ConsumerWidget {
         seenAtMillis: seenAtAsync.valueOrNull?.millisecondsSinceEpoch,
       ),
     );
-    
+
     // Aguardar todos os providers carregarem
     if (notificationsAsync.isLoading ||
         messagesAsync.isLoading ||
         networkAsync.isLoading) {
       return const SizedBox.shrink();
     }
-    
+
     final notificationCount = notificationsAsync.value ?? 0;
     final messageCount = messagesAsync.value ?? 0;
     final networkCount = networkAsync.value ?? 0;
     final totalCount = notificationCount + messageCount + networkCount;
-    
+
     if (totalCount <= 0) return const SizedBox.shrink();
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: 8,

@@ -107,7 +107,10 @@ function pickDate(data: Record<string, any>, keys: string[]): Date | undefined {
   return undefined;
 }
 
-function pickString(data: Record<string, any>, keys: string[]): string | undefined {
+function pickString(
+  data: Record<string, any>,
+  keys: string[],
+): string | undefined {
   for (const key of keys) {
     const value = data[key];
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -115,7 +118,10 @@ function pickString(data: Record<string, any>, keys: string[]): string | undefin
   return undefined;
 }
 
-function pickNumber(data: Record<string, any>, keys: string[]): number | undefined {
+function pickNumber(
+  data: Record<string, any>,
+  keys: string[],
+): number | undefined {
   for (const key of keys) {
     const value = data[key];
     if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -127,7 +133,10 @@ function pickNumber(data: Record<string, any>, keys: string[]): number | undefin
   return undefined;
 }
 
-function pickBoolean(data: Record<string, any>, keys: string[]): boolean | undefined {
+function pickBoolean(
+  data: Record<string, any>,
+  keys: string[],
+): boolean | undefined {
   for (const key of keys) {
     const value = data[key];
     if (typeof value === "boolean") return value;
@@ -140,7 +149,10 @@ function pickBoolean(data: Record<string, any>, keys: string[]): boolean | undef
   return undefined;
 }
 
-function pickStringArray(data: Record<string, any>, keys: string[]): string[] | undefined {
+function pickStringArray(
+  data: Record<string, any>,
+  keys: string[],
+): string[] | undefined {
   for (const key of keys) {
     const value = data[key];
     if (Array.isArray(value)) {
@@ -269,15 +281,21 @@ export async function getProfile(id: string): Promise<ProfileDetail | null> {
   const userData = ownerUid
     ? await getDoc(doc(db, "users", ownerUid))
         .then((userSnap) => (userSnap.exists() ? userSnap.data() : {}))
-        .catch(() => ({} as Record<string, any>))
+        .catch(() => ({}) as Record<string, any>)
     : ({} as Record<string, any>);
 
   return {
     ...base,
     bio: pickString(data, ["bio", "description", "about"]),
-    email: pickString(data, ["email", "userEmail", "contactEmail"]) ??
+    email:
+      pickString(data, ["email", "userEmail", "contactEmail"]) ??
       pickString(userData, ["email", "userEmail"]),
-    phone: pickString(data, ["phone", "phoneNumber", "whatsapp", "contactPhone"]),
+    phone: pickString(data, [
+      "phone",
+      "phoneNumber",
+      "whatsapp",
+      "contactPhone",
+    ]),
     neighborhood: pickString(data, ["neighborhood", "bairro"]),
     birthYear: pickNumber(data, ["birthYear", "year", "foundationYear"]),
     level: pickString(data, ["level", "experienceLevel"]),
@@ -299,7 +317,8 @@ export async function getProfile(id: string): Promise<ProfileDetail | null> {
     activeProfileId: pickString(userData, ["activeProfileId"]),
     username: base.username,
     verified: pickBoolean(data, ["verified", "isVerified"]) ?? false,
-    moderationStatus: data.moderationStatus ?? (base.banned ? "banned" : "active"),
+    moderationStatus:
+      data.moderationStatus ?? (base.banned ? "banned" : "active"),
     allowConnectionSuggestions:
       pickBoolean(data, ["allowConnectionSuggestions"]) ?? true,
     allowConnectionRequests:

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:rxdart/rxdart.dart';
 
 /// Helper para gerenciar a lista de UIDs bloqueados do usuário.
 ///
@@ -17,7 +18,8 @@ class BlockedUids {
   }) async {
     final doc = await firestore.collection('users').doc(uid).get();
     final data = doc.data();
-    final list = (data?[fieldName] as List?)?.cast<String>() ?? const <String>[];
+    final list =
+        (data?[fieldName] as List?)?.cast<String>() ?? const <String>[];
     return _normalize(list);
   }
 
@@ -25,17 +27,16 @@ class BlockedUids {
     required FirebaseFirestore firestore,
     required String uid,
   }) {
-    return firestore
-        .collection('users')
-        .doc(uid)
-        .snapshots()
-        .map((doc) {
-          final data = doc.data();
-          final list = (data?[fieldName] as List?)?.cast<String>() ??
-              const <String>[];
-          return _normalize(list);
-        })
-        .distinct(listEquals);
+    return firestore.collection('users').doc(uid).snapshots().map((doc) {
+      final data = doc.data();
+      final list =
+          (data?[fieldName] as List?)?.cast<String>() ?? const <String>[];
+      return _normalize(list);
+    }).doOnError((Object error, StackTrace stackTrace) {
+      if (kDebugMode) {
+        debugPrint('⚠️ BlockedUids.watch fallback: $error');
+      }
+    }).onErrorReturn(const <String>[]).distinct(listEquals);
   }
 
   static List<String> forWhereNotIn(List<String> blockedUids) {

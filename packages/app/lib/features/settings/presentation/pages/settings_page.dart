@@ -1,25 +1,31 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:io' show Platform;
+
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
+import 'package:core_ui/features/settings/domain/entities/user_settings_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/theme/app_typography.dart';
 import 'package:core_ui/utils/deep_link_generator.dart';
 import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:wegig_app/app/router/app_router.dart';
 import 'package:wegig_app/features/auth/presentation/providers/auth_providers.dart';
 import 'package:wegig_app/features/notifications_new/data/services/push_notification_service.dart';
 import 'package:wegig_app/features/post/presentation/providers/post_providers.dart';
 import 'package:wegig_app/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wegig_app/features/profile/presentation/providers/profile_providers.dart';
+import 'package:wegig_app/features/settings/presentation/pages/blocked_users_page.dart';
 import 'package:wegig_app/features/settings/presentation/providers/settings_providers.dart';
 import 'package:wegig_app/features/settings/presentation/widgets/settings_section.dart';
 import 'package:wegig_app/features/settings/presentation/widgets/settings_tile.dart';
-import 'package:wegig_app/features/settings/presentation/pages/blocked_users_page.dart';
-import 'package:iconsax/iconsax.dart';
 
 /// Tela de Configurações do perfil ativo
 /// Design Airbnb 2025: Clean, minimalista, switches e botões bem organizados
@@ -34,6 +40,8 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   // Variável para rastrear posição inicial do swipe (Swipe to go back)
   double _swipeStartX = 0;
+  int _notificationPermissionRefreshKey = 0;
+  String? _lastRequestedSettingsProfileId;
 
   @override
   void initState() {
@@ -42,22 +50,52 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     // Isso reduz a latência perceptível ao abrir a tela
     _loadSettingsEagerly();
   }
-  
+
   void _loadSettingsEagerly() {
     final profileState = ref.read(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
     if (activeProfile != null) {
       // Carregar diretamente sem addPostFrameCallback para reduzir latência
+      _lastRequestedSettingsProfileId = activeProfile.profileId;
       ref
           .read(userSettingsProvider.notifier)
           .loadSettings(activeProfile.profileId);
     }
   }
 
+  void _ensureSettingsLoaded(String profileId) {
+    if (_lastRequestedSettingsProfileId == profileId) {
+      return;
+    }
+
+    _lastRequestedSettingsProfileId = profileId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(userSettingsProvider.notifier).loadSettings(profileId);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final profileState = ref.read(profileProvider);
+    final profileState = ref.watch(profileProvider);
     final activeProfile = profileState.value?.activeProfile;
+    if (activeProfile != null) {
+      _ensureSettingsLoaded(activeProfile.profileId);
+    }
+
+    // Garante que as preferências do perfil ativo sejam carregadas mesmo
+    // quando o profileProvider ainda não estava pronto no initState
+    // (comum no Android quando o cold start é mais lento).
+    ref.listen<AsyncValue<ProfileState>>(profileProvider, (prev, next) {
+      final newActive = next.value?.activeProfile;
+      final prevActive = prev?.value?.activeProfile;
+      if (newActive != null && newActive.profileId != prevActive?.profileId) {
+        _lastRequestedSettingsProfileId = newActive.profileId;
+        ref
+            .read(userSettingsProvider.notifier)
+            .loadSettings(newActive.profileId);
+      }
+    });
 
     return GestureDetector(
       // Detecta início do swipe
@@ -78,7 +116,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       child: Scaffold(
         appBar: AppBar(
           title: Text('Configurações',
-              style: AppTypography.headlineMedium.copyWith(color: Colors.white)),
+              style:
+                  AppTypography.headlineMedium.copyWith(color: Colors.white)),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           iconTheme: const IconThemeData(color: Colors.white),
@@ -119,14 +158,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   return;
                 }
 
+                if (!mounted) {
+                  return;
+                }
+
                 await ref.read(profileProvider.notifier).refresh();
                 // Invalida posts para garantir que posts do perfil sejam atualizados
                 ref.invalidate(postNotifierProvider);
 
-                if (mounted) {
-                  messenger.showSnackBar(
-                    const SnackBar(
-                      content: Row(
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Row(
                       children: [
                         Icon(Iconsax.tick_circle, color: Colors.white),
                         SizedBox(width: 12),
@@ -136,33 +178,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     backgroundColor: AppColors.success,
                   ),
                 );
-              }
-            },
-          ),
-          const SizedBox(height: 8),
-          SettingsTile(
-            icon: Iconsax.share,
-            title: 'Compartilhar Perfil',
-            subtitle: 'Compartilhe com amigos',
-            onTap: () => _shareProfile(activeProfile),
-          ),
+              },
+            ),
+            const SizedBox(height: 8),
+            SettingsTile(
+              icon: Iconsax.share,
+              title: 'Compartilhar Perfil',
+              subtitle: 'Compartilhe com amigos',
+              onTap: () => _shareProfile(activeProfile),
+            ),
 
-          const SizedBox(height: 32),
-          const Divider(),
-          const SizedBox(height: 24),
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 24),
 
-          // Seção: Notificações
-          const SettingsSection(
-              title: 'Notificações', icon: Iconsax.notification),
-          const SizedBox(height: 12),
-          _buildNotificationSettings(),
+            // Seção: Notificações
+            const SettingsSection(
+                title: 'Notificações', icon: Iconsax.notification),
+            const SizedBox(height: 12),
+            _buildNotificationSettings(),
 
             const SizedBox(height: 32),
             const Divider(),
             const SizedBox(height: 24),
 
             // Seção: Bloqueios
-            const SettingsSection(title: 'Bloqueios', icon: Iconsax.shield_tick),
+            const SettingsSection(
+                title: 'Bloqueios', icon: Iconsax.shield_tick),
             const SizedBox(height: 12),
             SettingsTile(
               icon: Iconsax.user_remove,
@@ -177,173 +219,161 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               },
             ),
 
-          const SizedBox(height: 32),
-          const Divider(),
-          const SizedBox(height: 24),
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 24),
 
-          // Seção: Conta
-          const SettingsSection(
-              title: 'Conta', icon: Iconsax.profile_circle),
-          const SizedBox(height: 12),
-          SettingsTile(
-            icon: Iconsax.logout,
-            title: 'Sair da Conta',
-            subtitle: 'Desconectar do aplicativo',
-            iconColor: AppColors.error,
-            textColor: AppColors.error,
-            onTap: _showLogoutDialog,
-          ),
-          const SizedBox(height: 8),
-          SettingsTile(
-            icon: Iconsax.trash,
-            title: 'Excluir Conta',
-            subtitle: 'Remover permanentemente todos os dados',
-            iconColor: AppColors.error,
-            textColor: AppColors.error,
-            onTap: _showDeleteAccountDialog,
-          ),
+            // Seção: Conta
+            const SettingsSection(title: 'Conta', icon: Iconsax.profile_circle),
+            const SizedBox(height: 12),
+            SettingsTile(
+              icon: Iconsax.logout,
+              title: 'Sair da Conta',
+              subtitle: 'Desconectar do aplicativo',
+              iconColor: AppColors.error,
+              textColor: AppColors.error,
+              onTap: _showLogoutDialog,
+            ),
+            const SizedBox(height: 8),
+            SettingsTile(
+              icon: Iconsax.trash,
+              title: 'Excluir Conta',
+              subtitle: 'Remover permanentemente todos os dados',
+              iconColor: AppColors.error,
+              textColor: AppColors.error,
+              onTap: _showDeleteAccountDialog,
+            ),
 
-          const SizedBox(height: 40),
-        ],
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
-    ),
     );
   }
 
-
-
-  Widget _buildNearbyPostsCard() {
-    final settingsAsync = ref.watch(userSettingsProvider);
-
-    return settingsAsync.when(
-      data: (settings) {
-        if (settings == null) {
-          return const SizedBox.shrink();
-        }
-
-        return Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              SwitchListTile(
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                secondary: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Iconsax.location,
-                    color: AppColors.primary,
-                    size: 24,
-                  ),
-                ),
-                title: Text(
-                  'Posts Próximos',
-                  style: AppTypography.titleMedium.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                subtitle: Text(
-                  'Notificação de novos posts perto de você',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                value: settings.notifyNearbyPosts,
-                // ✅ FIX: Melhorar cores dos toggles para maior visibilidade
-                activeColor: AppColors.primary,
-                thumbColor: WidgetStateProperty.resolveWith<Color?>(
-                  (states) => states.contains(WidgetState.selected)
-                      ? Colors.white  // Thumb branco quando ativo
-                      : AppColors.textSecondary.withValues(alpha: 0.6),
-                ),
-                trackColor: WidgetStateProperty.resolveWith<Color?>(
-                  (states) => states.contains(WidgetState.selected)
-                      ? AppColors.primary  // Track colorido quando ativo
-                      : AppColors.border,  // Track cinza quando inativo
-                ),
-                trackOutlineColor: WidgetStateProperty.resolveWith<Color?>(
-                  (states) => states.contains(WidgetState.selected)
-                      ? AppColors.primary
-                      : AppColors.border,
-                ),
-                thumbIcon: WidgetStateProperty.resolveWith<Icon?>(
-                  (states) => null, // Thumb com sombra padrão
-                ),
-                onChanged: (value) {
-                  ref
-                      .read(userSettingsProvider.notifier)
-                      .toggleNotifyNearbyPosts(value);
-                  _showSnackBar(value
-                      ? 'Você receberá notificações de posts próximos'
-                      : 'Notificações de posts próximos desativadas');
-                },
+  Widget _buildNearbyPostsCard(UserSettingsEntity settings) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          SwitchListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            secondary: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
+              child: const Icon(
+                Iconsax.location,
+                color: AppColors.primary,
+                size: 24,
+              ),
+            ),
+            title: Text(
+              'Posts Próximos',
+              style: AppTypography.titleMedium.copyWith(
+                color: AppColors.textPrimary,
+              ),
+            ),
+            subtitle: Text(
+              'Notificação de novos posts perto de você',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            value: settings.notifyNearbyPosts,
+            // ✅ FIX: Melhorar cores dos toggles para maior visibilidade
+            activeColor: AppColors.primary,
+            thumbColor: WidgetStateProperty.resolveWith<Color?>(
+              (states) => states.contains(WidgetState.selected)
+                  ? Colors.white // Thumb branco quando ativo
+                  : AppColors.textSecondary.withValues(alpha: 0.6),
+            ),
+            trackColor: WidgetStateProperty.resolveWith<Color?>(
+              (states) => states.contains(WidgetState.selected)
+                  ? AppColors.primary // Track colorido quando ativo
+                  : AppColors.border, // Track cinza quando inativo
+            ),
+            trackOutlineColor: WidgetStateProperty.resolveWith<Color?>(
+              (states) => states.contains(WidgetState.selected)
+                  ? AppColors.primary
+                  : AppColors.border,
+            ),
+            thumbIcon: WidgetStateProperty.resolveWith<Icon?>(
+              (states) => null, // Thumb com sombra padrão
+            ),
+            onChanged: (value) {
+              ref
+                  .read(userSettingsProvider.notifier)
+                  .toggleNotifyNearbyPosts(value);
+              _showSnackBar(value
+                  ? 'Você receberá notificações de posts próximos'
+                  : 'Notificações de posts próximos desativadas');
+            },
+          ),
 
-              // Slider animado (aparece quando toggle está ativo)
-              AnimatedSize(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeInOut,
-                child: settings.notifyNearbyPosts
-                    ? Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                        child: Column(
+          // Slider animado (aparece quando toggle está ativo)
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: settings.notifyNearbyPosts
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    child: Column(
+                      children: [
+                        const Divider(),
+                        const SizedBox(height: 12),
+                        Row(
                           children: [
-                            const Divider(),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Iconsax.map,
-                                  color: AppColors.primary,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Raio de Notificação',
-                                    style: AppTypography.bodyMedium.copyWith(
-                                      color: AppColors.textPrimary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        AppColors.primary.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    '${settings.nearbyRadiusKm.toInt()} km',
-                                    style: AppTypography.bodyMedium.copyWith(
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            const Icon(
+                              Iconsax.map,
+                              color: AppColors.primary,
+                              size: 18,
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Notificar quando houver novos posts até ${settings.nearbyRadiusKm.toInt()} km de você',
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.textSecondary,
-                                height: 1.4,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Raio de Notificação',
+                                style: AppTypography.bodyMedium.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            SliderTheme(
-                              data: SliderTheme.of(context).copyWith(
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${settings.nearbyRadiusKm.toInt()} km',
+                                style: AppTypography.bodyMedium.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Notificar quando houver novos posts até ${settings.nearbyRadiusKm.toInt()} km de você',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.textSecondary,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
                             activeTrackColor: AppColors.primary,
                             inactiveTrackColor:
                                 AppColors.primary.withValues(alpha: 0.2),
@@ -351,175 +381,313 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             overlayColor:
                                 AppColors.primary.withValues(alpha: 0.2),
                             thumbShape: const RoundSliderThumbShape(),
-                                overlayShape: const RoundSliderOverlayShape(
-                                    overlayRadius: 20),
-                                trackHeight: 4,
-                                valueIndicatorColor: AppColors.primary,
-                                valueIndicatorTextStyle: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              child: Slider(
-                                value: settings.nearbyRadiusKm,
-                                min: 5,
-                                max: 100,
-                                divisions: 19, // 5, 10, 15, ..., 100
-                                label: '${settings.nearbyRadiusKm.toInt()} km',
-                                onChanged: (value) {
-                                  // Optimistic UI update via provider
-                                  ref
-                                      .read(userSettingsProvider.notifier)
-                                      .updateNearbyRadius(value);
-                                },
-                                onChangeEnd: (value) {
-                                  _showSnackBar(
-                                      'Raio atualizado para ${value.toInt()} km');
-                                },
+                            overlayShape: const RoundSliderOverlayShape(
+                                overlayRadius: 20),
+                            trackHeight: 4,
+                            valueIndicatorColor: AppColors.primary,
+                            valueIndicatorTextStyle: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          child: Slider(
+                            value: settings.nearbyRadiusKm,
+                            min: 5,
+                            max: 100,
+                            divisions: 19, // 5, 10, 15, ..., 100
+                            label: '${settings.nearbyRadiusKm.toInt()} km',
+                            onChanged: (value) {
+                              // Optimistic UI update via provider
+                              ref
+                                  .read(userSettingsProvider.notifier)
+                                  .updateNearbyRadius(value);
+                            },
+                            onChangeEnd: (value) {
+                              _showSnackBar(
+                                  'Raio atualizado para ${value.toInt()} km');
+                            },
+                          ),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '5 km',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
                               ),
                             ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  '5 km',
-                                  style: AppTypography.caption.copyWith(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                Text(
-                                  '100 km',
-                                  style: AppTypography.caption.copyWith(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              '100 km',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                              ),
                             ),
                           ],
                         ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ],
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
-        );
-      },
-      loading: () => Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.border),
-        ),
-        child: const Padding(
-          padding: EdgeInsets.all(20),
-          child: Center(
-            child: AppRadioPulseLoader(size: 44, color: AppColors.primary),
-          ),
-        ),
-      ),
-      error: (error, stack) => Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.error),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Text(
-            'Erro ao carregar configurações',
-            style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
-          ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildNotificationSettings() {
     final settingsAsync = ref.watch(userSettingsProvider);
+    final activeProfile = ref.watch(profileProvider).value?.activeProfile;
 
-    return settingsAsync.when(
-      data: (settings) {
-        if (settings == null) {
-          return const SizedBox.shrink();
-        }
+    // O card de notificações do sistema NÃO depende das preferências por
+    // perfil (que vivem em Firestore). Renderizamos sempre, e só os switches
+    // de preferência do app dependem do estado assíncrono.
+    return Column(
+      children: [
+        _buildSystemNotificationSettingsCard(),
+        const SizedBox(height: 8),
+        settingsAsync.when(
+          data: (settings) {
+            if (settings == null) {
+              if (activeProfile != null) {
+                return _buildProfileNotificationSettings(
+                  UserSettingsEntity(profileId: activeProfile.profileId),
+                );
+              }
+              return const SizedBox.shrink();
+            }
+            return _buildProfileNotificationSettings(settings);
+          },
+          loading: () => activeProfile != null
+              ? _buildProfileNotificationSettings(
+                  UserSettingsEntity(profileId: activeProfile.profileId),
+                )
+              : const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: AppRadioPulseLoader(
+                      size: 44,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+          error: (error, stack) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              'Erro ao carregar preferências de notificação',
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-        return Column(
-          children: [
-            SettingsSwitchTile(
-              icon: Iconsax.heart,
-              title: 'Interesses',
-              subtitle: 'Notificação quando alguém demonstra interesse',
-              value: settings.notifyInterests,
-              onChanged: (value) {
-                ref
-                    .read(userSettingsProvider.notifier)
-                    .toggleNotifyInterests(value);
-                _showSnackBar('Preferência salva');
-              },
+  Widget _buildProfileNotificationSettings(UserSettingsEntity settings) {
+    return Column(
+      children: [
+        SettingsSwitchTile(
+          icon: Iconsax.heart,
+          title: 'Interesses',
+          subtitle: 'Notificação quando alguém demonstra interesse',
+          value: settings.notifyInterests,
+          onChanged: (value) {
+            ref
+                .read(userSettingsProvider.notifier)
+                .toggleNotifyInterests(value);
+            _showSnackBar('Preferência salva');
+          },
+        ),
+        const SizedBox(height: 8),
+        SettingsSwitchTile(
+          icon: Iconsax.message,
+          title: 'Mensagens',
+          subtitle: 'Notificação de novas mensagens',
+          value: settings.notifyMessages,
+          onChanged: (value) {
+            ref.read(userSettingsProvider.notifier).toggleNotifyMessages(value);
+            _showSnackBar('Preferência salva');
+          },
+        ),
+        const SizedBox(height: 8),
+        SettingsSwitchTile(
+          icon: Iconsax.user_search,
+          title: 'Aparecer em sugestões',
+          subtitle: 'Permitir que seu perfil apareça em sugestões de conexão',
+          value: settings.allowConnectionSuggestions,
+          onChanged: (value) {
+            ref
+                .read(userSettingsProvider.notifier)
+                .toggleAllowConnectionSuggestions(value);
+            _showSnackBar('Preferência salva');
+          },
+        ),
+        const SizedBox(height: 8),
+        SettingsSwitchTile(
+          icon: Iconsax.user_add,
+          title: 'Receber convites de conexão',
+          subtitle: 'Permitir que outros perfis enviem convites para você',
+          value: settings.allowConnectionRequests,
+          onChanged: (value) {
+            ref
+                .read(userSettingsProvider.notifier)
+                .toggleAllowConnectionRequests(value);
+            _showSnackBar('Preferência salva');
+          },
+        ),
+        const SizedBox(height: 8),
+        _buildNearbyPostsCard(settings),
+      ],
+    );
+  }
+
+  Widget _buildSystemNotificationSettingsCard() {
+    final permissionFuture =
+        PushNotificationService().getNotificationSettings();
+
+    return FutureBuilder<NotificationSettings>(
+      key: ValueKey(_notificationPermissionRefreshKey),
+      future: permissionFuture,
+      builder: (context, snapshot) {
+        final authorizationStatus = snapshot.data?.authorizationStatus ??
+            AuthorizationStatus.notDetermined;
+        final hasPermission =
+            authorizationStatus == AuthorizationStatus.authorized ||
+                authorizationStatus == AuthorizationStatus.provisional;
+
+        final subtitle = hasPermission
+            ? 'As notificações do sistema estão ativas neste dispositivo.'
+            : Platform.isAndroid
+                ? 'Ative a permissão do Android para receber alertas do app.'
+                : 'Permita notificações do sistema para receber alertas do app.';
+
+        final actionLabel = hasPermission
+            ? 'Abrir configurações do app'
+            : Platform.isAndroid
+                ? 'Ativar no Android'
+                : 'Permitir notificações';
+
+        return Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: hasPermission ? AppColors.border : AppColors.warning,
             ),
-            const SizedBox(height: 8),
-            SettingsSwitchTile(
-              icon: Iconsax.message,
-              title: 'Mensagens',
-              subtitle: 'Notificação de novas mensagens',
-              value: settings.notifyMessages,
-              onChanged: (value) {
-                ref
-                    .read(userSettingsProvider.notifier)
-                    .toggleNotifyMessages(value);
-                _showSnackBar('Preferência salva');
-              },
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: (hasPermission
+                                ? AppColors.primary
+                                : AppColors.warning)
+                            .withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        hasPermission
+                            ? Iconsax.notification_status
+                            : Iconsax.notification_bing,
+                        color: hasPermission
+                            ? AppColors.primary
+                            : AppColors.warning,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Notificações do sistema',
+                            style: AppTypography.titleMedium.copyWith(
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: snapshot.connectionState ==
+                            ConnectionState.waiting
+                        ? null
+                        : () => _handleSystemNotificationAction(hasPermission),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor:
+                          hasPermission ? AppColors.primary : AppColors.warning,
+                      side: BorderSide(
+                        color: hasPermission
+                            ? AppColors.primary
+                            : AppColors.warning,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: snapshot.connectionState == ConnectionState.waiting
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(actionLabel),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            SettingsSwitchTile(
-              icon: Iconsax.user_search,
-              title: 'Aparecer em sugestões',
-              subtitle: 'Permitir que seu perfil apareça em sugestões de conexão',
-              value: settings.allowConnectionSuggestions,
-              onChanged: (value) {
-                ref
-                    .read(userSettingsProvider.notifier)
-                    .toggleAllowConnectionSuggestions(value);
-                _showSnackBar('Preferência salva');
-              },
-            ),
-            const SizedBox(height: 8),
-            SettingsSwitchTile(
-              icon: Iconsax.user_add,
-              title: 'Receber convites de conexão',
-              subtitle: 'Permitir que outros perfis enviem convites para você',
-              value: settings.allowConnectionRequests,
-              onChanged: (value) {
-                ref
-                    .read(userSettingsProvider.notifier)
-                    .toggleAllowConnectionRequests(value);
-                _showSnackBar('Preferência salva');
-              },
-            ),
-            const SizedBox(height: 8),
-            _buildNearbyPostsCard(),
-          ],
+          ),
         );
       },
-      loading: () => const Column(
-        children: [
-          SizedBox(height: 40),
-          Center(
-            child: AppRadioPulseLoader(size: 44, color: AppColors.primary),
-          ),
-          SizedBox(height: 40),
-        ],
-      ),
-      error: (error, stack) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(
-          'Erro ao carregar preferências de notificação',
-          style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
-          textAlign: TextAlign.center,
-        ),
-      ),
+    );
+  }
+
+  Future<void> _handleSystemNotificationAction(bool hasPermission) async {
+    if (hasPermission) {
+      await openAppSettings();
+      if (!mounted) return;
+      setState(() => _notificationPermissionRefreshKey++);
+      return;
+    }
+
+    final settings = await PushNotificationService().requestPermission();
+    final granted =
+        settings.authorizationStatus == AuthorizationStatus.authorized ||
+            settings.authorizationStatus == AuthorizationStatus.provisional;
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!granted && Platform.isAndroid) {
+      await openAppSettings();
+    }
+
+    setState(() => _notificationPermissionRefreshKey++);
+    _showSnackBar(
+      granted
+          ? 'Notificações do sistema ativadas'
+          : 'Ative as notificações nas configurações do app para receber alertas',
     );
   }
 
@@ -601,7 +769,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
       // 1. Remover tokens FCM de TODOS os perfis (antes do signOut)
       if (profileIds.isNotEmpty) {
-        debugPrint('🔓 SettingsPage: Removendo tokens FCM de ${profileIds.length} perfis...');
+        debugPrint(
+            '🔓 SettingsPage: Removendo tokens FCM de ${profileIds.length} perfis...');
         await PushNotificationService().removeTokenFromAllProfiles(profileIds);
       }
 
@@ -613,8 +782,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       // e o GoRouter redirecionará para /auth automaticamente.
       // NÃO invalidar providers aqui pois o widget pode já estar desmontado.
       // O router fará o cleanup ao navegar para /auth.
-      
-      debugPrint('✅ SettingsPage: Logout completo - aguardando redirect automático do router');
+
+      debugPrint(
+          '✅ SettingsPage: Logout completo - aguardando redirect automático do router');
     } catch (e) {
       debugPrint('❌ SettingsPage: Erro ao fazer logout: $e');
 
@@ -734,25 +904,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // Capturar referências ANTES de operações async
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context, rootNavigator: true);
     final profiles = ref.read(profileProvider).value?.profiles ?? [];
     final profileIds = profiles.map((p) => p.profileId).toList();
     final user = ref.read(currentUserProvider);
+    BuildContext? loadingDialogContext;
 
-    if (user == null) {
-      debugPrint('❌ SettingsPage: Usuário não encontrado para deletar conta');
-      return;
-    }
-
-    try {
-      debugPrint('🗑️ SettingsPage: Iniciando processo de exclusão de conta...');
-      
-      // Mostrar loading
-      if (mounted) {
-        showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const PopScope(
+    void showDeleteLoadingDialog() {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          loadingDialogContext = dialogContext;
+          return const PopScope(
             canPop: false,
             child: Center(
               child: Card(
@@ -769,13 +932,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ),
             ),
-          ),
-        );
+          );
+        },
+      );
+    }
+
+    void closeDeleteLoadingDialog() {
+      final dialogContext = loadingDialogContext;
+      if (dialogContext == null || !dialogContext.mounted) return;
+
+      Navigator.of(dialogContext, rootNavigator: true).pop();
+      loadingDialogContext = null;
+    }
+
+    if (user == null) {
+      debugPrint('❌ SettingsPage: Usuário não encontrado para deletar conta');
+      return;
+    }
+
+    try {
+      debugPrint(
+          '🗑️ SettingsPage: Iniciando processo de exclusão de conta...');
+
+      // Mostrar loading
+      if (mounted) {
+        showDeleteLoadingDialog();
       }
 
       // 1. Remover tokens FCM de todos os perfis (antes de deletar)
       if (profileIds.isNotEmpty) {
-        debugPrint('🗑️ SettingsPage: Removendo tokens FCM de ${profileIds.length} perfis...');
+        debugPrint(
+            '🗑️ SettingsPage: Removendo tokens FCM de ${profileIds.length} perfis...');
         await PushNotificationService().removeTokenFromAllProfiles(profileIds);
       }
 
@@ -785,77 +972,59 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       // - Todos os perfis do usuário (que por sua vez acionam onProfileDelete)
       // - Conversas, interesses, rate limits órfãos
       debugPrint('🗑️ SettingsPage: Deletando usuário do Firebase Auth...');
-      
+
       try {
         await user.delete();
       } on FirebaseAuthException catch (e) {
         if (e.code == 'requires-recent-login') {
           debugPrint('⚠️ SettingsPage: Reautenticação necessária');
-          
+
           // Fechar loading dialog
-          if (mounted) navigator.pop();
-          
+          closeDeleteLoadingDialog();
+
           // Tentar reautenticar
           final reauthed = await _reauthenticateUser(user);
           if (!reauthed) {
             debugPrint('❌ SettingsPage: Reautenticação falhou ou cancelada');
             return;
           }
-          
+
           // Mostrar loading novamente
           if (mounted) {
-            showDialog<void>(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => const PopScope(
-                canPop: false,
-                child: Center(
-                  child: Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AppRadioPulseLoader(size: 40),
-                          SizedBox(height: 16),
-                          Text('Excluindo conta...'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
+            showDeleteLoadingDialog();
           }
-          
+
           // Tentar deletar novamente após reautenticação
           await user.delete();
         } else {
           rethrow;
         }
       }
-      
-      debugPrint('✅ SettingsPage: Usuário deletado - Cloud Function onUserDelete cuidará da limpeza');
-      
+
+      debugPrint(
+          '✅ SettingsPage: Usuário deletado - Cloud Function onUserDelete cuidará da limpeza');
+
       debugPrint('✅ SettingsPage: Conta excluída com sucesso');
 
-      // ✅ Fechar dialog de loading - o router detectará authState == null
-      // e redirecionará automaticamente para /auth
+      // Fechar apenas o dialog de loading. Após `user.delete()`, o authState
+      // pode redirecionar a árvore de rotas antes deste await continuar,
+      // especialmente no Android. Um pop no root navigator aqui pode remover
+      // a tela de auth e deixar o app numa tela preta.
+      closeDeleteLoadingDialog();
       if (mounted) {
-        navigator.pop();
+        context.go(AppRoutes.auth);
       }
-
     } on FirebaseAuthException catch (e) {
-      debugPrint('❌ SettingsPage: FirebaseAuthException ao excluir conta: ${e.code} - ${e.message}');
+      debugPrint(
+          '❌ SettingsPage: FirebaseAuthException ao excluir conta: ${e.code} - ${e.message}');
 
       // Fechar loading dialog se ainda estiver aberto
-      if (mounted) {
-        navigator.pop();
-      }
+      closeDeleteLoadingDialog();
 
       String errorMessage;
       if (e.code == 'requires-recent-login') {
-        errorMessage = 'Para excluir sua conta, faça login novamente e tente de novo.';
+        errorMessage =
+            'Para excluir sua conta, faça login novamente e tente de novo.';
       } else {
         errorMessage = 'Erro ao excluir conta: ${e.message ?? e.code}';
       }
@@ -881,9 +1050,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       debugPrint('❌ SettingsPage: Erro ao excluir conta: $e');
 
       // Fechar loading dialog se ainda estiver aberto
-      if (mounted) {
-        navigator.pop();
-      }
+      closeDeleteLoadingDialog();
 
       scaffoldMessenger.showSnackBar(
         SnackBar(
@@ -910,16 +1077,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   /// Reautentica o usuário com base no provedor usado
   Future<bool> _reauthenticateUser(User user) async {
     final providerData = user.providerData;
-    
+
     if (providerData.isEmpty) {
       debugPrint('❌ SettingsPage: Nenhum provedor de autenticação encontrado');
       _showReauthError('Não foi possível identificar o método de login.');
       return false;
     }
-    
+
     final providerId = providerData.first.providerId;
     debugPrint('🔐 SettingsPage: Provedor de autenticação: $providerId');
-    
+
     try {
       if (providerId == 'google.com') {
         return await _reauthenticateWithGoogle(user);
@@ -938,25 +1105,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       return false;
     }
   }
-  
+
   Future<bool> _reauthenticateWithGoogle(User user) async {
     try {
       debugPrint('🔐 SettingsPage: Reautenticando com Google...');
-      
+
       final googleSignIn = GoogleSignIn();
       final googleUser = await googleSignIn.signIn();
-      
+
       if (googleUser == null) {
         debugPrint('⚠️ SettingsPage: Usuário cancelou Google Sign-In');
         return false;
       }
-      
+
       final googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      
+
       await user.reauthenticateWithCredential(credential);
       debugPrint('✅ SettingsPage: Reautenticação Google bem-sucedida');
       return true;
@@ -965,23 +1132,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       rethrow;
     }
   }
-  
+
   Future<bool> _reauthenticateWithApple(User user) async {
     try {
       debugPrint('🔐 SettingsPage: Reautenticando com Apple...');
-      
+
       final appleCredential = await SignInWithApple.getAppleIDCredential(
         scopes: [
           AppleIDAuthorizationScopes.email,
           AppleIDAuthorizationScopes.fullName,
         ],
       );
-      
+
       final oauthCredential = OAuthProvider('apple.com').credential(
         idToken: appleCredential.identityToken,
         accessToken: appleCredential.authorizationCode,
       );
-      
+
       await user.reauthenticateWithCredential(oauthCredential);
       debugPrint('✅ SettingsPage: Reautenticação Apple bem-sucedida');
       return true;
@@ -996,7 +1163,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       rethrow;
     }
   }
-  
+
   Future<bool> _reauthenticateWithPassword(User user) async {
     // Mostrar dialog para digitar a senha
     final password = await showDialog<String>(
@@ -1004,20 +1171,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       barrierDismissible: false,
       builder: (context) => _PasswordReauthDialog(email: user.email ?? ''),
     );
-    
+
     if (password == null || password.isEmpty) {
       debugPrint('⚠️ SettingsPage: Usuário cancelou entrada de senha');
       return false;
     }
-    
+
     try {
       debugPrint('🔐 SettingsPage: Reautenticando com senha...');
-      
+
       final credential = EmailAuthProvider.credential(
         email: user.email!,
         password: password,
       );
-      
+
       await user.reauthenticateWithCredential(credential);
       debugPrint('✅ SettingsPage: Reautenticação com senha bem-sucedida');
       return true;
@@ -1026,10 +1193,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       rethrow;
     }
   }
-  
+
   void _showReauthError(String message) {
     if (!mounted) return;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -1096,7 +1263,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 /// Dialog para reautenticação com senha
 class _PasswordReauthDialog extends StatefulWidget {
   const _PasswordReauthDialog({required this.email});
-  
+
   final String email;
 
   @override

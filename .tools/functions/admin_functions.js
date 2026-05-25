@@ -57,14 +57,22 @@ exports.aggregateDailyMetrics = functions
       safeCount(db.collection("profiles")),
       safeCount(db.collection("posts")),
       safeCount(
-        db.collection("posts").where("expiresAt", ">", admin.firestore.Timestamp.now()),
+        db
+          .collection("posts")
+          .where("expiresAt", ">", admin.firestore.Timestamp.now()),
       ),
       safeCount(db.collection("conversations")),
       safeCount(
-        db.collection("profiles").where("createdAt", ">=", startTs).where("createdAt", "<=", endTs),
+        db
+          .collection("profiles")
+          .where("createdAt", ">=", startTs)
+          .where("createdAt", "<=", endTs),
       ),
       safeCount(
-        db.collection("posts").where("createdAt", ">=", startTs).where("createdAt", "<=", endTs),
+        db
+          .collection("posts")
+          .where("createdAt", ">=", startTs)
+          .where("createdAt", "<=", endTs),
       ),
       safeCount(
         db
@@ -94,7 +102,10 @@ exports.aggregateDailyMetrics = functions
       generatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    await db.collection("analytics_daily").doc(dateId).set(payload, { merge: true });
+    await db
+      .collection("analytics_daily")
+      .doc(dateId)
+      .set(payload, { merge: true });
     console.log(`[aggregateDailyMetrics] saved ${dateId}`, payload);
     return null;
   });
@@ -109,7 +120,10 @@ exports.setUserModeration = functions
   .region(REGION)
   .https.onCall(async (data, context) => {
     if (!context.auth) {
-      throw new functions.https.HttpsError("unauthenticated", "Login obrigatório.");
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Login obrigatório.",
+      );
     }
     const db = admin.firestore();
     const adminSnap = await db.collection("admins").doc(context.auth.uid).get();
@@ -120,18 +134,27 @@ exports.setUserModeration = functions
     const role = adminData.role || "admin";
     const allowedRoles = ["superadmin", "admin", "moderator"];
     if (!allowedRoles.includes(role)) {
-      throw new functions.https.HttpsError("permission-denied", "Role sem permissão.");
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Role sem permissão.",
+      );
     }
 
     const { profileId, banned, reason } = data || {};
     if (!profileId || typeof banned !== "boolean") {
-      throw new functions.https.HttpsError("invalid-argument", "profileId e banned são obrigatórios.");
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "profileId e banned são obrigatórios.",
+      );
     }
 
     const profileRef = db.collection("profiles").doc(profileId);
     const profile = await profileRef.get();
     if (!profile.exists) {
-      throw new functions.https.HttpsError("not-found", "Perfil não encontrado.");
+      throw new functions.https.HttpsError(
+        "not-found",
+        "Perfil não encontrado.",
+      );
     }
 
     await profileRef.update({

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:wegig_app/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:wegig_app/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:wegig_app/features/auth/domain/entities/auth_result.dart';
@@ -20,7 +21,7 @@ part 'auth_providers.g.dart';
 /// ============================================
 /// Provider para bloquear redirect durante operações críticas
 /// ============================================
-/// 
+///
 /// Quando true, o router não deve fazer redirect automático.
 /// Isso previne race conditions durante login social onde:
 /// 1. Firebase Auth cria usuário automaticamente
@@ -34,7 +35,7 @@ final authOperationInProgressProvider = StateProvider<bool>((ref) {
 /// ============================================
 /// Provider para mensagem de erro pendente (exibida após redirecionamento)
 /// ============================================
-/// 
+///
 /// Usado quando um erro ocorre durante login social mas o router já navegou
 /// antes que a mensagem pudesse ser exibida. A mensagem será consumida
 /// quando a tela de auth for reconstruída.
@@ -43,7 +44,7 @@ final pendingAuthErrorProvider = StateProvider<String?>((ref) => null);
 /// ============================================
 /// Provider para dados do login social (Apple/Google)
 /// ============================================
-/// 
+///
 /// Armazena temporariamente os dados fornecidos pelo provider social
 /// (nome, email) para serem usados na tela de criação de perfil.
 /// Isso garante conformidade com as diretrizes da Apple (HIG) ao não
@@ -58,22 +59,23 @@ class SocialLoginData {
 
   /// Nome completo fornecido pelo provider (Apple/Google)
   final String? displayName;
-  
+
   /// Email fornecido pelo provider (pode ser private relay no caso da Apple)
   final String? email;
-  
+
   /// URL da foto de perfil (geralmente disponível apenas no Google)
   final String? photoUrl;
-  
+
   /// Provider de autenticação ('apple' ou 'google')
   final String? provider;
 
   /// Retorna true se temos um nome para usar
-  bool get hasDisplayName => displayName != null && displayName!.trim().isNotEmpty;
-  
+  bool get hasDisplayName =>
+      displayName != null && displayName!.trim().isNotEmpty;
+
   /// Retorna true se temos um email
   bool get hasEmail => email != null && email!.trim().isNotEmpty;
-  
+
   /// Gera sugestões de username baseadas no nome
   List<String> generateUsernameSuggestions() {
     // Apple muitas vezes não fornece nome nas tentativas subsequentes.
@@ -86,7 +88,7 @@ class SocialLoginData {
     final name = base;
     final parts = name.split(RegExp(r'\s+'));
     final suggestions = <String>[];
-    
+
     // Remover caracteres especiais e acentos
     String normalize(String s) {
       return s
@@ -98,7 +100,7 @@ class SocialLoginData {
           .replaceAll(RegExp(r'[ç]'), 'c')
           .replaceAll(RegExp(r'[^a-z0-9_]'), '');
     }
-    
+
     // 1. Primeiro nome apenas
     if (parts.isNotEmpty) {
       final firstName = normalize(parts.first);
@@ -106,7 +108,7 @@ class SocialLoginData {
         suggestions.add(firstName);
       }
     }
-    
+
     // 2. Primeiro nome + inicial do sobrenome
     if (parts.length >= 2) {
       final firstName = normalize(parts.first);
@@ -115,7 +117,7 @@ class SocialLoginData {
         suggestions.add('$firstName$lastInitial');
       }
     }
-    
+
     // 3. Primeiro nome + sobrenome
     if (parts.length >= 2) {
       final firstName = normalize(parts.first);
@@ -125,14 +127,14 @@ class SocialLoginData {
         suggestions.add('$firstName$lastName');
       }
     }
-    
+
     // 4. Iniciais + números aleatórios
     if (parts.isNotEmpty) {
       final firstName = normalize(parts.first);
       final random = DateTime.now().millisecondsSinceEpoch % 1000;
       suggestions.add('$firstName$random');
     }
-    
+
     // Filtrar sugestões válidas (3-20 caracteres, sem underscore no início/fim)
     return suggestions
         .where((s) => s.length >= 3 && s.length <= 20)
@@ -143,7 +145,8 @@ class SocialLoginData {
   }
 
   @override
-  String toString() => 'SocialLoginData(displayName: $displayName, email: $email, provider: $provider)';
+  String toString() =>
+      'SocialLoginData(displayName: $displayName, email: $email, provider: $provider)';
 }
 
 /// Provider para armazenar dados do login social temporariamente
@@ -394,18 +397,20 @@ final userDocumentProvider =
       if (user == null) {
         return Stream<UserAccountDocument?>.value(null);
       }
-      
+
       return FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .snapshots()
           .map((snapshot) {
-        if (!snapshot.exists) {
+        final data = snapshot.data();
+        if (!snapshot.exists || data == null) {
           return null;
         }
-        return UserAccountDocument.fromJson(
-            snapshot.data() as Map<String, dynamic>);
-      });
+        return UserAccountDocument.fromJson(data);
+      }).doOnError((Object error, StackTrace stackTrace) {
+        debugPrint('⚠️ userDocumentProvider stream fallback: $error');
+      }).onErrorReturn(null);
     },
     loading: () => Stream<UserAccountDocument?>.value(null),
     error: (_, __) => Stream<UserAccountDocument?>.value(null),

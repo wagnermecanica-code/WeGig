@@ -1,4 +1,5 @@
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/utils/music_constants.dart';
 import 'package:flutter/material.dart';
 
 /// Widget de chips de filtro por gênero
@@ -14,33 +15,12 @@ class GenreFilterChips extends StatelessWidget {
   final void Function(String) onGenreToggle;
   final int maxGenres;
 
-  static const List<String> genreOptions = <String>[
-    'Rock',
-    'Pop',
-    'Jazz',
-    'Blues',
-    'Country',
-    'Reggae',
-    'Eletrônica',
-    'Hip Hop',
-    'Funk',
-    'Samba',
-    'Pagode',
-    'MPB',
-    'Sertanejo',
-    'Forró',
-    'Gospel',
-    'Metal',
-    'Punk',
-    'Indie',
-    'Alternativo',
-    'Clássica',
-    'Soul',
-    'R&B',
-    'Bossa Nova',
-    'Axé',
-    'Arrocha',
-  ];
+  /// Lista completa de gêneros vinda de [MusicConstants.genreOptions].
+  ///
+  /// Mantida como getter estático para preservar a API pública e garantir que
+  /// qualquer adição em `MusicConstants` apareça automaticamente nos filtros
+  /// de busca/home.
+  static List<String> get genreOptions => MusicConstants.genreOptions;
 
   @override
   Widget build(BuildContext context) {

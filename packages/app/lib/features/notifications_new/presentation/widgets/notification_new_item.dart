@@ -550,6 +550,15 @@ class _NotificationInlineContentState extends State<NotificationInlineContent> {
         return 'Conexão removida';
       case 'connectionCancelled':
         return 'Convite cancelado';
+      case 'commentOnPost':
+        return 'Comentou no seu post';
+      case 'commentReply':
+      case 'commentReplay':
+      case 'commentReplyOnPost':
+        return 'Respondeu seu comentário';
+      case 'commentMention':
+      case 'commentMentionOnPost':
+        return 'Mencionou você em um comentário';
       default:
         return eventType;
     }

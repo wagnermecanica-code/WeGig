@@ -244,7 +244,10 @@ function buildInsightsFromProfiles(
       : 0;
   const avgEngagementSeconds = Math.max(
     18,
-    Math.round((totalActivityEvents * 24 + engagedProfiles * 35) / Math.max(engagedProfiles, 1)),
+    Math.round(
+      (totalActivityEvents * 24 + engagedProfiles * 35) /
+        Math.max(engagedProfiles, 1),
+    ),
   );
 
   return {
@@ -261,16 +264,18 @@ function buildInsightsFromProfiles(
     ),
     churnRate: nonZeroRatio(
       profiles.length > 0 ? churned / profiles.length : 0,
-      profiles.length > 0 ? Math.max(0.05, 1 - estimatedMau / profiles.length) : 0,
+      profiles.length > 0
+        ? Math.max(0.05, 1 - estimatedMau / profiles.length)
+        : 0,
     ),
     avgEngagementSeconds,
-    cohorts: Array.from(cohorts.values()).sort((a, b) =>
-      a.cohort.localeCompare(b.cohort),
-    ).map((row) => ({
-      ...row,
-      d1: row.newUsers > 0 ? Math.max(row.d1, 1) : row.d1,
-      d7: row.newUsers > 0 ? Math.max(row.d7, 1) : row.d7,
-    })),
+    cohorts: Array.from(cohorts.values())
+      .sort((a, b) => a.cohort.localeCompare(b.cohort))
+      .map((row) => ({
+        ...row,
+        d1: row.newUsers > 0 ? Math.max(row.d1, 1) : row.d1,
+        d7: row.newUsers > 0 ? Math.max(row.d7, 1) : row.d7,
+      })),
   };
 }
 

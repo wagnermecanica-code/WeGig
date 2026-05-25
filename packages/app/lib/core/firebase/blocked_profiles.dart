@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:rxdart/rxdart.dart';
 
 /// Helper para gerenciar a lista de ProfileIds bloqueados por um perfil.
 ///
@@ -21,7 +22,8 @@ class BlockedProfiles {
 
     final doc = await firestore.collection('profiles').doc(id).get();
     final data = doc.data();
-    final list = (data?[fieldName] as List?)?.cast<String>() ?? const <String>[];
+    final list =
+        (data?[fieldName] as List?)?.cast<String>() ?? const <String>[];
     return _normalize(list);
   }
 
@@ -33,17 +35,16 @@ class BlockedProfiles {
     final id = profileId.trim();
     if (id.isEmpty) return Stream.value(const <String>[]);
 
-    return firestore
-        .collection('profiles')
-        .doc(id)
-        .snapshots()
-        .map((doc) {
-          final data = doc.data();
-          final list = (data?[fieldName] as List?)?.cast<String>() ??
-              const <String>[];
-          return _normalize(list);
-        })
-        .distinct(listEquals);
+    return firestore.collection('profiles').doc(id).snapshots().map((doc) {
+      final data = doc.data();
+      final list =
+          (data?[fieldName] as List?)?.cast<String>() ?? const <String>[];
+      return _normalize(list);
+    }).doOnError((Object error, StackTrace stackTrace) {
+      if (kDebugMode) {
+        debugPrint('⚠️ BlockedProfiles.watch fallback: $error');
+      }
+    }).onErrorReturn(const <String>[]).distinct(listEquals);
   }
 
   /// Adiciona um profileId à lista de bloqueados.
