@@ -14,6 +14,7 @@ import {
   X,
   ScrollText,
   BarChart3,
+  Bug,
   MapPin,
   Sparkles,
   BadgeCheck,
@@ -36,6 +37,12 @@ const PRIMARY_NAV: NavItem[] = [
     label: "Dashboard",
     icon: LayoutDashboard,
     permission: "dashboard.view",
+  },
+  {
+    to: "/crashlytics",
+    label: "Crashlytics",
+    icon: Bug,
+    permission: "analytics.view",
   },
   {
     to: "/analytics",

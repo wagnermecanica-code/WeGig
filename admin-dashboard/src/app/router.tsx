@@ -140,6 +140,13 @@ const ReputationPage = lazy(() =>
     })),
   ),
 );
+const CrashlyticsPage = lazy(() =>
+  lazyImportWithReload(() =>
+    import("@features/crashlytics/presentation/CrashlyticsPage").then((m) => ({
+      default: m.CrashlyticsPage,
+    })),
+  ),
+);
 
 function Suspended({ children }: { children: React.ReactNode }) {
   return (
@@ -264,6 +271,16 @@ const router = createBrowserRouter(
             <RequireAdmin permission="analytics.view">
               <Suspended>
                 <AnalyticsPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: "crashlytics",
+          element: (
+            <RequireAdmin permission="analytics.view">
+              <Suspended>
+                <CrashlyticsPage />
               </Suspended>
             </RequireAdmin>
           ),
