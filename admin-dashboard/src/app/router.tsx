@@ -112,6 +112,34 @@ const SettingsPage = lazy(() =>
     })),
   ),
 );
+const AnalyticsPage = lazy(() =>
+  lazyImportWithReload(() =>
+    import("@features/analytics/presentation/AnalyticsPage").then((m) => ({
+      default: m.AnalyticsPage,
+    })),
+  ),
+);
+const HeatmapPage = lazy(() =>
+  lazyImportWithReload(() =>
+    import("@features/heatmap/presentation/HeatmapPage").then((m) => ({
+      default: m.HeatmapPage,
+    })),
+  ),
+);
+const FeedAdminPage = lazy(() =>
+  lazyImportWithReload(() =>
+    import("@features/feed-admin/presentation/FeedAdminPage").then((m) => ({
+      default: m.FeedAdminPage,
+    })),
+  ),
+);
+const ReputationPage = lazy(() =>
+  lazyImportWithReload(() =>
+    import("@features/reputation/presentation/ReputationPage").then((m) => ({
+      default: m.ReputationPage,
+    })),
+  ),
+);
 
 function Suspended({ children }: { children: React.ReactNode }) {
   return (
@@ -226,6 +254,46 @@ const router = createBrowserRouter(
             <RequireAdmin>
               <Suspended>
                 <SettingsPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: "analytics",
+          element: (
+            <RequireAdmin permission="analytics.view">
+              <Suspended>
+                <AnalyticsPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: "heatmap",
+          element: (
+            <RequireAdmin permission="heatmap.view">
+              <Suspended>
+                <HeatmapPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: "feed-admin",
+          element: (
+            <RequireAdmin permission="feed.manage">
+              <Suspended>
+                <FeedAdminPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: "reputation",
+          element: (
+            <RequireAdmin permission="reputation.manage">
+              <Suspended>
+                <ReputationPage />
               </Suspended>
             </RequireAdmin>
           ),

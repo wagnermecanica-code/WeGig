@@ -40,7 +40,10 @@ export type Permission =
   | "catalog.edit"
   | "analytics.view"
   | "audit.view"
-  | "admins.manage";
+  | "admins.manage"
+  | "heatmap.view"
+  | "feed.manage"
+  | "reputation.manage";
 
 const PERMISSION_MATRIX: Record<AdminRole, Permission[]> = {
   superadmin: [
@@ -62,6 +65,9 @@ const PERMISSION_MATRIX: Record<AdminRole, Permission[]> = {
     "analytics.view",
     "audit.view",
     "admins.manage",
+    "heatmap.view",
+    "feed.manage",
+    "reputation.manage",
   ],
   admin: [
     "dashboard.view",
@@ -79,6 +85,9 @@ const PERMISSION_MATRIX: Record<AdminRole, Permission[]> = {
     "catalog.edit",
     "analytics.view",
     "audit.view",
+    "heatmap.view",
+    "feed.manage",
+    "reputation.manage",
   ],
   moderator: [
     "dashboard.view",
@@ -95,7 +104,11 @@ const PERMISSION_MATRIX: Record<AdminRole, Permission[]> = {
     "audit.view",
   ],
   support: ["dashboard.view", "users.view", "reports.view", "feedbacks.view"],
-  analytics: ["dashboard.view", "analytics.view"],
+  analytics: [
+    "dashboard.view",
+    "analytics.view",
+    "heatmap.view",
+  ],
 };
 
 export function permissionsForRole(role: AdminRole): Permission[] {

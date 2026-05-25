@@ -14,6 +14,10 @@ import {
   Menu,
   X,
   ScrollText,
+  BarChart3,
+  MapPin,
+  Sparkles,
+  BadgeCheck,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useAuth } from "@core/auth/AuthProvider";
@@ -41,6 +45,30 @@ const NAV: NavItem[] = [
     permission: "reports.view",
   },
   { to: "/users", label: "Usuários", icon: Users, permission: "users.view" },
+  {
+    to: "/analytics",
+    label: "Analytics",
+    icon: BarChart3,
+    permission: "analytics.view",
+  },
+  {
+    to: "/heatmap",
+    label: "Heatmap musical",
+    icon: MapPin,
+    permission: "heatmap.view",
+  },
+  {
+    to: "/feed-admin",
+    label: "Feed admin",
+    icon: Sparkles,
+    permission: "feed.manage",
+  },
+  {
+    to: "/reputation",
+    label: "Reputação",
+    icon: BadgeCheck,
+    permission: "reputation.manage",
+  },
   {
     to: "/comments",
     label: "Comentários",

@@ -18,8 +18,10 @@ import {
   TrendingUp,
   Activity,
   Heart,
+  Download,
 } from "lucide-react";
 import { StatCard } from "@shared/components/ui/StatCard";
+import { Button } from "@shared/components/ui/Button";
 import {
   Card,
   CardBody,
@@ -27,6 +29,7 @@ import {
   CardTitle,
 } from "@shared/components/ui/Card";
 import { Skeleton } from "@shared/components/ui/Skeleton";
+import { exportSheetsToXlsx } from "@shared/utils/exportXlsx";
 import {
   fetchDerivedDailySnapshots,
   fetchDerivedDailySnapshotsFromHistory,
@@ -130,13 +133,43 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight dark:text-white">
-          Dashboard Executivo
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-slate-400">
-          Visão geral da plataforma em tempo real.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight dark:text-white">
+            Dashboard Executivo
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-slate-400">
+            Visão geral da plataforma em tempo real.
+          </p>
+        </div>
+        <Button
+          onClick={() => {
+            if (!overview) return;
+            exportSheetsToXlsx("wegig-dashboard", [
+              {
+                name: "Overview",
+                rows: [
+                  { metrica: "Usuários totais", valor: overview.totalUsers },
+                  { metrica: "Posts totais", valor: overview.totalPosts },
+                  { metrica: "Posts ativos", valor: overview.activePosts },
+                  { metrica: "Conversas", valor: overview.totalConversations },
+                  {
+                    metrica: "Conversas em grupo",
+                    valor: overview.totalGroupConversations,
+                  },
+                  { metrica: "Comentários", valor: overview.totalComments },
+                  { metrica: "Interesses", valor: overview.totalInterests },
+                  { metrica: "Reports pendentes", valor: overview.pendingReports },
+                  { metrica: "Feedbacks", valor: overview.pendingFeedbacks },
+                ],
+              },
+              { name: "Atividade diaria", rows: series },
+            ]);
+          }}
+          disabled={!overview || loading}
+        >
+          <Download className="h-4 w-4" /> Exportar .xlsx
+        </Button>
       </div>
 
       {error ? (
