@@ -1,39 +1,117 @@
-import { lazy, Suspense } from 'react';
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
-import { AppShell } from './AppShell';
-import { RequireAdmin } from './guards/RequireAdmin';
-import { useAuth } from '@core/auth/AuthProvider';
-import { LoginPage } from '@features/auth/presentation/LoginPage';
-import { AccessDeniedPage } from '@features/auth/presentation/AccessDeniedPage';
+import { lazy, Suspense } from "react";
+import {
+  createBrowserRouter,
+  Navigate,
+  RouterProvider,
+} from "react-router-dom";
+import { AppShell } from "./AppShell";
+import { RequireAdmin } from "./guards/RequireAdmin";
+import { useAuth } from "@core/auth/AuthProvider";
+import { LoginPage } from "@features/auth/presentation/LoginPage";
+import { AccessDeniedPage } from "@features/auth/presentation/AccessDeniedPage";
+
+const CHUNK_RELOAD_KEY = "admin_chunk_reload_once";
+
+function isChunkImportError(error: unknown): boolean {
+  const message =
+    error instanceof Error ? error.message : String(error ?? "");
+
+  return /Importing a module script failed|Failed to fetch dynamically imported module|ChunkLoadError|Loading chunk/i.test(
+    message,
+  );
+}
+
+async function lazyImportWithReload<T>(
+  importer: () => Promise<{ default: T }>,
+): Promise<{ default: T }> {
+  try {
+    const mod = await importer();
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    }
+    return mod;
+  } catch (error) {
+    if (typeof window !== "undefined" && isChunkImportError(error)) {
+      const alreadyReloaded =
+        window.sessionStorage.getItem(CHUNK_RELOAD_KEY) === "1";
+
+      if (!alreadyReloaded) {
+        window.sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+        window.location.reload();
+        return new Promise(() => {
+          // Aguarda o reload da página; evita propagar erro transitório de chunk.
+        });
+      }
+    }
+
+    throw error;
+  }
+}
 
 const DashboardPage = lazy(() =>
-  import('@features/dashboard/presentation/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+  lazyImportWithReload(() =>
+    import("@features/dashboard/presentation/DashboardPage").then((m) => ({
+      default: m.DashboardPage,
+    })),
+  ),
 );
 const ModerationReportsPage = lazy(() =>
-  import('@features/moderation/presentation/ModerationReportsPage').then((m) => ({
-    default: m.ModerationReportsPage,
-  })),
+  lazyImportWithReload(() =>
+    import("@features/moderation/presentation/ModerationReportsPage").then(
+      (m) => ({
+        default: m.ModerationReportsPage,
+      }),
+    ),
+  ),
 );
 const UsersListPage = lazy(() =>
-  import('@features/users/presentation/UsersListPage').then((m) => ({ default: m.UsersListPage })),
+  lazyImportWithReload(() =>
+    import("@features/users/presentation/UsersListPage").then((m) => ({
+      default: m.UsersListPage,
+    })),
+  ),
 );
 const UserDetailPage = lazy(() =>
-  import('@features/users/presentation/UserDetailPage').then((m) => ({ default: m.UserDetailPage })),
+  lazyImportWithReload(() =>
+    import("@features/users/presentation/UserDetailPage").then((m) => ({
+      default: m.UserDetailPage,
+    })),
+  ),
 );
 const CommentsPage = lazy(() =>
-  import('@features/comments/presentation/CommentsPage').then((m) => ({ default: m.CommentsPage })),
+  lazyImportWithReload(() =>
+    import("@features/comments/presentation/CommentsPage").then((m) => ({
+      default: m.CommentsPage,
+    })),
+  ),
 );
 const FeedbacksPage = lazy(() =>
-  import('@features/feedbacks/presentation/FeedbacksPage').then((m) => ({ default: m.FeedbacksPage })),
+  lazyImportWithReload(() =>
+    import("@features/feedbacks/presentation/FeedbacksPage").then((m) => ({
+      default: m.FeedbacksPage,
+    })),
+  ),
 );
 const CatalogPage = lazy(() =>
-  import('@features/catalog/presentation/CatalogPage').then((m) => ({ default: m.CatalogPage })),
+  lazyImportWithReload(() =>
+    import("@features/catalog/presentation/CatalogPage").then((m) => ({
+      default: m.CatalogPage,
+    })),
+  ),
 );
 const AuditLogPage = lazy(() =>
-  import('@features/audit/presentation/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
+  lazyImportWithReload(() =>
+    import("@features/audit/presentation/AuditLogPage").then((m) => ({
+      default: m.AuditLogPage,
+    })),
+  ),
 );
 const SettingsPage = lazy(() =>
-  import('@features/settings/presentation/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+  lazyImportWithReload(() =>
+    import("@features/settings/presentation/SettingsPage").then((m) => ({
+      default: m.SettingsPage,
+    })),
+  ),
 );
 
 function Suspended({ children }: { children: React.ReactNode }) {
@@ -52,10 +130,10 @@ function Suspended({ children }: { children: React.ReactNode }) {
 
 const router = createBrowserRouter(
   [
-    { path: '/login', element: <LoginPage /> },
-    { path: '/access-denied', element: <AccessDeniedPage /> },
+    { path: "/login", element: <LoginPage /> },
+    { path: "/access-denied", element: <AccessDeniedPage /> },
     {
-      path: '/',
+      path: "/",
       element: (
         <RequireAdmin>
           <AppShell />
@@ -64,7 +142,7 @@ const router = createBrowserRouter(
       children: [
         { index: true, element: <Navigate to="/dashboard" replace /> },
         {
-          path: 'dashboard',
+          path: "dashboard",
           element: (
             <RequireAdmin permission="dashboard.view">
               <Suspended>
@@ -74,7 +152,7 @@ const router = createBrowserRouter(
           ),
         },
         {
-          path: 'moderation/reports',
+          path: "moderation/reports",
           element: (
             <RequireAdmin permission="reports.view">
               <Suspended>
@@ -84,7 +162,7 @@ const router = createBrowserRouter(
           ),
         },
         {
-          path: 'users',
+          path: "users",
           element: (
             <RequireAdmin permission="users.view">
               <Suspended>
@@ -94,7 +172,7 @@ const router = createBrowserRouter(
           ),
         },
         {
-          path: 'users/:id',
+          path: "users/:id",
           element: (
             <RequireAdmin permission="users.view">
               <Suspended>
@@ -104,7 +182,7 @@ const router = createBrowserRouter(
           ),
         },
         {
-          path: 'comments',
+          path: "comments",
           element: (
             <RequireAdmin permission="comments.view">
               <Suspended>
@@ -114,7 +192,7 @@ const router = createBrowserRouter(
           ),
         },
         {
-          path: 'feedbacks',
+          path: "feedbacks",
           element: (
             <RequireAdmin permission="feedbacks.view">
               <Suspended>
@@ -124,7 +202,7 @@ const router = createBrowserRouter(
           ),
         },
         {
-          path: 'catalog',
+          path: "catalog",
           element: (
             <RequireAdmin permission="catalog.view">
               <Suspended>
@@ -134,7 +212,7 @@ const router = createBrowserRouter(
           ),
         },
         {
-          path: 'audit',
+          path: "audit",
           element: (
             <RequireAdmin permission="audit.view">
               <Suspended>
@@ -144,7 +222,7 @@ const router = createBrowserRouter(
           ),
         },
         {
-          path: 'settings',
+          path: "settings",
           element: (
             <RequireAdmin>
               <Suspended>
@@ -153,17 +231,22 @@ const router = createBrowserRouter(
             </RequireAdmin>
           ),
         },
-        { path: '*', element: <Navigate to="/dashboard" replace /> },
+        { path: "*", element: <Navigate to="/dashboard" replace /> },
       ],
     },
   ],
-  { basename: '/admin' },
+  { basename: "/admin" },
 );
 
 export function AppRouter() {
   // Roteia automaticamente um usuário autenticado mas não-admin para /access-denied
   const { user, isAdmin, loading } = useAuth();
-  if (!loading && user && !isAdmin && window.location.pathname !== '/admin/access-denied') {
+  if (
+    !loading &&
+    user &&
+    !isAdmin &&
+    window.location.pathname !== "/admin/access-denied"
+  ) {
     return <AccessDeniedPage />;
   }
   return <RouterProvider router={router} />;

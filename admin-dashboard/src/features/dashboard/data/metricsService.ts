@@ -2,6 +2,7 @@ import {
   collection,
   collectionGroup,
   doc,
+  documentId,
   getCountFromServer,
   getDoc,
   getDocs,
@@ -31,6 +32,19 @@ export interface DailySnapshot {
   newUsers?: number;
   newPosts?: number;
   messagesSent?: number;
+}
+
+function mapDailySnapshot(
+  data: Record<string, unknown>,
+  fallbackDate: string,
+): DailySnapshot {
+  return {
+    date: (typeof data.date === "string" && data.date) || fallbackDate,
+    dau: Number(data.dau ?? 0),
+    newUsers: Number(data.newUsers ?? 0),
+    newPosts: Number(data.newPosts ?? 0),
+    messagesSent: Number(data.messagesSent ?? 0),
+  };
 }
 
 /**
@@ -68,7 +82,9 @@ export async function fetchOverviewMetrics(): Promise<OverviewMetrics> {
     safeCount(collection(db, "posts")),
     safeCount(query(collection(db, "posts"), where("expiresAt", ">", now))),
     safeCount(collection(db, "conversations")),
-    safeCount(query(collection(db, "conversations"), where("isGroup", "==", true))),
+    safeCount(
+      query(collection(db, "conversations"), where("isGroup", "==", true)),
+    ),
     safeCount(collectionGroup(db, "comments")),
     safeCount(collection(db, "interests")),
     safeCount(
@@ -95,25 +111,32 @@ export async function fetchOverviewMetrics(): Promise<OverviewMetrics> {
  * Retorna [] se a coleção ainda não existir (Cloud Function não rodou).
  */
 export async function fetchDailySnapshots(days = 14): Promise<DailySnapshot[]> {
+  const col = collection(db, "analytics_daily");
+
   try {
-    const q = query(
-      collection(db, "analytics_daily"),
-      orderBy("date", "desc"),
-      limit(days),
-    );
+    const q = query(col, orderBy("date", "desc"), limit(days));
     const snap = await getDocs(q);
-    const items: DailySnapshot[] = snap.docs.map((d) => {
-      const data = d.data() as Record<string, any>;
-      return {
-        date: data.date ?? d.id,
-        dau: data.dau,
-        newUsers: data.newUsers,
-        newPosts: data.newPosts,
-        messagesSent: data.messagesSent,
-      };
-    });
-    return items.reverse();
-  } catch {
+    const items = snap.docs.map((d) =>
+      mapDailySnapshot(d.data() as Record<string, unknown>, d.id),
+    );
+
+    if (items.length > 0) {
+      return items.reverse();
+    }
+  } catch (err) {
+    console.warn("[metricsService] analytics_daily by date failed:", err);
+  }
+
+  // Fallback para dados legados sem campo `date`: ordena pelo ID do doc (YYYY-MM-DD).
+  try {
+    const qById = query(col, orderBy(documentId(), "desc"), limit(days));
+    const snapById = await getDocs(qById);
+    const itemsById = snapById.docs.map((d) =>
+      mapDailySnapshot(d.data() as Record<string, unknown>, d.id),
+    );
+    return itemsById.reverse();
+  } catch (err) {
+    console.warn("[metricsService] analytics_daily by documentId failed:", err);
     return [];
   }
 }
