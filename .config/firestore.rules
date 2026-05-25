@@ -14,6 +14,10 @@ service cloud.firestore {
       return request.auth.uid == uid;
     }
 
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     // Verifica se o auth.uid é participante de uma conversa (participants ou profileUid)
     function isConversationMember(conversationId) {
       let conv = get(/databases/$(database)/documents/conversations/$(conversationId));
@@ -73,7 +77,7 @@ service cloud.firestore {
       // Para create/update: usa request.resource.data (dados que serão escritos)
       // Para delete: usa resource.data (dados existentes no documento)
       allow create, update: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
 
       // ============================================
       // FCM TOKENS - Subcoleção para push notifications
@@ -120,7 +124,7 @@ service cloud.firestore {
         request.resource.data.authorUid == resource.data.authorUid
       );
       allow delete: if isSignedIn()
-        && resource.data.authorUid == request.auth.uid;
+        && (resource.data.authorUid == request.auth.uid || isAdmin());
 
       // ============================================
       // COMMENTS - Subcoleção de comentários
@@ -134,7 +138,8 @@ service cloud.firestore {
           && request.resource.data.authorUid == request.auth.uid;
         allow delete: if isSignedIn() && (
           resource.data.authorUid == request.auth.uid ||
-          get(/databases/$(database)/documents/posts/$(postId)).data.authorUid == request.auth.uid
+          get(/databases/$(database)/documents/posts/$(postId)).data.authorUid == request.auth.uid ||
+          isAdmin()
         );
         // Permite update SOMENTE para curtidas (likeCount e likedBy)
         allow update: if isSignedIn()
@@ -404,12 +409,30 @@ service cloud.firestore {
     }
 
     // ============================================
+    // ADMINS - Controle de acesso do painel web
+    // ============================================
+    // O próprio usuário autenticado pode verificar se seu UID está autorizado.
+    // Criação/remoção de admins deve ser feita via Console, CLI ou Admin SDK.
+    match /admins/{adminUid} {
+      allow get: if isSignedIn() && request.auth.uid == adminUid;
+      allow list, create, update, delete: if false;
+    }
+
+    // ============================================
     // ADMIN NOTIFICATIONS - Notificações para painel admin
     // ============================================
-    // Apenas Cloud Functions podem criar (via Admin SDK)
-    // Admins acessam via Admin SDK
+    // Cloud Functions usam Admin SDK; administradores autenticados usam o painel web.
     match /adminNotifications/{notificationId} {
-      allow read, write: if false; // Apenas Admin SDK
+      allow read, update, delete: if isAdmin();
+      allow create: if false;
+    }
+
+    // ============================================
+    // APP CONFIG - Configurações editáveis pelo painel admin
+    // ============================================
+    match /appConfig/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // ============================================
@@ -428,7 +451,7 @@ service cloud.firestore {
     // Edição/exclusão: apenas Admin SDK
     match /feedbacks/{feedbackId} {
       allow create, read: if isSignedIn();
-      allow update, delete: if false;
+      allow update, delete: if isAdmin();
     }
   }
 }
