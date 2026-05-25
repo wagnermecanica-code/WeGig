@@ -13,6 +13,7 @@ import {
 import {
   AlertTriangle,
   Bug,
+  Download,
   Gauge,
   Layers,
   RefreshCw,
@@ -29,6 +30,8 @@ import { Button } from "@shared/components/ui/Button";
 import { Skeleton } from "@shared/components/ui/Skeleton";
 import {
   fetchCrashlyticsSignals,
+  type CrashBreakdownPoint,
+  type CrashEvent,
   type CrashDailyPoint,
   type CrashIssuePoint,
   type CrashSummary,
@@ -50,12 +53,26 @@ const EMPTY_SUMMARY: CrashSummary = {
   affectedVersions: 0,
   affectedPlatforms: 0,
   fatalRate: 0,
+  crashFreeUsersRate: null,
+  crashFreeSessionsRate: null,
+  totalUsers: null,
+  totalSessions: null,
+  affectedUsersEstimate: 0,
+  affectedSessionsEstimate: 0,
 };
+
+function csvCell(value: unknown) {
+  const raw = String(value ?? "");
+  return `"${raw.replace(/"/g, '""')}"`;
+}
 
 export function CrashlyticsPage() {
   const [summary, setSummary] = useState<CrashSummary>(EMPTY_SUMMARY);
+  const [events, setEvents] = useState<CrashEvent[]>([]);
   const [daily, setDaily] = useState<CrashDailyPoint[]>([]);
   const [topIssues, setTopIssues] = useState<CrashIssuePoint[]>([]);
+  const [platforms, setPlatforms] = useState<CrashBreakdownPoint[]>([]);
+  const [versions, setVersions] = useState<CrashBreakdownPoint[]>([]);
   const [source, setSource] = useState("sem dados");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,9 +82,12 @@ export function CrashlyticsPage() {
     setError(null);
     try {
       const result = await fetchCrashlyticsSignals();
+      setEvents(result.events);
       setSummary(result.summary);
       setDaily(result.daily);
       setTopIssues(result.topIssues);
+      setPlatforms(result.platforms);
+      setVersions(result.versions);
       setSource(result.source);
     } catch (err) {
       setError(
@@ -83,6 +103,51 @@ export function CrashlyticsPage() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  function exportReport() {
+    const header = [
+      "id",
+      "issue",
+      "severity",
+      "appVersion",
+      "platform",
+      "eventCount",
+      "createdAt",
+      "source",
+    ];
+    const rows = events.map((event) => [
+      event.id,
+      event.issue,
+      event.severity,
+      event.appVersion,
+      event.platform,
+      event.eventCount,
+      event.createdAt?.toISOString() ?? "",
+      source,
+    ]);
+    const summaryRows = [
+      [],
+      ["metric", "value"],
+      ["totalEvents", summary.totalEvents],
+      ["fatalEvents", summary.fatalEvents],
+      ["nonFatalEvents", summary.nonFatalEvents],
+      ["events7d", summary.events7d],
+      ["affectedVersions", summary.affectedVersions],
+      ["affectedPlatforms", summary.affectedPlatforms],
+      ["crashFreeUsersRate", summary.crashFreeUsersRate ?? "unavailable"],
+      ["crashFreeSessionsRate", summary.crashFreeSessionsRate ?? "unavailable"],
+    ];
+    const csv = [header, ...rows, ...summaryRows]
+      .map((row) => row.map(csvCell).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `wegig-crashlytics-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="space-y-6">
@@ -100,9 +165,14 @@ export function CrashlyticsPage() {
             </p>
           ) : null}
         </div>
-        <Button variant="secondary" onClick={() => void loadData()}>
-          <RefreshCw className="h-4 w-4" /> Atualizar
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => void loadData()}>
+            <RefreshCw className="h-4 w-4" /> Atualizar
+          </Button>
+          <Button variant="primary" onClick={exportReport} disabled={loading}>
+            <Download className="h-4 w-4" /> Extrair relatório
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -172,8 +242,82 @@ export function CrashlyticsPage() {
               icon={<Gauge className="h-5 w-5" />}
               hint="Classificação heurística"
             />
+            <StatCard
+              label="Usuários sem falhas"
+              value={
+                summary.crashFreeUsersRate === null
+                  ? "—"
+                  : formatPercent(summary.crashFreeUsersRate)
+              }
+              icon={<Gauge className="h-5 w-5" />}
+              hint={
+                summary.totalUsers
+                  ? `${summary.affectedUsersEstimate} afetados de ${summary.totalUsers}`
+                  : "Sem denominador de usuários"
+              }
+            />
+            <StatCard
+              label="Sessões sem falhas"
+              value={
+                summary.crashFreeSessionsRate === null
+                  ? "—"
+                  : formatPercent(summary.crashFreeSessionsRate)
+              }
+              icon={<Gauge className="h-5 w-5" />}
+              hint={
+                summary.totalSessions
+                  ? `${summary.affectedSessionsEstimate} afetadas de ${summary.totalSessions}`
+                  : "Sem total de sessões exportado"
+              }
+            />
           </>
         )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Plataformas afetadas</CardTitle>
+          </CardHeader>
+          <CardBody>
+            {loading ? (
+              <Skeleton className="h-32" />
+            ) : platforms.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-slate-400">Sem plataformas.</p>
+            ) : (
+              <div className="space-y-2 text-sm">
+                {platforms.map((item) => (
+                  <div key={item.label} className="flex items-center justify-between gap-3 rounded border border-gray-100 px-3 py-2 dark:border-slate-800">
+                    <span className="font-medium text-gray-700 dark:text-slate-200">{item.label}</span>
+                    <span className="text-xs text-gray-500 dark:text-slate-400">{item.total} total · {item.fatal} fatal · {item.nonFatal} não fatal</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Versões afetadas</CardTitle>
+          </CardHeader>
+          <CardBody>
+            {loading ? (
+              <Skeleton className="h-32" />
+            ) : versions.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-slate-400">Sem versões.</p>
+            ) : (
+              <div className="space-y-2 text-sm">
+                {versions.map((item) => (
+                  <div key={item.label} className="flex items-center justify-between gap-3 rounded border border-gray-100 px-3 py-2 dark:border-slate-800">
+                    <span className="font-medium text-gray-700 dark:text-slate-200">{item.label}</span>
+                    <span className="text-xs text-gray-500 dark:text-slate-400">{item.total} total · {item.fatal} fatal · {item.nonFatal} não fatal</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

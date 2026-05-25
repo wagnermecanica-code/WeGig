@@ -1,5 +1,6 @@
 import {
   collection,
+  getCountFromServer,
   getDocs,
   limit,
   orderBy,
@@ -16,6 +17,8 @@ export interface CrashEvent {
   platform: string;
   eventCount: number;
   createdAt: Date | null;
+  userId?: string;
+  sessionId?: string;
 }
 
 export interface CrashSummary {
@@ -26,6 +29,12 @@ export interface CrashSummary {
   affectedVersions: number;
   affectedPlatforms: number;
   fatalRate: number;
+  crashFreeUsersRate: number | null;
+  crashFreeSessionsRate: number | null;
+  totalUsers: number | null;
+  totalSessions: number | null;
+  affectedUsersEstimate: number;
+  affectedSessionsEstimate: number;
 }
 
 export interface CrashDailyPoint {
@@ -41,11 +50,20 @@ export interface CrashIssuePoint {
   fatal: number;
 }
 
+export interface CrashBreakdownPoint {
+  label: string;
+  total: number;
+  fatal: number;
+  nonFatal: number;
+}
+
 export interface CrashlyticsSignals {
   events: CrashEvent[];
   summary: CrashSummary;
   daily: CrashDailyPoint[];
   topIssues: CrashIssuePoint[];
+  platforms: CrashBreakdownPoint[];
+  versions: CrashBreakdownPoint[];
   source: string;
 }
 
@@ -163,6 +181,8 @@ async function tryReadCollection(
       createdAt: parseTimestampLike(
         data.createdAt ?? data.timestamp ?? data.updatedAt,
       ),
+      userId: pickString(data, ["userId", "uid", "ownerUid"], ""),
+      sessionId: pickString(data, ["sessionId", "session"], ""),
     };
   });
 }
@@ -185,7 +205,9 @@ async function fetchLocalCrashEvents(): Promise<{
   return {
     source: payload.source ?? "fallback local",
     events: payload.events.map((event: Record<string, any>) => ({
-      id: String(event.id ?? `${event.issue ?? "issue"}-${event.createdAt ?? "unknown"}`),
+      id: String(
+        event.id ?? `${event.issue ?? "issue"}-${event.createdAt ?? "unknown"}`,
+      ),
       issue: pickString(event, ["issue", "title", "message"], "(sem título)"),
       severity: parseSeverity(event),
       appVersion: pickString(
@@ -196,6 +218,8 @@ async function fetchLocalCrashEvents(): Promise<{
       platform: pickString(event, ["platform", "os"], "desconhecido"),
       eventCount: pickNumber(event, ["eventCount", "count", "occurrences"], 1),
       createdAt: parseExternalDate(event.createdAt ?? event.timestamp),
+      userId: pickString(event, ["userId", "uid", "ownerUid"], ""),
+      sessionId: pickString(event, ["sessionId", "session"], ""),
     })),
   };
 }
@@ -217,7 +241,21 @@ export async function fetchCrashEvents(): Promise<{
   return fetchLocalCrashEvents();
 }
 
-export function buildCrashSummary(events: CrashEvent[]): CrashSummary {
+async function countProfilesSafe(): Promise<number | null> {
+  try {
+    const snap = await getCountFromServer(collection(db, "profiles"));
+    return snap.data().count ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function computeCrashFreeRate(total: number | null, affected: number) {
+  if (!total || total <= 0) return null;
+  return Math.max(0, Math.min(1, (total - affected) / total));
+}
+
+export async function buildCrashSummary(events: CrashEvent[]): Promise<CrashSummary> {
   const totalEvents = events.reduce((sum, e) => sum + e.eventCount, 0);
   const fatalEvents = events
     .filter((e) => e.severity === "fatal")
@@ -231,6 +269,15 @@ export function buildCrashSummary(events: CrashEvent[]): CrashSummary {
 
   const affectedVersions = new Set(events.map((e) => e.appVersion)).size;
   const affectedPlatforms = new Set(events.map((e) => e.platform)).size;
+  const explicitUsers = new Set(events.map((e) => e.userId).filter(Boolean));
+  const explicitSessions = new Set(
+    events.map((e) => e.sessionId).filter(Boolean),
+  );
+  const affectedUsersEstimate = explicitUsers.size || Math.min(events.length, totalEvents);
+  const affectedSessionsEstimate =
+    explicitSessions.size || Math.min(events.length, totalEvents);
+  const totalUsers = await countProfilesSafe();
+  const totalSessions = null;
 
   return {
     totalEvents,
@@ -240,7 +287,39 @@ export function buildCrashSummary(events: CrashEvent[]): CrashSummary {
     affectedVersions,
     affectedPlatforms,
     fatalRate: totalEvents > 0 ? fatalEvents / totalEvents : 0,
+    crashFreeUsersRate: computeCrashFreeRate(totalUsers, affectedUsersEstimate),
+    crashFreeSessionsRate: computeCrashFreeRate(
+      totalSessions,
+      affectedSessionsEstimate,
+    ),
+    totalUsers,
+    totalSessions,
+    affectedUsersEstimate,
+    affectedSessionsEstimate,
   };
+}
+
+export function buildCrashBreakdown(
+  events: CrashEvent[],
+  key: "platform" | "appVersion",
+): CrashBreakdownPoint[] {
+  const buckets = new Map<string, CrashBreakdownPoint>();
+
+  for (const event of events) {
+    const label = event[key] || "desconhecido";
+    const row = buckets.get(label) ?? {
+      label,
+      total: 0,
+      fatal: 0,
+      nonFatal: 0,
+    };
+    row.total += event.eventCount;
+    if (event.severity === "fatal") row.fatal += event.eventCount;
+    else row.nonFatal += event.eventCount;
+    buckets.set(label, row);
+  }
+
+  return Array.from(buckets.values()).sort((a, b) => b.total - a.total);
 }
 
 export function buildCrashDailySeries(
@@ -297,9 +376,11 @@ export async function fetchCrashlyticsSignals(): Promise<CrashlyticsSignals> {
   const { events, source } = await fetchCrashEvents();
   return {
     events,
-    summary: buildCrashSummary(events),
+    summary: await buildCrashSummary(events),
     daily: buildCrashDailySeries(events),
     topIssues: buildTopIssues(events),
+    platforms: buildCrashBreakdown(events, "platform"),
+    versions: buildCrashBreakdown(events, "appVersion"),
     source,
   };
 }

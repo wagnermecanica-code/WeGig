@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Phone,
   RefreshCw,
+  Send,
   ShieldAlert,
   UserCheck,
 } from "lucide-react";
@@ -31,7 +32,8 @@ import {
   type UserActivity,
 } from "../data/usersService";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@core/firebase/client";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth, db } from "@core/firebase/client";
 
 export function UserDetailPage() {
   const { id = "" } = useParams();
@@ -41,6 +43,7 @@ export function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -83,8 +86,34 @@ export function UserDetailPage() {
   async function copyToClipboard(value: string, label: string) {
     try {
       await navigator.clipboard.writeText(value);
+      setSuccess(`${label} copiado.`);
     } catch {
       setError(`Não foi possível copiar ${label}.`);
+    }
+  }
+
+  async function handleSendPasswordReset() {
+    if (!profile?.email || !admin) return;
+    setActionInProgress(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await sendPasswordResetEmail(auth, profile.email);
+      await recordAudit(admin, {
+        action: "user.password_reset_email",
+        targetType: "user",
+        targetId: profile.id,
+        metadata: { email: profile.email, name: profile.name },
+      });
+      setSuccess(`Email de reset de senha enviado para ${profile.email}.`);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erro ao enviar email de reset de senha",
+      );
+    } finally {
+      setActionInProgress(false);
     }
   }
 
@@ -156,6 +185,12 @@ export function UserDetailPage() {
         </div>
       ) : null}
 
+      {success ? (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700 dark:border-green-900 dark:bg-green-900/30 dark:text-green-300">
+          {success}
+        </div>
+      ) : null}
+
       <Card>
         <CardBody className="flex flex-col sm:flex-row gap-4 sm:items-center">
           <div className="h-16 w-16 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xl font-bold">
@@ -208,14 +243,28 @@ export function UserDetailPage() {
               </Button>
             ) : null}
             {canModerate ? (
-              <Button
-                variant={profile.banned ? "secondary" : "danger"}
-                onClick={handleToggleBan}
-                disabled={actionInProgress}
-              >
-                <Ban className="h-4 w-4" />
-                {profile.banned ? "Desbanir" : "Banir"}
-              </Button>
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={handleSendPasswordReset}
+                  disabled={actionInProgress || !profile.email}
+                  title={
+                    profile.email
+                      ? "Enviar email de reset de senha"
+                      : "Perfil sem email cadastrado"
+                  }
+                >
+                  <Send className="h-4 w-4" /> Resetar senha
+                </Button>
+                <Button
+                  variant={profile.banned ? "secondary" : "danger"}
+                  onClick={handleToggleBan}
+                  disabled={actionInProgress}
+                >
+                  <Ban className="h-4 w-4" />
+                  {profile.banned ? "Desbanir" : "Banir"}
+                </Button>
+              </>
             ) : null}
           </div>
         </CardBody>
@@ -358,16 +407,6 @@ export function UserDetailPage() {
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Dados brutos</CardTitle>
-        </CardHeader>
-        <CardBody>
-          <pre className="text-[11px] bg-gray-50 dark:bg-slate-800 p-3 rounded overflow-auto max-h-80">
-            {JSON.stringify(profile.raw, null, 2)}
-          </pre>
-        </CardBody>
-      </Card>
     </div>
   );
 }
