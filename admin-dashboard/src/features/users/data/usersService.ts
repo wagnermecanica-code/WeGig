@@ -52,9 +52,38 @@ function parseDateLike(value: unknown): Date | undefined {
   if (!value) return undefined;
   if (value instanceof Date) return value;
   if (value instanceof Timestamp) return value.toDate();
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const millis = value > 10_000_000_000 ? value : value * 1000;
+    const parsed = new Date(millis);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
   if (typeof value === "object" && value !== null) {
     const candidate = value as { toDate?: () => Date };
     if (typeof candidate.toDate === "function") return candidate.toDate();
+    const secondsCandidate = value as {
+      seconds?: number;
+      _seconds?: number;
+      nanoseconds?: number;
+      _nanoseconds?: number;
+    };
+    const seconds = secondsCandidate.seconds ?? secondsCandidate._seconds;
+    if (typeof seconds === "number" && Number.isFinite(seconds)) {
+      const nanos =
+        secondsCandidate.nanoseconds ?? secondsCandidate._nanoseconds ?? 0;
+      return new Date(seconds * 1000 + Math.floor(nanos / 1_000_000));
+    }
+  }
+  return undefined;
+}
+
+function pickDate(data: Record<string, any>, keys: string[]): Date | undefined {
+  for (const key of keys) {
+    const parsed = parseDateLike(data[key]);
+    if (parsed) return parsed;
   }
   return undefined;
 }
@@ -68,7 +97,15 @@ function mapProfile(id: string, data: Record<string, any>): ProfileSummary {
     profileType: data.profileType ?? data.type,
     ownerUid: data.ownerUid ?? data.userId ?? data.uid,
     photoUrl: data.photoUrl ?? data.avatarUrl,
-    createdAt: parseDateLike(data.createdAt),
+    createdAt: pickDate(data, [
+      "createdAt",
+      "created_at",
+      "created",
+      "createdOn",
+      "createdDate",
+      "timestamp",
+      "updatedAt",
+    ]),
     banned: data.banned === true || data.moderationStatus === "banned",
   };
 }
@@ -237,9 +274,7 @@ async function countUniqueDocumentsSafe(
 ): Promise<number> {
   const ids = new Set<string>();
   const results = await Promise.all(
-    queries.map((item) =>
-      collectDocumentIdsSafe(item.base, item.constraints),
-    ),
+    queries.map((item) => collectDocumentIdsSafe(item.base, item.constraints)),
   );
 
   for (const result of results) {
@@ -355,7 +390,9 @@ export async function getUserActivity(
     countUniqueDocumentsSafe([
       {
         base: collection(db, "conversations"),
-        constraints: [where("participantProfiles", "array-contains", profileId)],
+        constraints: [
+          where("participantProfiles", "array-contains", profileId),
+        ],
       },
       {
         base: collection(db, "conversations"),
