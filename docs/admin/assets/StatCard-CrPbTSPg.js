@@ -1,0 +1,6 @@
+import{c as r,n as e}from"./index-BEIokDZQ.js";import{C as i,c as n}from"./Card-r9gkeIaO.js";/**
+ * @license lucide-react v0.294.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const m=r("FileText",[["path",{d:"M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z",key:"1nnpy2"}],["polyline",{points:"14 2 14 8 20 8",key:"1ew0cm"}],["line",{x1:"16",x2:"8",y1:"13",y2:"13",key:"14keom"}],["line",{x1:"16",x2:"8",y1:"17",y2:"17",key:"17nazh"}],["line",{x1:"10",x2:"8",y1:"9",y2:"9",key:"1a5vjj"}]]);function y({label:x,value:l,hint:a,icon:s,trend:t}){return e.jsx(i,{children:e.jsxs(n,{className:"flex items-start justify-between",children:[e.jsxs("div",{children:[e.jsx("p",{className:"text-xs uppercase tracking-wide text-gray-500 dark:text-slate-400",children:x}),e.jsx("p",{className:"mt-2 text-2xl font-semibold text-gray-900 dark:text-white",children:l}),a?e.jsx("p",{className:"mt-1 text-xs text-gray-500 dark:text-slate-400",children:a}):null,t?e.jsxs("p",{className:`mt-2 text-xs font-medium ${t.positive===!1?"text-red-600":"text-green-600"}`,children:[t.positive===!1?"▼":"▲"," ",Math.abs(t.value).toFixed(1),"%"]}):null]}),s?e.jsx("div",{className:"rounded-lg bg-primary/10 p-2 text-primary dark:bg-primary/20",children:s}):null]})})}export{m as F,y as S};
