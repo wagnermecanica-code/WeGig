@@ -12,9 +12,11 @@ import {
   Users,
   FileText,
   MessageSquare,
+  MessageCircle,
   ShieldAlert,
   TrendingUp,
   Activity,
+  Heart,
 } from "lucide-react";
 import { StatCard } from "@shared/components/ui/StatCard";
 import {
@@ -121,7 +123,7 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading || !overview ? (
-          Array.from({ length: 6 }).map((_, i) => (
+          Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-28" />
           ))
         ) : (
@@ -142,6 +144,16 @@ export function DashboardPage() {
               label="Conversas"
               value={formatNumber(overview.totalConversations)}
               icon={<MessageSquare className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Comentários"
+              value={formatNumber(overview.totalComments)}
+              icon={<MessageCircle className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Interesses"
+              value={formatNumber(overview.totalInterests)}
+              icon={<Heart className="h-5 w-5" />}
             />
             <StatCard
               label="Reports pendentes"
@@ -175,7 +187,8 @@ export function DashboardPage() {
         <CardBody>
           {seriesIsFallback ? (
             <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-              Dados agregados ainda não disponíveis. Exibindo série temporária até a primeira execução do agregador diário.
+              Dados agregados ainda não disponíveis. Exibindo série temporária
+              até a primeira execução do agregador diário.
             </div>
           ) : null}
 

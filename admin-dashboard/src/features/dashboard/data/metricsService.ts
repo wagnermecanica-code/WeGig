@@ -1,5 +1,6 @@
 import {
   collection,
+  collectionGroup,
   doc,
   getCountFromServer,
   getDoc,
@@ -17,6 +18,8 @@ export interface OverviewMetrics {
   totalPosts: number;
   activePosts: number;
   totalConversations: number;
+  totalComments: number;
+  totalInterests: number;
   pendingReports: number;
   pendingFeedbacks: number;
 }
@@ -54,6 +57,8 @@ export async function fetchOverviewMetrics(): Promise<OverviewMetrics> {
     totalPosts,
     activePosts,
     totalConversations,
+    totalComments,
+    totalInterests,
     pendingReports,
     pendingFeedbacks,
   ] = await Promise.all([
@@ -61,6 +66,8 @@ export async function fetchOverviewMetrics(): Promise<OverviewMetrics> {
     safeCount(collection(db, "posts")),
     safeCount(query(collection(db, "posts"), where("expiresAt", ">", now))),
     safeCount(collection(db, "conversations")),
+    safeCount(collectionGroup(db, "comments")),
+    safeCount(collection(db, "interests")),
     safeCount(
       query(collection(db, "reports"), where("status", "==", "pending")),
     ),
@@ -72,6 +79,8 @@ export async function fetchOverviewMetrics(): Promise<OverviewMetrics> {
     totalPosts,
     activePosts,
     totalConversations,
+    totalComments,
+    totalInterests,
     pendingReports,
     pendingFeedbacks,
   };
