@@ -164,6 +164,7 @@ service cloud.firestore {
       // retorna permission-denied quando o doc não existe, quebrando o
       // fluxo idempotente de criação.
       allow read: if isSignedIn() && (
+        isAdmin() ||
         resource == null ||
         (resource.data.participants != null && request.auth.uid in resource.data.participants) ||
         (resource.data.profileUid != null && request.auth.uid in resource.data.profileUid)
@@ -398,14 +399,19 @@ service cloud.firestore {
         && request.resource.data.status == 'pending';
       
       // Read (get/list): permite leitura/queries onde o usuário é o reporter
-      // Queries DEVEM incluir .where('reporterUid', '==', auth.uid) OU
+      // OU admin (painel web).
+      // Queries de não-admins DEVEM incluir .where('reporterUid', '==', auth.uid) OU
       // .where('reportedBy', 'array-contains', auth.uid)
-      allow read: if isSignedIn() 
-        && (resource.data.reporterUid == request.auth.uid 
-            || request.auth.uid in resource.data.reportedBy);
-      
-      // Update/Delete: negado para usuários (apenas admins via Admin SDK)
-      allow update, delete: if false;
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        resource == null ||
+        resource.data.reporterUid == request.auth.uid ||
+        (resource.data.reportedBy != null && request.auth.uid in resource.data.reportedBy)
+      );
+
+      // Update: admin pode atualizar status (resolve/dismiss); usuários não.
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // ============================================

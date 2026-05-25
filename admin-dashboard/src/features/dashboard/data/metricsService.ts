@@ -9,8 +9,8 @@ import {
   query,
   where,
   Timestamp,
-} from 'firebase/firestore';
-import { db } from '@core/firebase/client';
+} from "firebase/firestore";
+import { db } from "@core/firebase/client";
 
 export interface OverviewMetrics {
   totalUsers: number;
@@ -29,38 +29,47 @@ export interface DailySnapshot {
   messagesSent?: number;
 }
 
+/**
+ * Conta documentos com Firestore aggregation, retornando 0 em caso de
+ * falha (permissão negada, coleção inexistente, índice ausente).
+ * Cada métrica falha de forma independente — o dashboard nunca quebra inteiro.
+ */
+async function safeCount(q: Parameters<typeof getCountFromServer>[0]): Promise<number> {
+  try {
+    const snap = await getCountFromServer(q);
+    return snap.data().count ?? 0;
+  } catch (err) {
+    console.warn("[metricsService] count failed:", err);
+    return 0;
+  }
+}
+
 /** Lê contagens diretamente do Firestore via getCountFromServer (rápido e barato). */
 export async function fetchOverviewMetrics(): Promise<OverviewMetrics> {
   const now = Timestamp.now();
   const [
-    usersSnap,
-    postsSnap,
-    activePostsSnap,
-    conversationsSnap,
-    reportsSnap,
-    feedbacksSnap,
+    totalUsers,
+    totalPosts,
+    activePosts,
+    totalConversations,
+    pendingReports,
+    pendingFeedbacks,
   ] = await Promise.all([
-    getCountFromServer(collection(db, 'profiles')),
-    getCountFromServer(collection(db, 'posts')),
-    getCountFromServer(
-      query(collection(db, 'posts'), where('expiresAt', '>', now)),
-    ),
-    getCountFromServer(collection(db, 'conversations')),
-    getCountFromServer(
-      query(collection(db, 'reports'), where('status', '==', 'pending')),
-    ).catch(() => ({ data: () => ({ count: 0 }) }) as any),
-    getCountFromServer(collection(db, 'feedbacks')).catch(
-      () => ({ data: () => ({ count: 0 }) }) as any,
-    ),
+    safeCount(collection(db, "profiles")),
+    safeCount(collection(db, "posts")),
+    safeCount(query(collection(db, "posts"), where("expiresAt", ">", now))),
+    safeCount(collection(db, "conversations")),
+    safeCount(query(collection(db, "reports"), where("status", "==", "pending"))),
+    safeCount(collection(db, "feedbacks")),
   ]);
 
   return {
-    totalUsers: usersSnap.data().count,
-    totalPosts: postsSnap.data().count,
-    activePosts: activePostsSnap.data().count,
-    totalConversations: conversationsSnap.data().count,
-    pendingReports: reportsSnap.data().count,
-    pendingFeedbacks: feedbacksSnap.data().count,
+    totalUsers,
+    totalPosts,
+    activePosts,
+    totalConversations,
+    pendingReports,
+    pendingFeedbacks,
   };
 }
 
@@ -71,8 +80,8 @@ export async function fetchOverviewMetrics(): Promise<OverviewMetrics> {
 export async function fetchDailySnapshots(days = 14): Promise<DailySnapshot[]> {
   try {
     const q = query(
-      collection(db, 'analytics_daily'),
-      orderBy('date', 'desc'),
+      collection(db, "analytics_daily"),
+      orderBy("date", "desc"),
       limit(days),
     );
     const snap = await getDocs(q);
@@ -96,7 +105,7 @@ export async function fetchDailySnapshots(days = 14): Promise<DailySnapshot[]> {
 export async function fetchTodaySnapshot(): Promise<DailySnapshot | null> {
   const today = new Date().toISOString().slice(0, 10);
   try {
-    const snap = await getDoc(doc(db, 'analytics_daily', today));
+    const snap = await getDoc(doc(db, "analytics_daily", today));
     if (!snap.exists()) return null;
     const data = snap.data();
     return {
