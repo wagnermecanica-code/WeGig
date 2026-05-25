@@ -104,11 +104,7 @@ const PERMISSION_MATRIX: Record<AdminRole, Permission[]> = {
     "audit.view",
   ],
   support: ["dashboard.view", "users.view", "reports.view", "feedbacks.view"],
-  analytics: [
-    "dashboard.view",
-    "analytics.view",
-    "heatmap.view",
-  ],
+  analytics: ["dashboard.view", "analytics.view", "heatmap.view"],
 };
 
 export function permissionsForRole(role: AdminRole): Permission[] {

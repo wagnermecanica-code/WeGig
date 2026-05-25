@@ -159,7 +159,10 @@ export function DashboardPage() {
                   },
                   { metrica: "Comentários", valor: overview.totalComments },
                   { metrica: "Interesses", valor: overview.totalInterests },
-                  { metrica: "Reports pendentes", valor: overview.pendingReports },
+                  {
+                    metrica: "Reports pendentes",
+                    valor: overview.pendingReports,
+                  },
                   { metrica: "Feedbacks", valor: overview.pendingFeedbacks },
                 ],
               },

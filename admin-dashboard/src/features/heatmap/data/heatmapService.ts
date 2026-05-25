@@ -1,10 +1,4 @@
-import {
-  collection,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-} from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
 import { db } from "@core/firebase/client";
 
 export interface HeatmapBucket {
@@ -71,17 +65,16 @@ export async function fetchMusicalHeatmap(
       if (!state && !city) continue;
 
       const key = `${state || "—"}|${city || "—"}`;
-      const bucket =
-        buckets.get(key) ?? {
-          state: state || "—",
-          city: city || "—",
-          posts: 0,
-          genres: {} as Record<string, number>,
-          instruments: {} as Record<string, number>,
-          latSum: 0,
-          lngSum: 0,
-          latCount: 0,
-        };
+      const bucket = buckets.get(key) ?? {
+        state: state || "—",
+        city: city || "—",
+        posts: 0,
+        genres: {} as Record<string, number>,
+        instruments: {} as Record<string, number>,
+        latSum: 0,
+        lngSum: 0,
+        latCount: 0,
+      };
 
       bucket.posts += 1;
 

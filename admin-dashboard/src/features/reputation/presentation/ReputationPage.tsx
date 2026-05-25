@@ -36,7 +36,10 @@ const STATUS_FILTERS: {
   { key: "unverified", label: "Não verificados" },
 ];
 
-const STATUS_TONE: Record<VerificationStatus, Parameters<typeof Badge>[0]["tone"]> = {
+const STATUS_TONE: Record<
+  VerificationStatus,
+  Parameters<typeof Badge>[0]["tone"]
+> = {
   verified: "success",
   pending: "warning",
   rejected: "danger",
@@ -74,9 +77,7 @@ export function ReputationPage() {
       });
       setProfiles(items);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Erro ao carregar perfis",
-      );
+      setError(err instanceof Error ? err.message : "Erro ao carregar perfis");
     } finally {
       setLoading(false);
     }
@@ -178,12 +179,14 @@ export function ReputationPage() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {([
-          ["Perfis", summary.total],
-          ["Verificados", summary.verified],
-          ["Pendentes", summary.pending],
-          ["Score médio", summary.avgScore],
-        ] as [string, number][]).map(([label, value]) => (
+        {(
+          [
+            ["Perfis", summary.total],
+            ["Verificados", summary.verified],
+            ["Pendentes", summary.pending],
+            ["Score médio", summary.avgScore],
+          ] as [string, number][]
+        ).map(([label, value]) => (
           <Card key={label}>
             <CardBody>
               <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-400">
@@ -278,7 +281,11 @@ export function ReputationPage() {
                               {profile.name}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-slate-400">
-                              {[profile.profileType, profile.city, profile.state]
+                              {[
+                                profile.profileType,
+                                profile.city,
+                                profile.state,
+                              ]
                                 .filter(Boolean)
                                 .join(" · ")}
                             </p>

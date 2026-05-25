@@ -31,10 +31,7 @@ import {
   CardTitle,
 } from "@shared/components/ui/Card";
 import { Skeleton } from "@shared/components/ui/Skeleton";
-import {
-  exportSheetsToXlsx,
-  exportRowsToXlsx,
-} from "@shared/utils/exportXlsx";
+import { exportSheetsToXlsx, exportRowsToXlsx } from "@shared/utils/exportXlsx";
 import {
   fetchActivationFunnel,
   fetchActivityMetrics,
@@ -135,8 +132,14 @@ export function AnalyticsPage() {
           { metrica: "DAU", valor: activity.dau },
           { metrica: "WAU", valor: activity.wau },
           { metrica: "MAU", valor: activity.mau },
-          { metrica: "Retenção D1", valor: formatPercent(activity.d1Retention) },
-          { metrica: "Retenção D7", valor: formatPercent(activity.d7Retention) },
+          {
+            metrica: "Retenção D1",
+            valor: formatPercent(activity.d1Retention),
+          },
+          {
+            metrica: "Retenção D7",
+            valor: formatPercent(activity.d7Retention),
+          },
           {
             metrica: "Engajamento médio",
             valor: formatDuration(activity.avgEngagementSeconds),
@@ -145,7 +148,10 @@ export function AnalyticsPage() {
           { metrica: "Churn 30d", valor: formatPercent(churn) },
         ],
       },
-      { name: "Funil", rows: funnel.map((s) => ({ etapa: s.label, total: s.count })) },
+      {
+        name: "Funil",
+        rows: funnel.map((s) => ({ etapa: s.label, total: s.count })),
+      },
       { name: "Coortes", rows: cohorts },
       { name: "Geografia", rows: geo },
     ]);
@@ -279,10 +285,7 @@ export function AnalyticsPage() {
                     label
                   >
                     {geoStateBuckets.map((_, i) => (
-                      <Cell
-                        key={i}
-                        fill={PIE_COLORS[i % PIE_COLORS.length]}
-                      />
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
                   <Legend />

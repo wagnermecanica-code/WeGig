@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Download,
-  Pin,
-  Sparkles,
-  Star,
-  RefreshCw,
-} from "lucide-react";
+import { Download, Pin, Sparkles, Star, RefreshCw } from "lucide-react";
 import {
   Card,
   CardBody,
@@ -131,12 +125,14 @@ export function FeedAdminPage() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {([
-          ["Total", summary.total],
-          ["Destacados", summary.featured],
-          ["Promovidos", summary.promoted],
-          ["Fixados", summary.pinned],
-        ] as [string, number][]).map(([label, value]) => (
+        {(
+          [
+            ["Total", summary.total],
+            ["Destacados", summary.featured],
+            ["Promovidos", summary.promoted],
+            ["Fixados", summary.pinned],
+          ] as [string, number][]
+        ).map(([label, value]) => (
           <Card key={label}>
             <CardBody>
               <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-400">

@@ -17,9 +17,7 @@ import {
 } from "@shared/components/ui/Card";
 import { Button } from "@shared/components/ui/Button";
 import { Skeleton } from "@shared/components/ui/Skeleton";
-import {
-  exportSheetsToXlsx,
-} from "@shared/utils/exportXlsx";
+import { exportSheetsToXlsx } from "@shared/utils/exportXlsx";
 import {
   fetchMusicalHeatmap,
   summarizeGenres,
@@ -53,7 +51,9 @@ export function HeatmapPage() {
         setBuckets(data);
       } catch (err) {
         if (!active) return;
-        setError(err instanceof Error ? err.message : "Erro ao carregar heatmap");
+        setError(
+          err instanceof Error ? err.message : "Erro ao carregar heatmap",
+        );
       } finally {
         if (active) setLoading(false);
       }
@@ -106,7 +106,10 @@ export function HeatmapPage() {
             Concentração geográfica e estilos musicais predominantes na base.
           </p>
         </div>
-        <Button onClick={handleExport} disabled={loading || buckets.length === 0}>
+        <Button
+          onClick={handleExport}
+          disabled={loading || buckets.length === 0}
+        >
           <Download className="h-4 w-4" /> Exportar .xlsx
         </Button>
       </div>
@@ -162,7 +165,9 @@ export function HeatmapPage() {
             <div className="space-y-2">
               {topCities.map((bucket) => {
                 const percent =
-                  maxPosts > 0 ? Math.round((bucket.posts / maxPosts) * 100) : 0;
+                  maxPosts > 0
+                    ? Math.round((bucket.posts / maxPosts) * 100)
+                    : 0;
                 return (
                   <div
                     key={`${bucket.state}-${bucket.city}`}
@@ -188,7 +193,9 @@ export function HeatmapPage() {
                         <Music2 className="h-3.5 w-3.5" />
                         Gêneros: {topEntries(bucket.genres) || "—"}
                       </div>
-                      <div>Instrumentos: {topEntries(bucket.instruments) || "—"}</div>
+                      <div>
+                        Instrumentos: {topEntries(bucket.instruments) || "—"}
+                      </div>
                     </div>
                   </div>
                 );
