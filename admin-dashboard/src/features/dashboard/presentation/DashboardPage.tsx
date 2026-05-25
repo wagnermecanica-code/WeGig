@@ -29,6 +29,7 @@ import {
 import { Skeleton } from "@shared/components/ui/Skeleton";
 import {
   fetchDerivedDailySnapshots,
+  fetchDerivedDailySnapshotsFromHistory,
   fetchDailySnapshots,
   fetchOverviewMetrics,
   fetchTodaySnapshot,
@@ -92,8 +93,19 @@ export function DashboardPage() {
               setSeries(derived);
               setSeriesIsFallback(false);
             } else {
-              setSeries(buildEmptySeries(chartDays));
-              setSeriesIsFallback(true);
+              const historical =
+                await fetchDerivedDailySnapshotsFromHistory(chartDays);
+              const hasHistoricalData = historical.some(
+                (row) => (row.newUsers ?? 0) > 0 || (row.newPosts ?? 0) > 0,
+              );
+
+              if (hasHistoricalData) {
+                setSeries(historical);
+                setSeriesIsFallback(false);
+              } else {
+                setSeries(buildEmptySeries(chartDays));
+                setSeriesIsFallback(true);
+              }
             }
           }
         } else {

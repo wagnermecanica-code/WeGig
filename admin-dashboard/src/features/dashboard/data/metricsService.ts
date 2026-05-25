@@ -128,6 +128,78 @@ export async function fetchDerivedDailySnapshots(
   }
 }
 
+export async function fetchDerivedDailySnapshotsFromHistory(
+  days = 14,
+  sampleLimit = 800,
+): Promise<DailySnapshot[]> {
+  try {
+    const [postsSnap, usersSnap] = await Promise.all([
+      getDocs(
+        query(
+          collection(db, "posts"),
+          orderBy("createdAt", "desc"),
+          limit(sampleLimit),
+        ),
+      ),
+      getDocs(
+        query(
+          collection(db, "profiles"),
+          orderBy("createdAt", "desc"),
+          limit(sampleLimit),
+        ),
+      ),
+    ]);
+
+    const buckets = new Map<string, DailySnapshot>();
+
+    for (const docSnap of postsSnap.docs) {
+      const createdAt = parseTimestampLike(docSnap.data().createdAt);
+      if (!createdAt) continue;
+      const key = formatDateKey(createdAt);
+      const row = buckets.get(key) ?? {
+        date: key,
+        dau: 0,
+        newUsers: 0,
+        newPosts: 0,
+        messagesSent: 0,
+      };
+      row.newPosts = (row.newPosts ?? 0) + 1;
+      buckets.set(key, row);
+    }
+
+    for (const docSnap of usersSnap.docs) {
+      const createdAt = parseTimestampLike(docSnap.data().createdAt);
+      if (!createdAt) continue;
+      const key = formatDateKey(createdAt);
+      const row = buckets.get(key) ?? {
+        date: key,
+        dau: 0,
+        newUsers: 0,
+        newPosts: 0,
+        messagesSent: 0,
+      };
+      row.newUsers = (row.newUsers ?? 0) + 1;
+      buckets.set(key, row);
+    }
+
+    const selectedKeys = Array.from(buckets.keys()).sort().reverse().slice(0, days);
+    const result = selectedKeys
+      .sort()
+      .map((key) => {
+        const row = buckets.get(key)!;
+        const newUsers = row.newUsers ?? 0;
+        const newPosts = row.newPosts ?? 0;
+        row.dau = newUsers + Math.round(newPosts / 2);
+        return row;
+      });
+
+    return result;
+  } catch (err) {
+    console.warn("[metricsService] historical derived snapshots failed:", err);
+    return [];
+  }
+}
+
 /**
  * Conta documentos com Firestore aggregation, retornando 0 em caso de
  * falha (permissão negada, coleção inexistente, índice ausente).
