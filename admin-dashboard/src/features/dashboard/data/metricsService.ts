@@ -182,16 +182,17 @@ export async function fetchDerivedDailySnapshotsFromHistory(
       buckets.set(key, row);
     }
 
-    const selectedKeys = Array.from(buckets.keys()).sort().reverse().slice(0, days);
-    const result = selectedKeys
+    const selectedKeys = Array.from(buckets.keys())
       .sort()
-      .map((key) => {
-        const row = buckets.get(key)!;
-        const newUsers = row.newUsers ?? 0;
-        const newPosts = row.newPosts ?? 0;
-        row.dau = newUsers + Math.round(newPosts / 2);
-        return row;
-      });
+      .reverse()
+      .slice(0, days);
+    const result = selectedKeys.sort().map((key) => {
+      const row = buckets.get(key)!;
+      const newUsers = row.newUsers ?? 0;
+      const newPosts = row.newPosts ?? 0;
+      row.dau = newUsers + Math.round(newPosts / 2);
+      return row;
+    });
 
     return result;
   } catch (err) {
