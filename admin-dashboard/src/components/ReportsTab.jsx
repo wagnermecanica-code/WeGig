@@ -8,6 +8,7 @@ import {
   updateDoc,
   getDoc,
   deleteDoc,
+  limit,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import {
@@ -93,6 +94,7 @@ export default function ReportsTab() {
     const q = query(
       collection(db, "adminNotifications"),
       orderBy("timestamp", "desc"),
+      limit(100),
     );
     const unsubscribe = onSnapshot(q, (snap) => {
       setReports(snap.docs.map((d) => ({ id: d.id, ...d.data() })));

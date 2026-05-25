@@ -11,8 +11,8 @@
 // Configurações
 const CONFIG = {
   MAP_ID: "b7134f9dc59c2ad97d5b292e", // WeGigProdMapWeb
-  MAX_VISIBLE_POSTS: 250,
-  FETCH_DOC_LIMIT: 1000,
+  MAX_VISIBLE_POSTS: 120,
+  FETCH_DOC_LIMIT: 150,
   DEFAULT_CENTER: { lat: -23.5505, lng: -46.6333 }, // São Paulo
   DEFAULT_ZOOM: 11,
   COLORS: {
@@ -40,11 +40,12 @@ let map = null;
 let markers = [];
 let posts = [];
 let activePostId = null;
+let mapInitializationStarted = false;
 
-// Aguardar Firebase e Google Maps estarem prontos
+// Aguardar Firebase estar pronto. O mapa é inicializado sob demanda.
 function waitForDependencies() {
   return new Promise((resolve, reject) => {
-    console.log("Aguardando dependências...");
+    console.log("Aguardando Firebase...");
 
     // Polling approach - mais confiável que eventos
     let attempts = 0;
@@ -54,14 +55,10 @@ function waitForDependencies() {
       attempts++;
 
       const firebaseOk = window.firebaseReady === true && window.firebaseDb;
-      const mapsOk = window.googleMapsReady === true && window.google?.maps;
+      console.log(`Tentativa ${attempts} - Firebase: ${firebaseOk}`);
 
-      console.log(
-        `Tentativa ${attempts} - Firebase: ${firebaseOk}, Maps: ${mapsOk}`,
-      );
-
-      if (firebaseOk && mapsOk) {
-        console.log("Ambas dependências prontas!");
+      if (firebaseOk) {
+        console.log("Firebase pronto!");
         resolve();
         return;
       }
@@ -72,11 +69,7 @@ function waitForDependencies() {
           ready: window.firebaseReady,
           db: !!window.firebaseDb,
         });
-        console.error("Maps:", {
-          ready: window.googleMapsReady,
-          google: !!window.google,
-        });
-        reject(new Error(`Timeout: Firebase=${firebaseOk}, Maps=${mapsOk}`));
+        reject(new Error(`Timeout: Firebase=${firebaseOk}`));
         return;
       }
 
@@ -89,12 +82,42 @@ function waitForDependencies() {
       console.log("Evento firebase-ready recebido");
     });
 
-    window.addEventListener("google-maps-ready", () => {
-      console.log("Evento google-maps-ready recebido");
-    });
-
     // Iniciar verificação
     checkDependencies();
+  });
+}
+
+function waitForMapsDependency() {
+  if (window.googleMapsReady === true && window.google?.maps) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    const maxAttempts = 100;
+
+    const onReady = () => {
+      window.removeEventListener("google-maps-ready", onReady);
+      resolve();
+    };
+
+    window.addEventListener("google-maps-ready", onReady, { once: true });
+
+    const checkMaps = () => {
+      attempts++;
+      if (window.googleMapsReady === true && window.google?.maps) {
+        onReady();
+        return;
+      }
+      if (attempts >= maxAttempts) {
+        window.removeEventListener("google-maps-ready", onReady);
+        reject(new Error("Timeout: Google Maps não inicializou"));
+        return;
+      }
+      setTimeout(checkMaps, 100);
+    };
+
+    checkMaps();
   });
 }
 
@@ -106,10 +129,6 @@ async function init() {
     await waitForDependencies();
     console.log("Dependências carregadas");
 
-    // Inicializar mapa
-    initMap();
-    console.log("Mapa inicializado");
-
     // Carregar posts do Firebase
     await loadPosts();
     console.log("Posts carregados:", posts.length);
@@ -118,9 +137,7 @@ async function init() {
     renderPosts();
     console.log("Posts renderizados");
 
-    // Adicionar markers ao mapa
-    addMarkersToMap();
-    console.log("Markers adicionados");
+    setupLazyMapInitialization();
 
     console.log("Posts Feed inicializado com sucesso");
   } catch (error) {
@@ -128,6 +145,49 @@ async function init() {
     console.error("Stack:", error.stack);
     showError(error.message);
   }
+}
+
+function setupLazyMapInitialization() {
+  const mapElement = document.getElementById("posts-map");
+  if (!mapElement || posts.length === 0) return;
+
+  const initializeWhenNeeded = () => {
+    initializeMapAndMarkers().catch((error) => {
+      console.error("Erro ao inicializar mapa sob demanda:", error);
+    });
+  };
+
+  mapElement.addEventListener("click", initializeWhenNeeded, { once: true });
+  mapElement.addEventListener("mouseenter", initializeWhenNeeded, {
+    once: true,
+  });
+  mapElement.addEventListener("touchstart", initializeWhenNeeded, {
+    once: true,
+    passive: true,
+  });
+
+  if ("IntersectionObserver" in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          initializeWhenNeeded();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(mapElement);
+  }
+}
+
+async function initializeMapAndMarkers() {
+  if (mapInitializationStarted || map) return;
+  mapInitializationStarted = true;
+  await waitForMapsDependency();
+  initMap();
+  console.log("Mapa inicializado sob demanda");
+  addMarkersToMap();
+  console.log("Markers adicionados");
 }
 
 // Inicializar Google Maps
@@ -160,8 +220,10 @@ async function loadPosts() {
   const q = window.firebaseQuery;
   const coll = window.firebaseCollection;
   const orderByClause = window.firebaseOrderBy;
+  const whereClause = window.firebaseWhere;
   const limitClause = window.firebaseLimit;
   const getDocs = window.firebaseGetDocs;
+  const Timestamp = window.firebaseTimestamp;
 
   console.log("Firebase refs:", {
     db: !!db,
@@ -170,14 +232,15 @@ async function loadPosts() {
     getDocs: !!getDocs,
   });
 
-  if (!db || !q || !coll || !getDocs) {
+  if (!db || !q || !coll || !whereClause || !getDocs || !Timestamp) {
     throw new Error("Firebase não inicializado corretamente");
   }
 
   const postsRef = coll(db, "posts");
   const postsQuery = q(
     postsRef,
-    orderByClause("createdAt", "desc"),
+    whereClause("expiresAt", ">", Timestamp.now()),
+    orderByClause("expiresAt", "desc"),
     limitClause(CONFIG.FETCH_DOC_LIMIT),
   );
 

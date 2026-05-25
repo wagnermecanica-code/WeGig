@@ -5,6 +5,7 @@ import {
   query,
   orderBy,
   onSnapshot,
+  limit,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import {
@@ -23,19 +24,27 @@ import CatalogTab from "./CatalogTab";
 
 function getFeedbackTypeIcon(type) {
   switch (type) {
-    case "problem":    return <Bug className="w-4 h-4 text-red-500" />;
-    case "review":     return <Star className="w-4 h-4 text-yellow-500" />;
-    case "suggestion": return <Lightbulb className="w-4 h-4 text-blue-500" />;
-    default:           return <MessageCircle className="w-4 h-4 text-gray-500" />;
+    case "problem":
+      return <Bug className="w-4 h-4 text-red-500" />;
+    case "review":
+      return <Star className="w-4 h-4 text-yellow-500" />;
+    case "suggestion":
+      return <Lightbulb className="w-4 h-4 text-blue-500" />;
+    default:
+      return <MessageCircle className="w-4 h-4 text-gray-500" />;
   }
 }
 
 function getFeedbackTypeBadge(type) {
   switch (type) {
-    case "problem":    return "text-red-700 bg-red-100";
-    case "review":     return "text-yellow-700 bg-yellow-100";
-    case "suggestion": return "text-blue-700 bg-blue-100";
-    default:           return "text-gray-700 bg-gray-100";
+    case "problem":
+      return "text-red-700 bg-red-100";
+    case "review":
+      return "text-yellow-700 bg-yellow-100";
+    case "suggestion":
+      return "text-blue-700 bg-blue-100";
+    default:
+      return "text-gray-700 bg-gray-100";
   }
 }
 
@@ -44,7 +53,11 @@ function FeedbacksTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, "feedbacks"), orderBy("createdAt", "desc"));
+    const q = query(
+      collection(db, "feedbacks"),
+      orderBy("createdAt", "desc"),
+      limit(100),
+    );
     const unsubscribe = onSnapshot(q, (snap) => {
       setFeedbacks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
@@ -83,7 +96,9 @@ function FeedbacksTab() {
                     </span>
                     <span className="text-xs text-gray-500">
                       {feedback.createdAt
-                        ? new Date(feedback.createdAt.toDate()).toLocaleString("pt-BR")
+                        ? new Date(feedback.createdAt.toDate()).toLocaleString(
+                            "pt-BR",
+                          )
                         : "—"}
                     </span>
                   </div>
@@ -91,7 +106,8 @@ function FeedbacksTab() {
                     {feedback.message}
                   </p>
                   <p className="text-xs text-gray-500 mt-2">
-                    {feedback.userEmail || "Sem email"} · ID: {feedback.userId || "—"}
+                    {feedback.userEmail || "Sem email"} · ID:{" "}
+                    {feedback.userId || "—"}
                   </p>
                 </div>
               </div>
@@ -104,10 +120,10 @@ function FeedbacksTab() {
 }
 
 const TABS = [
-  { key: "reports",   label: "Denúncias",   Icon: Flag },
-  { key: "feedbacks", label: "Feedbacks",   Icon: MessageSquare },
-  { key: "comments",  label: "Comentários", Icon: MessageCircle },
-  { key: "catalog",   label: "Catálogo",    Icon: BookOpen },
+  { key: "reports", label: "Denúncias", Icon: Flag },
+  { key: "feedbacks", label: "Feedbacks", Icon: MessageSquare },
+  { key: "comments", label: "Comentários", Icon: MessageCircle },
+  { key: "catalog", label: "Catálogo", Icon: BookOpen },
 ];
 
 function Dashboard({ user }) {
@@ -117,14 +133,25 @@ function Dashboard({ user }) {
 
   useEffect(() => {
     const unsubReports = onSnapshot(
-      query(collection(db, "adminNotifications"), orderBy("timestamp", "desc")),
+      query(
+        collection(db, "adminNotifications"),
+        orderBy("timestamp", "desc"),
+        limit(100),
+      ),
       (snap) => setReportCount(snap.size),
     );
     const unsubFeedbacks = onSnapshot(
-      query(collection(db, "feedbacks"), orderBy("createdAt", "desc")),
+      query(
+        collection(db, "feedbacks"),
+        orderBy("createdAt", "desc"),
+        limit(100),
+      ),
       (snap) => setFeedbackCount(snap.size),
     );
-    return () => { unsubReports(); unsubFeedbacks(); };
+    return () => {
+      unsubReports();
+      unsubFeedbacks();
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -136,7 +163,7 @@ function Dashboard({ user }) {
   };
 
   const badgeFor = (key) => {
-    if (key === "reports")   return reportCount > 0 ? reportCount : null;
+    if (key === "reports") return reportCount > 0 ? reportCount : null;
     if (key === "feedbacks") return feedbackCount > 0 ? feedbackCount : null;
     return null;
   };
@@ -196,10 +223,10 @@ function Dashboard({ user }) {
           </nav>
         </div>
 
-        {activeTab === "reports"   && <ReportsTab />}
+        {activeTab === "reports" && <ReportsTab />}
         {activeTab === "feedbacks" && <FeedbacksTab />}
-        {activeTab === "comments"  && <CommentsTab />}
-        {activeTab === "catalog"   && <CatalogTab />}
+        {activeTab === "comments" && <CommentsTab />}
+        {activeTab === "catalog" && <CatalogTab />}
       </main>
     </div>
   );

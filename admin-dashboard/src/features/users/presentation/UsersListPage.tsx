@@ -22,8 +22,8 @@ export function UsersListPage() {
     setLoading(true);
     listProfiles({
       profileType: type || undefined,
-      pageSize: 350,
-      maxRecords: 8000,
+      pageSize: 200,
+      maxRecords: 1000,
     })
       .then((rows) => {
         if (!active) return;
