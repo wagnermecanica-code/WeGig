@@ -1,11 +1,12 @@
 import {
   CollectionReference,
   DocumentData,
+  Query,
   QueryConstraint,
   QueryDocumentSnapshot,
   collection,
+  collectionGroup,
   doc,
-  getCountFromServer,
   getDoc,
   getDocs,
   limit,
@@ -202,20 +203,123 @@ export interface UserActivity {
   commentsCount: number;
 }
 
-async function countQuerySafe(
-  base: CollectionReference<DocumentData>,
+async function collectDocumentIdsSafe(
+  base: CollectionReference<DocumentData> | Query<DocumentData>,
   constraints: QueryConstraint[],
-): Promise<number> {
-  const q = query(base, ...constraints);
+  maxDocs = 5000,
+): Promise<Set<string>> {
   try {
-    const agg = await getCountFromServer(q);
-    return agg.data().count ?? 0;
+    const snap = await getDocs(query(base, ...constraints, limit(maxDocs)));
+    return new Set(snap.docs.map((docSnap) => docSnap.ref.path));
   } catch {
-    const snap = await getDocs(query(base, ...constraints, limit(2000))).catch(
-      () => null,
-    );
-    return snap?.size ?? 0;
+    return new Set<string>();
   }
+}
+
+async function collectDocumentLocalIdsSafe(
+  base: CollectionReference<DocumentData> | Query<DocumentData>,
+  constraints: QueryConstraint[],
+  maxDocs = 5000,
+): Promise<Set<string>> {
+  try {
+    const snap = await getDocs(query(base, ...constraints, limit(maxDocs)));
+    return new Set(snap.docs.map((docSnap) => docSnap.id));
+  } catch {
+    return new Set<string>();
+  }
+}
+
+async function countUniqueDocumentsSafe(
+  queries: Array<{
+    base: CollectionReference<DocumentData> | Query<DocumentData>;
+    constraints: QueryConstraint[];
+  }>,
+): Promise<number> {
+  const ids = new Set<string>();
+  const results = await Promise.all(
+    queries.map((item) =>
+      collectDocumentIdsSafe(item.base, item.constraints),
+    ),
+  );
+
+  for (const result of results) {
+    for (const id of result) ids.add(id);
+  }
+
+  return ids.size;
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+async function collectOwnedPostIds(
+  profileId: string,
+  ownerUid?: string,
+): Promise<Set<string>> {
+  const queries = [
+    collectDocumentLocalIdsSafe(collection(db, "posts"), [
+      where("authorProfileId", "==", profileId),
+    ]),
+    collectDocumentLocalIdsSafe(collection(db, "posts"), [
+      where("profileId", "==", profileId),
+    ]),
+    ...(ownerUid
+      ? [
+          collectDocumentLocalIdsSafe(collection(db, "posts"), [
+            where("authorUid", "==", ownerUid),
+          ]),
+        ]
+      : []),
+  ];
+
+  const results = await Promise.all(queries);
+  const ids = new Set<string>();
+  for (const result of results) {
+    for (const id of result) ids.add(id);
+  }
+  return ids;
+}
+
+async function countReportsAgainstProfile(
+  profileId: string,
+  ownerUid?: string,
+): Promise<number> {
+  const directReportIds = await Promise.all([
+    collectDocumentIdsSafe(collection(db, "reports"), [
+      where("reportedProfileId", "==", profileId),
+    ]),
+    collectDocumentIdsSafe(collection(db, "reports"), [
+      where("targetProfileId", "==", profileId),
+    ]),
+    collectDocumentIdsSafe(collection(db, "reports"), [
+      where("ownerProfileId", "==", profileId),
+    ]),
+  ]);
+
+  const ids = new Set<string>();
+  for (const result of directReportIds) {
+    for (const id of result) ids.add(id);
+  }
+
+  const postIds = Array.from(await collectOwnedPostIds(profileId, ownerUid));
+  const postReportIds = await Promise.all(
+    chunk(postIds, 10).map((idsChunk) =>
+      collectDocumentIdsSafe(collection(db, "reports"), [
+        where("reportedPostId", "in", idsChunk),
+      ]),
+    ),
+  );
+
+  for (const result of postReportIds) {
+    for (const id of result) ids.add(id);
+  }
+
+  return ids.size;
 }
 
 export async function getUserActivity(
@@ -230,21 +334,83 @@ export async function getUserActivity(
     reportsOpened,
     commentsCount,
   ] = await Promise.all([
-    countQuerySafe(collection(db, "posts"), [
-      where("profileId", "==", profileId),
+    countUniqueDocumentsSafe([
+      {
+        base: collection(db, "posts"),
+        constraints: [where("authorProfileId", "==", profileId)],
+      },
+      {
+        base: collection(db, "posts"),
+        constraints: [where("profileId", "==", profileId)],
+      },
+      ...(ownerUid
+        ? [
+            {
+              base: collection(db, "posts"),
+              constraints: [where("authorUid", "==", ownerUid)],
+            },
+          ]
+        : []),
     ]),
-    countQuerySafe(collection(db, "conversations"), [
-      where("participants", "array-contains", ownerKey),
+    countUniqueDocumentsSafe([
+      {
+        base: collection(db, "conversations"),
+        constraints: [where("participantProfiles", "array-contains", profileId)],
+      },
+      {
+        base: collection(db, "conversations"),
+        constraints: [where("participants", "array-contains", ownerKey)],
+      },
+      ...(ownerUid && ownerUid !== ownerKey
+        ? [
+            {
+              base: collection(db, "conversations"),
+              constraints: [where("participants", "array-contains", ownerUid)],
+            },
+          ]
+        : []),
+      {
+        base: collection(db, "conversations"),
+        constraints: [where("createdBy", "==", profileId)],
+      },
     ]),
-    countQuerySafe(collection(db, "reports"), [
-      where("targetProfileId", "==", profileId),
+    countReportsAgainstProfile(profileId, ownerUid),
+    countUniqueDocumentsSafe([
+      {
+        base: collection(db, "reports"),
+        constraints: [where("reporterProfileId", "==", profileId)],
+      },
+      ...(ownerUid
+        ? [
+            {
+              base: collection(db, "reports"),
+              constraints: [where("reporterUid", "==", ownerUid)],
+            },
+            {
+              base: collection(db, "reports"),
+              constraints: [where("reportedBy", "array-contains", ownerUid)],
+            },
+          ]
+        : []),
     ]),
-    countQuerySafe(collection(db, "reports"), [
-      where("reporterProfileId", "==", profileId),
-    ]).catch(() => 0),
-    countQuerySafe(collection(db, "comments"), [
-      where("profileId", "==", profileId),
-    ]).catch(() => 0),
+    countUniqueDocumentsSafe([
+      {
+        base: collectionGroup(db, "comments"),
+        constraints: [where("authorProfileId", "==", profileId)],
+      },
+      {
+        base: collectionGroup(db, "comments"),
+        constraints: [where("profileId", "==", profileId)],
+      },
+      ...(ownerUid
+        ? [
+            {
+              base: collectionGroup(db, "comments"),
+              constraints: [where("authorUid", "==", ownerUid)],
+            },
+          ]
+        : []),
+    ]),
   ]);
 
   return {
