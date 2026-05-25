@@ -1,10 +1,12 @@
-import CommentsTab from '../../../components/CommentsTab.jsx';
+import CommentsTab from "../../../components/CommentsTab.jsx";
 
 export function CommentsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight dark:text-white">Comentários</h2>
+        <h2 className="text-xl font-semibold tracking-tight dark:text-white">
+          Comentários
+        </h2>
         <p className="text-sm text-gray-500 dark:text-slate-400">
           Busca e moderação de comentários em todo o sistema.
         </p>

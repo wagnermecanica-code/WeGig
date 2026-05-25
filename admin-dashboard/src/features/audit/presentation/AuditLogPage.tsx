@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   collection,
   limit,
@@ -6,11 +6,11 @@ import {
   orderBy,
   query,
   Timestamp,
-} from 'firebase/firestore';
-import { db } from '@core/firebase/client';
-import { Card } from '@shared/components/ui/Card';
-import { Badge } from '@shared/components/ui/Badge';
-import { Skeleton } from '@shared/components/ui/Skeleton';
+} from "firebase/firestore";
+import { db } from "@core/firebase/client";
+import { Card } from "@shared/components/ui/Card";
+import { Badge } from "@shared/components/ui/Badge";
+import { Skeleton } from "@shared/components/ui/Skeleton";
 
 interface AuditEntry {
   id: string;
@@ -23,15 +23,18 @@ interface AuditEntry {
   timestamp?: Date;
 }
 
-const ACTION_TONE: Record<string, 'neutral' | 'success' | 'warning' | 'danger' | 'info'> = {
-  'user.ban': 'danger',
-  'user.unban': 'success',
-  'content.delete': 'danger',
-  'comment.delete': 'warning',
-  'post.delete': 'danger',
-  'report.resolve': 'success',
-  'report.dismiss': 'neutral',
-  'catalog.update': 'info',
+const ACTION_TONE: Record<
+  string,
+  "neutral" | "success" | "warning" | "danger" | "info"
+> = {
+  "user.ban": "danger",
+  "user.unban": "success",
+  "content.delete": "danger",
+  "comment.delete": "warning",
+  "post.delete": "danger",
+  "report.resolve": "success",
+  "report.dismiss": "neutral",
+  "catalog.update": "info",
 };
 
 export function AuditLogPage() {
@@ -39,7 +42,11 @@ export function AuditLogPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc'), limit(100));
+    const q = query(
+      collection(db, "audit_logs"),
+      orderBy("timestamp", "desc"),
+      limit(100),
+    );
     const unsub = onSnapshot(
       q,
       (snap) => {
@@ -68,7 +75,9 @@ export function AuditLogPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight dark:text-white">Log de Auditoria</h2>
+        <h2 className="text-xl font-semibold tracking-tight dark:text-white">
+          Log de Auditoria
+        </h2>
         <p className="text-sm text-gray-500 dark:text-slate-400">
           Histórico completo de ações administrativas (últimas 100).
         </p>
@@ -96,25 +105,39 @@ export function AuditLogPage() {
                 ))
               ) : entries.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-gray-500 dark:text-slate-400">
+                  <td
+                    colSpan={4}
+                    className="px-4 py-10 text-center text-gray-500 dark:text-slate-400"
+                  >
                     Nenhum evento registrado ainda.
                   </td>
                 </tr>
               ) : (
                 entries.map((e) => (
-                  <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50">
+                  <tr
+                    key={e.id}
+                    className="hover:bg-gray-50 dark:hover:bg-slate-800/50"
+                  >
                     <td className="px-4 py-3 text-xs text-gray-500 dark:text-slate-400 whitespace-nowrap">
-                      {e.timestamp ? e.timestamp.toLocaleString('pt-BR') : '—'}
+                      {e.timestamp ? e.timestamp.toLocaleString("pt-BR") : "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-xs font-medium dark:text-slate-200">{e.actorEmail ?? '—'}</div>
-                      <div className="text-[10px] uppercase text-gray-400">{e.actorRole}</div>
+                      <div className="text-xs font-medium dark:text-slate-200">
+                        {e.actorEmail ?? "—"}
+                      </div>
+                      <div className="text-[10px] uppercase text-gray-400">
+                        {e.actorRole}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge tone={ACTION_TONE[e.action] ?? 'neutral'}>{e.action}</Badge>
+                      <Badge tone={ACTION_TONE[e.action] ?? "neutral"}>
+                        {e.action}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 dark:text-slate-300">
-                      <span className="uppercase text-[10px] text-gray-400 mr-2">{e.targetType}</span>
+                      <span className="uppercase text-[10px] text-gray-400 mr-2">
+                        {e.targetType}
+                      </span>
                       <span className="font-mono">{e.targetId}</span>
                     </td>
                   </tr>

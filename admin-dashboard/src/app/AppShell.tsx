@@ -1,5 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { useState } from 'react';
+import { NavLink, Outlet } from "react-router-dom";
+import { useState } from "react";
 import {
   LayoutDashboard,
   ShieldAlert,
@@ -14,11 +14,11 @@ import {
   Menu,
   X,
   ScrollText,
-} from 'lucide-react';
-import { clsx } from 'clsx';
-import { useAuth } from '@core/auth/AuthProvider';
-import type { Permission } from '@core/auth/roles';
-import { useTheme } from '@core/theme/ThemeProvider';
+} from "lucide-react";
+import { clsx } from "clsx";
+import { useAuth } from "@core/auth/AuthProvider";
+import type { Permission } from "@core/auth/roles";
+import { useTheme } from "@core/theme/ThemeProvider";
 
 interface NavItem {
   to: string;
@@ -28,14 +28,49 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard.view' },
-  { to: '/moderation/reports', label: 'Moderação', icon: ShieldAlert, permission: 'reports.view' },
-  { to: '/users', label: 'Usuários', icon: Users, permission: 'users.view' },
-  { to: '/comments', label: 'Comentários', icon: MessageSquare, permission: 'comments.view' },
-  { to: '/feedbacks', label: 'Feedbacks', icon: Inbox, permission: 'feedbacks.view' },
-  { to: '/catalog', label: 'Catálogo', icon: BookOpen, permission: 'catalog.view' },
-  { to: '/audit', label: 'Auditoria', icon: ScrollText, permission: 'audit.view' },
-  { to: '/settings', label: 'Configurações', icon: Settings, permission: 'dashboard.view' },
+  {
+    to: "/dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    permission: "dashboard.view",
+  },
+  {
+    to: "/moderation/reports",
+    label: "Moderação",
+    icon: ShieldAlert,
+    permission: "reports.view",
+  },
+  { to: "/users", label: "Usuários", icon: Users, permission: "users.view" },
+  {
+    to: "/comments",
+    label: "Comentários",
+    icon: MessageSquare,
+    permission: "comments.view",
+  },
+  {
+    to: "/feedbacks",
+    label: "Feedbacks",
+    icon: Inbox,
+    permission: "feedbacks.view",
+  },
+  {
+    to: "/catalog",
+    label: "Catálogo",
+    icon: BookOpen,
+    permission: "catalog.view",
+  },
+  {
+    to: "/audit",
+    label: "Auditoria",
+    icon: ScrollText,
+    permission: "audit.view",
+  },
+  {
+    to: "/settings",
+    label: "Configurações",
+    icon: Settings,
+    permission: "dashboard.view",
+  },
 ];
 
 export function AppShell() {
@@ -58,10 +93,10 @@ export function AppShell() {
       {/* Sidebar */}
       <aside
         className={clsx(
-          'fixed inset-y-0 left-0 z-40 w-64 transform border-r bg-white transition-transform duration-200 ease-out',
-          'border-gray-200 dark:bg-slate-900 dark:border-slate-800',
-          'lg:translate-x-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+          "fixed inset-y-0 left-0 z-40 w-64 transform border-r bg-white transition-transform duration-200 ease-out",
+          "border-gray-200 dark:bg-slate-900 dark:border-slate-800",
+          "lg:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="flex h-16 items-center justify-between px-5 border-b border-gray-100 dark:border-slate-800">
@@ -95,10 +130,10 @@ export function AppShell() {
                 onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                     isActive
-                      ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-white'
-                      : 'text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                      ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-white"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-800",
                   )
                 }
               >
@@ -112,7 +147,7 @@ export function AppShell() {
         <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-100 dark:border-slate-800">
           <div className="flex items-center gap-3 px-2 py-2">
             <div className="h-8 w-8 rounded-full bg-primary/20 text-primary dark:text-white flex items-center justify-center text-xs font-bold">
-              {admin?.email?.slice(0, 2).toUpperCase() ?? 'AD'}
+              {admin?.email?.slice(0, 2).toUpperCase() ?? "AD"}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium truncate">{admin?.email}</p>
@@ -153,7 +188,11 @@ export function AppShell() {
               className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800"
               aria-label="Alternar tema"
             >
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
             </button>
           </div>
         </header>

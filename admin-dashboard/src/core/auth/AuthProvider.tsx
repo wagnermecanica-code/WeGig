@@ -5,16 +5,16 @@ import {
   useMemo,
   useState,
   type ReactNode,
-} from 'react';
-import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
-import { doc, getDoc, Timestamp } from 'firebase/firestore';
-import { auth, db } from '../firebase/client';
+} from "react";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { doc, getDoc, Timestamp } from "firebase/firestore";
+import { auth, db } from "../firebase/client";
 import {
   hasPermission,
   type AdminRole,
   type AdminUser,
   type Permission,
-} from './roles';
+} from "./roles";
 
 interface AuthState {
   user: User | null;
@@ -27,14 +27,20 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-const VALID_ROLES: AdminRole[] = ['superadmin', 'admin', 'moderator', 'support', 'analytics'];
+const VALID_ROLES: AdminRole[] = [
+  "superadmin",
+  "admin",
+  "moderator",
+  "support",
+  "analytics",
+];
 
 function normalizeRole(value: unknown): AdminRole {
   // Default conservador: documentos admins criados sem 'role' são tratados como 'admin'
-  if (typeof value === 'string' && (VALID_ROLES as string[]).includes(value)) {
+  if (typeof value === "string" && (VALID_ROLES as string[]).includes(value)) {
     return value as AdminRole;
   }
-  return 'admin';
+  return "admin";
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -52,12 +58,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        const snap = await getDoc(doc(db, 'admins', firebaseUser.uid));
+        const snap = await getDoc(doc(db, "admins", firebaseUser.uid));
         if (snap.exists()) {
           const data = snap.data();
           const createdAtRaw = data.createdAt;
           const createdAt =
-            createdAtRaw instanceof Timestamp ? createdAtRaw.toDate() : undefined;
+            createdAtRaw instanceof Timestamp
+              ? createdAtRaw.toDate()
+              : undefined;
           setAdmin({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
@@ -94,6 +102,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within <AuthProvider>');
+  if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
   return ctx;
 }

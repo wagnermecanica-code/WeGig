@@ -8,8 +8,8 @@ import {
   query,
   Timestamp,
   where,
-} from 'firebase/firestore';
-import { db } from '@core/firebase/client';
+} from "firebase/firestore";
+import { db } from "@core/firebase/client";
 
 export interface ProfileSummary {
   id: string;
@@ -33,14 +33,15 @@ function mapProfile(id: string, data: Record<string, any>): ProfileSummary {
   const createdAtRaw = data.createdAt;
   return {
     id,
-    name: data.name ?? data.displayName ?? '(sem nome)',
+    name: data.name ?? data.displayName ?? "(sem nome)",
     city: data.city,
     state: data.state,
     profileType: data.profileType ?? data.type,
     ownerUid: data.ownerUid ?? data.userId ?? data.uid,
     photoUrl: data.photoUrl ?? data.avatarUrl,
-    createdAt: createdAtRaw instanceof Timestamp ? createdAtRaw.toDate() : undefined,
-    banned: data.banned === true || data.moderationStatus === 'banned',
+    createdAt:
+      createdAtRaw instanceof Timestamp ? createdAtRaw.toDate() : undefined,
+    banned: data.banned === true || data.moderationStatus === "banned",
   };
 }
 
@@ -52,12 +53,12 @@ export async function listProfiles(params: {
   const pageSize = params.pageSize ?? 50;
   const constraints: any[] = [];
   if (params.profileType) {
-    constraints.push(where('profileType', '==', params.profileType));
+    constraints.push(where("profileType", "==", params.profileType));
   }
-  constraints.push(orderBy('createdAt', 'desc'));
+  constraints.push(orderBy("createdAt", "desc"));
   constraints.push(limit(pageSize));
 
-  const snap = await getDocs(query(collection(db, 'profiles'), ...constraints));
+  const snap = await getDocs(query(collection(db, "profiles"), ...constraints));
   let items = snap.docs.map((d) => mapProfile(d.id, d.data()));
 
   const term = params.searchTerm?.trim().toLowerCase();
@@ -65,8 +66,8 @@ export async function listProfiles(params: {
     items = items.filter(
       (p) =>
         p.name.toLowerCase().includes(term) ||
-        (p.city ?? '').toLowerCase().includes(term) ||
-        (p.profileType ?? '').toLowerCase().includes(term) ||
+        (p.city ?? "").toLowerCase().includes(term) ||
+        (p.profileType ?? "").toLowerCase().includes(term) ||
         p.id.toLowerCase().includes(term),
     );
   }
@@ -74,7 +75,7 @@ export async function listProfiles(params: {
 }
 
 export async function getProfile(id: string): Promise<ProfileDetail | null> {
-  const snap = await getDoc(doc(db, 'profiles', id));
+  const snap = await getDoc(doc(db, "profiles", id));
   if (!snap.exists()) return null;
   const data = snap.data();
   const base = mapProfile(snap.id, data);
@@ -92,17 +93,32 @@ export interface UserActivity {
   reportsAgainst: number;
 }
 
-export async function getUserActivity(profileId: string, ownerUid?: string): Promise<UserActivity> {
+export async function getUserActivity(
+  profileId: string,
+  ownerUid?: string,
+): Promise<UserActivity> {
   const ownerKey = ownerUid ?? profileId;
   const [postsSnap, convsSnap, reportsSnap] = await Promise.all([
-    getDocs(query(collection(db, 'posts'), where('profileId', '==', profileId), limit(50))).catch(
-      () => ({ size: 0 }) as any,
-    ),
     getDocs(
-      query(collection(db, 'conversations'), where('participants', 'array-contains', ownerKey), limit(50)),
+      query(
+        collection(db, "posts"),
+        where("profileId", "==", profileId),
+        limit(50),
+      ),
     ).catch(() => ({ size: 0 }) as any),
     getDocs(
-      query(collection(db, 'reports'), where('targetProfileId', '==', profileId), limit(50)),
+      query(
+        collection(db, "conversations"),
+        where("participants", "array-contains", ownerKey),
+        limit(50),
+      ),
+    ).catch(() => ({ size: 0 }) as any),
+    getDocs(
+      query(
+        collection(db, "reports"),
+        where("targetProfileId", "==", profileId),
+        limit(50),
+      ),
     ).catch(() => ({ size: 0 }) as any),
   ]);
   return {

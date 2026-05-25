@@ -13,8 +13,7 @@ import { AccessDeniedPage } from "@features/auth/presentation/AccessDeniedPage";
 const CHUNK_RELOAD_KEY = "admin_chunk_reload_once";
 
 function isChunkImportError(error: unknown): boolean {
-  const message =
-    error instanceof Error ? error.message : String(error ?? "");
+  const message = error instanceof Error ? error.message : String(error ?? "");
 
   return /Importing a module script failed|Failed to fetch dynamically imported module|ChunkLoadError|Loading chunk/i.test(
     message,

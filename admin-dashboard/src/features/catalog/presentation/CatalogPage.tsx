@@ -1,10 +1,12 @@
-import CatalogTab from '../../../components/CatalogTab.jsx';
+import CatalogTab from "../../../components/CatalogTab.jsx";
 
 export function CatalogPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight dark:text-white">Catálogo</h2>
+        <h2 className="text-xl font-semibold tracking-tight dark:text-white">
+          Catálogo
+        </h2>
         <p className="text-sm text-gray-500 dark:text-slate-400">
           Gerencia listas dinâmicas (gêneros, instrumentos, papéis).
         </p>

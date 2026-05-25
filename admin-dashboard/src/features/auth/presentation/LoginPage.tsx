@@ -1,22 +1,23 @@
-import { type FormEvent, useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Shield } from 'lucide-react';
-import { auth } from '@core/firebase/client';
-import { useAuth } from '@core/auth/AuthProvider';
-import { Button } from '@shared/components/ui/Button';
+import { type FormEvent, useState } from "react";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Shield } from "lucide-react";
+import { auth } from "@core/firebase/client";
+import { useAuth } from "@core/auth/AuthProvider";
+import { Button } from "@shared/components/ui/Button";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAdmin, loading } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   if (!loading && isAdmin) {
-    const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
+    const from =
+      (location.state as { from?: string } | null)?.from ?? "/dashboard";
     navigate(from, { replace: true });
   }
 
@@ -27,7 +28,8 @@ export function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao fazer login';
+      const message =
+        err instanceof Error ? err.message : "Erro ao fazer login";
       setError(message);
     } finally {
       setSubmitting(false);
@@ -42,11 +44,16 @@ export function LoginPage() {
             <Shield className="h-6 w-6" />
           </div>
           <h1 className="text-lg font-semibold dark:text-white">WeGig Admin</h1>
-          <p className="text-xs text-gray-500 dark:text-slate-400">Acesso restrito</p>
+          <p className="text-xs text-gray-500 dark:text-slate-400">
+            Acesso restrito
+          </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">
+            <label
+              htmlFor="email"
+              className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1"
+            >
               E-mail
             </label>
             <input
@@ -60,7 +67,10 @@ export function LoginPage() {
             />
           </div>
           <div>
-            <label htmlFor="password" className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">
+            <label
+              htmlFor="password"
+              className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1"
+            >
               Senha
             </label>
             <input
@@ -75,7 +85,7 @@ export function LoginPage() {
           </div>
           {error ? <p className="text-xs text-red-600">{error}</p> : null}
           <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? 'Entrando…' : 'Entrar'}
+            {submitting ? "Entrando…" : "Entrar"}
           </Button>
         </form>
       </div>

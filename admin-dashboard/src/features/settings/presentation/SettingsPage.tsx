@@ -1,7 +1,12 @@
-import { Card, CardBody, CardHeader, CardTitle } from '@shared/components/ui/Card';
-import { Badge } from '@shared/components/ui/Badge';
-import { useAuth } from '@core/auth/AuthProvider';
-import { permissionsForRole } from '@core/auth/roles';
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+} from "@shared/components/ui/Card";
+import { Badge } from "@shared/components/ui/Badge";
+import { useAuth } from "@core/auth/AuthProvider";
+import { permissionsForRole } from "@core/auth/roles";
 
 export function SettingsPage() {
   const { admin } = useAuth();
@@ -11,7 +16,9 @@ export function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight dark:text-white">Configurações</h2>
+        <h2 className="text-xl font-semibold tracking-tight dark:text-white">
+          Configurações
+        </h2>
         <p className="text-sm text-gray-500 dark:text-slate-400">
           Informações da sua conta administrativa.
         </p>

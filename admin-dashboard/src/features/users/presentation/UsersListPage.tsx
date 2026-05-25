@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, Filter } from 'lucide-react';
-import { Card, CardBody } from '@shared/components/ui/Card';
-import { Badge } from '@shared/components/ui/Badge';
-import { Skeleton } from '@shared/components/ui/Skeleton';
-import { listProfiles, type ProfileSummary } from '../data/usersService';
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Search, Filter } from "lucide-react";
+import { Card, CardBody } from "@shared/components/ui/Card";
+import { Badge } from "@shared/components/ui/Badge";
+import { Skeleton } from "@shared/components/ui/Skeleton";
+import { listProfiles, type ProfileSummary } from "../data/usersService";
 
-const TYPE_OPTIONS = ['', 'musico', 'banda', 'produtor', 'casa_de_show', 'fa'];
+const TYPE_OPTIONS = ["", "musico", "banda", "produtor", "casa_de_show", "fa"];
 
 export function UsersListPage() {
   const [items, setItems] = useState<ProfileSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [term, setTerm] = useState('');
-  const [type, setType] = useState('');
+  const [term, setTerm] = useState("");
+  const [type, setType] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export function UsersListPage() {
       })
       .catch((err) => {
         if (!active) return;
-        setError(err instanceof Error ? err.message : 'Erro ao listar perfis');
+        setError(err instanceof Error ? err.message : "Erro ao listar perfis");
       })
       .finally(() => active && setLoading(false));
     return () => {
@@ -40,7 +40,7 @@ export function UsersListPage() {
     return items.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
-        (p.city ?? '').toLowerCase().includes(q) ||
+        (p.city ?? "").toLowerCase().includes(q) ||
         p.id.toLowerCase().includes(q),
     );
   }, [term, items]);
@@ -48,7 +48,9 @@ export function UsersListPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight dark:text-white">Gestão de Usuários</h2>
+        <h2 className="text-xl font-semibold tracking-tight dark:text-white">
+          Gestão de Usuários
+        </h2>
         <p className="text-sm text-gray-500 dark:text-slate-400">
           Busca, filtros e ações administrativas sobre perfis.
         </p>
@@ -74,7 +76,7 @@ export function UsersListPage() {
             >
               {TYPE_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>
-                  {opt === '' ? 'Todos os tipos' : opt}
+                  {opt === "" ? "Todos os tipos" : opt}
                 </option>
               ))}
             </select>
@@ -83,7 +85,9 @@ export function UsersListPage() {
       </Card>
 
       {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
       ) : null}
 
       <Card>
@@ -109,13 +113,19 @@ export function UsersListPage() {
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-gray-500 dark:text-slate-400">
+                  <td
+                    colSpan={5}
+                    className="px-4 py-10 text-center text-gray-500 dark:text-slate-400"
+                  >
                     Nenhum perfil encontrado.
                   </td>
                 </tr>
               ) : (
                 filtered.map((p) => (
-                  <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50">
+                  <tr
+                    key={p.id}
+                    className="hover:bg-gray-50 dark:hover:bg-slate-800/50"
+                  >
                     <td className="px-4 py-3">
                       <Link
                         to={`/users/${p.id}`}
@@ -124,8 +134,12 @@ export function UsersListPage() {
                         {p.name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{p.profileType ?? '—'}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{p.city ?? '—'}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-slate-300">
+                      {p.profileType ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-slate-300">
+                      {p.city ?? "—"}
+                    </td>
                     <td className="px-4 py-3">
                       {p.banned ? (
                         <Badge tone="danger">Banido</Badge>
@@ -133,7 +147,9 @@ export function UsersListPage() {
                         <Badge tone="success">Ativo</Badge>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-[10px] text-gray-400">{p.id}</td>
+                    <td className="px-4 py-3 font-mono text-[10px] text-gray-400">
+                      {p.id}
+                    </td>
                   </tr>
                 ))
               )}

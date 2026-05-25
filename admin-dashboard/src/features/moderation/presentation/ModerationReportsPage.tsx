@@ -1,10 +1,12 @@
-import ReportsTab from '../../../components/ReportsTab.jsx';
+import ReportsTab from "../../../components/ReportsTab.jsx";
 
 export function ModerationReportsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight dark:text-white">Moderação · Reports</h2>
+        <h2 className="text-xl font-semibold tracking-tight dark:text-white">
+          Moderação · Reports
+        </h2>
         <p className="text-sm text-gray-500 dark:text-slate-400">
           Conteúdo denunciado pela comunidade.
         </p>

@@ -1,6 +1,6 @@
-import { AuthProvider } from '@core/auth/AuthProvider';
-import { ThemeProvider } from '@core/theme/ThemeProvider';
-import { AppRouter } from './app/router';
+import { AuthProvider } from "@core/auth/AuthProvider";
+import { ThemeProvider } from "@core/theme/ThemeProvider";
+import { AppRouter } from "./app/router";
 
 export function App() {
   return (

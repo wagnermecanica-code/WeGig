@@ -1,24 +1,24 @@
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase/client';
-import type { AdminUser } from '../auth/roles';
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "../firebase/client";
+import type { AdminUser } from "../auth/roles";
 
 export type AuditAction =
-  | 'report.resolve'
-  | 'report.dismiss'
-  | 'content.delete'
-  | 'comment.delete'
-  | 'post.delete'
-  | 'user.ban'
-  | 'user.unban'
-  | 'user.delete'
-  | 'catalog.update'
-  | 'admin.role.update'
-  | 'admin.create'
-  | 'admin.delete';
+  | "report.resolve"
+  | "report.dismiss"
+  | "content.delete"
+  | "comment.delete"
+  | "post.delete"
+  | "user.ban"
+  | "user.unban"
+  | "user.delete"
+  | "catalog.update"
+  | "admin.role.update"
+  | "admin.create"
+  | "admin.delete";
 
 export interface AuditPayload {
   action: AuditAction;
-  targetType: 'user' | 'post' | 'comment' | 'report' | 'catalog' | 'admin';
+  targetType: "user" | "post" | "comment" | "report" | "catalog" | "admin";
   targetId: string;
   metadata?: Record<string, unknown>;
 }
@@ -34,7 +34,7 @@ export async function recordAudit(
 ): Promise<void> {
   if (!actor) return;
   try {
-    await addDoc(collection(db, 'audit_logs'), {
+    await addDoc(collection(db, "audit_logs"), {
       actorUid: actor.uid,
       actorEmail: actor.email,
       actorRole: actor.role,
@@ -45,6 +45,6 @@ export async function recordAudit(
       timestamp: serverTimestamp(),
     });
   } catch (err) {
-    console.warn('[audit] failed to record event', payload.action, err);
+    console.warn("[audit] failed to record event", payload.action, err);
   }
 }
