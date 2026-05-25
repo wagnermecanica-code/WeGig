@@ -17,39 +17,77 @@ export default function CommentsTab() {
   const [removingId, setRemovingId] = useState(null);
   const [error, setError] = useState(null);
 
+  const mapComments = (snap) =>
+    snap.docs.map((d) => ({
+      id: d.id,
+      postId: d.ref.parent.parent?.id ?? "—",
+      ...d.data(),
+      _ref: d.ref,
+    }));
+
+  const sortByCreatedAtDesc = (items) =>
+    [...items].sort((a, b) => {
+      const aMs = a?.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+      const bMs = b?.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+      return bMs - aMs;
+    });
+
+  const formatLoadError = (err) => {
+    if (err?.code === "permission-denied") {
+      return "Erro ao carregar comentários: sem permissão de leitura no Firestore (permission-denied).";
+    }
+
+    if (err?.code === "failed-precondition") {
+      return "Erro ao carregar comentários: índice necessário ainda não está pronto no Firestore.";
+    }
+
+    return "Erro ao carregar comentários no Firestore.";
+  };
+
   useEffect(() => {
-    // Requires a Firestore collectionGroup index on `comments` for `createdAt` DESC.
-    // If missing, Firestore will log a link in the console to create it automatically.
-    const q = query(
+    // Primeiro tenta com índice (mais eficiente). Se faltar índice, cai para
+    // consulta sem orderBy e ordena localmente.
+    const indexedQuery = query(
       collectionGroup(db, "comments"),
       orderBy("createdAt", "desc"),
       limit(200),
     );
 
-    const unsubscribe = onSnapshot(
-      q,
+    const fallbackQuery = query(collectionGroup(db, "comments"), limit(200));
+
+    let unsubscribe = onSnapshot(
+      indexedQuery,
       (snap) => {
-        const data = snap.docs.map((d) => ({
-          id: d.id,
-          postId: d.ref.parent.parent?.id ?? "—",
-          ...d.data(),
-          _ref: d.ref,
-        }));
-        setComments(data);
+        setComments(mapComments(snap));
         setLoading(false);
         setError(null);
       },
       (err) => {
-        // Likely missing index — console will show a direct link to create it
-        setError(
-          "Erro ao carregar comentários. Verifique se o índice collectionGroup em 'comments' (campo createdAt DESC) foi criado no Firestore Console.",
-        );
+        if (err?.code === "failed-precondition") {
+          unsubscribe = onSnapshot(
+            fallbackQuery,
+            (snap) => {
+              const data = sortByCreatedAtDesc(mapComments(snap));
+              setComments(data);
+              setLoading(false);
+              setError(null);
+            },
+            (fallbackErr) => {
+              setError(formatLoadError(fallbackErr));
+              setLoading(false);
+              console.error("CommentsTab fallback:", fallbackErr);
+            },
+          );
+          return;
+        }
+
+        setError(formatLoadError(err));
         setLoading(false);
         console.error("CommentsTab:", err);
       },
     );
 
-    return unsubscribe;
+    return () => unsubscribe();
   }, []);
 
   const removeComment = async (comment) => {

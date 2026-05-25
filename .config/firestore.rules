@@ -488,5 +488,14 @@ service cloud.firestore {
       allow create, read: if isSignedIn();
       allow update, delete: if isAdmin();
     }
+
+    // ============================================
+    // COMMENTS (COLLECTION GROUP) - Acesso administrativo global
+    // ============================================
+    // Necessário para queries collectionGroup('comments') no painel admin,
+    // inclusive quando houver comentários fora de /posts/{postId}/comments.
+    match /{path=**}/comments/{commentId} {
+      allow read, delete: if isAdmin();
+    }
   }
 }

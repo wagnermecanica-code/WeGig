@@ -34,7 +34,9 @@ export interface DailySnapshot {
  * falha (permissão negada, coleção inexistente, índice ausente).
  * Cada métrica falha de forma independente — o dashboard nunca quebra inteiro.
  */
-async function safeCount(q: Parameters<typeof getCountFromServer>[0]): Promise<number> {
+async function safeCount(
+  q: Parameters<typeof getCountFromServer>[0],
+): Promise<number> {
   try {
     const snap = await getCountFromServer(q);
     return snap.data().count ?? 0;
@@ -59,7 +61,9 @@ export async function fetchOverviewMetrics(): Promise<OverviewMetrics> {
     safeCount(collection(db, "posts")),
     safeCount(query(collection(db, "posts"), where("expiresAt", ">", now))),
     safeCount(collection(db, "conversations")),
-    safeCount(query(collection(db, "reports"), where("status", "==", "pending"))),
+    safeCount(
+      query(collection(db, "reports"), where("status", "==", "pending")),
+    ),
     safeCount(collection(db, "feedbacks")),
   ]);
 

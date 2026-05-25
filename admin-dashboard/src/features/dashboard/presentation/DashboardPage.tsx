@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -7,20 +7,33 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-} from 'recharts';
-import { Users, FileText, MessageSquare, ShieldAlert, TrendingUp, Activity } from 'lucide-react';
-import { StatCard } from '@shared/components/ui/StatCard';
-import { Card, CardBody, CardHeader, CardTitle } from '@shared/components/ui/Card';
-import { Skeleton } from '@shared/components/ui/Skeleton';
+} from "recharts";
+import {
+  Users,
+  FileText,
+  MessageSquare,
+  ShieldAlert,
+  TrendingUp,
+  Activity,
+} from "lucide-react";
+import { StatCard } from "@shared/components/ui/StatCard";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+} from "@shared/components/ui/Card";
+import { Skeleton } from "@shared/components/ui/Skeleton";
 import {
   fetchDailySnapshots,
   fetchOverviewMetrics,
+  fetchTodaySnapshot,
   type DailySnapshot,
   type OverviewMetrics,
-} from '../data/metricsService';
+} from "../data/metricsService";
 
 function formatNumber(value: number): string {
-  return new Intl.NumberFormat('pt-BR').format(value);
+  return new Intl.NumberFormat("pt-BR").format(value);
 }
 
 export function DashboardPage() {
@@ -38,11 +51,20 @@ export function DashboardPage() {
           fetchDailySnapshots(14),
         ]);
         if (!active) return;
+
+        if (snaps.length === 0) {
+          const today = await fetchTodaySnapshot();
+          setSeries(today ? [today] : []);
+        } else {
+          setSeries(snaps);
+        }
+
         setOverview(ov);
-        setSeries(snaps);
       } catch (err) {
         if (!active) return;
-        setError(err instanceof Error ? err.message : 'Erro ao carregar métricas');
+        setError(
+          err instanceof Error ? err.message : "Erro ao carregar métricas",
+        );
       } finally {
         if (active) setLoading(false);
       }
@@ -55,7 +77,9 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight dark:text-white">Dashboard Executivo</h2>
+        <h2 className="text-xl font-semibold tracking-tight dark:text-white">
+          Dashboard Executivo
+        </h2>
         <p className="text-sm text-gray-500 dark:text-slate-400">
           Visão geral da plataforma em tempo real.
         </p>
@@ -107,7 +131,7 @@ export function DashboardPage() {
               value={
                 overview.totalUsers > 0
                   ? `${((overview.totalConversations / overview.totalUsers) * 100).toFixed(1)}%`
-                  : '—'
+                  : "—"
               }
               icon={<TrendingUp className="h-5 w-5" />}
               hint="Conversas / Usuários"
@@ -123,13 +147,18 @@ export function DashboardPage() {
         <CardBody>
           {series.length === 0 ? (
             <div className="py-10 text-center text-sm text-gray-500 dark:text-slate-400">
-              Nenhum snapshot agregado encontrado em <code>analytics_daily</code>.<br />
-              A Cloud Function <code>aggregateDailyMetrics</code> precisa rodar para popular este gráfico.
+              Ainda não existem dados históricos para exibir no gráfico diário.
+              <br />
+              Assim que os snapshots de analytics forem gerados, este painel
+              será preenchido automaticamente.
             </div>
           ) : (
             <div className="h-72 w-full">
               <ResponsiveContainer>
-                <AreaChart data={series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                <AreaChart
+                  data={series}
+                  margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+                >
                   <defs>
                     <linearGradient id="dau" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#37475A" stopOpacity={0.4} />
