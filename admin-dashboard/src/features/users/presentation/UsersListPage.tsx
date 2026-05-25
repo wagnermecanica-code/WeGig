@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, RefreshCw } from "lucide-react";
 import { Card, CardBody } from "@shared/components/ui/Card";
 import { Badge } from "@shared/components/ui/Badge";
 import { Skeleton } from "@shared/components/ui/Skeleton";
+import { Button } from "@shared/components/ui/Button";
 import { listProfiles, type ProfileSummary } from "../data/usersService";
 
 const TYPE_OPTIONS = ["", "musico", "banda", "produtor", "casa_de_show", "fa"];
@@ -14,11 +15,16 @@ export function UsersListPage() {
   const [term, setTerm] = useState("");
   const [type, setType] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    listProfiles({ profileType: type || undefined, pageSize: 100 })
+    listProfiles({
+      profileType: type || undefined,
+      pageSize: 350,
+      maxRecords: 8000,
+    })
       .then((rows) => {
         if (!active) return;
         setItems(rows);
@@ -32,7 +38,7 @@ export function UsersListPage() {
     return () => {
       active = false;
     };
-  }, [type]);
+  }, [type, reloadKey]);
 
   const filtered = useMemo(() => {
     const q = term.trim().toLowerCase();
@@ -44,6 +50,14 @@ export function UsersListPage() {
         p.id.toLowerCase().includes(q),
     );
   }, [term, items]);
+
+  function formatDate(value?: Date) {
+    if (!value) return "—";
+    return new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(value);
+  }
 
   return (
     <div className="space-y-6">
@@ -81,8 +95,21 @@ export function UsersListPage() {
               ))}
             </select>
           </div>
+          <Button
+            variant="secondary"
+            onClick={() => setReloadKey((x) => x + 1)}
+            disabled={loading}
+          >
+            <RefreshCw className="h-4 w-4" /> Atualizar
+          </Button>
         </CardBody>
       </Card>
+
+      <div className="text-xs text-gray-500 dark:text-slate-400">
+        {loading
+          ? "Carregando perfis..."
+          : `${filtered.length} de ${items.length} perfis exibidos`}
+      </div>
 
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -98,6 +125,7 @@ export function UsersListPage() {
                 <th className="px-4 py-3 text-left">Nome</th>
                 <th className="px-4 py-3 text-left">Tipo</th>
                 <th className="px-4 py-3 text-left">Cidade</th>
+                <th className="px-4 py-3 text-left">Criado em</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">ID</th>
               </tr>
@@ -106,7 +134,7 @@ export function UsersListPage() {
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={5} className="px-4 py-3">
+                    <td colSpan={6} className="px-4 py-3">
                       <Skeleton className="h-5 w-full" />
                     </td>
                   </tr>
@@ -114,7 +142,7 @@ export function UsersListPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-4 py-10 text-center text-gray-500 dark:text-slate-400"
                   >
                     Nenhum perfil encontrado.
@@ -139,6 +167,9 @@ export function UsersListPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-slate-300">
                       {p.city ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-slate-300">
+                      {formatDate(p.createdAt)}
                     </td>
                     <td className="px-4 py-3">
                       {p.banned ? (

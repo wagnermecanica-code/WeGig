@@ -3,9 +3,14 @@ import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Ban,
+  Copy,
   FileText,
+  Mail,
   MessageSquare,
+  Phone,
+  RefreshCw,
   ShieldAlert,
+  UserCheck,
 } from "lucide-react";
 import {
   Card,
@@ -36,6 +41,7 @@ export function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -58,7 +64,29 @@ export function UserDetailPage() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, reloadKey]);
+
+  function formatDate(value?: Date) {
+    if (!value) return "—";
+    return new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(value);
+  }
+
+  function renderFlag(value?: boolean) {
+    if (value === true) return "Sim";
+    if (value === false) return "Não";
+    return "—";
+  }
+
+  async function copyToClipboard(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      setError(`Não foi possível copiar ${label}.`);
+    }
+  }
 
   async function handleToggleBan() {
     if (!profile || !admin) return;
@@ -152,20 +180,48 @@ export function UserDetailPage() {
             </p>
             <p className="text-xs font-mono text-gray-400 mt-1">{profile.id}</p>
           </div>
-          {canModerate ? (
+          <div className="flex flex-wrap gap-2">
             <Button
-              variant={profile.banned ? "secondary" : "danger"}
-              onClick={handleToggleBan}
-              disabled={actionInProgress}
+              variant="secondary"
+              onClick={() => setReloadKey((x) => x + 1)}
+              disabled={loading || actionInProgress}
             >
-              <Ban className="h-4 w-4" />
-              {profile.banned ? "Desbanir" : "Banir"}
+              <RefreshCw className="h-4 w-4" /> Atualizar
             </Button>
-          ) : null}
+            <Button
+              variant="ghost"
+              onClick={() => void copyToClipboard(profile.id, "ID do perfil")}
+            >
+              <Copy className="h-4 w-4" /> Copiar ID
+            </Button>
+            {profile.ownerUid ? (
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  void copyToClipboard(
+                    profile.ownerUid ?? "",
+                    "UID proprietário",
+                  )
+                }
+              >
+                <Copy className="h-4 w-4" /> Copiar UID
+              </Button>
+            ) : null}
+            {canModerate ? (
+              <Button
+                variant={profile.banned ? "secondary" : "danger"}
+                onClick={handleToggleBan}
+                disabled={actionInProgress}
+              >
+                <Ban className="h-4 w-4" />
+                {profile.banned ? "Desbanir" : "Banir"}
+              </Button>
+            ) : null}
+          </div>
         </CardBody>
       </Card>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           label="Posts"
           value={activity?.postsCount ?? "—"}
@@ -181,7 +237,115 @@ export function UserDetailPage() {
           value={activity?.reportsAgainst ?? "—"}
           icon={<ShieldAlert className="h-4 w-4" />}
         />
+        <StatCard
+          label="Reports abertos"
+          value={activity?.reportsOpened ?? "—"}
+          icon={<ShieldAlert className="h-4 w-4" />}
+        />
+        <StatCard
+          label="Comentários"
+          value={activity?.commentsCount ?? "—"}
+          icon={<MessageSquare className="h-4 w-4" />}
+        />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Dados do Perfil</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">
+                UID proprietário
+              </p>
+              <p className="font-mono text-xs break-all">
+                {profile.ownerUid ?? "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Username</p>
+              <p>{profile.username ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Email</p>
+              <p className="inline-flex items-center gap-1">
+                <Mail className="h-3.5 w-3.5" /> {profile.email ?? "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Telefone</p>
+              <p className="inline-flex items-center gap-1">
+                <Phone className="h-3.5 w-3.5" /> {profile.phone ?? "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Verificado</p>
+              <p className="inline-flex items-center gap-1">
+                <UserCheck className="h-3.5 w-3.5" />{" "}
+                {renderFlag(profile.verified)}
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">
+                Status de moderação
+              </p>
+              <p>{profile.moderationStatus ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Criado em</p>
+              <p>{formatDate(profile.createdAt)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Atualizado em</p>
+              <p>{formatDate(profile.updatedAt)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Último acesso</p>
+              <p>{formatDate(profile.lastSeenAt)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">
+                Permite sugestões de conexão
+              </p>
+              <p>{renderFlag(profile.allowConnectionSuggestions)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">
+                Permite solicitações de conexão
+              </p>
+              <p>{renderFlag(profile.allowConnectionRequests)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">
+                Bloqueados / bloqueado por
+              </p>
+              <p>
+                {(profile.blockedProfilesCount ?? 0).toString()} /{" "}
+                {(profile.blockedByProfilesCount ?? 0).toString()}
+              </p>
+            </div>
+          </div>
+        </CardBody>
+      </Card>
+
+      {profile.genres?.length || profile.instruments?.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Preferências Musicais</CardTitle>
+          </CardHeader>
+          <CardBody className="space-y-3 text-sm">
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Gêneros</p>
+              <p>{profile.genres?.join(", ") ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Instrumentos</p>
+              <p>{profile.instruments?.join(", ") ?? "—"}</p>
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
 
       {profile.bio ? (
         <Card>
