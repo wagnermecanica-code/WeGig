@@ -1,0 +1,170 @@
+import { lazy, Suspense } from 'react';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { AppShell } from './AppShell';
+import { RequireAdmin } from './guards/RequireAdmin';
+import { useAuth } from '@core/auth/AuthProvider';
+import { LoginPage } from '@features/auth/presentation/LoginPage';
+import { AccessDeniedPage } from '@features/auth/presentation/AccessDeniedPage';
+
+const DashboardPage = lazy(() =>
+  import('@features/dashboard/presentation/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+);
+const ModerationReportsPage = lazy(() =>
+  import('@features/moderation/presentation/ModerationReportsPage').then((m) => ({
+    default: m.ModerationReportsPage,
+  })),
+);
+const UsersListPage = lazy(() =>
+  import('@features/users/presentation/UsersListPage').then((m) => ({ default: m.UsersListPage })),
+);
+const UserDetailPage = lazy(() =>
+  import('@features/users/presentation/UserDetailPage').then((m) => ({ default: m.UserDetailPage })),
+);
+const CommentsPage = lazy(() =>
+  import('@features/comments/presentation/CommentsPage').then((m) => ({ default: m.CommentsPage })),
+);
+const FeedbacksPage = lazy(() =>
+  import('@features/feedbacks/presentation/FeedbacksPage').then((m) => ({ default: m.FeedbacksPage })),
+);
+const CatalogPage = lazy(() =>
+  import('@features/catalog/presentation/CatalogPage').then((m) => ({ default: m.CatalogPage })),
+);
+const AuditLogPage = lazy(() =>
+  import('@features/audit/presentation/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
+);
+const SettingsPage = lazy(() =>
+  import('@features/settings/presentation/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+);
+
+function Suspended({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-12 text-center text-sm text-gray-500 dark:text-slate-400">
+          Carregando…
+        </div>
+      }
+    >
+      {children}
+    </Suspense>
+  );
+}
+
+const router = createBrowserRouter(
+  [
+    { path: '/login', element: <LoginPage /> },
+    { path: '/access-denied', element: <AccessDeniedPage /> },
+    {
+      path: '/',
+      element: (
+        <RequireAdmin>
+          <AppShell />
+        </RequireAdmin>
+      ),
+      children: [
+        { index: true, element: <Navigate to="/dashboard" replace /> },
+        {
+          path: 'dashboard',
+          element: (
+            <RequireAdmin permission="dashboard.view">
+              <Suspended>
+                <DashboardPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: 'moderation/reports',
+          element: (
+            <RequireAdmin permission="reports.view">
+              <Suspended>
+                <ModerationReportsPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: 'users',
+          element: (
+            <RequireAdmin permission="users.view">
+              <Suspended>
+                <UsersListPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: 'users/:id',
+          element: (
+            <RequireAdmin permission="users.view">
+              <Suspended>
+                <UserDetailPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: 'comments',
+          element: (
+            <RequireAdmin permission="comments.view">
+              <Suspended>
+                <CommentsPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: 'feedbacks',
+          element: (
+            <RequireAdmin permission="feedbacks.view">
+              <Suspended>
+                <FeedbacksPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: 'catalog',
+          element: (
+            <RequireAdmin permission="catalog.view">
+              <Suspended>
+                <CatalogPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: 'audit',
+          element: (
+            <RequireAdmin permission="audit.view">
+              <Suspended>
+                <AuditLogPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        {
+          path: 'settings',
+          element: (
+            <RequireAdmin>
+              <Suspended>
+                <SettingsPage />
+              </Suspended>
+            </RequireAdmin>
+          ),
+        },
+        { path: '*', element: <Navigate to="/dashboard" replace /> },
+      ],
+    },
+  ],
+  { basename: '/admin' },
+);
+
+export function AppRouter() {
+  // Roteia automaticamente um usuário autenticado mas não-admin para /access-denied
+  const { user, isAdmin, loading } = useAuth();
+  if (!loading && user && !isAdmin && window.location.pathname !== '/admin/access-denied') {
+    return <AccessDeniedPage />;
+  }
+  return <RouterProvider router={router} />;
+}

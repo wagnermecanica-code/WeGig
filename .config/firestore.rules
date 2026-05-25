@@ -412,10 +412,39 @@ service cloud.firestore {
     // ADMINS - Controle de acesso do painel web
     // ============================================
     // O próprio usuário autenticado pode verificar se seu UID está autorizado.
-    // Criação/remoção de admins deve ser feita via Console, CLI ou Admin SDK.
+    // Superadmins podem listar/gerenciar via painel; demais via Console/Admin SDK.
     match /admins/{adminUid} {
       allow get: if isSignedIn() && request.auth.uid == adminUid;
-      allow list, create, update, delete: if false;
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin() &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'superadmin';
+    }
+
+    // ============================================
+    // AUDIT LOGS - Trilha de auditoria de ações administrativas
+    // ============================================
+    // Admins gravam o próprio evento (actorUid == request.auth.uid).
+    // Leitura restrita a admins. Não permitir update/delete (imutável).
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.actorUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ============================================
+    // ANALYTICS DAILY - Snapshots agregados pela Cloud Function
+    // ============================================
+    match /analytics_daily/{dateId} {
+      allow read: if isAdmin();
+      allow write: if false; // somente Cloud Functions via Admin SDK
+    }
+
+    // ============================================
+    // USER MODERATION - Histórico de moderação (ban/unban)
+    // ============================================
+    match /user_moderation/{entryId} {
+      allow read: if isAdmin();
+      allow write: if false; // somente via callable setUserModeration
     }
 
     // ============================================

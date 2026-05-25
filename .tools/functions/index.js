@@ -3593,3 +3593,10 @@ exports.rebuildConnectionStats = functions
       rebuiltProfiles: uniqueProfileIds(profileIds),
     };
   });
+
+// =====================================================================
+// Admin Functions (Phase 1) — aggregateDailyMetrics, setUserModeration
+// =====================================================================
+const adminFunctions = require("./admin_functions");
+exports.aggregateDailyMetrics = adminFunctions.aggregateDailyMetrics;
+exports.setUserModeration = adminFunctions.setUserModeration;
