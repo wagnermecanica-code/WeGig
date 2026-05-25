@@ -47,6 +47,87 @@ function mapDailySnapshot(
   };
 }
 
+function formatDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function parseTimestampLike(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "object" && value !== null) {
+    const maybe = value as { toDate?: () => Date };
+    if (typeof maybe.toDate === "function") {
+      return maybe.toDate();
+    }
+  }
+  return null;
+}
+
+export async function fetchDerivedDailySnapshots(
+  days = 14,
+): Promise<DailySnapshot[]> {
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(now.getDate() - (days - 1));
+  start.setHours(0, 0, 0, 0);
+  const startTs = Timestamp.fromDate(start);
+
+  const initial = new Map<string, DailySnapshot>();
+  for (let i = 0; i < days; i += 1) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const key = formatDateKey(d);
+    initial.set(key, {
+      date: key,
+      dau: 0,
+      newUsers: 0,
+      newPosts: 0,
+      messagesSent: 0,
+    });
+  }
+
+  try {
+    const [postsSnap, usersSnap] = await Promise.all([
+      getDocs(
+        query(collection(db, "posts"), where("createdAt", ">=", startTs)),
+      ),
+      getDocs(
+        query(collection(db, "profiles"), where("createdAt", ">=", startTs)),
+      ),
+    ]);
+
+    for (const docSnap of postsSnap.docs) {
+      const createdAt = parseTimestampLike(docSnap.data().createdAt);
+      if (!createdAt) continue;
+      const key = formatDateKey(createdAt);
+      const row = initial.get(key);
+      if (!row) continue;
+      row.newPosts = (row.newPosts ?? 0) + 1;
+    }
+
+    for (const docSnap of usersSnap.docs) {
+      const createdAt = parseTimestampLike(docSnap.data().createdAt);
+      if (!createdAt) continue;
+      const key = formatDateKey(createdAt);
+      const row = initial.get(key);
+      if (!row) continue;
+      row.newUsers = (row.newUsers ?? 0) + 1;
+    }
+
+    const result = Array.from(initial.values());
+    for (const row of result) {
+      const newUsers = row.newUsers ?? 0;
+      const newPosts = row.newPosts ?? 0;
+      row.dau = newUsers + Math.round(newPosts / 2);
+    }
+
+    return result;
+  } catch (err) {
+    console.warn("[metricsService] derived daily snapshots failed:", err);
+    return [];
+  }
+}
+
 /**
  * Conta documentos com Firestore aggregation, retornando 0 em caso de
  * falha (permissão negada, coleção inexistente, índice ausente).

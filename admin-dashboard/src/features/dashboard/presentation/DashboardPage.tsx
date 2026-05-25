@@ -28,6 +28,7 @@ import {
 } from "@shared/components/ui/Card";
 import { Skeleton } from "@shared/components/ui/Skeleton";
 import {
+  fetchDerivedDailySnapshots,
   fetchDailySnapshots,
   fetchOverviewMetrics,
   fetchTodaySnapshot,
@@ -82,8 +83,18 @@ export function DashboardPage() {
             setSeries([today]);
             setSeriesIsFallback(false);
           } else {
-            setSeries(buildEmptySeries(chartDays));
-            setSeriesIsFallback(true);
+            const derived = await fetchDerivedDailySnapshots(chartDays);
+            const hasDerivedData = derived.some(
+              (row) => (row.newUsers ?? 0) > 0 || (row.newPosts ?? 0) > 0,
+            );
+
+            if (hasDerivedData) {
+              setSeries(derived);
+              setSeriesIsFallback(false);
+            } else {
+              setSeries(buildEmptySeries(chartDays));
+              setSeriesIsFallback(true);
+            }
           }
         } else {
           setSeries(snaps);
