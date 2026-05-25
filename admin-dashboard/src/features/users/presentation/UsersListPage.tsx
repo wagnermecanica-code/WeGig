@@ -46,6 +46,7 @@ export function UsersListPage() {
     return items.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
+        (p.username ?? "").toLowerCase().includes(q) ||
         (p.city ?? "").toLowerCase().includes(q) ||
         p.id.toLowerCase().includes(q),
     );
@@ -75,7 +76,7 @@ export function UsersListPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
-              placeholder="Buscar por nome, cidade ou ID…"
+              placeholder="Buscar por nome, username, cidade ou ID..."
               value={term}
               onChange={(e) => setTerm(e.target.value)}
               className="w-full pl-9 h-10 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"

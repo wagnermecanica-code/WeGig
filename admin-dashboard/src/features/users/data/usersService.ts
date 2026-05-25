@@ -21,6 +21,7 @@ import { db } from "@core/firebase/client";
 export interface ProfileSummary {
   id: string;
   name: string;
+  username?: string;
   city?: string;
   state?: string;
   profileType?: string;
@@ -92,6 +93,7 @@ function mapProfile(id: string, data: Record<string, any>): ProfileSummary {
   return {
     id,
     name: data.name ?? data.displayName ?? "(sem nome)",
+    username: data.username ?? data.userName ?? data.handle,
     city: data.city,
     state: data.state,
     profileType: data.profileType ?? data.type,
@@ -177,6 +179,7 @@ export async function listProfiles(params: {
     items = items.filter(
       (p) =>
         p.name.toLowerCase().includes(term) ||
+        (p.username ?? "").toLowerCase().includes(term) ||
         (p.city ?? "").toLowerCase().includes(term) ||
         (p.profileType ?? "").toLowerCase().includes(term) ||
         p.id.toLowerCase().includes(term),
