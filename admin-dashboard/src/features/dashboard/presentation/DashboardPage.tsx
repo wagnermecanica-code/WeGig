@@ -13,6 +13,7 @@ import {
   FileText,
   MessageSquare,
   MessageCircle,
+  UsersRound,
   ShieldAlert,
   TrendingUp,
   Activity,
@@ -123,7 +124,7 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading || !overview ? (
-          Array.from({ length: 8 }).map((_, i) => (
+          Array.from({ length: 9 }).map((_, i) => (
             <Skeleton key={i} className="h-28" />
           ))
         ) : (
@@ -144,6 +145,11 @@ export function DashboardPage() {
               label="Conversas"
               value={formatNumber(overview.totalConversations)}
               icon={<MessageSquare className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Conversas em grupo"
+              value={formatNumber(overview.totalGroupConversations)}
+              icon={<UsersRound className="h-5 w-5" />}
             />
             <StatCard
               label="Comentários"

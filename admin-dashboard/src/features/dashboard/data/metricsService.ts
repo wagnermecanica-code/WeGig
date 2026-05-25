@@ -18,6 +18,7 @@ export interface OverviewMetrics {
   totalPosts: number;
   activePosts: number;
   totalConversations: number;
+  totalGroupConversations: number;
   totalComments: number;
   totalInterests: number;
   pendingReports: number;
@@ -57,6 +58,7 @@ export async function fetchOverviewMetrics(): Promise<OverviewMetrics> {
     totalPosts,
     activePosts,
     totalConversations,
+    totalGroupConversations,
     totalComments,
     totalInterests,
     pendingReports,
@@ -66,6 +68,7 @@ export async function fetchOverviewMetrics(): Promise<OverviewMetrics> {
     safeCount(collection(db, "posts")),
     safeCount(query(collection(db, "posts"), where("expiresAt", ">", now))),
     safeCount(collection(db, "conversations")),
+    safeCount(query(collection(db, "conversations"), where("isGroup", "==", true))),
     safeCount(collectionGroup(db, "comments")),
     safeCount(collection(db, "interests")),
     safeCount(
@@ -79,6 +82,7 @@ export async function fetchOverviewMetrics(): Promise<OverviewMetrics> {
     totalPosts,
     activePosts,
     totalConversations,
+    totalGroupConversations,
     totalComments,
     totalInterests,
     pendingReports,
