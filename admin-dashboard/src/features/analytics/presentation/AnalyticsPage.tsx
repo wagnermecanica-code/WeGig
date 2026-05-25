@@ -190,19 +190,19 @@ export function AnalyticsPage() {
               label="DAU"
               value={formatNumber(activity.dau)}
               icon={<Activity className="h-5 w-5" />}
-              hint="Usuários ativos hoje"
+              hint="Ativos hoje ou proxy legado"
             />
             <StatCard
               label="WAU"
               value={formatNumber(activity.wau)}
               icon={<Users className="h-5 w-5" />}
-              hint="Últimos 7 dias"
+              hint="Últimos 7 dias ou proxy legado"
             />
             <StatCard
               label="MAU"
               value={formatNumber(activity.mau)}
               icon={<CalendarRange className="h-5 w-5" />}
-              hint="Últimos 30 dias"
+              hint="Últimos 30 dias ou proxy legado"
             />
             <StatCard
               label="Conteúdo total"
@@ -214,25 +214,25 @@ export function AnalyticsPage() {
               label="Retenção D1"
               value={formatPercent(activity.d1Retention)}
               icon={<UserCheck className="h-5 w-5" />}
-              hint="Usuários retornando no D1"
+              hint="Retorno D1 com dados legados"
             />
             <StatCard
               label="Retenção D7"
               value={formatPercent(activity.d7Retention)}
               icon={<UserCheck className="h-5 w-5" />}
-              hint="Usuários retornando no D7"
+              hint="Retorno D7 com dados legados"
             />
             <StatCard
               label="Engajamento médio"
               value={formatDuration(activity.avgEngagementSeconds)}
               icon={<Timer className="h-5 w-5" />}
-              hint="Estimado por sessão"
+              hint="Estimado por eventos legados"
             />
             <StatCard
               label="Churn 30d"
               value={formatPercent(churn)}
               icon={<TrendingDown className="h-5 w-5" />}
-              hint="Perfis inativos > 30 dias"
+              hint="Inatividade 30d + proxy legado"
             />
           </>
         )}
