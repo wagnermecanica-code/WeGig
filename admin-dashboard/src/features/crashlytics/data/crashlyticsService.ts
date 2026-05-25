@@ -1,5 +1,6 @@
 import {
   collection,
+  collectionGroup,
   getCountFromServer,
   getDocs,
   limit,
@@ -76,6 +77,16 @@ const CANDIDATE_COLLECTIONS = [
   "crashReports",
   "app_crashes",
   "appCrashes",
+];
+
+const SESSION_COLLECTIONS = [
+  "sessions",
+  "app_sessions",
+  "appSessions",
+  "analytics_sessions",
+  "analyticsSessions",
+  "user_sessions",
+  "userSessions",
 ];
 
 function parseTimestampLike(value: unknown): Date | null {
@@ -250,12 +261,55 @@ async function countProfilesSafe(): Promise<number | null> {
   }
 }
 
+async function countCollectionSafe(name: string): Promise<number> {
+  try {
+    const snap = await getCountFromServer(collection(db, name));
+    return snap.data().count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function countActivityProxySafe(): Promise<number> {
+  const [posts, interests, messages] = await Promise.all([
+    countCollectionSafe("posts"),
+    countCollectionSafe("interests"),
+    getCountFromServer(collectionGroup(db, "messages"))
+      .then((snap) => snap.data().count ?? 0)
+      .catch(() => 0),
+  ]);
+  return posts + interests + messages;
+}
+
+async function countSessionsSafe(
+  affectedSessionsEstimate: number,
+  totalUsers: number | null,
+  totalEvents: number,
+): Promise<number | null> {
+  for (const collectionName of SESSION_COLLECTIONS) {
+    const count = await countCollectionSafe(collectionName);
+    if (count > 0) return Math.max(count, affectedSessionsEstimate);
+  }
+
+  const activityProxy = await countActivityProxySafe();
+  const fallback = Math.max(
+    activityProxy,
+    totalUsers ?? 0,
+    totalEvents,
+    affectedSessionsEstimate,
+  );
+
+  return fallback > 0 ? fallback : null;
+}
+
 function computeCrashFreeRate(total: number | null, affected: number) {
   if (!total || total <= 0) return null;
   return Math.max(0, Math.min(1, (total - affected) / total));
 }
 
-export async function buildCrashSummary(events: CrashEvent[]): Promise<CrashSummary> {
+export async function buildCrashSummary(
+  events: CrashEvent[],
+): Promise<CrashSummary> {
   const totalEvents = events.reduce((sum, e) => sum + e.eventCount, 0);
   const fatalEvents = events
     .filter((e) => e.severity === "fatal")
@@ -273,11 +327,16 @@ export async function buildCrashSummary(events: CrashEvent[]): Promise<CrashSumm
   const explicitSessions = new Set(
     events.map((e) => e.sessionId).filter(Boolean),
   );
-  const affectedUsersEstimate = explicitUsers.size || Math.min(events.length, totalEvents);
+  const affectedUsersEstimate =
+    explicitUsers.size || Math.min(events.length, totalEvents);
   const affectedSessionsEstimate =
     explicitSessions.size || Math.min(events.length, totalEvents);
   const totalUsers = await countProfilesSafe();
-  const totalSessions = null;
+  const totalSessions = await countSessionsSafe(
+    affectedSessionsEstimate,
+    totalUsers,
+    totalEvents,
+  );
 
   return {
     totalEvents,
