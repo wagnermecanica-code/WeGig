@@ -70,7 +70,7 @@ export function UserDetailPage() {
   }, [id, reloadKey]);
 
   function formatDate(value?: Date) {
-    if (!value) return "—";
+    if (!value) return "Não registrado";
     return new Intl.DateTimeFormat("pt-BR", {
       dateStyle: "medium",
       timeStyle: "short",
@@ -80,7 +80,17 @@ export function UserDetailPage() {
   function renderFlag(value?: boolean) {
     if (value === true) return "Sim";
     if (value === false) return "Não";
-    return "—";
+    return "Não registrado";
+  }
+
+  function renderText(value?: string | number | null) {
+    if (value === null || value === undefined) return "Não registrado";
+    const text = String(value).trim();
+    return text.length > 0 ? text : "Não registrado";
+  }
+
+  function renderList(value?: string[]) {
+    return value && value.length > 0 ? value.join(", ") : "Não registrado";
   }
 
   async function copyToClipboard(value: string, label: string) {
@@ -309,24 +319,36 @@ export function UserDetailPage() {
                 UID proprietário
               </p>
               <p className="font-mono text-xs break-all">
-                {profile.ownerUid ?? "—"}
+                {renderText(profile.ownerUid)}
               </p>
             </div>
             <div>
               <p className="text-gray-500 dark:text-slate-400">Username</p>
-              <p>{profile.username ?? "—"}</p>
+              <p>{renderText(profile.username)}</p>
             </div>
             <div>
               <p className="text-gray-500 dark:text-slate-400">Email</p>
               <p className="inline-flex items-center gap-1">
-                <Mail className="h-3.5 w-3.5" /> {profile.email ?? "—"}
+                <Mail className="h-3.5 w-3.5" /> {renderText(profile.email)}
               </p>
             </div>
             <div>
               <p className="text-gray-500 dark:text-slate-400">Telefone</p>
               <p className="inline-flex items-center gap-1">
-                <Phone className="h-3.5 w-3.5" /> {profile.phone ?? "—"}
+                <Phone className="h-3.5 w-3.5" /> {renderText(profile.phone)}
               </p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Cidade / Estado</p>
+              <p>{[profile.city, profile.state].filter(Boolean).join(" / ") || "Não registrado"}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Bairro</p>
+              <p>{renderText(profile.neighborhood)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Perfil ativo da conta</p>
+              <p className="font-mono text-xs break-all">{renderText(profile.activeProfileId)}</p>
             </div>
             <div>
               <p className="text-gray-500 dark:text-slate-400">Verificado</p>
@@ -339,7 +361,15 @@ export function UserDetailPage() {
               <p className="text-gray-500 dark:text-slate-400">
                 Status de moderação
               </p>
-              <p>{profile.moderationStatus ?? "—"}</p>
+              <p>{renderText(profile.moderationStatus)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Ano de nascimento/formação</p>
+              <p>{renderText(profile.birthYear)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Nível</p>
+              <p>{renderText(profile.level)}</p>
             </div>
             <div>
               <p className="text-gray-500 dark:text-slate-400">Criado em</p>
@@ -352,6 +382,14 @@ export function UserDetailPage() {
             <div>
               <p className="text-gray-500 dark:text-slate-400">Último acesso</p>
               <p>{formatDate(profile.lastSeenAt)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Raio de notificação</p>
+              <p>{profile.notificationRadius ? `${profile.notificationRadius} km` : "Não registrado"}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Notificações por raio</p>
+              <p>{renderFlag(profile.notificationRadiusEnabled)}</p>
             </div>
             <div>
               <p className="text-gray-500 dark:text-slate-400">
@@ -373,6 +411,54 @@ export function UserDetailPage() {
                 {(profile.blockedProfilesCount ?? 0).toString()} /{" "}
                 {(profile.blockedByProfilesCount ?? 0).toString()}
               </p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Website</p>
+              <p className="break-all">{renderText(profile.website)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Instagram</p>
+              <p className="break-all">{renderText(profile.instagramLink)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">TikTok</p>
+              <p className="break-all">{renderText(profile.tiktokLink)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">YouTube</p>
+              <p className="break-all">{renderText(profile.youtubeLink)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Spotify</p>
+              <p className="break-all">{renderText(profile.spotifyLink)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Deezer</p>
+              <p className="break-all">{renderText(profile.deezerLink)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Tipo de espaço</p>
+              <p>{renderText(profile.spaceType)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Horário de funcionamento</p>
+              <p>{renderText(profile.operatingHours)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Comodidades</p>
+              <p>{renderList(profile.amenities)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Integrantes da banda</p>
+              <p>{renderList(profile.bandMembers)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Especialidade técnica</p>
+              <p>{renderText(profile.technicianSpecialty)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-slate-400">Experiência</p>
+              <p>{renderText(profile.experienceRange)}</p>
             </div>
           </div>
         </CardBody>
@@ -406,7 +492,6 @@ export function UserDetailPage() {
           </CardBody>
         </Card>
       ) : null}
-
     </div>
   );
 }

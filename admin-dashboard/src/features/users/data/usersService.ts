@@ -35,6 +35,24 @@ export interface ProfileDetail extends ProfileSummary {
   bio?: string;
   email?: string;
   phone?: string;
+  neighborhood?: string;
+  birthYear?: number;
+  level?: string;
+  notificationRadius?: number;
+  notificationRadiusEnabled?: boolean;
+  instagramLink?: string;
+  tiktokLink?: string;
+  youtubeLink?: string;
+  spotifyLink?: string;
+  deezerLink?: string;
+  spaceType?: string;
+  operatingHours?: string;
+  website?: string;
+  amenities?: string[];
+  bandMembers?: string[];
+  technicianSpecialty?: string;
+  experienceRange?: string;
+  activeProfileId?: string;
   username?: string;
   verified?: boolean;
   moderationStatus?: string;
@@ -85,6 +103,52 @@ function pickDate(data: Record<string, any>, keys: string[]): Date | undefined {
   for (const key of keys) {
     const parsed = parseDateLike(data[key]);
     if (parsed) return parsed;
+  }
+  return undefined;
+}
+
+function pickString(data: Record<string, any>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = data[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function pickNumber(data: Record<string, any>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = data[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return undefined;
+}
+
+function pickBoolean(data: Record<string, any>, keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = data[key];
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["true", "sim", "yes", "1"].includes(normalized)) return true;
+      if (["false", "nao", "não", "no", "0"].includes(normalized)) return false;
+    }
+  }
+  return undefined;
+}
+
+function pickStringArray(data: Record<string, any>, keys: string[]): string[] | undefined {
+  for (const key of keys) {
+    const value = data[key];
+    if (Array.isArray(value)) {
+      const items = value
+        .map((item) => String(item ?? "").trim())
+        .filter(Boolean);
+      if (items.length > 0) return items;
+    }
   }
   return undefined;
 }
@@ -201,36 +265,57 @@ export async function getProfile(id: string): Promise<ProfileDetail | null> {
   if (!snap.exists()) return null;
   const data = snap.data();
   const base = mapProfile(snap.id, data);
+  const ownerUid = base.ownerUid;
+  const userData = ownerUid
+    ? await getDoc(doc(db, "users", ownerUid))
+        .then((userSnap) => (userSnap.exists() ? userSnap.data() : {}))
+        .catch(() => ({} as Record<string, any>))
+    : ({} as Record<string, any>);
+
   return {
     ...base,
-    bio: data.bio,
-    email: data.email,
-    phone: data.phone ?? data.phoneNumber,
-    username: data.username,
-    verified: data.verified === true || data.isVerified === true,
-    moderationStatus: data.moderationStatus,
+    bio: pickString(data, ["bio", "description", "about"]),
+    email: pickString(data, ["email", "userEmail", "contactEmail"]) ??
+      pickString(userData, ["email", "userEmail"]),
+    phone: pickString(data, ["phone", "phoneNumber", "whatsapp", "contactPhone"]),
+    neighborhood: pickString(data, ["neighborhood", "bairro"]),
+    birthYear: pickNumber(data, ["birthYear", "year", "foundationYear"]),
+    level: pickString(data, ["level", "experienceLevel"]),
+    notificationRadius: pickNumber(data, ["notificationRadius"]),
+    notificationRadiusEnabled:
+      pickBoolean(data, ["notificationRadiusEnabled"]) ?? true,
+    instagramLink: pickString(data, ["instagramLink", "instagram"]),
+    tiktokLink: pickString(data, ["tiktokLink", "tiktok"]),
+    youtubeLink: pickString(data, ["youtubeLink", "youtube"]),
+    spotifyLink: pickString(data, ["spotifyLink", "spotify"]),
+    deezerLink: pickString(data, ["deezerLink", "deezer"]),
+    spaceType: pickString(data, ["spaceType"]),
+    operatingHours: pickString(data, ["operatingHours", "openingHours"]),
+    website: pickString(data, ["website", "site"]),
+    amenities: pickStringArray(data, ["amenities"]),
+    bandMembers: pickStringArray(data, ["bandMembers", "members"]),
+    technicianSpecialty: pickString(data, ["technicianSpecialty"]),
+    experienceRange: pickString(data, ["experienceRange"]),
+    activeProfileId: pickString(userData, ["activeProfileId"]),
+    username: base.username,
+    verified: pickBoolean(data, ["verified", "isVerified"]) ?? false,
+    moderationStatus: data.moderationStatus ?? (base.banned ? "banned" : "active"),
     allowConnectionSuggestions:
-      typeof data.allowConnectionSuggestions === "boolean"
-        ? data.allowConnectionSuggestions
-        : undefined,
+      pickBoolean(data, ["allowConnectionSuggestions"]) ?? true,
     allowConnectionRequests:
-      typeof data.allowConnectionRequests === "boolean"
-        ? data.allowConnectionRequests
-        : undefined,
+      pickBoolean(data, ["allowConnectionRequests"]) ?? true,
     blockedProfilesCount: Array.isArray(data.blockedProfileIds)
       ? data.blockedProfileIds.length
       : undefined,
     blockedByProfilesCount: Array.isArray(data.blockedByProfileIds)
       ? data.blockedByProfileIds.length
       : undefined,
-    genres: Array.isArray(data.genres)
-      ? data.genres.filter((x: unknown) => typeof x === "string")
-      : undefined,
-    instruments: Array.isArray(data.instruments)
-      ? data.instruments.filter((x: unknown) => typeof x === "string")
-      : undefined,
-    updatedAt: parseDateLike(data.updatedAt),
-    lastSeenAt: parseDateLike(data.lastSeenAt ?? data.lastActiveAt),
+    genres: pickStringArray(data, ["genres", "genreOptions"]),
+    instruments: pickStringArray(data, ["instruments", "instrumentOptions"]),
+    updatedAt: pickDate(data, ["updatedAt", "updated_at", "modifiedAt"]),
+    lastSeenAt:
+      pickDate(data, ["lastSeenAt", "lastActiveAt", "lastLoginAt"]) ??
+      pickDate(userData, ["lastSeenAt", "lastActiveAt", "lastLoginAt"]),
     raw: data,
   };
 }
