@@ -36,9 +36,30 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("pt-BR").format(value);
 }
 
+function buildEmptySeries(days: number): DailySnapshot[] {
+  const result: DailySnapshot[] = [];
+  const now = new Date();
+
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    result.push({
+      date: d.toISOString().slice(0, 10),
+      dau: 0,
+      newPosts: 0,
+      newUsers: 0,
+      messagesSent: 0,
+    });
+  }
+
+  return result;
+}
+
 export function DashboardPage() {
+  const chartDays = 14;
   const [overview, setOverview] = useState<OverviewMetrics | null>(null);
   const [series, setSeries] = useState<DailySnapshot[]>([]);
+  const [seriesIsFallback, setSeriesIsFallback] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,15 +69,22 @@ export function DashboardPage() {
       try {
         const [ov, snaps] = await Promise.all([
           fetchOverviewMetrics(),
-          fetchDailySnapshots(14),
+          fetchDailySnapshots(chartDays),
         ]);
         if (!active) return;
 
         if (snaps.length === 0) {
           const today = await fetchTodaySnapshot();
-          setSeries(today ? [today] : []);
+          if (today) {
+            setSeries([today]);
+            setSeriesIsFallback(false);
+          } else {
+            setSeries(buildEmptySeries(chartDays));
+            setSeriesIsFallback(true);
+          }
         } else {
           setSeries(snaps);
+          setSeriesIsFallback(false);
         }
 
         setOverview(ov);
@@ -142,53 +170,50 @@ export function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Atividade diária (últimos 14 dias)</CardTitle>
+          <CardTitle>Atividade diária (últimos {chartDays} dias)</CardTitle>
         </CardHeader>
         <CardBody>
-          {series.length === 0 ? (
-            <div className="py-10 text-center text-sm text-gray-500 dark:text-slate-400">
-              Ainda não existem dados históricos para exibir no gráfico diário.
-              <br />
-              Assim que os snapshots de analytics forem gerados, este painel
-              será preenchido automaticamente.
+          {seriesIsFallback ? (
+            <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+              Dados agregados ainda não disponíveis. Exibindo série temporária até a primeira execução do agregador diário.
             </div>
-          ) : (
-            <div className="h-72 w-full">
-              <ResponsiveContainer>
-                <AreaChart
-                  data={series}
-                  margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="dau" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#37475A" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#37475A" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Area
-                    type="monotone"
-                    dataKey="dau"
-                    stroke="#37475A"
-                    fill="url(#dau)"
-                    strokeWidth={2}
-                    name="DAU"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="newPosts"
-                    stroke="#E47911"
-                    fill="transparent"
-                    strokeWidth={2}
-                    name="Novos posts"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          ) : null}
+
+          <div className="h-72 w-full">
+            <ResponsiveContainer>
+              <AreaChart
+                data={series}
+                margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="dau" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#37475A" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="#37475A" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Area
+                  type="monotone"
+                  dataKey="dau"
+                  stroke="#37475A"
+                  fill="url(#dau)"
+                  strokeWidth={2}
+                  name="DAU"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="newPosts"
+                  stroke="#E47911"
+                  fill="transparent"
+                  strokeWidth={2}
+                  name="Novos posts"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </CardBody>
       </Card>
     </div>
