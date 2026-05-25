@@ -7,7 +7,6 @@ import {
   MessageSquare,
   BookOpen,
   Inbox,
-  Settings,
   LogOut,
   Sun,
   Moon,
@@ -31,20 +30,13 @@ interface NavItem {
   permission: Permission;
 }
 
-const NAV: NavItem[] = [
+const PRIMARY_NAV: NavItem[] = [
   {
     to: "/dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
     permission: "dashboard.view",
   },
-  {
-    to: "/moderation/reports",
-    label: "Moderação",
-    icon: ShieldAlert,
-    permission: "reports.view",
-  },
-  { to: "/users", label: "Usuários", icon: Users, permission: "users.view" },
   {
     to: "/analytics",
     label: "Analytics",
@@ -58,6 +50,28 @@ const NAV: NavItem[] = [
     permission: "heatmap.view",
   },
   {
+    to: "/comments",
+    label: "Comentários",
+    icon: MessageSquare,
+    permission: "comments.view",
+  },
+  { to: "/users", label: "Usuários", icon: Users, permission: "users.view" },
+  {
+    to: "/feedbacks",
+    label: "Feedback",
+    icon: Inbox,
+    permission: "feedbacks.view",
+  },
+  {
+    to: "/moderation/reports",
+    label: "Moderação",
+    icon: ShieldAlert,
+    permission: "reports.view",
+  },
+];
+
+const UNDER_CONSTRUCTION_NAV: NavItem[] = [
+  {
     to: "/feed-admin",
     label: "Feed admin",
     icon: Sparkles,
@@ -68,18 +82,6 @@ const NAV: NavItem[] = [
     label: "Reputação",
     icon: BadgeCheck,
     permission: "reputation.manage",
-  },
-  {
-    to: "/comments",
-    label: "Comentários",
-    icon: MessageSquare,
-    permission: "comments.view",
-  },
-  {
-    to: "/feedbacks",
-    label: "Feedbacks",
-    icon: Inbox,
-    permission: "feedbacks.view",
   },
   {
     to: "/catalog",
@@ -93,12 +95,6 @@ const NAV: NavItem[] = [
     icon: ScrollText,
     permission: "audit.view",
   },
-  {
-    to: "/settings",
-    label: "Configurações",
-    icon: Settings,
-    permission: "dashboard.view",
-  },
 ];
 
 export function AppShell() {
@@ -106,7 +102,12 @@ export function AppShell() {
   const { theme, toggle } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const visibleNav = NAV.filter((item) => hasPermission(item.permission));
+  const visiblePrimaryNav = PRIMARY_NAV.filter((item) =>
+    hasPermission(item.permission),
+  );
+  const visibleConstructionNav = UNDER_CONSTRUCTION_NAV.filter((item) =>
+    hasPermission(item.permission),
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-slate-950 dark:text-slate-100">
@@ -148,8 +149,8 @@ export function AppShell() {
           </button>
         </div>
 
-        <nav className="px-3 py-4 space-y-1">
-          {visibleNav.map((item) => {
+        <nav className="px-3 py-4 space-y-1 overflow-y-auto max-h-[calc(100vh-9.5rem)]">
+          {visiblePrimaryNav.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
@@ -170,6 +171,38 @@ export function AppShell() {
               </NavLink>
             );
           })}
+
+          {visibleConstructionNav.length > 0 ? (
+            <>
+              <div className="mt-4 mb-2 px-3">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-amber-600 dark:text-amber-400">
+                  Em construção
+                </p>
+              </div>
+
+              {visibleConstructionNav.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setSidebarOpen(false)}
+                    className={({ isActive }) =>
+                      clsx(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-white"
+                          : "text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-800",
+                      )
+                    }
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </NavLink>
+                );
+              })}
+            </>
+          ) : null}
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-100 dark:border-slate-800">
