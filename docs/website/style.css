@@ -17,84 +17,8 @@
   --border: #e0e0e0;
 }
 
-body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
-    Cantarell, sans-serif;
-  line-height: 1.6;
-  color: var(--text-primary);
-  background-color: var(--background);
-}
-
-img {
-  image-rendering: auto;
-  image-rendering: -webkit-optimize-contrast;
-  -ms-interpolation-mode: bicubic;
-  max-width: 100%;
-  height: auto;
-}
-
-.container {
-  max-width: 1200px;
+  max-width: 860px;
   margin: 0 auto;
-  padding: 0 20px;
-}
-
-/* Header */
-header {
-  background: linear-gradient(135deg, #4820d0, #673dfd);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  padding: 1rem 0;
-}
-
-header .container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-icon {
-  width: 40px;
-  height: 40px;
-  filter: brightness(0) saturate(100%) invert(62%) sepia(85%) saturate(2000%)
-    hue-rotate(360deg) brightness(100%) contrast(95%);
-  flex-shrink: 0;
-}
-
-@media (max-width: 768px) {
-  .header-icon {
-    width: 28px;
-    height: 28px;
-  }
-}
-
-.logo img {
-  height: 130px;
-  width: auto;
-  display: block;
-  image-rendering: auto;
-  image-rendering: -webkit-optimize-contrast;
-}
-
-@media (max-width: 768px) {
-  .logo img {
-    height: 108px;
-  }
-}
-
-nav {
-  display: flex;
-  gap: 2rem;
-}
-
-nav a {
-  color: rgba(255, 255, 255, 0.75);
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.3s;
 }
 
 nav a:hover {
@@ -105,8 +29,11 @@ nav a:hover {
 .hero {
   background:
     linear-gradient(135deg, rgba(72, 32, 208, 0.75), rgba(103, 61, 253, 0.75)),
-    url("Hero.png") center/cover no-repeat;
+  grid-template-columns: 1fr;
   color: white;
+  max-height: calc((18.5rem * 3) + (1.25rem * 2));
+  overflow-y: auto;
+  padding-right: 0.5rem;
   padding: 6rem 0;
   text-align: center;
 }
@@ -425,84 +352,8 @@ nav a:hover {
 
 /* Posts Feed Shell */
 .posts-feed-shell {
-  display: grid;
-  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
-  gap: 2rem;
-  align-items: start;
-}
-
-.posts-feed-lead {
-  position: sticky;
-  top: 2rem;
-  padding: 2rem;
-  border-radius: 28px;
-  background:
-    radial-gradient(circle at top left, rgba(255, 203, 146, 0.2), transparent 42%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.24);
-  backdrop-filter: blur(12px);
-}
-
-.feed-note {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.8rem;
-  border-radius: 999px;
-  background: rgba(255, 203, 146, 0.14);
-  color: #ffcb92;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.posts-feed-lead h3 {
-  margin: 1rem 0 0.75rem;
-  font-size: 2rem;
-  line-height: 1.05;
-  color: #fff7ef;
-}
-
-.posts-feed-lead p {
-  color: rgba(255, 255, 255, 0.78);
-  line-height: 1.7;
-  margin-bottom: 1.5rem;
-}
-
-.posts-type-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.type-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.7rem 1rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-  color: #fff;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.type-pill-musician {
-  box-shadow: inset 0 0 0 1px rgba(55, 71, 90, 0.7);
-}
-
-.type-pill-band {
-  box-shadow: inset 0 0 0 1px rgba(228, 121, 17, 0.7);
-}
-
-.type-pill-sales {
-  box-shadow: inset 0 0 0 1px rgba(104, 63, 255, 0.7);
-}
-
-.type-pill-hiring {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  max-width: 860px;
+  margin: 0 auto;
 }
 
 .carousel-side {
@@ -513,8 +364,11 @@ nav a:hover {
 
 .posts-carousel {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 1.25rem;
+  max-height: calc((18.5rem * 3) + (1.25rem * 2));
+  overflow-y: auto;
+  padding-right: 0.5rem;
   scroll-behavior: smooth;
 }
 
@@ -539,13 +393,17 @@ nav a:hover {
 .post-card {
   position: relative;
   overflow: hidden;
-  min-height: 100%;
+  height: 18.5rem;
   display: grid;
-  grid-template-rows: 180px 1fr;
+  grid-template-rows: 132px 1fr;
   border-radius: 26px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.09),
+      rgba(255, 255, 255, 0.03)
+    ),
     #111111;
   box-shadow: 0 24px 40px rgba(0, 0, 0, 0.22);
   transition:
@@ -559,7 +417,12 @@ nav a:hover {
   position: absolute;
   inset: auto 18px 18px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.26), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.26),
+    transparent
+  );
 }
 
 .post-card:hover,
@@ -573,7 +436,11 @@ nav a:hover {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--pc-accent) 42%, white 8%), transparent 45%),
+    radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--pc-accent) 42%, white 8%),
+      transparent 45%
+    ),
     linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0));
 }
 
@@ -757,7 +624,11 @@ nav a:hover {
   padding: 1.5rem;
   text-align: center;
   background:
-    linear-gradient(135deg, rgba(255, 203, 146, 0.18), rgba(103, 61, 253, 0.18)),
+    linear-gradient(
+      135deg,
+      rgba(255, 203, 146, 0.18),
+      rgba(103, 61, 253, 0.18)
+    ),
     rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.2);
@@ -830,16 +701,8 @@ nav a:hover {
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .posts-feed-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .posts-feed-lead {
-    position: static;
-  }
-
   .posts-carousel {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: calc((18.5rem * 3) + (1.25rem * 2));
   }
 }
 
@@ -848,17 +711,13 @@ nav a:hover {
     padding: 3.5rem 0;
   }
 
-  .posts-feed-lead {
-    padding: 1.5rem;
-    border-radius: 22px;
-  }
-
-  .posts-feed-lead h3 {
-    font-size: 1.65rem;
-  }
-
   .posts-carousel {
-    grid-template-columns: 1fr;
+    max-height: calc((17rem * 3) + (1.25rem * 2));
+  }
+
+  .post-card {
+    height: 17rem;
+    grid-template-rows: 120px 1fr;
   }
 }
 
