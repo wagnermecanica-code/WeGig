@@ -36,31 +36,13 @@ import {
   fetchDailySnapshots,
   fetchOverviewMetrics,
   fetchTodaySnapshot,
+  normalizeDailySnapshots,
   type DailySnapshot,
   type OverviewMetrics,
 } from "../data/metricsService";
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat("pt-BR").format(value);
-}
-
-function buildEmptySeries(days: number): DailySnapshot[] {
-  const result: DailySnapshot[] = [];
-  const now = new Date();
-
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    result.push({
-      date: d.toISOString().slice(0, 10),
-      dau: 0,
-      newPosts: 0,
-      newUsers: 0,
-      messagesSent: 0,
-    });
-  }
-
-  return result;
 }
 
 export function DashboardPage() {
@@ -84,7 +66,7 @@ export function DashboardPage() {
         if (snaps.length === 0) {
           const today = await fetchTodaySnapshot();
           if (today) {
-            setSeries([today]);
+            setSeries(normalizeDailySnapshots(chartDays, [today]));
             setSeriesIsFallback(false);
           } else {
             const derived = await fetchDerivedDailySnapshots(chartDays);
@@ -103,16 +85,16 @@ export function DashboardPage() {
               );
 
               if (hasHistoricalData) {
-                setSeries(historical);
+                setSeries(normalizeDailySnapshots(chartDays, historical));
                 setSeriesIsFallback(false);
               } else {
-                setSeries(buildEmptySeries(chartDays));
+                setSeries(normalizeDailySnapshots(chartDays, []));
                 setSeriesIsFallback(true);
               }
             }
           }
         } else {
-          setSeries(snaps);
+          setSeries(normalizeDailySnapshots(chartDays, snaps));
           setSeriesIsFallback(false);
         }
 

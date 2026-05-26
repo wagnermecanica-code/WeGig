@@ -34,6 +34,44 @@ export interface DailySnapshot {
   messagesSent?: number;
 }
 
+export function normalizeDailySnapshots(
+  days: number,
+  items: DailySnapshot[],
+): DailySnapshot[] {
+  const result = new Map<string, DailySnapshot>();
+  const now = new Date();
+
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const currentDate = new Date(now);
+    currentDate.setDate(now.getDate() - i);
+    const key = formatDateKey(currentDate);
+    result.set(key, {
+      date: key,
+      dau: 0,
+      newUsers: 0,
+      newPosts: 0,
+      messagesSent: 0,
+    });
+  }
+
+  for (const item of items) {
+    if (!item?.date) continue;
+    const existing = result.get(item.date);
+    if (!existing) continue;
+
+    result.set(item.date, {
+      ...existing,
+      ...item,
+      dau: Number(item.dau ?? existing.dau ?? 0),
+      newUsers: Number(item.newUsers ?? existing.newUsers ?? 0),
+      newPosts: Number(item.newPosts ?? existing.newPosts ?? 0),
+      messagesSent: Number(item.messagesSent ?? existing.messagesSent ?? 0),
+    });
+  }
+
+  return Array.from(result.values());
+}
+
 function mapDailySnapshot(
   data: Record<string, unknown>,
   fallbackDate: string,
@@ -121,7 +159,7 @@ export async function fetchDerivedDailySnapshots(
       row.dau = newUsers + Math.round(newPosts / 2);
     }
 
-    return result;
+    return normalizeDailySnapshots(days, result);
   } catch (err) {
     console.warn("[metricsService] derived daily snapshots failed:", err);
     return [];
@@ -194,7 +232,7 @@ export async function fetchDerivedDailySnapshotsFromHistory(
       return row;
     });
 
-    return result;
+    return normalizeDailySnapshots(days, result);
   } catch (err) {
     console.warn("[metricsService] historical derived snapshots failed:", err);
     return [];
@@ -275,7 +313,7 @@ export async function fetchDailySnapshots(days = 14): Promise<DailySnapshot[]> {
     );
 
     if (items.length > 0) {
-      return items.reverse();
+      return normalizeDailySnapshots(days, items.reverse());
     }
   } catch (err) {
     console.warn("[metricsService] analytics_daily by date failed:", err);
@@ -288,7 +326,7 @@ export async function fetchDailySnapshots(days = 14): Promise<DailySnapshot[]> {
     const itemsById = snapById.docs.map((d) =>
       mapDailySnapshot(d.data() as Record<string, unknown>, d.id),
     );
-    return itemsById.reverse();
+    return normalizeDailySnapshots(days, itemsById.reverse());
   } catch (err) {
     console.warn("[metricsService] analytics_daily by documentId failed:", err);
     return [];
