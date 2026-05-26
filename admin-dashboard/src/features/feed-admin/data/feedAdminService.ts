@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDocs,
   limit,
@@ -7,22 +8,35 @@ import {
   query,
   Timestamp,
   updateDoc,
+  writeBatch,
   where,
 } from "firebase/firestore";
 import { db } from "@core/firebase/client";
+
+export interface PostReportIndicator {
+  notificationIds: string[];
+  totalReports: number;
+  unreadReports: number;
+  highPriority: boolean;
+  lastReportedAt?: Date;
+  reasons: string[];
+}
 
 export interface FeedPost {
   id: string;
   title: string;
   description?: string;
+  postType?: string;
   city?: string;
   state?: string;
   authorProfileId?: string;
+  authorName?: string;
   createdAt?: Date;
   featured?: boolean;
   promoted?: boolean;
   pinned?: boolean;
   expiresAt?: Date;
+  reports?: PostReportIndicator;
 }
 
 function parseDate(value: unknown): Date | undefined {
@@ -35,10 +49,12 @@ function mapPost(id: string, data: Record<string, any>): FeedPost {
   return {
     id,
     title: data.title ?? data.name ?? "(sem título)",
-    description: data.description ?? data.text,
+    description: data.description ?? data.text ?? data.content,
+    postType: data.postType ?? data.type,
     city: data.city ?? data.locationCity,
     state: data.state ?? data.locationState,
     authorProfileId: data.profileId ?? data.authorProfileId,
+    authorName: data.authorName ?? data.profileName,
     createdAt: parseDate(data.createdAt),
     featured: data.featured === true,
     promoted: data.promoted === true,
@@ -48,9 +64,62 @@ function mapPost(id: string, data: Record<string, any>): FeedPost {
 }
 
 export interface FeedListParams {
-  filter?: "all" | "featured" | "promoted" | "pinned";
+  filter?: "all" | "featured" | "promoted" | "pinned" | "reported";
   pageSize?: number;
   searchTerm?: string;
+}
+
+function isActiveReportStatus(status: unknown): boolean {
+  return status !== "resolved" && status !== "removed" && status !== "dismissed";
+}
+
+export async function listPostReportIndicators(): Promise<
+  Map<string, PostReportIndicator>
+> {
+  const snap = await getDocs(
+    query(
+      collection(db, "adminNotifications"),
+      orderBy("timestamp", "desc"),
+      limit(250),
+    ),
+  );
+  const indicators = new Map<string, PostReportIndicator>();
+
+  snap.docs.forEach((reportDoc) => {
+    const data = reportDoc.data();
+    if (data.type !== "new_report" || data.targetType !== "post" || !data.targetId) {
+      return;
+    }
+    if (!isActiveReportStatus(data.status)) return;
+
+    const targetId = String(data.targetId);
+    const current = indicators.get(targetId) ?? {
+      notificationIds: [],
+      totalReports: 0,
+      unreadReports: 0,
+      highPriority: false,
+      reasons: [],
+    };
+    const totalReports = Number(data.totalReports ?? 1);
+    const reportedAt = parseDate(data.timestamp);
+
+    current.notificationIds.push(reportDoc.id);
+    current.totalReports += Number.isFinite(totalReports) ? totalReports : 1;
+    current.unreadReports += data.read ? 0 : 1;
+    current.highPriority = current.highPriority || data.priority === "high";
+
+    if (reportedAt && (!current.lastReportedAt || reportedAt > current.lastReportedAt)) {
+      current.lastReportedAt = reportedAt;
+    }
+
+    if (typeof data.reason === "string" && !current.reasons.includes(data.reason)) {
+      current.reasons.push(data.reason);
+    }
+
+    indicators.set(targetId, current);
+  });
+
+  return indicators;
 }
 
 export async function listFeedPosts(
@@ -70,8 +139,18 @@ export async function listFeedPosts(
   constraints.push(orderBy("createdAt", "desc"));
   constraints.push(limit(pageSize));
 
-  const snap = await getDocs(query(collection(db, "posts"), ...constraints));
-  let items = snap.docs.map((d) => mapPost(d.id, d.data()));
+  const [snap, reportIndicators] = await Promise.all([
+    getDocs(query(collection(db, "posts"), ...constraints)),
+    listPostReportIndicators(),
+  ]);
+  let items = snap.docs.map((d) => ({
+    ...mapPost(d.id, d.data()),
+    reports: reportIndicators.get(d.id),
+  }));
+
+  if (params.filter === "reported") {
+    items = items.filter((post) => Boolean(post.reports));
+  }
 
   const term = params.searchTerm?.trim().toLowerCase();
   if (term) {
@@ -79,12 +158,44 @@ export async function listFeedPosts(
       (post) =>
         post.title.toLowerCase().includes(term) ||
         (post.description ?? "").toLowerCase().includes(term) ||
+        (post.authorName ?? "").toLowerCase().includes(term) ||
+        (post.authorProfileId ?? "").toLowerCase().includes(term) ||
         (post.city ?? "").toLowerCase().includes(term) ||
         (post.state ?? "").toLowerCase().includes(term),
     );
   }
 
   return items;
+}
+
+export async function resolvePostReports(post: FeedPost): Promise<void> {
+  if (!post.reports?.notificationIds.length) return;
+
+  const batch = writeBatch(db);
+  post.reports.notificationIds.forEach((notificationId) => {
+    batch.update(doc(db, "adminNotifications", notificationId), {
+      read: true,
+      status: "resolved",
+      resolvedAt: Timestamp.now(),
+    });
+  });
+  await batch.commit();
+}
+
+export async function deleteFeedPost(post: FeedPost): Promise<void> {
+  await deleteDoc(doc(db, "posts", post.id));
+
+  if (!post.reports?.notificationIds.length) return;
+
+  const batch = writeBatch(db);
+  post.reports.notificationIds.forEach((notificationId) => {
+    batch.update(doc(db, "adminNotifications", notificationId), {
+      read: true,
+      status: "removed",
+      resolvedAt: Timestamp.now(),
+    });
+  });
+  await batch.commit();
 }
 
 export type FeedFlag = "featured" | "promoted" | "pinned";

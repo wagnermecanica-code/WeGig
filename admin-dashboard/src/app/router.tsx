@@ -296,7 +296,7 @@ const router = createBrowserRouter(
           ),
         },
         {
-          path: "feed-admin",
+          path: "posts",
           element: (
             <RequireAdmin permission="feed.manage">
               <Suspended>
@@ -305,6 +305,7 @@ const router = createBrowserRouter(
             </RequireAdmin>
           ),
         },
+        { path: "feed-admin", element: <Navigate to="/posts" replace /> },
         {
           path: "reputation",
           element: (

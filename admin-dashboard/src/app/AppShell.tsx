@@ -15,8 +15,8 @@ import {
   ScrollText,
   BarChart3,
   Bug,
+  FileText,
   MapPin,
-  Sparkles,
   BadgeCheck,
 } from "lucide-react";
 import { clsx } from "clsx";
@@ -62,6 +62,12 @@ const PRIMARY_NAV: NavItem[] = [
     icon: MessageSquare,
     permission: "comments.view",
   },
+  {
+    to: "/posts",
+    label: "Posts",
+    icon: FileText,
+    permission: "feed.manage",
+  },
   { to: "/users", label: "Usuários", icon: Users, permission: "users.view" },
   {
     to: "/feedbacks",
@@ -78,12 +84,6 @@ const PRIMARY_NAV: NavItem[] = [
 ];
 
 const UNDER_CONSTRUCTION_NAV: NavItem[] = [
-  {
-    to: "/feed-admin",
-    label: "Feed admin",
-    icon: Sparkles,
-    permission: "feed.manage",
-  },
   {
     to: "/reputation",
     label: "Reputação",

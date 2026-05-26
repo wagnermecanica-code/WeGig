@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, Pin, Sparkles, Star, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+  Pin,
+  RefreshCw,
+  Sparkles,
+  Star,
+  Trash2,
+} from "lucide-react";
 import {
   Card,
   CardBody,
@@ -11,16 +20,19 @@ import { Badge } from "@shared/components/ui/Badge";
 import { Skeleton } from "@shared/components/ui/Skeleton";
 import { exportRowsToXlsx } from "@shared/utils/exportXlsx";
 import {
+  deleteFeedPost,
   listFeedPosts,
+  resolvePostReports,
   setFeedFlag,
   type FeedFlag,
   type FeedPost,
 } from "../data/feedAdminService";
 
-type FilterKey = "all" | "featured" | "promoted" | "pinned";
+type FilterKey = "all" | "reported" | "featured" | "promoted" | "pinned";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "Todos" },
+  { key: "reported", label: "Denunciados" },
   { key: "featured", label: "Destacados" },
   { key: "promoted", label: "Promovidos" },
   { key: "pinned", label: "Fixados" },
@@ -38,6 +50,7 @@ export function FeedAdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,6 +75,7 @@ export function FeedAdminPage() {
 
   async function handleToggle(post: FeedPost, flag: FeedFlag) {
     setPendingId(post.id);
+    setActionError(null);
     try {
       const current = Boolean(post[flag]);
       await setFeedFlag(post.id, flag, !current);
@@ -70,6 +84,45 @@ export function FeedAdminPage() {
       );
     } catch (err) {
       console.warn("[FeedAdminPage] toggle failed", err);
+      setActionError("Não foi possível atualizar o post.");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  async function handleResolveReports(post: FeedPost) {
+    setPendingId(post.id);
+    setActionError(null);
+    try {
+      await resolvePostReports(post);
+      setPosts((prev) =>
+        prev
+          .map((p) => (p.id === post.id ? { ...p, reports: undefined } : p))
+          .filter((p) => filter !== "reported" || Boolean(p.reports)),
+      );
+    } catch (err) {
+      console.warn("[FeedAdminPage] resolve reports failed", err);
+      setActionError("Não foi possível resolver as denúncias do post.");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  async function handleDeletePost(post: FeedPost) {
+    const confirmed = window.confirm(
+      `Remover definitivamente o post "${post.title}"? Esta ação não pode ser desfeita.`,
+    );
+
+    if (!confirmed) return;
+
+    setPendingId(post.id);
+    setActionError(null);
+    try {
+      await deleteFeedPost(post);
+      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+    } catch (err) {
+      console.warn("[FeedAdminPage] delete post failed", err);
+      setActionError("Não foi possível remover o post.");
     } finally {
       setPendingId(null);
     }
@@ -86,10 +139,16 @@ export function FeedAdminPage() {
         cidade: p.city ?? "",
         estado: p.state ?? "",
         autor: p.authorProfileId ?? "",
+        autor_nome: p.authorName ?? "",
+        tipo: p.postType ?? "",
         criado_em: p.createdAt ? p.createdAt.toISOString() : "",
         destacado: p.featured ? "sim" : "não",
         promovido: p.promoted ? "sim" : "não",
         fixado: p.pinned ? "sim" : "não",
+        denuncias: p.reports?.totalReports ?? 0,
+        denuncias_nao_lidas: p.reports?.unreadReports ?? 0,
+        prioridade_denuncia: p.reports?.highPriority ? "alta" : "normal",
+        motivos_denuncia: p.reports?.reasons.join(", ") ?? "",
       })),
     );
   }
@@ -100,6 +159,12 @@ export function FeedAdminPage() {
       featured: posts.filter((p) => p.featured).length,
       promoted: posts.filter((p) => p.promoted).length,
       pinned: posts.filter((p) => p.pinned).length,
+      reported: posts.filter((p) => p.reports).length,
+      reportTotal: posts.reduce(
+        (total, post) => total + (post.reports?.totalReports ?? 0),
+        0,
+      ),
+      highPriorityReports: posts.filter((p) => p.reports?.highPriority).length,
     };
   }, [posts]);
 
@@ -108,10 +173,10 @@ export function FeedAdminPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold tracking-tight dark:text-white">
-            Conteúdo do Feed
+            Gerenciamento de posts
           </h2>
           <p className="text-sm text-gray-500 dark:text-slate-400">
-            Destaque, promova e fixe posts no feed para curadoria editorial.
+            Modere denúncias, acompanhe estado operacional e faça curadoria editorial.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -128,6 +193,27 @@ export function FeedAdminPage() {
         {(
           [
             ["Total", summary.total],
+            ["Com denúncias", summary.reported],
+            ["Denúncias", summary.reportTotal],
+            ["Alta prioridade", summary.highPriorityReports],
+          ] as [string, number][]
+        ).map(([label, value]) => (
+          <Card key={label}>
+            <CardBody>
+              <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                {label}
+              </p>
+              <p className="mt-1 text-2xl font-semibold dark:text-white">
+                {value}
+              </p>
+            </CardBody>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {(
+          [
             ["Destacados", summary.featured],
             ["Promovidos", summary.promoted],
             ["Fixados", summary.pinned],
@@ -180,6 +266,12 @@ export function FeedAdminPage() {
             <p className="text-sm text-red-600 dark:text-red-300">{error}</p>
           ) : null}
 
+          {actionError ? (
+            <p className="mb-3 text-sm text-red-600 dark:text-red-300">
+              {actionError}
+            </p>
+          ) : null}
+
           {loading ? (
             <div className="space-y-2">
               <Skeleton className="h-12" />
@@ -198,6 +290,7 @@ export function FeedAdminPage() {
                     <th className="px-3 py-2">Post</th>
                     <th className="px-3 py-2">Localização</th>
                     <th className="px-3 py-2">Criado</th>
+                    <th className="px-3 py-2">Denúncias</th>
                     <th className="px-3 py-2">Estado</th>
                     <th className="px-3 py-2 text-right">Ações</th>
                   </tr>
@@ -215,6 +308,11 @@ export function FeedAdminPage() {
                         <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-1">
                           {post.description}
                         </p>
+                        <p className="mt-1 text-[11px] text-gray-400 dark:text-slate-500">
+                          {[post.postType, post.authorName ?? post.authorProfileId]
+                            .filter(Boolean)
+                            .join(" · ") || post.id}
+                        </p>
                       </td>
                       <td className="px-3 py-3 text-xs text-gray-500 dark:text-slate-400">
                         {[post.city, post.state].filter(Boolean).join(", ") ||
@@ -224,7 +322,30 @@ export function FeedAdminPage() {
                         {formatDate(post.createdAt)}
                       </td>
                       <td className="px-3 py-3">
+                        {post.reports ? (
+                          <div className="space-y-1">
+                            <Badge
+                              tone={post.reports.highPriority ? "danger" : "warning"}
+                              className="gap-1"
+                            >
+                              <AlertTriangle className="h-3 w-3" />
+                              {post.reports.totalReports} denúncia
+                              {post.reports.totalReports > 1 ? "s" : ""}
+                            </Badge>
+                            <p className="text-[11px] text-gray-500 dark:text-slate-400">
+                              {post.reports.reasons.slice(0, 2).join(", ") ||
+                                "Sem motivo informado"}
+                            </p>
+                          </div>
+                        ) : (
+                          <Badge tone="success">Sem denúncias</Badge>
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
                         <div className="flex flex-wrap gap-1">
+                          {post.reports?.highPriority ? (
+                            <Badge tone="danger">Prioridade alta</Badge>
+                          ) : null}
                           {post.featured ? (
                             <Badge tone="warning">Destacado</Badge>
                           ) : null}
@@ -240,7 +361,17 @@ export function FeedAdminPage() {
                         </div>
                       </td>
                       <td className="px-3 py-3">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex flex-wrap justify-end gap-1">
+                          {post.reports ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={pendingId === post.id}
+                              onClick={() => handleResolveReports(post)}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Resolver
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             variant={post.featured ? "primary" : "secondary"}
@@ -264,6 +395,14 @@ export function FeedAdminPage() {
                             onClick={() => handleToggle(post, "pinned")}
                           >
                             <Pin className="h-3.5 w-3.5" /> Fixar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            disabled={pendingId === post.id}
+                            onClick={() => handleDeletePost(post)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" /> Remover
                           </Button>
                         </div>
                       </td>
