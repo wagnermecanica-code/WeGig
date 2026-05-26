@@ -56,7 +56,8 @@ interface LegacyActivityInsights {
   mau: number;
   d1Retention: number;
   d7Retention: number;
-  churnRate: number;
+  churnRate3d: number;
+  churnRate30d: number;
   avgEngagementSeconds: number;
   cohorts: CohortBucket[];
 }
@@ -148,15 +149,22 @@ function nonZeroRatio(value: number, fallback: number): number {
   return fallback;
 }
 
+function clampRate(value: number, fallback = 0): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(1, Math.max(0, value));
+}
+
 function buildInsightsFromProfiles(
   profiles: LegacyProfileActivity[],
 ): LegacyActivityInsights {
   const today = new Date();
+  const d3 = startOfDayMinus(3);
   const d30 = startOfDayMinus(30);
   let d1Eligible = 0;
   let d1Retained = 0;
   let d7Eligible = 0;
   let d7Retained = 0;
+  let churned3d = 0;
   let churned = 0;
   let dau = 0;
   let wau = 0;
@@ -215,6 +223,9 @@ function buildInsightsFromProfiles(
         d7Retained += 1;
       }
     }
+    if (latestObserved < d3) {
+      churned3d += 1;
+    }
     if (latestObserved < d30) {
       churned += 1;
     }
@@ -254,16 +265,32 @@ function buildInsightsFromProfiles(
     dau: Math.min(profiles.length, estimatedDau),
     wau: Math.min(profiles.length, estimatedWau),
     mau: Math.min(profiles.length, estimatedMau),
-    d1Retention: nonZeroRatio(
-      d1Eligible > 0 ? d1Retained / d1Eligible : 0,
+    d1Retention: clampRate(
+      nonZeroRatio(d1Eligible > 0 ? d1Retained / d1Eligible : 0, fallbackD1),
       fallbackD1,
     ),
-    d7Retention: nonZeroRatio(
-      d7Eligible > 0 ? d7Retained / d7Eligible : 0,
+    d7Retention: clampRate(
+      nonZeroRatio(d7Eligible > 0 ? d7Retained / d7Eligible : 0, fallbackD7),
       fallbackD7,
     ),
-    churnRate: nonZeroRatio(
-      profiles.length > 0 ? churned / profiles.length : 0,
+    churnRate3d: clampRate(
+      nonZeroRatio(
+        profiles.length > 0 ? churned3d / profiles.length : 0,
+        profiles.length > 0
+          ? Math.max(0.08, 1 - estimatedWau / profiles.length)
+          : 0,
+      ),
+      profiles.length > 0
+        ? Math.max(0.08, 1 - estimatedWau / profiles.length)
+        : 0,
+    ),
+    churnRate30d: clampRate(
+      nonZeroRatio(
+        profiles.length > 0 ? churned / profiles.length : 0,
+        profiles.length > 0
+          ? Math.max(0.05, 1 - estimatedMau / profiles.length)
+          : 0,
+      ),
       profiles.length > 0
         ? Math.max(0.05, 1 - estimatedMau / profiles.length)
         : 0,
@@ -440,16 +467,22 @@ export async function fetchActivityMetrics(): Promise<ActivityMetrics> {
 
   const d1Retention =
     profilesCreatedD7 > 0
-      ? Math.max(
+      ? clampRate(
+          Math.max(
+            legacyInsights.d1Retention,
+            Math.min(1, profilesActiveD1AfterD7 / profilesCreatedD7),
+          ),
           legacyInsights.d1Retention,
-          Math.min(1, profilesActiveD1AfterD7 / profilesCreatedD7),
         )
       : legacyInsights.d1Retention;
   const d7Retention =
     profilesCreatedD30 > 0
-      ? Math.max(
+      ? clampRate(
+          Math.max(
+            legacyInsights.d7Retention,
+            Math.min(1, profilesActiveD7AfterD30 / profilesCreatedD30),
+          ),
           legacyInsights.d7Retention,
-          Math.min(1, profilesActiveD7AfterD30 / profilesCreatedD30),
         )
       : legacyInsights.d7Retention;
 
@@ -573,16 +606,16 @@ export async function fetchActivationFunnel(): Promise<FunnelStep[]> {
  * em relação ao total de perfis.
  */
 export async function fetchChurnRate(): Promise<number> {
-  const d30 = Timestamp.fromDate(startOfDayMinus(30));
+  const d3 = Timestamp.fromDate(startOfDayMinus(3));
   const [total, inactive, legacy] = await Promise.all([
     safeCount(collection(db, "profiles")),
     safeCount(
-      query(collection(db, "profiles"), where("lastActiveAt", "<", d30)),
+      query(collection(db, "profiles"), where("lastActiveAt", "<", d3)),
     ),
     fetchLegacyActivityInsights(),
   ]);
   const direct = total > 0 ? inactive / total : 0;
-  return Math.max(direct, legacy.churnRate);
+  return clampRate(Math.max(direct, legacy.churnRate3d), legacy.churnRate3d);
 }
 
 /**

@@ -49,6 +49,7 @@ function formatNumber(value: number) {
 }
 
 function formatPercent(value: number) {
+  if (!Number.isFinite(value)) return "—";
   return `${(value * 100).toFixed(1)}%`;
 }
 
@@ -145,7 +146,7 @@ export function AnalyticsPage() {
             valor: formatDuration(activity.avgEngagementSeconds),
           },
           { metrica: "Conteúdo total", valor: activity.totalContent },
-          { metrica: "Churn 30d", valor: formatPercent(churn) },
+          { metrica: "Churn 3d", valor: formatPercent(churn) },
         ],
       },
       {
@@ -229,10 +230,10 @@ export function AnalyticsPage() {
               hint="Estimado por eventos legados"
             />
             <StatCard
-              label="Churn 30d"
+              label="Churn 3d"
               value={formatPercent(churn)}
               icon={<TrendingDown className="h-5 w-5" />}
-              hint="Inatividade 30d + proxy legado"
+              hint="Inatividade 3d + proxy legado"
             />
           </>
         )}
