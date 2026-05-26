@@ -45,16 +45,44 @@ function parseDate(value: unknown): Date | undefined {
   return undefined;
 }
 
+function cleanString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function truncateText(value: string, maxLength = 72): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
+}
+
+function buildPostTitle(data: Record<string, any>): string {
+  const explicitTitle = cleanString(data.title) ?? cleanString(data.name);
+  if (explicitTitle) return explicitTitle;
+
+  const contentTitle =
+    cleanString(data.content) ??
+    cleanString(data.description) ??
+    cleanString(data.text) ??
+    cleanString(data.targetInfo?.content);
+  if (contentTitle) return truncateText(contentTitle.replace(/\s+/g, " "));
+
+  const authorName = cleanString(data.authorName) ?? cleanString(data.profileName);
+  if (authorName) return `Post de ${authorName}`;
+
+  return "Post sem título";
+}
+
 function mapPost(id: string, data: Record<string, any>): FeedPost {
   return {
     id,
-    title: data.title ?? data.name ?? "(sem título)",
-    description: data.description ?? data.text ?? data.content,
-    postType: data.postType ?? data.type,
-    city: data.city ?? data.locationCity,
-    state: data.state ?? data.locationState,
-    authorProfileId: data.profileId ?? data.authorProfileId,
-    authorName: data.authorName ?? data.profileName,
+    title: buildPostTitle(data),
+    description:
+      cleanString(data.description) ?? cleanString(data.text) ?? cleanString(data.content),
+    postType: cleanString(data.postType) ?? cleanString(data.type),
+    city: cleanString(data.city) ?? cleanString(data.locationCity),
+    state: cleanString(data.state) ?? cleanString(data.locationState),
+    authorProfileId: cleanString(data.profileId) ?? cleanString(data.authorProfileId),
+    authorName: cleanString(data.authorName) ?? cleanString(data.profileName),
     createdAt: parseDate(data.createdAt),
     featured: data.featured === true,
     promoted: data.promoted === true,
