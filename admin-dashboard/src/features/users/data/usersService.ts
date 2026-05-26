@@ -16,7 +16,8 @@ import {
   Timestamp,
   where,
 } from "firebase/firestore";
-import { db } from "@core/firebase/client";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@core/firebase/client";
 
 export interface ProfileSummary {
   id: string;
@@ -206,6 +207,29 @@ async function getUserData(uid: string): Promise<Record<string, any>> {
     .catch(() => ({}) as Record<string, any>);
 }
 
+interface AuthUserEmailRecord {
+  email?: string | null;
+  emailVerified?: boolean;
+  disabled?: boolean;
+}
+
+async function getAuthUserEmails(
+  ownerUids: string[],
+): Promise<Map<string, AuthUserEmailRecord>> {
+  if (ownerUids.length === 0) return new Map();
+
+  try {
+    const callable = httpsCallable<
+      { uids: string[] },
+      { users?: Record<string, AuthUserEmailRecord> }
+    >(functions, "getAuthUserEmails");
+    const result = await callable({ uids: ownerUids });
+    return new Map(Object.entries(result.data.users ?? {}));
+  } catch {
+    return new Map();
+  }
+}
+
 async function enrichProfilesWithAccountEmails(
   profiles: ProfileSummary[],
 ): Promise<ProfileSummary[]> {
@@ -219,10 +243,13 @@ async function enrichProfilesWithAccountEmails(
     ownerUids.map(async (uid) => [uid, await getUserData(uid)] as const),
   );
   const usersByUid = new Map(entries);
+  const authUsersByUid = await getAuthUserEmails(ownerUids);
 
   return profiles.map((profile) => {
     if (!profile.ownerUid) return profile;
-    const accountEmail = pickAccountEmail(usersByUid.get(profile.ownerUid) ?? {});
+    const authEmail = authUsersByUid.get(profile.ownerUid)?.email?.trim();
+    const accountEmail =
+      authEmail || pickAccountEmail(usersByUid.get(profile.ownerUid) ?? {});
     return accountEmail ? { ...profile, email: accountEmail } : profile;
   });
 }
@@ -320,13 +347,18 @@ export async function getProfile(id: string): Promise<ProfileDetail | null> {
   const data = snap.data();
   const base = mapProfile(snap.id, data);
   const ownerUid = base.ownerUid;
-  const userData = ownerUid ? await getUserData(ownerUid) : {};
+  const [userData, authUsersByUid] = ownerUid
+    ? await Promise.all([getUserData(ownerUid), getAuthUserEmails([ownerUid])])
+    : [{}, new Map<string, AuthUserEmailRecord>()] as const;
+  const authEmail = ownerUid
+    ? authUsersByUid.get(ownerUid)?.email?.trim()
+    : undefined;
 
   return {
     ...base,
     bio: pickString(data, ["bio", "description", "about"]),
     email:
-      pickAccountEmail(userData) ??
+      (authEmail || pickAccountEmail(userData)) ??
       pickString(data, ["email", "userEmail", "contactEmail"]),
     phone: pickString(data, [
       "phone",

@@ -3,6 +3,7 @@
  *
  * - aggregateDailyMetrics: scheduled (3AM BRT). Agrega métricas em `analytics_daily/{YYYY-MM-DD}`.
  * - setUserModeration: callable (ban/unban um perfil). Apenas admins.
+ * - getAuthUserEmails: callable (emails do Firebase Authentication por UID). Apenas admins.
  *
  * Região: southamerica-east1.
  */
@@ -11,6 +12,32 @@ const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 
 const REGION = "southamerica-east1";
+
+async function requireAdmin(context, allowedRoles = ["superadmin", "admin", "moderator"]) {
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Login obrigatório.",
+    );
+  }
+
+  const db = admin.firestore();
+  const adminSnap = await db.collection("admins").doc(context.auth.uid).get();
+  if (!adminSnap.exists) {
+    throw new functions.https.HttpsError("permission-denied", "Não é admin.");
+  }
+
+  const adminData = adminSnap.data() || {};
+  const role = adminData.role || "admin";
+  if (!allowedRoles.includes(role)) {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "Role sem permissão.",
+    );
+  }
+
+  return { adminData, role };
+}
 
 /**
  * Conta documentos de uma coleção (ou query) usando agregação count() do Firestore.
@@ -119,26 +146,8 @@ exports.aggregateDailyMetrics = functions
 exports.setUserModeration = functions
   .region(REGION)
   .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError(
-        "unauthenticated",
-        "Login obrigatório.",
-      );
-    }
+    const { adminData, role } = await requireAdmin(context);
     const db = admin.firestore();
-    const adminSnap = await db.collection("admins").doc(context.auth.uid).get();
-    if (!adminSnap.exists) {
-      throw new functions.https.HttpsError("permission-denied", "Não é admin.");
-    }
-    const adminData = adminSnap.data() || {};
-    const role = adminData.role || "admin";
-    const allowedRoles = ["superadmin", "admin", "moderator"];
-    if (!allowedRoles.includes(role)) {
-      throw new functions.https.HttpsError(
-        "permission-denied",
-        "Role sem permissão.",
-      );
-    }
 
     const { profileId, banned, reason } = data || {};
     if (!profileId || typeof banned !== "boolean") {
@@ -177,4 +186,43 @@ exports.setUserModeration = functions
     });
 
     return { ok: true, profileId, banned };
+  });
+
+/**
+ * getAuthUserEmails
+ * Callable: retorna emails autoritativos do Firebase Authentication por UID.
+ *
+ * data: { uids: string[] }
+ */
+exports.getAuthUserEmails = functions
+  .region(REGION)
+  .https.onCall(async (data, context) => {
+    await requireAdmin(context);
+
+    const rawUids = Array.isArray(data?.uids) ? data.uids : [];
+    const uids = Array.from(
+      new Set(
+        rawUids
+          .filter((uid) => typeof uid === "string")
+          .map((uid) => uid.trim())
+          .filter(Boolean),
+      ),
+    ).slice(0, 100);
+
+    if (uids.length === 0) {
+      return { users: {} };
+    }
+
+    const result = await admin.auth().getUsers(uids.map((uid) => ({ uid })));
+    const users = {};
+
+    for (const user of result.users) {
+      users[user.uid] = {
+        email: user.email || null,
+        emailVerified: user.emailVerified,
+        disabled: user.disabled,
+      };
+    }
+
+    return { users };
   });

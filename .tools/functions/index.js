@@ -3600,3 +3600,4 @@ exports.rebuildConnectionStats = functions
 const adminFunctions = require("./admin_functions");
 exports.aggregateDailyMetrics = adminFunctions.aggregateDailyMetrics;
 exports.setUserModeration = adminFunctions.setUserModeration;
+exports.getAuthUserEmails = adminFunctions.getAuthUserEmails;
