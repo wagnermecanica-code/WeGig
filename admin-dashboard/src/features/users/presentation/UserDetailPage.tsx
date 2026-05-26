@@ -260,8 +260,8 @@ export function UserDetailPage() {
                   disabled={actionInProgress || !profile.email}
                   title={
                     profile.email
-                      ? "Enviar email de reset de senha"
-                      : "Perfil sem email cadastrado"
+                      ? "Enviar email de reset de senha para o email do Authentication"
+                      : "Conta sem email do Authentication registrado"
                   }
                 >
                   <Send className="h-4 w-4" /> Resetar senha
@@ -327,7 +327,9 @@ export function UserDetailPage() {
               <p>{renderText(profile.username)}</p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-slate-400">Email</p>
+              <p className="text-gray-500 dark:text-slate-400">
+                Email Authentication
+              </p>
               <p className="inline-flex items-center gap-1">
                 <Mail className="h-3.5 w-3.5" /> {renderText(profile.email)}
               </p>

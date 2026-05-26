@@ -47,6 +47,7 @@ export function UsersListPage() {
       (p) =>
         p.name.toLowerCase().includes(q) ||
         (p.username ?? "").toLowerCase().includes(q) ||
+        (p.email ?? "").toLowerCase().includes(q) ||
         (p.city ?? "").toLowerCase().includes(q) ||
         p.id.toLowerCase().includes(q),
     );
@@ -76,7 +77,7 @@ export function UsersListPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
-              placeholder="Buscar por nome, username, cidade ou ID..."
+              placeholder="Buscar por nome, email, username, cidade ou ID..."
               value={term}
               onChange={(e) => setTerm(e.target.value)}
               className="w-full pl-9 h-10 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
@@ -124,6 +125,7 @@ export function UsersListPage() {
             <thead className="bg-gray-50 dark:bg-slate-800/50 text-xs uppercase tracking-wider text-gray-500 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3 text-left">Nome</th>
+                <th className="px-4 py-3 text-left">Email Auth</th>
                 <th className="px-4 py-3 text-left">Tipo</th>
                 <th className="px-4 py-3 text-left">Cidade</th>
                 <th className="px-4 py-3 text-left">Criado em</th>
@@ -135,7 +137,7 @@ export function UsersListPage() {
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={6} className="px-4 py-3">
+                    <td colSpan={7} className="px-4 py-3">
                       <Skeleton className="h-5 w-full" />
                     </td>
                   </tr>
@@ -143,7 +145,7 @@ export function UsersListPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-4 py-10 text-center text-gray-500 dark:text-slate-400"
                   >
                     Nenhum perfil encontrado.
@@ -162,6 +164,9 @@ export function UsersListPage() {
                       >
                         {p.name}
                       </Link>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-slate-300">
+                      {p.email ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-slate-300">
                       {p.profileType ?? "—"}

@@ -22,6 +22,7 @@ export interface ProfileSummary {
   id: string;
   name: string;
   username?: string;
+  email?: string;
   city?: string;
   state?: string;
   profileType?: string;
@@ -170,6 +171,7 @@ function mapProfile(id: string, data: Record<string, any>): ProfileSummary {
     id,
     name: data.name ?? data.displayName ?? "(sem nome)",
     username: data.username ?? data.userName ?? data.handle,
+    email: pickString(data, ["email", "userEmail", "contactEmail"]),
     city: data.city,
     state: data.state,
     profileType: data.profileType ?? data.type,
@@ -186,6 +188,43 @@ function mapProfile(id: string, data: Record<string, any>): ProfileSummary {
     ]),
     banned: data.banned === true || data.moderationStatus === "banned",
   };
+}
+
+function pickAccountEmail(data: Record<string, any>): string | undefined {
+  return pickString(data, [
+    "email",
+    "authEmail",
+    "authenticationEmail",
+    "providerEmail",
+    "userEmail",
+  ]);
+}
+
+async function getUserData(uid: string): Promise<Record<string, any>> {
+  return getDoc(doc(db, "users", uid))
+    .then((userSnap) => (userSnap.exists() ? userSnap.data() : {}))
+    .catch(() => ({}) as Record<string, any>);
+}
+
+async function enrichProfilesWithAccountEmails(
+  profiles: ProfileSummary[],
+): Promise<ProfileSummary[]> {
+  const ownerUids = Array.from(
+    new Set(profiles.map((profile) => profile.ownerUid).filter(Boolean)),
+  ) as string[];
+
+  if (ownerUids.length === 0) return profiles;
+
+  const entries = await Promise.all(
+    ownerUids.map(async (uid) => [uid, await getUserData(uid)] as const),
+  );
+  const usersByUid = new Map(entries);
+
+  return profiles.map((profile) => {
+    if (!profile.ownerUid) return profile;
+    const accountEmail = pickAccountEmail(usersByUid.get(profile.ownerUid) ?? {});
+    return accountEmail ? { ...profile, email: accountEmail } : profile;
+  });
 }
 
 async function fetchProfilesByPages(params: {
@@ -241,7 +280,9 @@ export async function listProfiles(params: {
 }): Promise<ProfileSummary[]> {
   const pageSize = Math.max(50, Math.min(params.pageSize ?? 300, 500));
   const maxRecords = Math.max(pageSize, params.maxRecords ?? 5000);
-  let items = await fetchProfilesByPages({ batchSize: pageSize, maxRecords });
+  let items = await enrichProfilesWithAccountEmails(
+    await fetchProfilesByPages({ batchSize: pageSize, maxRecords }),
+  );
 
   if (params.profileType) {
     const requestedType = params.profileType.trim().toLowerCase();
@@ -256,6 +297,7 @@ export async function listProfiles(params: {
       (p) =>
         p.name.toLowerCase().includes(term) ||
         (p.username ?? "").toLowerCase().includes(term) ||
+        (p.email ?? "").toLowerCase().includes(term) ||
         (p.city ?? "").toLowerCase().includes(term) ||
         (p.profileType ?? "").toLowerCase().includes(term) ||
         p.id.toLowerCase().includes(term),
@@ -278,18 +320,14 @@ export async function getProfile(id: string): Promise<ProfileDetail | null> {
   const data = snap.data();
   const base = mapProfile(snap.id, data);
   const ownerUid = base.ownerUid;
-  const userData = ownerUid
-    ? await getDoc(doc(db, "users", ownerUid))
-        .then((userSnap) => (userSnap.exists() ? userSnap.data() : {}))
-        .catch(() => ({}) as Record<string, any>)
-    : ({} as Record<string, any>);
+  const userData = ownerUid ? await getUserData(ownerUid) : {};
 
   return {
     ...base,
     bio: pickString(data, ["bio", "description", "about"]),
     email:
-      pickString(data, ["email", "userEmail", "contactEmail"]) ??
-      pickString(userData, ["email", "userEmail"]),
+      pickAccountEmail(userData) ??
+      pickString(data, ["email", "userEmail", "contactEmail"]),
     phone: pickString(data, [
       "phone",
       "phoneNumber",
