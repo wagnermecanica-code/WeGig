@@ -137,9 +137,11 @@ export function AppShell() {
       >
         <div className="flex h-16 items-center justify-between px-5 border-b border-gray-100 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-sm">
-              W
-            </div>
+            <img
+              src="/Logo.png"
+              alt="WeGig"
+              className="h-9 w-auto object-contain"
+            />
             <div>
               <p className="text-sm font-semibold leading-none">WeGig</p>
               <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-slate-400">

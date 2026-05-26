@@ -1,7 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Shield } from "lucide-react";
 import { auth } from "@core/firebase/client";
 import { useAuth } from "@core/auth/AuthProvider";
 import { Button } from "@shared/components/ui/Button";
@@ -40,9 +39,11 @@ export function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-950 dark:to-slate-900 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-gray-100 dark:bg-slate-900 dark:border-slate-800 p-8">
         <div className="flex flex-col items-center gap-2 mb-6">
-          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center text-white">
-            <Shield className="h-6 w-6" />
-          </div>
+          <img
+            src="/Logo.png"
+            alt="WeGig"
+            className="h-14 w-auto object-contain"
+          />
           <h1 className="text-lg font-semibold dark:text-white">WeGig Admin</h1>
           <p className="text-xs text-gray-500 dark:text-slate-400">
             Acesso restrito
