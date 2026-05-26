@@ -176,7 +176,8 @@ export function FeedAdminPage() {
             Gerenciamento de posts
           </h2>
           <p className="text-sm text-gray-500 dark:text-slate-400">
-            Modere denúncias, acompanhe estado operacional e faça curadoria editorial.
+            Modere denúncias, acompanhe estado operacional e faça curadoria
+            editorial.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -309,7 +310,10 @@ export function FeedAdminPage() {
                           {post.description}
                         </p>
                         <p className="mt-1 text-[11px] text-gray-400 dark:text-slate-500">
-                          {[post.postType, post.authorName ?? post.authorProfileId]
+                          {[
+                            post.postType,
+                            post.authorName ?? post.authorProfileId,
+                          ]
                             .filter(Boolean)
                             .join(" · ") || post.id}
                         </p>
@@ -325,7 +329,9 @@ export function FeedAdminPage() {
                         {post.reports ? (
                           <div className="space-y-1">
                             <Badge
-                              tone={post.reports.highPriority ? "danger" : "warning"}
+                              tone={
+                                post.reports.highPriority ? "danger" : "warning"
+                              }
                               className="gap-1"
                             >
                               <AlertTriangle className="h-3 w-3" />

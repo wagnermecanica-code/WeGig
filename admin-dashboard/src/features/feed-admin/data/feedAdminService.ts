@@ -70,7 +70,9 @@ export interface FeedListParams {
 }
 
 function isActiveReportStatus(status: unknown): boolean {
-  return status !== "resolved" && status !== "removed" && status !== "dismissed";
+  return (
+    status !== "resolved" && status !== "removed" && status !== "dismissed"
+  );
 }
 
 export async function listPostReportIndicators(): Promise<
@@ -87,7 +89,11 @@ export async function listPostReportIndicators(): Promise<
 
   snap.docs.forEach((reportDoc) => {
     const data = reportDoc.data();
-    if (data.type !== "new_report" || data.targetType !== "post" || !data.targetId) {
+    if (
+      data.type !== "new_report" ||
+      data.targetType !== "post" ||
+      !data.targetId
+    ) {
       return;
     }
     if (!isActiveReportStatus(data.status)) return;
@@ -108,11 +114,17 @@ export async function listPostReportIndicators(): Promise<
     current.unreadReports += data.read ? 0 : 1;
     current.highPriority = current.highPriority || data.priority === "high";
 
-    if (reportedAt && (!current.lastReportedAt || reportedAt > current.lastReportedAt)) {
+    if (
+      reportedAt &&
+      (!current.lastReportedAt || reportedAt > current.lastReportedAt)
+    ) {
       current.lastReportedAt = reportedAt;
     }
 
-    if (typeof data.reason === "string" && !current.reasons.includes(data.reason)) {
+    if (
+      typeof data.reason === "string" &&
+      !current.reasons.includes(data.reason)
+    ) {
       current.reasons.push(data.reason);
     }
 
