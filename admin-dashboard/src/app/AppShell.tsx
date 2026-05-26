@@ -66,7 +66,7 @@ const PRIMARY_NAV: NavItem[] = [
     to: "/posts",
     label: "Posts",
     icon: FileText,
-    permission: "feed.manage",
+    permission: "content.moderate",
   },
   { to: "/users", label: "Usuários", icon: Users, permission: "users.view" },
   {

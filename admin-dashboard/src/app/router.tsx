@@ -298,7 +298,7 @@ const router = createBrowserRouter(
         {
           path: "posts",
           element: (
-            <RequireAdmin permission="feed.manage">
+            <RequireAdmin permission="content.moderate">
               <Suspended>
                 <FeedAdminPage />
               </Suspended>
