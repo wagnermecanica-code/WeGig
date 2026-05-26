@@ -292,27 +292,22 @@
             Veja as últimas oportunidades compartilhadas pela comunidade
           </p>
 
-          <div class="posts-map-container">
-            <!-- Mapa à esquerda -->
-            <div class="map-side">
-              <div id="posts-map" class="posts-map"></div>
-              <div class="map-legend">
-                <div class="legend-item">
-                  <span class="legend-dot musician"></span>
-                  <span>Músico</span>
-                </div>
-                <div class="legend-item">
-                  <span class="legend-dot band"></span>
-                  <span>Banda</span>
-                </div>
-                <div class="legend-item">
-                  <span class="legend-dot sales"></span>
-                  <span>Espaço</span>
-                </div>
+          <div class="posts-feed-shell">
+            <div class="posts-feed-lead">
+              <div class="feed-note">Curadoria em tempo real</div>
+              <h3>Uma vitrine mais limpa, rápida e feita para conversão</h3>
+              <p>
+                Selecionamos os posts mais recentes para destacar oportunidades,
+                bandas, músicos e anúncios em um layout mais agradável para leitura.
+              </p>
+              <div class="posts-type-pills" aria-label="Tipos de posts exibidos">
+                <span class="type-pill type-pill-musician">Músicos</span>
+                <span class="type-pill type-pill-band">Bandas</span>
+                <span class="type-pill type-pill-sales">Espaços</span>
+                <span class="type-pill type-pill-hiring">Contratações</span>
               </div>
             </div>
 
-            <!-- Carrossel à direita -->
             <div class="carousel-side">
               <div class="posts-carousel" id="posts-carousel">
                 <!-- Posts serão inseridos dinamicamente -->
@@ -407,21 +402,8 @@
       </div>
     </footer>
 
-    <!-- Google Maps API with Advanced Markers -->
-    <script>
-      function initMap() {
-        window.googleMapsReady = true;
-        window.dispatchEvent(new Event("google-maps-ready"));
-      }
-    </script>
-    <script
-      async
-      defer
-      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA3Rq-Fmlsrwn-fywriTBp7xZsOo7i5fyQ&map_ids=b7134f9dc59c2ad97d5b292e&libraries=marker&callback=initMap"
-    ></script>
-
     <!-- Posts Feed Script -->
-    <script src="posts-feed.js?v=11"></script>
+    <script src="posts-feed.js?v=12"></script>
 
     <!-- Meta Pixel: Download Tracking -->
     <script>
