@@ -1000,7 +1000,7 @@ nav a:hover {
 
   .post-card {
     grid-template-columns: 1fr;
-    grid-template-rows: 150px 1fr;
+    grid-template-rows: 150px auto;
     height: auto;
     min-height: 0;
     border-radius: 20px;
