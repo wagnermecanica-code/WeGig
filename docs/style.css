@@ -25,6 +25,7 @@ body {
   line-height: 1.6;
   color: var(--text-primary);
   background-color: var(--background);
+  overflow-x: hidden;
 }
 
 img {
@@ -1067,7 +1068,17 @@ nav a:hover {
 
 @media (max-width: 768px) {
   .posts-feed {
-    padding: 3.5rem 0;
+    padding: 3rem 0;
+  }
+
+  .posts-feed h2 {
+    font-size: 1.7rem;
+  }
+
+  .posts-feed .section-subtitle {
+    max-width: 28ch;
+    margin: 0 auto 1.6rem;
+    font-size: 0.96rem;
   }
 
   .posts-feed-lead {
@@ -1081,14 +1092,19 @@ nav a:hover {
 
   .posts-carousel {
     grid-template-columns: 1fr;
-    max-height: min(82vh, 66rem);
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+    scroll-snap-type: none;
   }
 
   .post-card {
     grid-template-columns: 1fr;
-    grid-template-rows: 168px 1fr;
+    grid-template-rows: 150px 1fr;
     height: auto;
     min-height: 0;
+    border-radius: 20px;
+    scroll-snap-align: none;
   }
 
   .post-card--no-photo {
@@ -1098,12 +1114,46 @@ nav a:hover {
 
   .pc-content {
     justify-content: flex-start;
+    gap: 0.72rem;
+  }
+
+  .pc-media-header,
+  .pc-author-block {
+    left: 0.85rem;
+    right: 0.85rem;
+  }
+
+  .pc-media-header {
+    top: 0.85rem;
+  }
+
+  .pc-author-block {
+    bottom: 0.85rem;
+  }
+
+  .pc-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 15px;
+  }
+
+  .pc-name {
+    font-size: 1.04rem;
+  }
+
+  .pc-title {
+    font-size: 1.08rem;
+  }
+
+  .carousel-cta {
+    border-radius: 20px;
+    padding: 1.2rem;
   }
 }
 
 @media (max-width: 480px) {
   .pc-content {
-    padding: 1rem;
+    padding: 0.92rem;
   }
 
   .pc-title-row {
@@ -1118,6 +1168,22 @@ nav a:hover {
   .pc-inline-header .pc-time {
     grid-column: 1 / -1;
     width: fit-content;
+  }
+
+  .pc-type-chip,
+  .pc-meta-chip,
+  .pc-detail-chip,
+  .pc-kicker,
+  .pc-price {
+    font-size: 0.72rem;
+  }
+
+  .pc-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pc-message {
+    font-size: 0.88rem;
   }
 }
 
@@ -1236,7 +1302,7 @@ footer {
   }
 
   .logo img {
-    height: 87px;
+    height: 76px;
   }
 
   nav {
@@ -1300,7 +1366,7 @@ footer {
   }
 
   .hero {
-    padding: 1.7rem 0 2rem;
+    padding: 1.45rem 0 1.85rem;
   }
 
   .hero .container {
@@ -1308,9 +1374,9 @@ footer {
   }
 
   .hero h2 {
-    max-width: 16ch;
+    max-width: 18ch;
     margin: 0 auto 0.85rem;
-    font-size: 1.6rem;
+    font-size: 1.48rem;
     line-height: 1.2;
   }
 
@@ -1342,7 +1408,7 @@ footer {
   }
 
   .hero-store-cta .store-btn-icon {
-    height: 48px;
+    height: 44px;
   }
 
   .cta-buttons {
@@ -1399,7 +1465,7 @@ footer {
   }
 
   .logo img {
-    height: 77px;
+    height: 68px;
   }
 
   .mobile-menu-panel a {
@@ -1416,15 +1482,15 @@ footer {
   }
 
   .hero-store-cta .store-btn-icon {
-    height: 42px;
+    height: 38px;
   }
 
   .hero {
-    padding: 1.8rem 0 2rem;
+    padding: 1.45rem 0 1.85rem;
   }
 
   .hero h2 {
-    font-size: 1.42rem;
+    font-size: 1.34rem;
   }
 
   .hero p {
