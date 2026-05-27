@@ -1164,7 +1164,7 @@ class _PostFullCardState extends ConsumerState<_PostFullCard> {
   Widget _buildActionIcons() {
     final isSales = widget.post.type == 'sales';
     final liveCommentCount =
-        ref.watch(commentCountStreamProvider(widget.post.id)).value ??
+        ref.watch(commentCountStreamProvider(widget.post.id)).valueOrNull ??
             widget.post.commentCount;
 
     return Padding(

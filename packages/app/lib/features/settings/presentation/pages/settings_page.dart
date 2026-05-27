@@ -646,10 +646,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     child: snapshot.connectionState == ConnectionState.waiting
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                        ? const AppBrandCircularLoader(
+                            size: 18,
+                            strokeWidth: 2,
                           )
                         : Text(actionLabel),
                   ),

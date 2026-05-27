@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wegig_app/core/cache/image_cache_manager.dart';
@@ -213,7 +214,7 @@ class ConnectionRequestsPage extends ConsumerWidget {
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: AppBrandCircularLoader()),
         error: (e, st) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),

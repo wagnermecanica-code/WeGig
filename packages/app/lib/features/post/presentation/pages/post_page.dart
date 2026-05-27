@@ -100,7 +100,7 @@ class _PostPageState extends ConsumerState<PostPage> {
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _discountController = TextEditingController();
   final TextEditingController _whatsappController = TextEditingController();
-  
+
   String _salesType = 'Venda';
   String _discountMode = 'none'; // 'none', 'percentage', 'fixed'
   bool _isFreeProduct = false; // Produto/serviço gratuito
@@ -126,7 +126,7 @@ class _PostPageState extends ConsumerState<PostPage> {
     'Manutenção/Reparo',
     'Outro',
   ];
-  
+
   // === Erros de validação ===
   String? _instrumentsError;
   String? _genresError;
@@ -140,18 +140,18 @@ class _PostPageState extends ConsumerState<PostPage> {
   String? _titleError;
   String? _priceError;
 
- // Lista para disponibilidade
+  // Lista para disponibilidade
   @override
   void initState() {
     super.initState();
     _postType = widget.postType;
-    
+
     // Inicializar listeners para sales
     if (_postType == 'sales') {
       _priceController.addListener(_calculateFinalPrice);
       _discountController.addListener(_calculateFinalPrice);
     }
-    
+
     _loadExistingData();
   }
 
@@ -267,7 +267,7 @@ class _PostPageState extends ConsumerState<PostPage> {
     setState(() {
       final photoUrls = data['photoUrls'] as List<dynamic>?;
       final photoUrl = data['photoUrl'] as String?;
-      
+
       if (photoUrls != null && photoUrls.isNotEmpty) {
         _photoPaths = photoUrls.cast<String>().toList();
       } else if (photoUrl != null && photoUrl.isNotEmpty) {
@@ -280,12 +280,13 @@ class _PostPageState extends ConsumerState<PostPage> {
       _titleController.text = (data['title'] as String?) ?? '';
       _salesType = (data['salesType'] as String?) ?? 'Venda';
       _whatsappController.text = (data['whatsappNumber'] as String?) ?? '';
-      
+
       // Preço - agora data['price'] é o preço ORIGINAL (sem desconto)
       final originalPrice = data['price'];
-      
+
       // ✅ Verificar se é gratuito (preço = 0 ou null)
-      if (originalPrice == null || (originalPrice is num && originalPrice == 0)) {
+      if (originalPrice == null ||
+          (originalPrice is num && originalPrice == 0)) {
         _isFreeProduct = true;
         _priceController.clear();
       } else if (originalPrice is num && originalPrice > 0) {
@@ -294,7 +295,7 @@ class _PostPageState extends ConsumerState<PostPage> {
         final priceInCents = (originalPrice.toDouble() * 100).toInt();
         _priceController.text = priceInCents.toString();
       }
-      
+
       // Modo de desconto e valor
       _discountMode = (data['discountMode'] as String?) ?? 'none';
       final discountValue = data['discountValue'];
@@ -313,7 +314,7 @@ class _PostPageState extends ConsumerState<PostPage> {
           _discountController.text = cleaned.isEmpty ? '' : cleaned;
         }
       }
-      
+
       // Datas da promoção
       if (data['promoStartDate'] != null) {
         if (data['promoStartDate'] is Timestamp) {
@@ -322,7 +323,7 @@ class _PostPageState extends ConsumerState<PostPage> {
           _promoStartDate = data['promoStartDate'] as DateTime;
         }
       }
-      
+
       if (data['promoEndDate'] != null) {
         if (data['promoEndDate'] is Timestamp) {
           _promoEndDate = (data['promoEndDate'] as Timestamp).toDate();
@@ -330,10 +331,10 @@ class _PostPageState extends ConsumerState<PostPage> {
           _promoEndDate = data['promoEndDate'] as DateTime;
         }
       }
-      
+
       // Recalcular preço final após carregar dados
       _calculateFinalPrice();
-      
+
       debugPrint('''
 ✅ Sales fields loaded:
    Title: ${_titleController.text}
@@ -407,7 +408,7 @@ class _PostPageState extends ConsumerState<PostPage> {
     _locationController.dispose();
     _locationFocusNode.dispose();
     _guestCountController.dispose();
-    
+
     // Dispose sales-specific controllers
     if (_postType == 'sales') {
       _titleController.dispose();
@@ -415,7 +416,7 @@ class _PostPageState extends ConsumerState<PostPage> {
       _discountController.dispose();
       _whatsappController.dispose();
     }
-    
+
     super.dispose();
   }
 
@@ -481,21 +482,23 @@ class _PostPageState extends ConsumerState<PostPage> {
   void _calculateFinalPrice() {
     final priceStr = _priceController.text.replaceAll(RegExp(r'[^\d]'), '');
     final price = double.tryParse(priceStr) ?? 0.0;
-    
+
     if (_discountMode == 'none' || _discountController.text.isEmpty) {
       setState(() => _calculatedFinalPrice = price / 100);
       return;
     }
-    
-    final discountStr = _discountController.text.replaceAll(RegExp(r'[^\d]'), '');
+
+    final discountStr =
+        _discountController.text.replaceAll(RegExp(r'[^\d]'), '');
     final discountValue = double.tryParse(discountStr) ?? 0.0;
-    
+
     if (_discountMode == 'percentage') {
       setState(
         () => _calculatedFinalPrice = (price / 100) * (1 - discountValue / 100),
       );
     } else if (_discountMode == 'fixed') {
-      setState(() => _calculatedFinalPrice = (price / 100) - (discountValue / 100));
+      setState(
+          () => _calculatedFinalPrice = (price / 100) - (discountValue / 100));
     }
   }
 
@@ -583,10 +586,12 @@ class _PostPageState extends ConsumerState<PostPage> {
   }
 
   Future<void> _submitPost() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     _resetFieldErrors();
 
     if (!_formKey.currentState!.validate()) {
-      _showSnackBar('Complete os campos destacados para continuar.', isError: true);
+      _showSnackBar('Complete os campos destacados para continuar.',
+          isError: true);
       return;
     }
 
@@ -594,8 +599,10 @@ class _PostPageState extends ConsumerState<PostPage> {
     if (_postType == 'sales') {
       // Sales: fotos, título, descrição, tipo, preço, localização (SEM gêneros/instrumentos)
       if (_photoPaths.isEmpty) {
-        setState(() => _photoError = 'Adicione pelo menos uma foto para anunciar.');
-        _showSnackBar('Inclua pelo menos uma foto para o anúncio.', isError: true);
+        setState(
+            () => _photoError = 'Adicione pelo menos uma foto para anunciar.');
+        _showSnackBar('Inclua pelo menos uma foto para o anúncio.',
+            isError: true);
         return;
       }
       if (_titleController.text.trim().isEmpty) {
@@ -609,21 +616,27 @@ class _PostPageState extends ConsumerState<PostPage> {
         return;
       }
       // Preço obrigatório apenas se não for gratuito
-      if (!_isFreeProduct && (_priceController.text.isEmpty || _calculatedFinalPrice <= 0)) {
-        setState(() => _priceError = 'Defina um preço ou marque como gratuito.');
-        _showSnackBar('Defina um preço ou marque como gratuito.', isError: true);
+      if (!_isFreeProduct &&
+          (_priceController.text.isEmpty || _calculatedFinalPrice <= 0)) {
+        setState(
+            () => _priceError = 'Defina um preço ou marque como gratuito.');
+        _showSnackBar('Defina um preço ou marque como gratuito.',
+            isError: true);
         return;
       }
       if (_promoEndDate.isBefore(_promoStartDate)) {
-        _showSnackBar('A data final da promoção deve ser após a data inicial.', isError: true);
+        _showSnackBar('A data final da promoção deve ser após a data inicial.',
+            isError: true);
         return;
       }
       // Sales NÃO precisa de gêneros ou instrumentos
     } else if (_postType == 'musician') {
       // Musician: instrumentos, gêneros, descrição, localização
       if (_selectedInstruments.isEmpty) {
-        setState(() => _instrumentsError = 'Selecione pelo menos um instrumento.');
-        _showSnackBar('Escolha pelo menos um instrumento para continuar.', isError: true);
+        setState(
+            () => _instrumentsError = 'Selecione pelo menos um instrumento.');
+        _showSnackBar('Escolha pelo menos um instrumento para continuar.',
+            isError: true);
         return;
       }
       if (_selectedGenres.isEmpty) {
@@ -640,7 +653,8 @@ class _PostPageState extends ConsumerState<PostPage> {
       // Band: músicos procurados, gêneros, descrição, localização
       if (_selectedInstruments.isEmpty) {
         setState(() => _instrumentsError = 'Liste quem você procura.');
-        _showSnackBar('Informe pelo menos um músico ou instrumento procurado.', isError: true);
+        _showSnackBar('Informe pelo menos um músico ou instrumento procurado.',
+            isError: true);
         return;
       }
       if (_selectedGenres.isEmpty) {
@@ -672,7 +686,8 @@ class _PostPageState extends ConsumerState<PostPage> {
       }
       if (_hiringDate == null) {
         setState(() => _dateError = 'Selecione a data.');
-        _showSnackBar('Selecione a data da apresentação/contratação.', isError: true);
+        _showSnackBar('Selecione a data da apresentação/contratação.',
+            isError: true);
         return;
       }
       if (_budgetRange == null || _budgetRange!.isEmpty) {
@@ -683,7 +698,8 @@ class _PostPageState extends ConsumerState<PostPage> {
       if (_guestCountController.text.trim().isEmpty ||
           int.tryParse(_guestCountController.text.trim()) == null) {
         setState(() => _guestCountError = 'Informe um número de convidados.');
-        _showSnackBar('Informe a quantidade aproximada de convidados.', isError: true);
+        _showSnackBar('Informe a quantidade aproximada de convidados.',
+            isError: true);
         return;
       }
       if (_messageController.text.trim().isEmpty) {
@@ -703,37 +719,50 @@ class _PostPageState extends ConsumerState<PostPage> {
     setState(() => _isSaving = true);
 
     try {
-        final computedExpiresAt = _postType == 'hiring' && _hiringDate != null
+      final computedExpiresAt = _postType == 'hiring' && _hiringDate != null
           ? _hiringDate!.add(const Duration(days: 1))
           : _maybeExtractDate(widget.existingPostData?['expiresAt']);
 
-        final selectedEventType =
+      final selectedEventType =
           _selectedEventTypes.isNotEmpty ? _selectedEventTypes.first : null;
-        final selectedGigFormat =
+      final selectedGigFormat =
           _selectedGigFormats.isNotEmpty ? _selectedGigFormats.first : null;
 
       final input = PostFormInput(
         postId: widget.existingPostData?['postId'] as String?,
         type: _postType,
-        
+
         // Campos específicos de sales
         title: _postType == 'sales' ? _titleController.text.trim() : null,
         salesType: _postType == 'sales' ? _salesType : null,
-        price: _postType == 'sales' 
-            ? (_isFreeProduct ? 0.0 : (double.tryParse(_priceController.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0.0) / 100) 
+        price: _postType == 'sales'
+            ? (_isFreeProduct
+                ? 0.0
+                : (double.tryParse(_priceController.text
+                            .replaceAll(RegExp(r'[^\d]'), '')) ??
+                        0.0) /
+                    100)
             : null,
-        discountMode: _postType == 'sales' && !_isFreeProduct ? _discountMode : null,
-        discountValue: _postType == 'sales' && _discountController.text.isNotEmpty
-            ? (_discountMode == 'fixed' 
-                ? (double.tryParse(_discountController.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0.0) / 100
-                : double.tryParse(_discountController.text.replaceAll(RegExp(r'[^\d]'), '')) ?? 0.0)
-            : null,
+        discountMode:
+            _postType == 'sales' && !_isFreeProduct ? _discountMode : null,
+        discountValue:
+            _postType == 'sales' && _discountController.text.isNotEmpty
+                ? (_discountMode == 'fixed'
+                    ? (double.tryParse(_discountController.text
+                                .replaceAll(RegExp(r'[^\d]'), '')) ??
+                            0.0) /
+                        100
+                    : double.tryParse(_discountController.text
+                            .replaceAll(RegExp(r'[^\d]'), '')) ??
+                        0.0)
+                : null,
         promoStartDate: _postType == 'sales' ? _promoStartDate : null,
         promoEndDate: _postType == 'sales' ? _promoEndDate : null,
-        whatsappNumber: _postType == 'sales' && _whatsappController.text.isNotEmpty
-            ? _whatsappController.text.replaceAll(RegExp(r'\D'), '')
-            : null,
-        
+        whatsappNumber:
+            _postType == 'sales' && _whatsappController.text.isNotEmpty
+                ? _whatsappController.text.replaceAll(RegExp(r'\D'), '')
+                : null,
+
         // Campos comuns
         content: _messageController.text.trim(),
         location: location,
@@ -741,27 +770,37 @@ class _PostPageState extends ConsumerState<PostPage> {
         neighborhood: _selectedNeighborhood,
         state: _selectedState,
         photoPaths: _photoPaths,
-        youtubeLink: _youtubeController.text.trim().isEmpty ? null : _youtubeController.text.trim(),
-        spotifyLink: _spotifyController.text.trim().isEmpty ? null : _spotifyController.text.trim(),
-        deezerLink: _deezerController.text.trim().isEmpty ? null : _deezerController.text.trim(),
+        youtubeLink: _youtubeController.text.trim().isEmpty
+            ? null
+            : _youtubeController.text.trim(),
+        spotifyLink: _spotifyController.text.trim().isEmpty
+            ? null
+            : _spotifyController.text.trim(),
+        deezerLink: _deezerController.text.trim().isEmpty
+            ? null
+            : _deezerController.text.trim(),
         eventDate: _postType == 'hiring' ? _hiringDate : null,
         eventType: _postType == 'hiring' ? selectedEventType : null,
         gigFormat: _postType == 'hiring' ? selectedGigFormat : null,
         venueSetup: _postType == 'hiring' ? _venueSetup.toList() : <String>[],
         budgetRange: _postType == 'hiring' ? _budgetRange : null,
-        eventStartTime: _postType == 'hiring' ? _timeToString(_startTime) : null,
+        eventStartTime:
+            _postType == 'hiring' ? _timeToString(_startTime) : null,
         eventEndTime: _postType == 'hiring' ? _timeToString(_endTime) : null,
-        eventDurationMinutes: _postType == 'hiring' ? _eventDurationMinutes : null,
+        eventDurationMinutes:
+            _postType == 'hiring' ? _eventDurationMinutes : null,
         guestCount: _postType == 'hiring'
-          ? int.tryParse(_guestCountController.text.trim())
-          : null,
-        
+            ? int.tryParse(_guestCountController.text.trim())
+            : null,
+
         // Campos de musician/band (null para sales)
         level: _postType != 'sales' ? _level : null,
         genres: _postType != 'sales' ? _selectedGenres.toList() : <String>[],
-        selectedInstruments: _postType != 'sales' ? _selectedInstruments.toList() : <String>[],
-        availableFor: _postType != 'sales' ? _selectedAvailableFor.toList() : <String>[],
-        
+        selectedInstruments:
+            _postType != 'sales' ? _selectedInstruments.toList() : <String>[],
+        availableFor:
+            _postType != 'sales' ? _selectedAvailableFor.toList() : <String>[],
+
         createdAt: _maybeExtractDate(widget.existingPostData?['createdAt']),
         expiresAt: computedExpiresAt,
       );
@@ -861,153 +900,160 @@ class _PostPageState extends ConsumerState<PostPage> {
     // Ler provider apenas uma vez, sem observar mudanças para evitar rebuild loops
     final profileAsync = ref.read(profileProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return AppLoadingOverlay(
+      isLoading: _isSaving,
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.close, size: 28),
-        ),
-        actions: [
-          if (_isSaving)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.only(right: 16),
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: AppRadioPulseLoader(size: 24),
-                ),
-              ),
-            )
-          else
-            IconButton(
-              onPressed: _submitPost,
-              icon: const Icon(
-                Icons.send_rounded,
-                size: 26,
-                color: AppColors.primary,
-              ),
-            ),
-        ],
-      ),
-      body: profileAsync.when(
-        loading: () => const Center(
-          child: AppRadioPulseLoader(size: 52),
-        ),
-        error: (err, stack) => const Center(
-          child: Text('Erro ao carregar perfil. Tente novamente.'),
-        ),
-        data: (profileState) {
-          final profile = profileState.activeProfile;
-
-          return AbsorbPointer(
-            absorbing: _isSaving,
-            child: Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 24,
-                ),
-                children: [
-                  // Card de Título
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    margin: const EdgeInsets.only(bottom: 24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppColors.primary,
-                          AppColors.primary.withValues(alpha: 0.8),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        // Foto do perfil
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withValues(
-                                alpha: 0.3,
-                              ),
-                              width: 2,
-                            ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: profile?.photoUrl != null &&
-                                    profile!.photoUrl!.isNotEmpty
-                                ? CachedNetworkImage(
-                                    imageUrl: profile.photoUrl!,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => Icon(
-                                      headerIcon,
-                                      color: Colors.white,
-                                      size: 28,
-                                    ),
-                                    errorWidget: (context, url, error) => Icon(
-                                      headerIcon,
-                                      color: Colors.white,
-                                      size: 28,
-                                    ),
-                                  )
-                                : Icon(
-                                    headerIcon,
-                                    color: Colors.white,
-                                    size: 28,
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Text(
-                            headerTitle,
-                            style: const TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              height: 1.3,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                        ),
-                      ],
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close, size: 28),
+          ),
+          actions: [
+            if (_isSaving)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.only(right: 16),
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: AppBrandCircularLoader(
+                      size: 24,
+                      strokeWidth: 2.6,
                     ),
                   ),
-
-                  // Renderização condicional baseada no tipo
-                  if (_postType == 'sales') 
-                    ..._buildSalesFields()
-                  else if (_postType == 'hiring')
-                    ..._buildHiringFields()
-                  else
-                    ..._buildMusicianBandFields(),
-
-                  const SizedBox(height: 32),
-                ],
+                ),
+              )
+            else
+              IconButton(
+                onPressed: _submitPost,
+                icon: const Icon(
+                  Icons.send_rounded,
+                  size: 26,
+                  color: AppColors.primary,
+                ),
               ),
-            ),
-          );
-        },
+          ],
+        ),
+        body: profileAsync.when(
+          loading: () => const Center(
+            child: AppRadioPulseLoader(size: 52),
+          ),
+          error: (err, stack) => const Center(
+            child: Text('Erro ao carregar perfil. Tente novamente.'),
+          ),
+          data: (profileState) {
+            final profile = profileState.activeProfile;
+
+            return AbsorbPointer(
+              absorbing: _isSaving,
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 24,
+                  ),
+                  children: [
+                    // Card de Título
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      margin: const EdgeInsets.only(bottom: 24),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.primary,
+                            AppColors.primary.withValues(alpha: 0.8),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          // Foto do perfil
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.white.withValues(
+                                  alpha: 0.3,
+                                ),
+                                width: 2,
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: profile?.photoUrl != null &&
+                                      profile!.photoUrl!.isNotEmpty
+                                  ? CachedNetworkImage(
+                                      imageUrl: profile.photoUrl!,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) => Icon(
+                                        headerIcon,
+                                        color: Colors.white,
+                                        size: 28,
+                                      ),
+                                      errorWidget: (context, url, error) =>
+                                          Icon(
+                                        headerIcon,
+                                        color: Colors.white,
+                                        size: 28,
+                                      ),
+                                    )
+                                  : Icon(
+                                      headerIcon,
+                                      color: Colors.white,
+                                      size: 28,
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              headerTitle,
+                              style: const TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                height: 1.3,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Renderização condicional baseada no tipo
+                    if (_postType == 'sales')
+                      ..._buildSalesFields()
+                    else if (_postType == 'hiring')
+                      ..._buildHiringFields()
+                    else
+                      ..._buildMusicianBandFields(),
+
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -1015,13 +1061,16 @@ class _PostPageState extends ConsumerState<PostPage> {
   // ====================================================================
   // SALES FIELDS
   // ====================================================================
-  
+
   List<Widget> _buildSalesFields() {
     return [
       // 1. Fotos (obrigatória)
       const Text(
         'Fotos do produto/serviço *',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+        style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary),
       ),
       const SizedBox(height: 12),
       PhotoCarouselPicker(
@@ -1041,7 +1090,10 @@ class _PostPageState extends ConsumerState<PostPage> {
       // 2. Título do anúncio
       const Text(
         'Título do anúncio *',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+        style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary),
       ),
       const SizedBox(height: 12),
       TextFormField(
@@ -1066,7 +1118,10 @@ class _PostPageState extends ConsumerState<PostPage> {
       // 3. Descrição
       const Text(
         'Descrição *',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+        style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary),
       ),
       const SizedBox(height: 12),
       TextFormField(
@@ -1092,7 +1147,10 @@ class _PostPageState extends ConsumerState<PostPage> {
       // 4. Tipo do anúncio
       const Text(
         'Tipo do anúncio *',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+        style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary),
       ),
       const SizedBox(height: 12),
       Wrap(
@@ -1127,7 +1185,10 @@ class _PostPageState extends ConsumerState<PostPage> {
         children: [
           const Text(
             'Preço',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary),
           ),
           const Spacer(),
           Text(
@@ -1135,7 +1196,8 @@ class _PostPageState extends ConsumerState<PostPage> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: _isFreeProduct ? AppColors.success : AppColors.textSecondary,
+              color:
+                  _isFreeProduct ? AppColors.success : AppColors.textSecondary,
             ),
           ),
           const SizedBox(width: 8),
@@ -1169,7 +1231,8 @@ class _PostPageState extends ConsumerState<PostPage> {
             decoration: InputDecoration(
               hintText: _isFreeProduct ? 'Gratuito' : '0,00',
               errorText: _priceError,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
               fillColor: _isFreeProduct ? Colors.grey[200] : Colors.grey[50],
             ),
@@ -1193,7 +1256,10 @@ class _PostPageState extends ConsumerState<PostPage> {
             children: [
               const Text(
                 'Desconto (opcional)',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary),
               ),
               const SizedBox(height: 12),
               Row(
@@ -1202,13 +1268,16 @@ class _PostPageState extends ConsumerState<PostPage> {
                     child: FilterChip(
                       label: const Text('Sem desconto'),
                       selected: _discountMode == 'none',
-                      onSelected: _isFreeProduct ? null : (selected) => setState(() {
-                        _discountMode = 'none';
-                        _discountController.clear();
-                      }),
+                      onSelected: _isFreeProduct
+                          ? null
+                          : (selected) => setState(() {
+                                _discountMode = 'none';
+                                _discountController.clear();
+                              }),
                       backgroundColor: Theme.of(context).cardColor,
                       selectedColor: AppColors.primary.withOpacity(0.1),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1216,13 +1285,16 @@ class _PostPageState extends ConsumerState<PostPage> {
                     child: FilterChip(
                       label: const Text('% desconto'),
                       selected: _discountMode == 'percentage',
-                      onSelected: _isFreeProduct ? null : (selected) => setState(() {
-                        _discountMode = 'percentage';
-                        _discountController.clear();
-                      }),
+                      onSelected: _isFreeProduct
+                          ? null
+                          : (selected) => setState(() {
+                                _discountMode = 'percentage';
+                                _discountController.clear();
+                              }),
                       backgroundColor: Theme.of(context).cardColor,
                       selectedColor: AppColors.primary.withOpacity(0.1),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1230,13 +1302,16 @@ class _PostPageState extends ConsumerState<PostPage> {
                     child: FilterChip(
                       label: const Text('R\$ off'),
                       selected: _discountMode == 'fixed',
-                      onSelected: _isFreeProduct ? null : (selected) => setState(() {
-                        _discountMode = 'fixed';
-                        _discountController.clear();
-                      }),
+                      onSelected: _isFreeProduct
+                          ? null
+                          : (selected) => setState(() {
+                                _discountMode = 'fixed';
+                                _discountController.clear();
+                              }),
                       backgroundColor: Theme.of(context).cardColor,
                       selectedColor: AppColors.primary.withOpacity(0.1),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
                     ),
                   ),
                 ],
@@ -1250,13 +1325,20 @@ class _PostPageState extends ConsumerState<PostPage> {
                     prefixText: _discountMode == 'percentage' ? '' : 'R\$ ',
                     suffixText: _discountMode == 'percentage' ? '%' : '',
                     hintText: _discountMode == 'percentage' ? '0' : '0,00',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     filled: true,
                     fillColor: Colors.grey[50],
                   ),
                   inputFormatters: _discountMode == 'percentage'
-                      ? [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(2)]
-                      : [FilteringTextInputFormatter.digitsOnly, _CurrencyInputFormatter()],
+                      ? [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(2)
+                        ]
+                      : [
+                          FilteringTextInputFormatter.digitsOnly,
+                          _CurrencyInputFormatter()
+                        ],
                 ),
               ],
             ],
@@ -1276,13 +1358,18 @@ class _PostPageState extends ConsumerState<PostPage> {
             children: [
               const Text(
                 'Valor final',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary),
               ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _isFreeProduct ? Colors.green.shade100 : Colors.green.shade50,
+                  color: _isFreeProduct
+                      ? Colors.green.shade100
+                      : Colors.green.shade50,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.green.shade300),
                 ),
@@ -1290,18 +1377,23 @@ class _PostPageState extends ConsumerState<PostPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      _isFreeProduct 
-                          ? 'Grátis' 
-                          : NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ').format(_calculatedFinalPrice),
+                      _isFreeProduct
+                          ? 'Grátis'
+                          : NumberFormat.currency(
+                                  locale: 'pt_BR', symbol: 'R\$ ')
+                              .format(_calculatedFinalPrice),
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.green,
                       ),
                     ),
-                    if (!_isFreeProduct && _discountMode != 'none' && _discountController.text.isNotEmpty)
+                    if (!_isFreeProduct &&
+                        _discountMode != 'none' &&
+                        _discountController.text.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.green,
                           borderRadius: BorderRadius.circular(8),
@@ -1310,7 +1402,8 @@ class _PostPageState extends ConsumerState<PostPage> {
                           _discountMode == 'percentage'
                               ? '-${_discountController.text}%'
                               : 'R\$ ${_discountController.text} off',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                       ),
                   ],
@@ -1325,12 +1418,16 @@ class _PostPageState extends ConsumerState<PostPage> {
       // 8. Validade da promoção
       const Text(
         'Validade da promoção *',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+        style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary),
       ),
       const SizedBox(height: 8),
       Text(
         'Datas desabilitadas ficam acinzentadas no calendário',
-        style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
+        style: TextStyle(
+            fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
       ),
       const SizedBox(height: 12),
       Row(
@@ -1340,7 +1437,8 @@ class _PostPageState extends ConsumerState<PostPage> {
               onPressed: () async {
                 final now = DateTime.now();
                 // Se a data atual é passada (edição de post antigo), usar hoje
-                final safeInitialDate = _promoStartDate.isBefore(now) ? now : _promoStartDate;
+                final safeInitialDate =
+                    _promoStartDate.isBefore(now) ? now : _promoStartDate;
                 final date = await showDatePicker(
                   context: context,
                   initialDate: safeInitialDate,
@@ -1364,14 +1462,17 @@ class _PostPageState extends ConsumerState<PostPage> {
                   setState(() {
                     _promoStartDate = date;
                     // Ajusta data de término automaticamente se necessário
-                    if (_promoEndDate.isBefore(date) || _promoEndDate.isAfter(date.add(const Duration(days: 30)))) {
+                    if (_promoEndDate.isBefore(date) ||
+                        _promoEndDate
+                            .isAfter(date.add(const Duration(days: 30)))) {
                       _promoEndDate = date.add(const Duration(days: 30));
                     }
                   });
                 }
               },
               icon: const Icon(Icons.calendar_today),
-              label: Text('De: ${_promoStartDate.day}/${_promoStartDate.month}/${_promoStartDate.year.toString().substring(2)}'),
+              label: Text(
+                  'De: ${_promoStartDate.day}/${_promoStartDate.month}/${_promoStartDate.year.toString().substring(2)}'),
             ),
           ),
           const SizedBox(width: 8),
@@ -1381,8 +1482,11 @@ class _PostPageState extends ConsumerState<PostPage> {
                 final now = DateTime.now();
                 final tomorrow = now.add(const Duration(days: 1));
                 // firstDate deve ser no mínimo amanhã (mesmo se promoStartDate é passada)
-                final safeFirstDate = _promoStartDate.isBefore(tomorrow) ? tomorrow : _promoStartDate;
-                final safeLastDate = safeFirstDate.add(const Duration(days: 30));
+                final safeFirstDate = _promoStartDate.isBefore(tomorrow)
+                    ? tomorrow
+                    : _promoStartDate;
+                final safeLastDate =
+                    safeFirstDate.add(const Duration(days: 30));
                 // initialDate deve estar no range [safeFirstDate, safeLastDate]
                 DateTime safeInitialDate;
                 if (_promoEndDate.isBefore(safeFirstDate)) {
@@ -1414,7 +1518,8 @@ class _PostPageState extends ConsumerState<PostPage> {
                 if (date != null) setState(() => _promoEndDate = date);
               },
               icon: const Icon(Icons.calendar_today),
-              label: Text('Até: ${_promoEndDate.day}/${_promoEndDate.month}/${_promoEndDate.year.toString().substring(2)}'),
+              label: Text(
+                  'Até: ${_promoEndDate.day}/${_promoEndDate.month}/${_promoEndDate.year.toString().substring(2)}'),
             ),
           ),
         ],
@@ -1445,7 +1550,10 @@ class _PostPageState extends ConsumerState<PostPage> {
       // 9. Localização
       const Text(
         'Localização *',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+        style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary),
       ),
       const SizedBox(height: 12),
       TypeAheadField<Map<String, dynamic>>(
@@ -1454,7 +1562,8 @@ class _PostPageState extends ConsumerState<PostPage> {
         suggestionsCallback: _fetchAddressSuggestions,
         itemBuilder: (BuildContext context, Map<String, dynamic> suggestion) {
           final address = suggestion['address'] as Map<String, dynamic>? ?? {};
-          final road = (address['road'] ?? address['pedestrian'] ?? '') as String;
+          final road =
+              (address['road'] ?? address['pedestrian'] ?? '') as String;
           final houseNumber = (address['house_number'] ?? '') as String;
           final neighbourhood = (address['neighbourhood'] ??
               address['suburb'] ??
@@ -1466,16 +1575,21 @@ class _PostPageState extends ConsumerState<PostPage> {
               address['municipality'] ??
               '') as String;
           final state = (address['state'] ?? '') as String;
-          final streetLine = [road, houseNumber].where((e) => e.isNotEmpty).join(', ');
+          final streetLine =
+              [road, houseNumber].where((e) => e.isNotEmpty).join(', ');
           final List<String> secondaryParts = [];
           if (neighbourhood.isNotEmpty) secondaryParts.add(neighbourhood);
           if (city.isNotEmpty) secondaryParts.add(city);
           if (state.isNotEmpty) secondaryParts.add(state);
           final secondaryLine = secondaryParts.join(' • ');
           return ListTile(
-            leading: const Icon(Icons.location_on, color: AppColors.primary, size: 20),
+            leading: const Icon(Icons.location_on,
+                color: AppColors.primary, size: 20),
             title: Text(
-              streetLine.isNotEmpty ? streetLine : (suggestion['display_name'] as String?)?.split(',').first ?? 'Localização',
+              streetLine.isNotEmpty
+                  ? streetLine
+                  : (suggestion['display_name'] as String?)?.split(',').first ??
+                      'Localização',
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1501,7 +1615,8 @@ class _PostPageState extends ConsumerState<PostPage> {
               prefixIcon: const Icon(Iconsax.location),
               suffixIcon: controller.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Iconsax.close_circle, color: AppColors.textSecondary),
+                      icon: const Icon(Iconsax.close_circle,
+                          color: AppColors.textSecondary),
                       onPressed: () {
                         setState(() {
                           controller.clear();
@@ -1514,7 +1629,8 @@ class _PostPageState extends ConsumerState<PostPage> {
                       },
                     )
                   : null,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
               fillColor: Colors.grey[50],
             ),
@@ -1574,7 +1690,10 @@ class _PostPageState extends ConsumerState<PostPage> {
       // 10. WhatsApp
       const Text(
         'WhatsApp para contato (opcional)',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
+        style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.primary),
       ),
       const SizedBox(height: 12),
       TextFormField(
@@ -1717,7 +1836,8 @@ class _PostPageState extends ConsumerState<PostPage> {
                   builder: (context, child) {
                     return Theme(
                       data: Theme.of(context).copyWith(
-                        colorScheme: const ColorScheme.light(primary: AppColors.primary),
+                        colorScheme:
+                            const ColorScheme.light(primary: AppColors.primary),
                       ),
                       child: child!,
                     );
@@ -1871,7 +1991,8 @@ class _PostPageState extends ConsumerState<PostPage> {
         itemBuilder: (BuildContext context, Map<String, dynamic> suggestion) {
           final address = suggestion['address'] as Map<String, dynamic>? ?? {};
 
-          final road = (address['road'] ?? address['pedestrian'] ?? '') as String;
+          final road =
+              (address['road'] ?? address['pedestrian'] ?? '') as String;
           final houseNumber = (address['house_number'] ?? '') as String;
           final neighbourhood = (address['neighbourhood'] ??
               address['suburb'] ??
@@ -1884,7 +2005,8 @@ class _PostPageState extends ConsumerState<PostPage> {
               '') as String;
           final state = (address['state'] ?? '') as String;
 
-          final streetLine = [road, houseNumber].where((e) => e.isNotEmpty).join(', ');
+          final streetLine =
+              [road, houseNumber].where((e) => e.isNotEmpty).join(', ');
           final List<String> secondaryParts = [];
           if (neighbourhood.isNotEmpty) secondaryParts.add(neighbourhood);
           if (city.isNotEmpty) secondaryParts.add(city);
@@ -1892,11 +2014,13 @@ class _PostPageState extends ConsumerState<PostPage> {
           final secondaryLine = secondaryParts.join(' • ');
 
           return ListTile(
-            leading: const Icon(Icons.location_on, color: AppColors.primary, size: 20),
+            leading: const Icon(Icons.location_on,
+                color: AppColors.primary, size: 20),
             title: Text(
               streetLine.isNotEmpty
                   ? streetLine
-                  : (suggestion['display_name'] as String?)?.split(',').first ?? 'Localização',
+                  : (suggestion['display_name'] as String?)?.split(',').first ??
+                      'Localização',
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -2070,9 +2194,8 @@ class _PostPageState extends ConsumerState<PostPage> {
       const SizedBox(height: 12),
       PostFormFields(
         descriptionController: _messageController,
-        descriptionValidator: (v) => v == null || v.trim().isEmpty
-            ? 'Campo obrigatório'
-            : null,
+        descriptionValidator: (v) =>
+            v == null || v.trim().isEmpty ? 'Campo obrigatório' : null,
       ),
       const Divider(height: 48, thickness: 0.5),
     ];
@@ -2081,444 +2204,445 @@ class _PostPageState extends ConsumerState<PostPage> {
   // ====================================================================
   // MUSICIAN/BAND FIELDS
   // ====================================================================
-  
+
   List<Widget> _buildMusicianBandFields() {
     final theme = Theme.of(context);
     final sectionTitleStyle = theme.textTheme.titleMedium?.copyWith(
       fontWeight: FontWeight.bold,
     );
-    
+
     return [
       // Disponível para
       MultiSelectField(
-                    title: 'Disponível para',
-                    placeholder: 'Selecione suas disponibilidades',
-                    options: MusicConstants.availableForOptions,
-                    selectedItems: _selectedAvailableFor,
-                    maxSelections: 8,
-                    onSelectionChanged: (values) {
-                      setState(() {
-                        _selectedAvailableFor
-                          ..clear()
-                          ..addAll(values);
-                      });
-                    },
+        title: 'Disponível para',
+        placeholder: 'Selecione suas disponibilidades',
+        options: MusicConstants.availableForOptions,
+        selectedItems: _selectedAvailableFor,
+        maxSelections: 8,
+        onSelectionChanged: (values) {
+          setState(() {
+            _selectedAvailableFor
+              ..clear()
+              ..addAll(values);
+          });
+        },
+      ),
+      const Divider(thickness: 0.5, height: 48),
+
+      // Localização
+      const Text(
+        'Localização',
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: AppColors.primary,
+        ),
+      ),
+      const SizedBox(height: 12),
+      TypeAheadField<Map<String, dynamic>>(
+        controller: _locationController,
+        focusNode: _locationFocusNode,
+        suggestionsCallback: _fetchAddressSuggestions,
+        itemBuilder: (BuildContext context, Map<String, dynamic> suggestion) {
+          final address = suggestion['address'] as Map<String, dynamic>? ?? {};
+
+          // Extrai os componentes com fallback
+          final road =
+              (address['road'] ?? address['pedestrian'] ?? '') as String;
+          final houseNumber = (address['house_number'] ?? '') as String;
+          final neighbourhood = (address['neighbourhood'] ??
+              address['suburb'] ??
+              address['quarter'] ??
+              '') as String;
+          final city = (address['city'] ??
+              address['town'] ??
+              address['village'] ??
+              address['municipality'] ??
+              '') as String;
+          final state = (address['state'] ?? '') as String;
+
+          // Monta a linha principal (rua + número)
+          final streetLine =
+              [road, houseNumber].where((e) => e.isNotEmpty).join(', ');
+
+          // Monta a linha secundária (bairro • cidade - estado)
+          final List<String> secondaryParts = [];
+          if (neighbourhood.isNotEmpty) secondaryParts.add(neighbourhood);
+          if (city.isNotEmpty) secondaryParts.add(city);
+          if (state.isNotEmpty) secondaryParts.add(state);
+
+          final secondaryLine = secondaryParts.join(' • ');
+
+          return ListTile(
+            leading: const Icon(Icons.location_on,
+                color: AppColors.primary, size: 20),
+            title: Text(
+              streetLine.isNotEmpty
+                  ? streetLine
+                  : (suggestion['display_name'] as String?)?.split(',').first ??
+                      'Localização',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: secondaryLine.isNotEmpty
+                ? Text(
+                    secondaryLine,
+                    style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : null,
+          );
+        },
+        onSelected: _onAddressSelected,
+        builder: (context, controller, focusNode) {
+          return TextFormField(
+            controller: controller,
+            focusNode: focusNode,
+            decoration: InputDecoration(
+              labelText: 'Digite o endereço',
+              hintText: 'Ex: Rua das Flores, São Paulo',
+              prefixIcon: Icon(Iconsax.location),
+              suffixIcon: controller.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(
+                        Iconsax.close_circle,
+                        color: AppColors.textSecondary,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          controller.clear();
+                          _selectedLocation = null;
+                          _selectedCity = null;
+                          _selectedNeighborhood = null;
+                          _selectedState = null;
+                        });
+                        focusNode.unfocus();
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: Colors.grey[50],
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Localização é obrigatória';
+              }
+              if (_selectedLocation == null) {
+                return 'Selecione uma localização da lista';
+              }
+              return null;
+            },
+          );
+        },
+        hideOnEmpty: true,
+        hideOnLoading: false,
+        hideOnError: false,
+        debounceDuration: Duration.zero,
+        loadingBuilder: (context) => const Padding(
+          padding: EdgeInsets.all(16.0),
+          child: AppRadioPulseLoader(size: 24),
+        ),
+        errorBuilder: (context, error) => Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text('Erro ao buscar endereços: $error'),
+        ),
+        emptyBuilder: (context) => const Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('Nenhum endereço encontrado'),
+        ),
+      ),
+      const SizedBox(height: 8),
+      // Aviso de segurança sobre localização
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Iconsax.shield_tick,
+            size: 16,
+            color: Colors.orange.shade700,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Dica de segurança: Use um ponto de referência próximo ao invés do seu endereço exato.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+      const Divider(thickness: 0.5, height: 48),
+
+      // Gêneros musicais
+      MultiSelectField(
+        title: 'Gêneros musicais *',
+        placeholder: 'Selecione até 5 gêneros',
+        options: MusicConstants.genreOptions,
+        selectedItems: _selectedGenres,
+        maxSelections: maxGenres,
+        errorText: _genresError,
+        onSelectionChanged: (values) {
+          setState(() {
+            _selectedGenres
+              ..clear()
+              ..addAll(values);
+          });
+        },
+      ),
+      const SizedBox(height: 16),
+
+      // Instrumentos
+      MultiSelectField(
+        title: 'Instrumentos *',
+        placeholder: 'Selecione até 5 instrumentos',
+        options: MusicConstants.instrumentOptions,
+        selectedItems: _selectedInstruments,
+        maxSelections: maxInstruments,
+        enabled: !_isSaving,
+        errorText: _instrumentsError,
+        onSelectionChanged: (values) {
+          setState(() {
+            _selectedInstruments
+              ..clear()
+              ..addAll(values);
+          });
+        },
+      ),
+      const Divider(thickness: 0.5, height: 48),
+
+      // Nível
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Nível',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: MusicConstants.levelOptions.map((level) {
+              final isSelected = _level == level;
+              return FilterChip(
+                label: Text(level),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    _level = level;
+                  });
+                },
+                backgroundColor: Theme.of(context).cardColor,
+                selectedColor: AppColors.primary.withOpacity(0.1),
+                checkmarkColor: AppColors.primary,
+                labelStyle: TextStyle(
+                  color: isSelected ? AppColors.primary : Colors.grey[700],
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color:
+                        isSelected ? AppColors.primary : Colors.grey.shade300,
                   ),
-                  const Divider(thickness: 0.5, height: 48),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+      const Divider(height: 48, thickness: 0.5),
 
-                  // Localização
-                  const Text(
-                    'Localização',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TypeAheadField<Map<String, dynamic>>(
-                    controller: _locationController,
-                    focusNode: _locationFocusNode,
-                    suggestionsCallback: _fetchAddressSuggestions,
-                    itemBuilder: (BuildContext context, Map<String, dynamic> suggestion) {
-                      final address = suggestion['address'] as Map<String, dynamic>? ?? {};
+      // Fotos
+      Text('Fotos (opcional, até 4)', style: sectionTitleStyle),
+      const SizedBox(height: 12),
+      PhotoCarouselPicker(
+        photoPaths: _photoPaths,
+        onPhotosChanged: (paths) => setState(() => _photoPaths = paths),
+        maxPhotos: 4,
+      ),
+      const Divider(height: 48, thickness: 0.5),
 
-                      // Extrai os componentes com fallback
-                      final road = (address['road'] ?? address['pedestrian'] ?? '') as String;
-                      final houseNumber = (address['house_number'] ?? '') as String;
-                      final neighbourhood = (address['neighbourhood'] ??
-                          address['suburb'] ??
-                          address['quarter'] ??
-                          '') as String;
-                      final city = (address['city'] ??
-                          address['town'] ??
-                          address['village'] ??
-                          address['municipality'] ??
-                          '') as String;
-                      final state = (address['state'] ?? '') as String;
+      // Mensagem
+      Text('Mensagem', style: sectionTitleStyle),
+      const SizedBox(height: 12),
+      PostFormFields(
+        descriptionController: _messageController,
+        descriptionValidator: (v) =>
+            v == null || v.trim().isEmpty ? 'Campo obrigatório' : null,
+      ),
+      const Divider(height: 48, thickness: 0.5),
 
-                      // Monta a linha principal (rua + número)
-                      final streetLine = [road, houseNumber].where((e) => e.isNotEmpty).join(', ');
+      // Spotify
+      Text('Spotify (opcional)', style: sectionTitleStyle),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _spotifyController,
+        decoration: InputDecoration(
+          hintText: 'https://open.spotify.com/artist/...',
+          prefixIcon: const Icon(Iconsax.music),
+          suffixIcon: _spotifyController.text.isEmpty
+              ? null
+              : _isValidSpotifyUrl(_spotifyController.text)
+                  ? const Icon(Icons.check_circle, color: Colors.green)
+                  : const Icon(Icons.error_outline, color: Colors.red),
+          helperText: _spotifyController.text.isEmpty
+              ? 'Link para artista, álbum ou playlist no Spotify'
+              : (_isValidSpotifyUrl(_spotifyController.text)
+                  ? '✓ Link válido'
+                  : '✗ Use um link open.spotify.com ou spotify:'),
+          helperMaxLines: 2,
+          helperStyle: TextStyle(
+            color: _spotifyController.text.isEmpty
+                ? AppColors.textSecondary
+                : (_isValidSpotifyUrl(_spotifyController.text)
+                    ? Colors.green
+                    : Colors.red),
+            fontSize: 12,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: AppColors.primary,
+              width: 2,
+            ),
+          ),
+        ),
+        keyboardType: TextInputType.url,
+        validator: (v) {
+          if (v == null || v.trim().isEmpty) return null;
+          if (!_isValidSpotifyUrl(v)) {
+            return 'Insira um link válido do Spotify';
+          }
+          return null;
+        },
+        onChanged: (_) => setState(() {}),
+      ),
+      const Divider(height: 48, thickness: 0.5),
 
-                      // Monta a linha secundária (bairro • cidade - estado)
-                      final List<String> secondaryParts = [];
-                      if (neighbourhood.isNotEmpty) secondaryParts.add(neighbourhood);
-                      if (city.isNotEmpty) secondaryParts.add(city);
-                      if (state.isNotEmpty) secondaryParts.add(state);
+      // Deezer
+      Text('Deezer (opcional)', style: sectionTitleStyle),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _deezerController,
+        decoration: InputDecoration(
+          hintText: 'https://www.deezer.com/artist/...',
+          prefixIcon: const Icon(Iconsax.music_square),
+          suffixIcon: _deezerController.text.isEmpty
+              ? null
+              : _isValidDeezerUrl(_deezerController.text)
+                  ? const Icon(Icons.check_circle, color: Colors.green)
+                  : const Icon(Icons.error_outline, color: Colors.red),
+          helperText: _deezerController.text.isEmpty
+              ? 'Link para artista, álbum ou playlist no Deezer'
+              : (_isValidDeezerUrl(_deezerController.text)
+                  ? '✓ Link válido'
+                  : '✗ Use um link deezer.com ou deezer.page.link'),
+          helperMaxLines: 2,
+          helperStyle: TextStyle(
+            color: _deezerController.text.isEmpty
+                ? AppColors.textSecondary
+                : (_isValidDeezerUrl(_deezerController.text)
+                    ? Colors.green
+                    : Colors.red),
+            fontSize: 12,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: AppColors.primary,
+              width: 2,
+            ),
+          ),
+        ),
+        keyboardType: TextInputType.url,
+        validator: (v) {
+          if (v == null || v.trim().isEmpty) return null;
+          if (!_isValidDeezerUrl(v)) {
+            return 'Insira um link válido do Deezer';
+          }
+          return null;
+        },
+        onChanged: (_) => setState(() {}),
+      ),
+      const Divider(height: 48, thickness: 0.5),
 
-                      final secondaryLine = secondaryParts.join(' • ');
-
-                      return ListTile(
-                        leading: const Icon(Icons.location_on, color: AppColors.primary, size: 20),
-                        title: Text(
-                          streetLine.isNotEmpty ? streetLine : (suggestion['display_name'] as String?)?.split(',').first ?? 'Localização',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: secondaryLine.isNotEmpty
-                            ? Text(
-                                secondaryLine,
-                                style: TextStyle(color: Colors.grey[700], fontSize: 13),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              )
-                            : null,
-                      );
-                    },
-                    onSelected: _onAddressSelected,
-                    builder: (context, controller, focusNode) {
-                      return TextFormField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        decoration: InputDecoration(
-                          labelText: 'Digite o endereço',
-                          hintText: 'Ex: Rua das Flores, São Paulo',
-                          prefixIcon: Icon(Iconsax.location),
-                          suffixIcon: controller.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(
-                                    Iconsax.close_circle,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      controller.clear();
-                                      _selectedLocation = null;
-                                      _selectedCity = null;
-                                      _selectedNeighborhood = null;
-                                      _selectedState = null;
-                                    });
-                                    focusNode.unfocus();
-                                  },
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Localização é obrigatória';
-                          }
-                          if (_selectedLocation == null) {
-                            return 'Selecione uma localização da lista';
-                          }
-                          return null;
-                        },
-                      );
-                    },
-                    hideOnEmpty: true,
-                    hideOnLoading: false,
-                    hideOnError: false,
-                    debounceDuration: Duration.zero,
-                    loadingBuilder: (context) => const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: AppRadioPulseLoader(size: 24),
-                    ),
-                    errorBuilder: (context, error) => Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text('Erro ao buscar endereços: $error'),
-                    ),
-                    emptyBuilder: (context) => const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text('Nenhum endereço encontrado'),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Aviso de segurança sobre localização
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Iconsax.shield_tick,
-                        size: 16,
-                        color: Colors.orange.shade700,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Dica de segurança: Use um ponto de referência próximo ao invés do seu endereço exato.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(thickness: 0.5, height: 48),
-
-                  // Gêneros musicais
-                  MultiSelectField(
-                    title: 'Gêneros musicais *',
-                    placeholder: 'Selecione até 5 gêneros',
-                    options: MusicConstants.genreOptions,
-                    selectedItems: _selectedGenres,
-                    maxSelections: maxGenres,
-                    errorText: _genresError,
-                    onSelectionChanged: (values) {
-                      setState(() {
-                        _selectedGenres
-                          ..clear()
-                          ..addAll(values);
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Instrumentos
-                  MultiSelectField(
-                    title: 'Instrumentos *',
-                    placeholder: 'Selecione até 5 instrumentos',
-                    options: MusicConstants.instrumentOptions,
-                    selectedItems: _selectedInstruments,
-                    maxSelections: maxInstruments,
-                    enabled: !_isSaving,
-                    errorText: _instrumentsError,
-                    onSelectionChanged: (values) {
-                      setState(() {
-                        _selectedInstruments
-                          ..clear()
-                          ..addAll(values);
-                      });
-                    },
-                  ),
-                  const Divider(thickness: 0.5, height: 48),
-
-                  // Nível
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Nível',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: MusicConstants.levelOptions.map((level) {
-                          final isSelected = _level == level;
-                          return FilterChip(
-                            label: Text(level),
-                            selected: isSelected,
-                            onSelected: (selected) {
-                              setState(() {
-                                _level = level;
-                              });
-                            },
-                            backgroundColor: Theme.of(context).cardColor,
-                            selectedColor: AppColors.primary.withOpacity(0.1),
-                            checkmarkColor: AppColors.primary,
-                            labelStyle: TextStyle(
-                              color: isSelected ? AppColors.primary : Colors.grey[700],
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              side: BorderSide(
-                                color: isSelected ? AppColors.primary : Colors.grey.shade300,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 48, thickness: 0.5),
-
-                  // Fotos
-                  Text('Fotos (opcional, até 4)', style: sectionTitleStyle),
-                  const SizedBox(height: 12),
-                  PhotoCarouselPicker(
-                    photoPaths: _photoPaths,
-                    onPhotosChanged: (paths) => setState(() => _photoPaths = paths),
-                    maxPhotos: 4,
-                  ),
-                  const Divider(height: 48, thickness: 0.5),
-
-                  // Mensagem
-                  Text('Mensagem', style: sectionTitleStyle),
-                  const SizedBox(height: 12),
-                  PostFormFields(
-                    descriptionController: _messageController,
-                    descriptionValidator: (v) => v == null || v.trim().isEmpty
-                        ? 'Campo obrigatório'
-                        : null,
-                  ),
-                  const Divider(height: 48, thickness: 0.5),
-
-                  // Spotify
-                  Text('Spotify (opcional)', style: sectionTitleStyle),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _spotifyController,
-                    decoration: InputDecoration(
-                      hintText: 'https://open.spotify.com/artist/...',
-                      prefixIcon: const Icon(Iconsax.music),
-                      suffixIcon: _spotifyController.text.isEmpty
-                          ? null
-                          : _isValidSpotifyUrl(_spotifyController.text)
-                              ? const Icon(Icons.check_circle, color: Colors.green)
-                              : const Icon(Icons.error_outline, color: Colors.red),
-                      helperText: _spotifyController.text.isEmpty
-                          ? 'Link para artista, álbum ou playlist no Spotify'
-                          : (_isValidSpotifyUrl(_spotifyController.text)
-                              ? '✓ Link válido'
-                              : '✗ Use um link open.spotify.com ou spotify:'),
-                      helperMaxLines: 2,
-                      helperStyle: TextStyle(
-                        color: _spotifyController.text.isEmpty
-                            ? AppColors.textSecondary
-                            : (_isValidSpotifyUrl(_spotifyController.text)
-                                ? Colors.green
-                                : Colors.red),
-                        fontSize: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                    keyboardType: TextInputType.url,
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return null;
-                      if (!_isValidSpotifyUrl(v)) {
-                        return 'Insira um link válido do Spotify';
-                      }
-                      return null;
-                    },
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const Divider(height: 48, thickness: 0.5),
-
-                  // Deezer
-                  Text('Deezer (opcional)', style: sectionTitleStyle),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _deezerController,
-                    decoration: InputDecoration(
-                      hintText: 'https://www.deezer.com/artist/...',
-                      prefixIcon: const Icon(Iconsax.music_square),
-                      suffixIcon: _deezerController.text.isEmpty
-                          ? null
-                          : _isValidDeezerUrl(_deezerController.text)
-                              ? const Icon(Icons.check_circle, color: Colors.green)
-                              : const Icon(Icons.error_outline, color: Colors.red),
-                      helperText: _deezerController.text.isEmpty
-                          ? 'Link para artista, álbum ou playlist no Deezer'
-                          : (_isValidDeezerUrl(_deezerController.text)
-                              ? '✓ Link válido'
-                              : '✗ Use um link deezer.com ou deezer.page.link'),
-                      helperMaxLines: 2,
-                      helperStyle: TextStyle(
-                        color: _deezerController.text.isEmpty
-                            ? AppColors.textSecondary
-                            : (_isValidDeezerUrl(_deezerController.text)
-                                ? Colors.green
-                                : Colors.red),
-                        fontSize: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                    keyboardType: TextInputType.url,
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return null;
-                      if (!_isValidDeezerUrl(v)) {
-                        return 'Insira um link válido do Deezer';
-                      }
-                      return null;
-                    },
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const Divider(height: 48, thickness: 0.5),
-
-                  // YouTube
-                  Text('YouTube (opcional)', style: sectionTitleStyle),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _youtubeController,
-                    decoration: InputDecoration(
-                      hintText: 'https://youtu.be/...',
-                      prefixIcon: const Icon(Icons.link),
-                      suffixIcon: _youtubeController.text.isEmpty
-                          ? null
-                          : _extractYouTubeVideoId(_youtubeController.text) !=
-                                  null
-                              ? const Icon(Icons.check_circle,
-                                  color: Colors.green)
-                              : const Icon(Icons.error_outline,
-                                  color: Colors.red),
-                      helperText: _youtubeController.text.isEmpty
-                          ? 'Adicione um vídeo do YouTube para enriquecer seu post!'
-                          : (_extractYouTubeVideoId(_youtubeController.text) !=
-                                  null
-                              ? '✓ Vídeo encontrado'
-                              : '✗ URL inválida'),
-                      helperMaxLines: 2,
-                      helperStyle: TextStyle(
-                        color: _youtubeController.text.isEmpty
-                            ? AppColors.textSecondary
-                            : (_extractYouTubeVideoId(_youtubeController.text) !=
-                                    null
-                                ? Colors.green
-                                : Colors.red),
-                        fontSize: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                    keyboardType: TextInputType.url,
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return null;
-                      final url = v.trim();
-                      final ytRegex = RegExp(
-                        r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+',
-                      );
-                      if (!ytRegex.hasMatch(url)) {
-                        return 'Insira um link válido do YouTube';
-                      }
-                      return null;
-                    },
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  // Preview do vídeo YouTube
-                  if (_youtubeController.text.isNotEmpty &&
-                      _extractYouTubeVideoId(_youtubeController.text) != null) ...[
-                    const SizedBox(height: 12),
-                    _buildYouTubePreview(_youtubeController.text),
-                  ],
+      // YouTube
+      Text('YouTube (opcional)', style: sectionTitleStyle),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _youtubeController,
+        decoration: InputDecoration(
+          hintText: 'https://youtu.be/...',
+          prefixIcon: const Icon(Icons.link),
+          suffixIcon: _youtubeController.text.isEmpty
+              ? null
+              : _extractYouTubeVideoId(_youtubeController.text) != null
+                  ? const Icon(Icons.check_circle, color: Colors.green)
+                  : const Icon(Icons.error_outline, color: Colors.red),
+          helperText: _youtubeController.text.isEmpty
+              ? 'Adicione um vídeo do YouTube para enriquecer seu post!'
+              : (_extractYouTubeVideoId(_youtubeController.text) != null
+                  ? '✓ Vídeo encontrado'
+                  : '✗ URL inválida'),
+          helperMaxLines: 2,
+          helperStyle: TextStyle(
+            color: _youtubeController.text.isEmpty
+                ? AppColors.textSecondary
+                : (_extractYouTubeVideoId(_youtubeController.text) != null
+                    ? Colors.green
+                    : Colors.red),
+            fontSize: 12,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: AppColors.primary,
+              width: 2,
+            ),
+          ),
+        ),
+        keyboardType: TextInputType.url,
+        validator: (v) {
+          if (v == null || v.trim().isEmpty) return null;
+          final url = v.trim();
+          final ytRegex = RegExp(
+            r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+',
+          );
+          if (!ytRegex.hasMatch(url)) {
+            return 'Insira um link válido do YouTube';
+          }
+          return null;
+        },
+        onChanged: (_) => setState(() {}),
+      ),
+      // Preview do vídeo YouTube
+      if (_youtubeController.text.isNotEmpty &&
+          _extractYouTubeVideoId(_youtubeController.text) != null) ...[
+        const SizedBox(height: 12),
+        _buildYouTubePreview(_youtubeController.text),
+      ],
     ];
   }
 
@@ -2551,7 +2675,8 @@ class _PostPageState extends ConsumerState<PostPage> {
   bool _isValidSpotifyUrl(String url) {
     final normalized = url.trim();
     if (normalized.isEmpty) return false;
-    return normalized.startsWith('https://open.spotify.com/') || normalized.startsWith('spotify:');
+    return normalized.startsWith('https://open.spotify.com/') ||
+        normalized.startsWith('spotify:');
   }
 
   bool _isValidDeezerUrl(String url) {
@@ -2605,11 +2730,13 @@ class _PostPageState extends ConsumerState<PostPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(11)),
             ),
             child: Row(
               children: [
-                Icon(Icons.play_circle_outline, size: 16, color: AppColors.textSecondary),
+                Icon(Icons.play_circle_outline,
+                    size: 16, color: AppColors.textSecondary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -2625,7 +2752,8 @@ class _PostPageState extends ConsumerState<PostPage> {
           ),
           // Thumbnail do vídeo
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
+            borderRadius:
+                const BorderRadius.vertical(bottom: Radius.circular(11)),
             child: AspectRatio(
               aspectRatio: 16 / 9,
               child: Stack(
@@ -2678,10 +2806,11 @@ class _CurrencyInputFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     if (newValue.text.isEmpty) return newValue;
-    
+
     final value = int.parse(newValue.text);
-    final formatted = NumberFormat.currency(locale: 'pt_BR', symbol: '').format(value / 100);
-    
+    final formatted =
+        NumberFormat.currency(locale: 'pt_BR', symbol: '').format(value / 100);
+
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),
@@ -2697,20 +2826,22 @@ class _PhoneInputFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     if (newValue.text.isEmpty) return newValue;
-    
+
     final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
     String formatted = '';
-    
+
     if (digits.length <= 2) {
       formatted = '($digits';
     } else if (digits.length <= 7) {
       formatted = '(${digits.substring(0, 2)}) ${digits.substring(2)}';
     } else if (digits.length <= 11) {
-      formatted = '(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7)}';
+      formatted =
+          '(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7)}';
     } else {
-      formatted = '(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7, 11)}';
+      formatted =
+          '(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7, 11)}';
     }
-    
+
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),

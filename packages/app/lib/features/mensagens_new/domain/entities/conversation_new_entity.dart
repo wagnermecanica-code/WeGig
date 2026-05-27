@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:core_ui/utils/utf16_sanitizer.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'message_new_entity.dart';
@@ -110,34 +111,37 @@ class ConversationNewEntity with _$ConversationNewEntity {
 
     return ConversationNewEntity(
       id: snapshot.id,
-      participants:
-          (data['participants'] as List<dynamic>?)?.cast<String>() ?? [],
-      participantProfiles:
-          (data['participantProfiles'] as List<dynamic>?)?.cast<String>() ?? [],
-      lastMessage: data['lastMessage'] as String? ?? '',
-        lastMessageStatus: _parseLastMessageStatus(data['lastMessageStatus']),
+      participants: _safeList(
+        (data['participants'] as List<dynamic>?)?.cast<String>(),
+      ),
+      participantProfiles: _safeList(
+        (data['participantProfiles'] as List<dynamic>?)?.cast<String>(),
+      ),
+      lastMessage: _safe(data['lastMessage'] as String? ?? ''),
+      lastMessageStatus: _parseLastMessageStatus(data['lastMessageStatus']),
       lastMessageTimestamp:
           (data['lastMessageTimestamp'] as Timestamp?)?.toDate() ??
               DateTime.now(),
-      lastMessageSenderId: data['lastMessageSenderId'] as String?,
+      lastMessageSenderId: _safeOrNull(data['lastMessageSenderId'] as String?),
       unreadCount: _parseUnreadCount(data['unreadCount']),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
       participantsData: enrichedParticipants ?? const [],
       archived: data['archived'] as bool? ?? false,
-      archivedByProfiles:
-          (data['archivedByProfiles'] as List<dynamic>?)?.cast<String>() ??
-              const [],
-      mutedByProfiles:
-          (data['mutedByProfiles'] as List<dynamic>?)?.cast<String>() ??
-              const [],
-      pinnedByProfiles:
-          (data['pinnedByProfiles'] as List<dynamic>?)?.cast<String>() ??
-              const [],
-      deletedByProfiles:
-          (data['deletedByProfiles'] as List<dynamic>?)?.cast<String>() ??
-              const [],
-      clearHistoryTimestamp: _parseClearHistoryTimestamp(data['clearHistoryTimestamp']),
+      archivedByProfiles: _safeList(
+        (data['archivedByProfiles'] as List<dynamic>?)?.cast<String>(),
+      ),
+      mutedByProfiles: _safeList(
+        (data['mutedByProfiles'] as List<dynamic>?)?.cast<String>(),
+      ),
+      pinnedByProfiles: _safeList(
+        (data['pinnedByProfiles'] as List<dynamic>?)?.cast<String>(),
+      ),
+      deletedByProfiles: _safeList(
+        (data['deletedByProfiles'] as List<dynamic>?)?.cast<String>(),
+      ),
+      clearHistoryTimestamp:
+          _parseClearHistoryTimestamp(data['clearHistoryTimestamp']),
       typingIndicators: _parseTypingIndicators(data['typingIndicators']),
       // Inferir isGroup com lógica clara:
       // 1. Se isGroup está explícito no Firestore, usar esse valor
@@ -146,8 +150,8 @@ class ConversationNewEntity with _$ConversationNewEntity {
       //    - OU tem groupName preenchido = grupo
       //    - OU conversationType == 'group' = grupo
       isGroup: _inferIsGroup(data),
-      groupName: data['groupName'] as String?,
-      groupPhotoUrl: data['groupPhotoUrl'] as String?,
+      groupName: _safeOrNull(data['groupName'] as String?),
+      groupPhotoUrl: _safeOrNull(data['groupPhotoUrl'] as String?),
     );
   }
 
@@ -329,7 +333,8 @@ class ConversationNewEntity with _$ConversationNewEntity {
       'lastMessage': lastMessage,
       'lastMessageStatus': lastMessageStatus.name,
       'lastMessageTimestamp': Timestamp.fromDate(lastMessageTimestamp),
-      if (lastMessageSenderId != null) 'lastMessageSenderId': lastMessageSenderId,
+      if (lastMessageSenderId != null)
+        'lastMessageSenderId': lastMessageSenderId,
       'unreadCount': unreadCount,
       'archived': archived,
       'archivedByProfiles': archivedByProfiles,
@@ -346,7 +351,8 @@ class ConversationNewEntity with _$ConversationNewEntity {
       if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
       // CRÍTICO: Campos canônicos para distinguir tipo de conversa
       'isGroup': isGroup,
-      'conversationType': isGroup ? 'group' : 'direct', // Campo canônico imutável
+      'conversationType':
+          isGroup ? 'group' : 'direct', // Campo canônico imutável
       if (groupName != null) 'groupName': groupName,
       if (groupPhotoUrl != null) 'groupPhotoUrl': groupPhotoUrl,
     };
@@ -384,11 +390,11 @@ class ParticipantData with _$ParticipantData {
   /// From Firestore map
   factory ParticipantData.fromMap(Map<String, dynamic> map) {
     return ParticipantData(
-      profileId: map['profileId'] as String? ?? '',
-      uid: map['uid'] as String? ?? '',
-      name: map['name'] as String? ?? 'Usuário',
-      photoUrl: map['photoUrl'] as String?,
-      profileType: map['profileType'] as String?,
+      profileId: _safe(map['profileId'] as String? ?? ''),
+      uid: _safe(map['uid'] as String? ?? ''),
+      name: _safe(map['name'] as String? ?? 'Usuário'),
+      photoUrl: _safeOrNull(map['photoUrl'] as String?),
+      profileType: _safeOrNull(map['profileType'] as String?),
       isOnline: map['isOnline'] as bool? ?? false,
       lastSeen: (map['lastSeen'] as Timestamp?)?.toDate(),
     );
@@ -410,3 +416,11 @@ class ParticipantData with _$ParticipantData {
     };
   }
 }
+
+String _safe(String value) => Utf16Sanitizer.removeInvalidSurrogates(value);
+
+String? _safeOrNull(String? value) =>
+    Utf16Sanitizer.removeInvalidSurrogatesOrNull(value);
+
+List<String> _safeList(List<String>? values) =>
+    Utf16Sanitizer.removeInvalidSurrogatesFromList(values) ?? const <String>[];

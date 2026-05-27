@@ -476,12 +476,16 @@ GoRouter goRouter(Ref ref) {
           final postId = state.pathParameters['postId']!;
           final commentId = state.uri.queryParameters['commentId'];
           final parentCommentId = state.uri.queryParameters['parentCommentId'];
+          final extra = state.extra;
+          final initialPost = extra is PostEntity ? extra : null;
           return CupertinoPage<void>(
             key: state.pageKey,
             child: PostDetailPage(
               postId: postId,
-              highlightCommentId:
-                  (commentId != null && commentId.isNotEmpty) ? commentId : null,
+              initialPost: initialPost,
+              highlightCommentId: (commentId != null && commentId.isNotEmpty)
+                  ? commentId
+                  : null,
               highlightParentCommentId:
                   (parentCommentId != null && parentCommentId.isNotEmpty)
                       ? parentCommentId
@@ -733,6 +737,7 @@ extension TypedNavigationExtension on BuildContext {
     String postId, {
     String? commentId,
     String? parentCommentId,
+    PostEntity? post,
   }) {
     _logNavigation('post_detail', {
       'postId': postId,
@@ -751,7 +756,7 @@ extension TypedNavigationExtension on BuildContext {
             path: AppRoutes.postDetail(postId),
             queryParameters: qp,
           ).toString();
-    push(location);
+    push(location, extra: post);
   }
 
   /// Push vertical post feed (carrossel)
@@ -905,6 +910,7 @@ extension TypedNavigationExtension on BuildContext {
     }
 
     try {
+      final router = GoRouter.of(this);
       final currentUser = FirebaseAuth.instance.currentUser;
       final container = ProviderScope.containerOf(this);
       final activeProfile = container.read(activeProfileProvider);
@@ -927,24 +933,31 @@ extension TypedNavigationExtension on BuildContext {
           .get();
 
       if (query.docs.isEmpty) {
-        AppSnackBar.showError(this, 'Perfil não encontrado');
+        if (mounted) {
+          AppSnackBar.showError(this, 'Perfil não encontrado');
+        }
         return;
       }
 
       final targetProfileId = query.docs.first.id;
       if (excludedProfileIds.contains(targetProfileId)) {
-        AppSnackBar.showInfo(this, 'Perfil indisponível.');
+        if (mounted) {
+          AppSnackBar.showInfo(this, 'Perfil indisponível.');
+        }
         return;
       }
 
-      pushProfile(targetProfileId);
+      _logNavigation('profile', {'profileId': targetProfileId});
+      router.push(AppRoutes.profile(targetProfileId));
     } catch (error, stackTrace) {
       debugPrint('pushProfileByUsername error: $error');
       debugPrintStack(stackTrace: stackTrace);
-      AppSnackBar.showError(
-        this,
-        'Não conseguimos abrir esse perfil agora.',
-      );
+      if (mounted) {
+        AppSnackBar.showError(
+          this,
+          'Não conseguimos abrir esse perfil agora.',
+        );
+      }
     }
   }
 

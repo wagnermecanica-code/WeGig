@@ -457,7 +457,8 @@ class _AuthPageState extends ConsumerState<AuthPage>
   Future<bool?> _lookupEmailRegistration(String email) async {
     final apiKey = Firebase.app().options.apiKey;
     if (apiKey.isEmpty) {
-      debugPrint('⚠️ AuthPage: Firebase API key ausente para lookup de e-mail.');
+      debugPrint(
+          '⚠️ AuthPage: Firebase API key ausente para lookup de e-mail.');
       return null;
     }
 
@@ -1668,12 +1669,10 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
           ),
           onPressed: _isSubmitting ? null : _submit,
           child: _isSubmitting
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
+              ? const AppBrandCircularLoader(
+                  size: 18,
+                  strokeWidth: 2,
+                  color: Colors.white,
                 )
               : const Text('Enviar'),
         ),

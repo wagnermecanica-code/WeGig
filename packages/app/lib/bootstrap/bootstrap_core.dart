@@ -246,7 +246,7 @@ void _configureErrorHandling({
 }) {
   if (enableCrashlytics) {
     FlutterError.onError = (details) {
-      if (_isNonFatalFlutterError(details.exception, details.stack)) {
+      if (_isNonFatalFlutterErrorDetails(details)) {
         FirebaseCrashlytics.instance.recordFlutterError(details);
         FlutterError.presentError(details);
         return;
@@ -277,21 +277,41 @@ void _configureErrorHandling({
   };
 }
 
+bool _isNonFatalFlutterErrorDetails(FlutterErrorDetails details) {
+  return _isNonFatalImageFailure(
+        details.exception,
+        details.stack,
+        detailsText: details.toString(),
+      ) ||
+      _isNonFatalLayoutOrFrameworkError(details.exception, details.stack);
+}
+
 bool _isNonFatalFlutterError(Object error, StackTrace? stack) {
   return _isNonFatalImageFailure(error, stack) ||
       _isNonFatalLayoutOrFrameworkError(error, stack);
 }
 
-bool _isNonFatalImageFailure(Object error, StackTrace? stack) {
+bool _isNonFatalImageFailure(
+  Object error,
+  StackTrace? stack, {
+  String? detailsText,
+}) {
   final message = error.toString();
   final stackText = stack?.toString() ?? '';
-  final isImageStack = stackText.contains('image_stream.dart') ||
+  final diagnosticText = '$message\n$stackText\n${detailsText ?? ''}';
+  final isImageStack = diagnosticText.contains('image_stream.dart') ||
       stackText.contains('multi_image_stream_completer.dart') ||
-      stackText.contains('cached_network_image') ||
-      stackText.contains('flutter_cache_manager') ||
-      stackText.contains('web_helper.dart') ||
-      stackText.contains('file_service.dart') ||
-      stackText.contains('image_provider.dart');
+      diagnosticText.contains('MultiImageStreamCompleter') ||
+      diagnosticText.contains('ImageStreamCompleter') ||
+      diagnosticText.contains('Image provider') ||
+      diagnosticText.contains('image resource service') ||
+      diagnosticText.contains('CachedNetworkImageProvider') ||
+      diagnosticText.contains('cached_network_image') ||
+      diagnosticText.contains('flutter_cache_manager') ||
+      diagnosticText.contains('web_helper.dart') ||
+      diagnosticText.contains('file_service.dart') ||
+      diagnosticText.contains('image_provider.dart') ||
+      diagnosticText.contains('firebasestorage.googleapis.com');
 
   if (!isImageStack) return false;
 
@@ -314,12 +334,22 @@ bool _isNonFatalLayoutOrFrameworkError(Object error, StackTrace? stack) {
   final isFrameworkStack = stackText.contains('framework.dart') ||
       stackText.contains('binding.dart') ||
       stackText.contains('flex.dart') ||
+      stackText.contains('paragraph.dart') ||
+      stackText.contains('text_painter.dart') ||
+      stackText.contains('text_span.dart') ||
+      stackText.contains('editable.dart') ||
+      stackText.contains('text_selection.dart') ||
+      stackText.contains('long_press.dart') ||
+      stackText.contains('recognizer.dart') ||
+      stackText.contains('wrap.dart') ||
       stackText.contains('platform_view.dart') ||
       stackText.contains('debug_overflow_indicator.dart');
 
   if (!isFrameworkStack) return false;
 
   return message.contains('RenderFlex overflowed') ||
+      message.contains('string is not well-formed UTF-16') ||
+      _isNonFatalTextSelectionGestureFailure(message, stackText) ||
       message.contains('RenderBox was not laid out') ||
       message.contains('Duplicate GlobalKeys detected') ||
       message.contains('Tried to build dirty widget') ||
@@ -327,4 +357,18 @@ bool _isNonFatalLayoutOrFrameworkError(Object error, StackTrace? stack) {
       message.contains(
           'Tried to modify a provider while the widget tree was building') ||
       message.contains("'_dependents.isEmpty': is not true");
+}
+
+bool _isNonFatalTextSelectionGestureFailure(
+  String message,
+  String stackText,
+) {
+  final isSelectionGestureStack =
+      stackText.contains('RenderEditable.selectWord') ||
+          stackText.contains('TextSelectionGestureDetectorBuilder') ||
+          stackText.contains('_TextSelectionGestureDetectorState') ||
+          stackText.contains('LongPressGestureRecognizer');
+
+  return isSelectionGestureStack &&
+      message.contains('Null check operator used on a null value');
 }

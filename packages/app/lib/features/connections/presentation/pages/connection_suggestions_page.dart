@@ -6,6 +6,7 @@ import 'package:core_ui/features/profile/domain/entities/profile_type.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/utils/music_constants.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1168,7 +1169,7 @@ class _ConnectionSuggestionsPageState
                         const SliverFillRemaining(
                           hasScrollBody: false,
                           child: Center(
-                            child: CircularProgressIndicator(),
+                            child: AppBrandCircularLoader(),
                           ),
                         )
                       else if (_errorMessage != null && _suggestions.isEmpty)
@@ -1183,7 +1184,7 @@ class _ConnectionSuggestionsPageState
                         const SliverFillRemaining(
                           hasScrollBody: false,
                           child: Center(
-                            child: CircularProgressIndicator(),
+                            child: AppBrandCircularLoader(),
                           ),
                         )
                       else if (visibleSuggestions.isEmpty)
@@ -1724,10 +1725,9 @@ class _SuggestionsPageFooter extends StatelessWidget {
       return const Padding(
         padding: EdgeInsets.fromLTRB(16, 0, 16, 32),
         child: Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2.5),
+          child: AppBrandCircularLoader(
+            size: 24,
+            strokeWidth: 2.5,
           ),
         ),
       );

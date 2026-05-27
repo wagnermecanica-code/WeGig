@@ -1441,10 +1441,9 @@ class _MyNetworkPageState extends ConsumerState<MyNetworkPage>
         width: 32,
         height: 32,
         child: Center(
-          child: SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(strokeWidth: 2),
+          child: AppBrandCircularLoader(
+            size: 14,
+            strokeWidth: 2,
           ),
         ),
       ),
@@ -1901,7 +1900,7 @@ class _MyNetworkPageState extends ConsumerState<MyNetworkPage>
                         'source': 'overview_preview',
                       },
                     );
-                    context.pushPostDetail(post.id);
+                    context.pushPostDetail(post.id, post: post);
                   },
                   onViewProfile: (post) {
                     _logAnalyticsEvent(
@@ -3588,10 +3587,9 @@ class _OverviewPreviewLoadingState extends StatelessWidget {
           const SizedBox(width: 12),
           const Padding(
             padding: EdgeInsets.only(top: 8),
-            child: SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2.2),
+            child: AppBrandCircularLoader(
+              size: 16,
+              strokeWidth: 2.2,
             ),
           ),
           const SizedBox(width: 12),
@@ -4097,7 +4095,7 @@ class _SectionLoader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: CircularProgressIndicator());
+    return const Center(child: AppBrandCircularLoader());
   }
 }
 

@@ -45,6 +45,7 @@ class PostDetailPage extends ConsumerStatefulWidget {
   /// Construtor da página de detalhes
   const PostDetailPage({
     required this.postId,
+    this.initialPost,
     this.highlightCommentId,
     this.highlightParentCommentId,
     super.key,
@@ -52,6 +53,10 @@ class PostDetailPage extends ConsumerStatefulWidget {
 
   /// ID do post a ser exibido
   final String postId;
+
+  /// Post já carregado pela tela anterior, usado para evitar tela vazia durante
+  /// a revalidação dos dados no Firestore.
+  final PostEntity? initialPost;
 
   /// ID do comentário a destacar/rolar ao abrir (deep link de notificação).
   /// Quando definido, a tela abre automaticamente o bottom sheet de
@@ -93,13 +98,51 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   @override
   void initState() {
     super.initState();
-    _loadPost();
+    final initialPost = widget.initialPost;
+    if (initialPost != null && initialPost.id == widget.postId) {
+      _primePost(initialPost);
+      unawaited(_loadPost());
+    } else {
+      _loadPost();
+    }
   }
 
   @override
   void dispose() {
     _youtubeController?.dispose();
     super.dispose();
+  }
+
+  void _primePost(PostEntity post) {
+    _post = post;
+    _isLoading = false;
+    _authorName = post.authorName?.trim().isNotEmpty == true
+        ? post.authorName!.trim()
+        : 'Perfil';
+    _authorPhotoUrl = post.authorPhotoUrl ?? '';
+    _authorUid = post.authorUid;
+    _configureYoutubeController(post.youtubeLink);
+  }
+
+  void _configureYoutubeController(String? youtubeLink) {
+    if (youtubeLink == null || youtubeLink.isEmpty) {
+      _youtubeController?.dispose();
+      _youtubeController = null;
+      return;
+    }
+
+    final videoId = YoutubePlayer.convertUrlToId(youtubeLink);
+    if (videoId == null) {
+      return;
+    }
+
+    _youtubeController?.dispose();
+    _youtubeController = YoutubePlayerController(
+      initialVideoId: videoId,
+      flags: const YoutubePlayerFlags(
+        autoPlay: false,
+      ),
+    );
   }
 
   /// Carrega os dados do post
@@ -169,17 +212,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       await _loadAuthorProfile(post.authorProfileId);
 
       // Inicializar player de YouTube se houver link
-      if (post.youtubeLink != null && post.youtubeLink!.isNotEmpty) {
-        final videoId = YoutubePlayer.convertUrlToId(post.youtubeLink!);
-        if (videoId != null) {
-          _youtubeController = YoutubePlayerController(
-            initialVideoId: videoId,
-            flags: const YoutubePlayerFlags(
-              autoPlay: false,
-            ),
-          );
-        }
-      }
+      _configureYoutubeController(post.youtubeLink);
 
       if (mounted) {
         setState(() {
@@ -1654,7 +1687,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final photoHeight = screenWidth * 0.7; // Proporção ~10:7
     final liveCommentCount =
-        ref.watch(commentCountStreamProvider(_post!.id)).value ??
+        ref.watch(commentCountStreamProvider(_post!.id)).valueOrNull ??
             _post!.commentCount;
 
     return PopScope(

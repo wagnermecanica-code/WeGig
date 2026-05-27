@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/features/post/domain/entities/post_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -206,7 +207,7 @@ class _NetworkActivityPageState extends ConsumerState<NetworkActivityPage> {
               ),
             )
           : activityAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: AppBrandCircularLoader()),
               error: (_, __) => _NetworkActivityLoadError(
                 onRetry: () => ref
                     .read(networkActivityListControllerProvider.notifier)
@@ -310,7 +311,7 @@ class _NetworkActivityPageState extends ConsumerState<NetworkActivityPage> {
                     },
                   ),
                 );
-                context.pushPostDetail(post.id);
+                context.pushPostDetail(post.id, post: post);
               },
               onOpenProfile: () {
                 unawaited(
@@ -659,7 +660,7 @@ class _NetworkActivityFooter extends StatelessWidget {
     if (isLoadingMore) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 16),
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(child: AppBrandCircularLoader()),
       );
     }
 

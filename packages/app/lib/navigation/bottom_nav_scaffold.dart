@@ -28,7 +28,7 @@ import 'package:wegig_app/features/profile/presentation/providers/profile_provid
 import 'package:wegig_app/features/profile/presentation/widgets/profile_switcher_bottom_sheet.dart';
 
 /// Cor de realce dos ícones selecionados na bottom nav.
-const _navSelectedColor = Color(0xFF683FFF);
+const _navSelectedColor = Colors.black;
 
 /// Configuração de item da bottom nav
 class _NavItemConfig {
@@ -100,7 +100,8 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
   // Configuração dos itens da bottom nav (elimina código repetitivo)
   static const List<_NavItemConfig> _navItems = [
     _NavItemConfig(icon: Iconsax.home, label: 'Início'),
-    _NavItemConfig(icon: Iconsax.profile_2user, label: 'Minha Rede', hasBadge: true),
+    _NavItemConfig(
+        icon: Iconsax.profile_2user, label: 'Minha Rede', hasBadge: true),
     _NavItemConfig(icon: Iconsax.add_circle, label: 'Criar Post'),
     _NavItemConfig(icon: Iconsax.message, label: 'Mensagens', hasBadge: true),
     _NavItemConfig(icon: Iconsax.user, label: 'Perfil', isAvatar: true),
@@ -311,9 +312,7 @@ class _BottomNavScaffoldState extends ConsumerState<BottomNavScaffold> {
                     minHeight: 20,
                   ),
                   child: Text(
-                    badgeCount > 99
-                        ? '99+'
-                        : badgeCount.toString(),
+                    badgeCount > 99 ? '99+' : badgeCount.toString(),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 10,

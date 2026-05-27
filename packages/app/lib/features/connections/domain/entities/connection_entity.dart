@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:core_ui/utils/utf16_sanitizer.dart';
 
 class ConnectionEntity {
   const ConnectionEntity({
@@ -20,22 +21,27 @@ class ConnectionEntity {
 
     return ConnectionEntity(
       id: snapshot.id,
-      profileIds: (data['profileIds'] as List<dynamic>? ?? const <dynamic>[])
-          .cast<String>(),
-      profileUids: (data['profileUids'] as List<dynamic>? ?? const <dynamic>[])
-          .cast<String>(),
-      profileNames: Map<String, String>.from(
+      profileIds: _safeList(
+        (data['profileIds'] as List<dynamic>? ?? const <dynamic>[])
+            .cast<String>(),
+      ),
+      profileUids: _safeList(
+        (data['profileUids'] as List<dynamic>? ?? const <dynamic>[])
+            .cast<String>(),
+      ),
+      profileNames: _safeMap(Map<String, String>.from(
         data['profileNames'] as Map<String, dynamic>? ??
             const <String, dynamic>{},
-      ),
-      profilePhotoUrls: Map<String, String>.from(
+      )),
+      profilePhotoUrls: _safeMap(Map<String, String>.from(
         data['profilePhotoUrls'] as Map<String, dynamic>? ??
             const <String, dynamic>{},
-      ),
+      )),
       createdAt: _parseConnectionDate(data['createdAt']),
       updatedAt: _parseConnectionDate(data['updatedAt']),
-      initiatedByProfileId: data['initiatedByProfileId'] as String? ?? '',
-      requestId: data['requestId'] as String? ?? '',
+      initiatedByProfileId:
+          _safe(data['initiatedByProfileId'] as String? ?? ''),
+      requestId: _safe(data['requestId'] as String? ?? ''),
     );
   }
 
@@ -74,6 +80,15 @@ class ConnectionEntity {
     final otherProfileId = getOtherProfileId(currentProfileId);
     return profilePhotoUrls[otherProfileId];
   }
+}
+
+String _safe(String value) => Utf16Sanitizer.removeInvalidSurrogates(value);
+
+List<String> _safeList(List<String> values) =>
+    Utf16Sanitizer.removeInvalidSurrogatesFromList(values) ?? const <String>[];
+
+Map<String, String> _safeMap(Map<String, String> values) {
+  return values.map((key, value) => MapEntry(_safe(key), _safe(value)));
 }
 
 DateTime _parseConnectionDate(dynamic value) {

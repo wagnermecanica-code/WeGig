@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:core_ui/utils/utf16_sanitizer.dart';
 
 /// Entidade de domínio para comentários de posts.
 ///
@@ -74,26 +75,27 @@ class CommentEntity {
 
     return CommentEntity(
       id: snapshot.id,
-      postId: postId,
-      authorProfileId: data['authorProfileId'] as String? ?? '',
-      authorUid: data['authorUid'] as String? ?? '',
-      authorName: data['authorName'] as String? ?? 'Anônimo',
-      authorPhotoUrl: data['authorPhotoUrl'] as String?,
-      text: data['text'] as String? ?? '',
+      postId: _safe(postId),
+      authorProfileId: _safe(data['authorProfileId'] as String? ?? ''),
+      authorUid: _safe(data['authorUid'] as String? ?? ''),
+      authorName: _safe(data['authorName'] as String? ?? 'Anônimo'),
+      authorPhotoUrl: _safeOrNull(data['authorPhotoUrl'] as String?),
+      text: _safe(data['text'] as String? ?? ''),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      parentCommentId: data['parentCommentId'] as String?,
-      replyToName: data['replyToName'] as String?,
-      replyToProfileId: data['replyToProfileId'] as String?,
+      parentCommentId: _safeOrNull(data['parentCommentId'] as String?),
+      replyToName: _safeOrNull(data['replyToName'] as String?),
+      replyToProfileId: _safeOrNull(data['replyToProfileId'] as String?),
       likeCount: (data['likeCount'] as num?)?.toInt() ?? 0,
-      likedBy: (data['likedBy'] as List<dynamic>?)?.cast<String>() ?? const [],
-      mentionedProfileIds:
-          (data['mentionedProfileIds'] as List<dynamic>?)?.cast<String>() ??
-              const [],
-      mentionedUids:
-          (data['mentionedUids'] as List<dynamic>?)?.cast<String>() ?? const [],
-      mentionedUsernames:
-          (data['mentionedUsernames'] as List<dynamic>?)?.cast<String>() ??
-              const [],
+      likedBy: _safeList((data['likedBy'] as List<dynamic>?)?.cast<String>()),
+      mentionedProfileIds: _safeList(
+        (data['mentionedProfileIds'] as List<dynamic>?)?.cast<String>(),
+      ),
+      mentionedUids: _safeList(
+        (data['mentionedUids'] as List<dynamic>?)?.cast<String>(),
+      ),
+      mentionedUsernames: _safeList(
+        (data['mentionedUsernames'] as List<dynamic>?)?.cast<String>(),
+      ),
     );
   }
 
@@ -155,3 +157,11 @@ class CommentEntity {
     );
   }
 }
+
+String _safe(String value) => Utf16Sanitizer.removeInvalidSurrogates(value);
+
+String? _safeOrNull(String? value) =>
+    Utf16Sanitizer.removeInvalidSurrogatesOrNull(value);
+
+List<String> _safeList(List<String>? values) =>
+    Utf16Sanitizer.removeInvalidSurrogatesFromList(values) ?? const <String>[];

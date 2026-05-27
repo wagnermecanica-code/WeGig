@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:core_ui/utils/utf16_sanitizer.dart';
 
 import 'connection_status.dart';
 
@@ -26,16 +27,17 @@ class ConnectionRequestEntity {
 
     return ConnectionRequestEntity(
       id: snapshot.id,
-      requesterProfileId: data['requesterProfileId'] as String? ?? '',
-      requesterUid: data['requesterUid'] as String? ?? '',
-      requesterName: data['requesterName'] as String? ?? '',
-      requesterPhotoUrl: data['requesterPhotoUrl'] as String?,
-      recipientProfileId: data['recipientProfileId'] as String? ?? '',
-      recipientUid: data['recipientUid'] as String? ?? '',
-      recipientName: data['recipientName'] as String? ?? '',
-      recipientPhotoUrl: data['recipientPhotoUrl'] as String?,
+      requesterProfileId: _safe(data['requesterProfileId'] as String? ?? ''),
+      requesterUid: _safe(data['requesterUid'] as String? ?? ''),
+      requesterName: _safe(data['requesterName'] as String? ?? ''),
+      requesterPhotoUrl: _safeOrNull(data['requesterPhotoUrl'] as String?),
+      recipientProfileId: _safe(data['recipientProfileId'] as String? ?? ''),
+      recipientUid: _safe(data['recipientUid'] as String? ?? ''),
+      recipientName: _safe(data['recipientName'] as String? ?? ''),
+      recipientPhotoUrl: _safeOrNull(data['recipientPhotoUrl'] as String?),
       status: connectionRequestStatusFromString(
-        data['status'] as String? ?? ConnectionRequestStatus.pending.name,
+        _safe(
+            data['status'] as String? ?? ConnectionRequestStatus.pending.name),
       ),
       createdAt: _parseDate(data['createdAt']),
       updatedAt: _parseDate(data['updatedAt']),
@@ -77,6 +79,11 @@ class ConnectionRequestEntity {
     };
   }
 }
+
+String _safe(String value) => Utf16Sanitizer.removeInvalidSurrogates(value);
+
+String? _safeOrNull(String? value) =>
+    Utf16Sanitizer.removeInvalidSurrogatesOrNull(value);
 
 DateTime _parseDate(dynamic value) {
   if (value is Timestamp) {

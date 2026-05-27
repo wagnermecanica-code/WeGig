@@ -951,8 +951,10 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                                 context.pushProfile(comment.authorProfileId);
                               },
                               onMentionTap: (username) {
+                                final navigation =
+                                    context.pushProfileByUsername(username);
                                 Navigator.pop(context);
-                                context.pushProfileByUsername(username);
+                                unawaited(navigation);
                               },
                             ),
                           );

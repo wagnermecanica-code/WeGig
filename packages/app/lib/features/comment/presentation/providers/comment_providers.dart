@@ -10,7 +10,8 @@ part 'comment_providers.g.dart';
 
 /// Provider para o datasource de comentários
 @riverpod
-CommentRemoteDatasource commentRemoteDatasource(CommentRemoteDatasourceRef ref) {
+CommentRemoteDatasource commentRemoteDatasource(
+    CommentRemoteDatasourceRef ref) {
   return CommentRemoteDatasourceImpl();
 }
 
@@ -23,7 +24,8 @@ CommentRepository commentRepository(CommentRepositoryRef ref) {
 
 /// Provider de stream para assistir comentários em tempo real
 @riverpod
-Stream<List<CommentEntity>> commentsStream(CommentsStreamRef ref, String postId) {
+Stream<List<CommentEntity>> commentsStream(
+    CommentsStreamRef ref, String postId) {
   final repository = ref.watch(commentRepositoryProvider);
   ref.onDispose(() {
     debugPrint('🧹 commentsStream disposed for postId: $postId');
@@ -31,11 +33,18 @@ Stream<List<CommentEntity>> commentsStream(CommentsStreamRef ref, String postId)
   return repository.watchComments(postId);
 }
 
-/// Provider para buscar commentCount de um post (para exibir o contador)
+/// Provider para buscar commentCount real de um post (para exibir o contador).
+///
+/// Usa a subcoleção sem orderBy para evitar depender do índice de createdAt e
+/// para não exibir valores antigos do campo posts/{postId}.commentCount.
 @riverpod
 Stream<int> commentCountStream(CommentCountStreamRef ref, String postId) {
-  final repository = ref.watch(commentRepositoryProvider);
-  return repository.watchComments(postId).map((comments) => comments.length);
+  return FirebaseFirestore.instance
+      .collection('posts')
+      .doc(postId)
+      .collection('comments')
+      .snapshots()
+      .map((snapshot) => snapshot.docs.length);
 }
 
 /// Provider para buscar forwardCount de um post (para exibir o contador)

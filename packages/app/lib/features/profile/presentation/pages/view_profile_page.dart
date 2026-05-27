@@ -1628,11 +1628,10 @@ class _ViewProfilePageState extends ConsumerState<ViewProfilePage>
     // "voltar" apenas quando esta página não é a rota inicial.
     final canGoBackInHistory =
         route != null ? !route.isFirst : Navigator.canPop(context);
-    // Detecta entrada via deep link: a rota atual é /profile/... no GoRouter
-    // (não está embutida dentro do BottomNavScaffold / home tab) mas não há
-    // histórico de navegação para fazer pop.
-    final routerLocation = GoRouterState.of(context).matchedLocation;
-    final isStandaloneProfileRoute = routerLocation.startsWith('/profile/');
+    // Detecta entrada standalone/deep link sem depender de GoRouterState.of,
+    // porque esta página também é usada dentro do BottomNavScaffold.
+    final isStandaloneProfileRoute =
+        widget.profileId != null || widget.userId != null;
     final isDeepLinkEntry = isStandaloneProfileRoute && !canGoBackInHistory;
     final shouldShowBackButton = canGoBackInHistory;
 

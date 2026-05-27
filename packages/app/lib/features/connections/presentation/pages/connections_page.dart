@@ -6,6 +6,7 @@ import 'package:core_ui/features/profile/domain/entities/profile_entity.dart';
 import 'package:core_ui/theme/app_colors.dart';
 import 'package:core_ui/utils/app_snackbar.dart';
 import 'package:core_ui/utils/location_utils.dart';
+import 'package:core_ui/widgets/app_loading_overlay.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -429,7 +430,7 @@ class _ConnectionsPageState extends ConsumerState<ConnectionsPage> {
               ),
             )
           : connectionsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: AppBrandCircularLoader()),
               error: (_, __) => _ConnectionsLoadError(
                 onRetry: () => ref
                     .read(connectionsListControllerProvider.notifier)
@@ -1033,7 +1034,7 @@ class _ConnectionsPageFooter extends StatelessWidget {
     if (isLoadingMore) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(child: AppBrandCircularLoader()),
       );
     }
 
