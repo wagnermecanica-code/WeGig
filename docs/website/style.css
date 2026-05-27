@@ -967,6 +967,10 @@ nav a:hover {
 }
 
 @media (max-width: 768px) {
+  :root {
+    --mobile-post-card-height: min(72vh, 25rem);
+  }
+
   .posts-feed {
     padding: 3rem 0;
   }
@@ -992,29 +996,32 @@ nav a:hover {
 
   .posts-carousel {
     grid-template-columns: 1fr;
-    max-height: none;
-    overflow: visible;
-    padding-right: 0;
-    scroll-snap-type: none;
+    max-height: var(--mobile-post-card-height);
+    overflow-y: auto;
+    padding-right: 0.35rem;
+    scroll-snap-type: y mandatory;
+    overscroll-behavior: contain;
   }
 
   .post-card {
     grid-template-columns: 1fr;
-    grid-template-rows: 150px auto;
-    height: auto;
-    min-height: 0;
+    grid-template-rows: 150px minmax(0, 1fr);
+    height: var(--mobile-post-card-height);
+    min-height: var(--mobile-post-card-height);
     border-radius: 20px;
-    scroll-snap-align: none;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
   }
 
   .post-card--no-photo {
     grid-template-rows: none;
-    min-height: 0;
   }
 
   .pc-content {
     justify-content: flex-start;
     gap: 0.72rem;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .pc-media-header,
