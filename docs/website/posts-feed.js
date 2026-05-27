@@ -151,6 +151,7 @@ async function loadPosts() {
       type: normalizePostType(post.type),
     }))
     .filter((post) => isPostActive(post))
+    .sort(comparePostsByCreatedAtDesc)
     .slice(0, CONFIG.MAX_VISIBLE_POSTS);
 
   console.log(
@@ -382,7 +383,8 @@ function formatPostDate(date) {
 function formatLocationLabel(post) {
   const city = firstAvailable(post, ["city", "cidade"]);
   const state = firstAvailable(post, ["state", "uf", "estado", "region"]);
-  const normalizedState = state && String(state).length <= 3 ? String(state).toUpperCase() : state;
+  const normalizedState =
+    state && String(state).length <= 3 ? String(state).toUpperCase() : state;
 
   if (city && normalizedState) return `${city} · ${normalizedState}`;
   if (city) return city;
@@ -440,7 +442,12 @@ function buildPostDetailChips(post, type) {
     addChip("box", firstAvailable(post, ["brand", "manufacturer", "model"]));
   } else if (type === "hiring") {
     addChip("briefcase", firstAvailable(post, ["eventType", "title"]));
-    addChip("calendar-1", formatOptionalDate(firstAvailable(post, ["eventDate", "date", "startDate"])));
+    addChip(
+      "calendar-1",
+      formatOptionalDate(
+        firstAvailable(post, ["eventDate", "date", "startDate"]),
+      ),
+    );
     addChip(
       "people",
       typeof post.guestCount === "number"
@@ -453,8 +460,14 @@ function buildPostDetailChips(post, type) {
     ).slice(0, 2);
 
     addChip("star", genres.join(" · "));
-    addChip("clock", firstAvailable(post, ["availability", "schedule", "period"]));
-    addChip("award", firstAvailable(post, ["experienceLevel", "level", "experience"]));
+    addChip(
+      "clock",
+      firstAvailable(post, ["availability", "schedule", "period"]),
+    );
+    addChip(
+      "award",
+      firstAvailable(post, ["experienceLevel", "level", "experience"]),
+    );
   }
 
   return chips;
@@ -550,6 +563,12 @@ function isPostActive(post) {
   const now = Date.now();
   const expiresAt = resolvePostExpiryDate(post);
   return expiresAt.getTime() > now;
+}
+
+function comparePostsByCreatedAtDesc(postA, postB) {
+  const dateA = timestampToDate(postA.createdAt)?.getTime() ?? 0;
+  const dateB = timestampToDate(postB.createdAt)?.getTime() ?? 0;
+  return dateB - dateA;
 }
 
 function getTypeDistribution(items) {
