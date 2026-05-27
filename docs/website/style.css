@@ -436,8 +436,16 @@ nav a:hover {
   padding: 2rem;
   border-radius: 28px;
   background:
-    radial-gradient(circle at top left, rgba(255, 203, 146, 0.2), transparent 42%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+    radial-gradient(
+      circle at top left,
+      rgba(255, 203, 146, 0.2),
+      transparent 42%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.07),
+      rgba(255, 255, 255, 0.03)
+    );
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(12px);
@@ -542,31 +550,26 @@ nav a:hover {
 .post-card {
   position: relative;
   overflow: hidden;
-  min-height: 100%;
   display: grid;
   grid-template-columns: minmax(220px, 36%) minmax(0, 1fr);
-  min-height: 17rem;
+  height: 17.25rem;
+  min-height: 17.25rem;
   scroll-snap-align: start;
   border-radius: 24px;
   isolation: isolate;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.025)),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.1),
+      rgba(255, 255, 255, 0.025)
+    ),
     #0f1014;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.28);
   transition:
     transform 0.25s ease,
     box-shadow 0.25s ease,
     border-color 0.25s ease;
-}
-
-.post-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 4px;
-  background: linear-gradient(90deg, var(--pc-accent), rgba(255, 255, 255, 0.55));
-  z-index: 3;
 }
 
 .post-card:hover,
@@ -579,9 +582,14 @@ nav a:hover {
 .pc-media {
   position: relative;
   overflow: hidden;
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   background:
-    radial-gradient(circle at 18% 16%, color-mix(in srgb, var(--pc-accent) 54%, white 10%), transparent 40%),
+    radial-gradient(
+      circle at 18% 16%,
+      color-mix(in srgb, var(--pc-accent) 54%, white 10%),
+      transparent 40%
+    ),
     linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
 }
 
@@ -603,35 +611,9 @@ nav a:hover {
   transform: scale(1.01);
 }
 
-.pc-media--placeholder {
-  display: grid;
-  place-items: center;
-}
-
-.pc-media-symbol {
-  width: 92px;
-  height: 92px;
-  display: grid;
-  place-items: center;
-  border-radius: 24px;
-  background: color-mix(in srgb, var(--pc-accent) 32%, #ffffff 8%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #fff;
-  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.28);
-}
-
-.pc-media-symbol i {
-  font-size: 2.2rem;
-}
-
-.post-card--no-photo .pc-media {
-  background:
-    radial-gradient(circle at 12% 20%, color-mix(in srgb, var(--pc-accent) 56%, white 8%), transparent 38%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
-}
-
 .post-card--no-photo {
   grid-template-columns: 1fr;
+  height: auto;
   min-height: 15.5rem;
 }
 
@@ -639,13 +621,21 @@ nav a:hover {
   justify-content: flex-start;
   padding: 1.2rem;
   background:
-    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--pc-accent) 20%, transparent), transparent 38%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.02));
+    radial-gradient(
+      circle at 0% 0%,
+      color-mix(in srgb, var(--pc-accent) 20%, transparent),
+      transparent 38%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.075),
+      rgba(255, 255, 255, 0.02)
+    );
 }
 
 .pc-inline-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.85rem;
 }
@@ -657,21 +647,6 @@ nav a:hover {
 
 .pc-inline-header .pc-time {
   background: rgba(255, 255, 255, 0.075);
-}
-
-.pc-inline-icon {
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--pc-accent) 34%, #ffffff 8%);
-  color: #fff;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
-}
-
-.pc-inline-icon i {
-  font-size: 1.35rem;
 }
 
 .pc-type-chip--inline {
@@ -905,7 +880,11 @@ nav a:hover {
   padding: 1.5rem;
   text-align: center;
   background:
-    linear-gradient(135deg, rgba(255, 203, 146, 0.18), rgba(103, 61, 253, 0.18)),
+    linear-gradient(
+      135deg,
+      rgba(255, 203, 146, 0.18),
+      rgba(103, 61, 253, 0.18)
+    ),
     rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.2);
@@ -1013,22 +992,13 @@ nav a:hover {
   .post-card {
     grid-template-columns: 1fr;
     grid-template-rows: 168px 1fr;
+    height: auto;
     min-height: 0;
   }
 
   .post-card--no-photo {
     grid-template-rows: none;
     min-height: 0;
-  }
-
-  .post-card--no-photo .pc-media-symbol {
-    width: 58px;
-    height: 58px;
-    border-radius: 18px;
-  }
-
-  .post-card--no-photo .pc-media-symbol i {
-    font-size: 1.55rem;
   }
 
   .pc-content {

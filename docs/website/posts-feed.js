@@ -260,7 +260,8 @@ function createPostCard(post) {
       type === "musician"
         ? (post.instruments || []).slice(0, 3).join(" · ")
         : (post.seekingMusicians || []).slice(0, 3).join(" · ");
-    if (items) primaryInfo = `<span class="pc-price pc-price--soft">${escapeHtml(items)}</span>`;
+    if (items)
+      primaryInfo = `<span class="pc-price pc-price--soft">${escapeHtml(items)}</span>`;
   }
 
   const detailChips = buildPostDetailChips(post, type);
@@ -277,7 +278,7 @@ function createPostCard(post) {
 
   const media = postPhoto
     ? `<img src="${postPhoto}" alt="" class="pc-cover" loading="lazy" />`
-    : `<div class="pc-media-symbol" aria-hidden="true"><i class="iconsax" data-icon="${typeIcon}"></i></div>`;
+    : "";
 
   const authorMarkup = `
     <div class="pc-author-block">
@@ -297,7 +298,6 @@ function createPostCard(post) {
 
   const noPhotoHeader = `
     <div class="pc-inline-header">
-      <div class="pc-inline-icon" aria-hidden="true"><i class="iconsax" data-icon="${typeIcon}"></i></div>
       ${authorMarkup}
       <span class="pc-time">${timeAgo}</span>
     </div>
@@ -437,20 +437,37 @@ function buildPostDetailChips(post, type) {
   };
 
   if (type === "sales") {
-    addChip("shop", firstAvailable(post, ["category", "productCategory", "itemCategory"]));
-    addChip("tag", firstAvailable(post, ["condition", "itemCondition", "state"]));
+    addChip(
+      "shop",
+      firstAvailable(post, ["category", "productCategory", "itemCategory"]),
+    );
+    addChip(
+      "tag",
+      firstAvailable(post, ["condition", "itemCondition", "state"]),
+    );
     addChip("location", post.city || post.state || "Brasil");
   } else if (type === "hiring") {
     addChip("briefcase", firstAvailable(post, ["eventType", "title"]));
-    addChip("people", typeof post.guestCount === "number" ? `${post.guestCount} convidados` : null);
+    addChip(
+      "people",
+      typeof post.guestCount === "number"
+        ? `${post.guestCount} convidados`
+        : null,
+    );
     addChip("location", post.city || post.state || "Brasil");
   } else {
     const instruments = normalizeList(
       type === "musician"
         ? firstAvailable(post, ["instruments", "instrument", "skills"])
-        : firstAvailable(post, ["seekingMusicians", "wantedInstruments", "instruments"]),
+        : firstAvailable(post, [
+            "seekingMusicians",
+            "wantedInstruments",
+            "instruments",
+          ]),
     ).slice(0, 2);
-    const genres = normalizeList(firstAvailable(post, ["genres", "musicGenres", "styles"])).slice(0, 2);
+    const genres = normalizeList(
+      firstAvailable(post, ["genres", "musicGenres", "styles"]),
+    ).slice(0, 2);
 
     addChip("music", instruments.join(" · "));
     addChip("star", genres.join(" · "));
