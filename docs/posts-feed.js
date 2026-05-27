@@ -211,13 +211,14 @@ function createPostCard(post) {
   const createdAt = post.createdAt?.toDate?.() || new Date();
   const timeAgo = formatTimeAgo(createdAt);
   const postedLabel = formatPostDate(createdAt);
+  const expiresLabel = formatExpiryLabel(post);
 
   const content = post.content || "";
   const truncatedContent =
-    content.length > 120 ? content.substring(0, 120) + "..." : content;
+    content.length > 170 ? content.substring(0, 170) + "..." : content;
 
   let subtitle = typeLabel;
-  let extraInfo = "";
+  let primaryInfo = "";
 
   if (type === "sales") {
     const title = post.title || "Anúncio";
@@ -231,7 +232,7 @@ function createPostCard(post) {
       : price;
 
     subtitle = title;
-    extraInfo = `<span class="pc-price">R$ ${finalPrice.toFixed(0)}${
+    primaryInfo = `<span class="pc-price">${formatCurrency(finalPrice)}${
       hasDiscount
         ? ` <small class="pc-discount">-${discountValue}${
             post.discountMode === "percentage" ? "%" : ""
@@ -250,7 +251,7 @@ function createPostCard(post) {
 
     const metaParts = [budget, guestCount].filter(Boolean);
     if (metaParts.length) {
-      extraInfo = `<span class="pc-tags">${escapeHtml(
+      primaryInfo = `<span class="pc-price pc-price--soft">${escapeHtml(
         metaParts.join(" · "),
       )}</span>`;
     }
@@ -259,45 +260,79 @@ function createPostCard(post) {
       type === "musician"
         ? (post.instruments || []).slice(0, 3).join(" · ")
         : (post.seekingMusicians || []).slice(0, 3).join(" · ");
-    if (items) extraInfo = `<span class="pc-tags">${escapeHtml(items)}</span>`;
+    if (items) primaryInfo = `<span class="pc-price pc-price--soft">${escapeHtml(items)}</span>`;
   }
 
+  const detailChips = buildPostDetailChips(post, type);
+  const detailMarkup = detailChips.length
+    ? `<div class="pc-detail-grid">${detailChips
+        .map(
+          (chip) =>
+            `<span class="pc-detail-chip"><i class="iconsax" data-icon="${chip.icon}"></i>${escapeHtml(
+              chip.label,
+            )}</span>`,
+        )
+        .join("")}</div>`
+    : "";
+
   const media = postPhoto
-    ? `<div class="pc-media"><img src="${postPhoto}" alt="" class="pc-cover" loading="lazy" /></div>`
-    : `<div class="pc-media pc-media--placeholder" aria-hidden="true"><span>${escapeHtml(typeLabel)}</span></div>`;
+    ? `<img src="${postPhoto}" alt="" class="pc-cover" loading="lazy" />`
+    : `<div class="pc-media-symbol" aria-hidden="true"><i class="iconsax" data-icon="${typeIcon}"></i></div>`;
+
+  const authorMarkup = `
+    <div class="pc-author-block">
+      ${
+        authorPhoto
+          ? `<img src="${authorPhoto}" alt="" class="pc-avatar" loading="lazy" />`
+          : `<span class="pc-avatar pc-avatar--placeholder" style="background:${color}">${escapeHtml(
+              authorName.charAt(0),
+            )}</span>`
+      }
+      <div class="pc-author-copy">
+        <span class="pc-kicker"><i class="iconsax" data-icon="location"></i>${escapeHtml(city)}</span>
+        <span class="pc-name">${escapeHtml(authorName)}</span>
+      </div>
+    </div>
+  `;
+
+  const noPhotoHeader = `
+    <div class="pc-inline-header">
+      <div class="pc-inline-icon" aria-hidden="true"><i class="iconsax" data-icon="${typeIcon}"></i></div>
+      ${authorMarkup}
+      <span class="pc-time">${timeAgo}</span>
+    </div>
+  `;
 
   return `
-    <article class="post-card pc" data-post-id="${post.id}" style="--pc-accent:${color}">
-      ${media}
+    <article class="post-card pc ${postPhoto ? "" : "post-card--no-photo"}" data-post-id="${post.id}" style="--pc-accent:${color}">
+      ${
+        postPhoto
+          ? `<div class="pc-media">
+              ${media}
+              <div class="pc-media-header">
+                <span class="pc-type-chip"><i class="iconsax" data-icon="${typeIcon}"></i>${escapeHtml(typeLabel)}</span>
+                <span class="pc-time">${timeAgo}</span>
+              </div>
+              ${authorMarkup}
+            </div>`
+          : ""
+      }
       <div class="pc-content">
-        <div class="pc-topline">
-          <span class="pc-type-chip"><i class="iconsax" data-icon="${typeIcon}"></i>${escapeHtml(typeLabel)}</span>
-          <span class="pc-time">${timeAgo}</span>
+        ${postPhoto ? "" : noPhotoHeader}
+        ${postPhoto ? "" : `<span class="pc-type-chip pc-type-chip--inline"><i class="iconsax" data-icon="${typeIcon}"></i>${escapeHtml(typeLabel)}</span>`}
+        <div class="pc-title-row">
+          <h3 class="pc-title">${escapeHtml(subtitle)}</h3>
+          ${primaryInfo}
         </div>
-        <div class="pc-header">
-          <div class="pc-identity">
-            ${
-              authorPhoto
-                ? `<img src="${authorPhoto}" alt="" class="pc-avatar" loading="lazy" />`
-                : `<span class="pc-avatar pc-avatar--placeholder" style="background:${color}">${authorName.charAt(
-                    0,
-                  )}</span>`
-            }
-            <div>
-              <span class="pc-name">${escapeHtml(authorName)}</span>
-              <div class="pc-subtitle">${escapeHtml(subtitle)}</div>
-            </div>
-          </div>
-        </div>
-        ${extraInfo}
         ${
           truncatedContent
             ? `<p class="pc-message">${escapeHtml(truncatedContent)}</p>`
             : ""
         }
+        ${detailMarkup}
         <div class="pc-meta-row">
-          <span class="pc-meta-chip"><i class="iconsax" data-icon="location"></i>${escapeHtml(city)}</span>
-          <span class="pc-meta-chip pc-meta-chip--ghost">${postedLabel}</span>
+          <span class="pc-meta-chip"><i class="iconsax" data-icon="calendar-1"></i>${postedLabel}</span>
+          <span class="pc-meta-chip pc-meta-chip--accent"><i class="iconsax" data-icon="clock"></i>${escapeHtml(expiresLabel)}</span>
         </div>
       </div>
     </article>
@@ -344,6 +379,85 @@ function formatPostDate(date) {
     day: "2-digit",
     month: "short",
   }).format(date);
+}
+
+function formatCurrency(value) {
+  const amount = Number(value) || 0;
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatExpiryLabel(post) {
+  const expiryDate = resolvePostExpiryDate(post);
+  if (!expiryDate) return "Ativo no app";
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const expiry = new Date(expiryDate);
+  expiry.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.ceil((expiry - today) / 86400000);
+  if (diffDays <= 0) return "Encerra hoje";
+  if (diffDays === 1) return "Encerra amanhã";
+  if (diffDays <= 14) return `${diffDays} dias restantes`;
+  return `Até ${formatPostDate(expiryDate)}`;
+}
+
+function normalizeList(value) {
+  if (Array.isArray(value)) return value.filter(Boolean).map(String);
+  if (typeof value === "string") {
+    return value
+      .split(/[,;·]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function firstAvailable(post, keys) {
+  for (const key of keys) {
+    const value = post[key];
+    if (Array.isArray(value) && value.length) return value;
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function buildPostDetailChips(post, type) {
+  const chips = [];
+
+  const addChip = (icon, value) => {
+    if (!value || chips.length >= 4) return;
+    chips.push({ icon, label: value });
+  };
+
+  if (type === "sales") {
+    addChip("shop", firstAvailable(post, ["category", "productCategory", "itemCategory"]));
+    addChip("tag", firstAvailable(post, ["condition", "itemCondition", "state"]));
+    addChip("location", post.city || post.state || "Brasil");
+  } else if (type === "hiring") {
+    addChip("briefcase", firstAvailable(post, ["eventType", "title"]));
+    addChip("people", typeof post.guestCount === "number" ? `${post.guestCount} convidados` : null);
+    addChip("location", post.city || post.state || "Brasil");
+  } else {
+    const instruments = normalizeList(
+      type === "musician"
+        ? firstAvailable(post, ["instruments", "instrument", "skills"])
+        : firstAvailable(post, ["seekingMusicians", "wantedInstruments", "instruments"]),
+    ).slice(0, 2);
+    const genres = normalizeList(firstAvailable(post, ["genres", "musicGenres", "styles"])).slice(0, 2);
+
+    addChip("music", instruments.join(" · "));
+    addChip("star", genres.join(" · "));
+    addChip("location", post.city || post.state || "Brasil");
+  }
+
+  return chips;
 }
 
 function escapeHtml(text) {
