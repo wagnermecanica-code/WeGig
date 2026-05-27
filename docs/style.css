@@ -536,8 +536,16 @@ nav a:hover {
   padding: 2rem;
   border-radius: 28px;
   background:
-    radial-gradient(circle at top left, rgba(255, 203, 146, 0.2), transparent 42%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+    radial-gradient(
+      circle at top left,
+      rgba(255, 203, 146, 0.2),
+      transparent 42%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.07),
+      rgba(255, 255, 255, 0.03)
+    );
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(12px);
@@ -649,7 +657,11 @@ nav a:hover {
   border-radius: 26px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.09),
+      rgba(255, 255, 255, 0.03)
+    ),
     #111111;
   box-shadow: 0 24px 40px rgba(0, 0, 0, 0.22);
   transition:
@@ -663,7 +675,12 @@ nav a:hover {
   position: absolute;
   inset: auto 18px 18px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.26), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.26),
+    transparent
+  );
 }
 
 .post-card:hover,
@@ -677,7 +694,11 @@ nav a:hover {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--pc-accent) 42%, white 8%), transparent 45%),
+    radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--pc-accent) 42%, white 8%),
+      transparent 45%
+    ),
     linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0));
 }
 
@@ -861,7 +882,11 @@ nav a:hover {
   padding: 1.5rem;
   text-align: center;
   background:
-    linear-gradient(135deg, rgba(255, 203, 146, 0.18), rgba(103, 61, 253, 0.18)),
+    linear-gradient(
+      135deg,
+      rgba(255, 203, 146, 0.18),
+      rgba(103, 61, 253, 0.18)
+    ),
     rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.2);
