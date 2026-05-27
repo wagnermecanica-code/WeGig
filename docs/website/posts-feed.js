@@ -207,11 +207,10 @@ function createPostCard(post) {
   const authorName = post.authorName || "Perfil";
   const authorPhoto = post.authorPhotoUrl || post.activeProfilePhotoUrl;
   const postPhoto = post.photoUrls?.[0] || null;
-  const city = post.city || "Brasil";
+  const locationLabel = formatLocationLabel(post);
   const createdAt = post.createdAt?.toDate?.() || new Date();
   const timeAgo = formatTimeAgo(createdAt);
   const postedLabel = formatPostDate(createdAt);
-  const expiresLabel = formatExpiryLabel(post);
 
   const content = post.content || "";
   const truncatedContent =
@@ -290,7 +289,7 @@ function createPostCard(post) {
             )}</span>`
       }
       <div class="pc-author-copy">
-        <span class="pc-kicker"><i class="iconsax" data-icon="location"></i>${escapeHtml(city)}</span>
+        <span class="pc-kicker"><i class="iconsax" data-icon="location"></i>${escapeHtml(locationLabel)}</span>
         <span class="pc-name">${escapeHtml(authorName)}</span>
       </div>
     </div>
@@ -332,7 +331,6 @@ function createPostCard(post) {
         ${detailMarkup}
         <div class="pc-meta-row">
           <span class="pc-meta-chip"><i class="iconsax" data-icon="calendar-1"></i>${postedLabel}</span>
-          <span class="pc-meta-chip pc-meta-chip--accent"><i class="iconsax" data-icon="clock"></i>${escapeHtml(expiresLabel)}</span>
         </div>
       </div>
     </article>
@@ -381,6 +379,17 @@ function formatPostDate(date) {
   }).format(date);
 }
 
+function formatLocationLabel(post) {
+  const city = firstAvailable(post, ["city", "cidade"]);
+  const state = firstAvailable(post, ["state", "uf", "estado", "region"]);
+  const normalizedState = state && String(state).length <= 3 ? String(state).toUpperCase() : state;
+
+  if (city && normalizedState) return `${city} · ${normalizedState}`;
+  if (city) return city;
+  if (normalizedState) return normalizedState;
+  return "Brasil";
+}
+
 function formatCurrency(value) {
   const amount = Number(value) || 0;
   return new Intl.NumberFormat("pt-BR", {
@@ -388,23 +397,6 @@ function formatCurrency(value) {
     currency: "BRL",
     maximumFractionDigits: 0,
   }).format(amount);
-}
-
-function formatExpiryLabel(post) {
-  const expiryDate = resolvePostExpiryDate(post);
-  if (!expiryDate) return "Ativo no app";
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const expiry = new Date(expiryDate);
-  expiry.setHours(0, 0, 0, 0);
-
-  const diffDays = Math.ceil((expiry - today) / 86400000);
-  if (diffDays <= 0) return "Encerra hoje";
-  if (diffDays === 1) return "Encerra amanhã";
-  if (diffDays <= 14) return `${diffDays} dias restantes`;
-  return `Até ${formatPostDate(expiryDate)}`;
 }
 
 function normalizeList(value) {
@@ -443,38 +435,34 @@ function buildPostDetailChips(post, type) {
     );
     addChip(
       "tag",
-      firstAvailable(post, ["condition", "itemCondition", "state"]),
+      firstAvailable(post, ["condition", "itemCondition", "productCondition"]),
     );
-    addChip("location", post.city || post.state || "Brasil");
+    addChip("box", firstAvailable(post, ["brand", "manufacturer", "model"]));
   } else if (type === "hiring") {
     addChip("briefcase", firstAvailable(post, ["eventType", "title"]));
+    addChip("calendar-1", formatOptionalDate(firstAvailable(post, ["eventDate", "date", "startDate"])));
     addChip(
       "people",
       typeof post.guestCount === "number"
         ? `${post.guestCount} convidados`
         : null,
     );
-    addChip("location", post.city || post.state || "Brasil");
   } else {
-    const instruments = normalizeList(
-      type === "musician"
-        ? firstAvailable(post, ["instruments", "instrument", "skills"])
-        : firstAvailable(post, [
-            "seekingMusicians",
-            "wantedInstruments",
-            "instruments",
-          ]),
-    ).slice(0, 2);
     const genres = normalizeList(
       firstAvailable(post, ["genres", "musicGenres", "styles"]),
     ).slice(0, 2);
 
-    addChip("music", instruments.join(" · "));
     addChip("star", genres.join(" · "));
-    addChip("location", post.city || post.state || "Brasil");
+    addChip("clock", firstAvailable(post, ["availability", "schedule", "period"]));
+    addChip("award", firstAvailable(post, ["experienceLevel", "level", "experience"]));
   }
 
   return chips;
+}
+
+function formatOptionalDate(value) {
+  const date = timestampToDate(value);
+  return date ? formatPostDate(date) : null;
 }
 
 function escapeHtml(text) {

@@ -864,11 +864,6 @@ nav a:hover {
   font-weight: 600;
 }
 
-.pc-meta-chip--accent {
-  background: color-mix(in srgb, var(--pc-accent) 18%, #ffffff 4%);
-  color: #fff;
-}
-
 .pc-meta-chip--ghost {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.12);
