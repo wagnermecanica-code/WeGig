@@ -49,13 +49,15 @@ header {
   position: sticky;
   top: 0;
   z-index: 1000;
-  padding: 1rem 0;
+  padding: 0.62rem 0;
 }
 
 header .container {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.9rem;
+  max-width: 1400px;
 }
 
 .header-icon {
@@ -74,7 +76,7 @@ header .container {
 }
 
 .logo img {
-  height: 130px;
+  height: 94px;
   width: auto;
   display: block;
   image-rendering: auto;
@@ -89,13 +91,20 @@ header .container {
 
 nav {
   display: flex;
-  gap: 2rem;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  gap: clamp(0.6rem, 1.1vw, 1.2rem);
+  min-width: 0;
 }
 
 nav a {
   color: rgba(255, 255, 255, 0.75);
   text-decoration: none;
+  font-size: clamp(0.78rem, 0.9vw, 0.95rem);
   font-weight: 500;
+  line-height: 1.15;
+  white-space: nowrap;
   transition: color 0.3s;
 }
 
@@ -119,6 +128,7 @@ nav a:hover {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .hero-store-cta {
@@ -158,6 +168,53 @@ nav a:hover {
   border-color: rgba(255, 255, 255, 0.58);
   background: rgba(0, 0, 0, 0.34);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.26);
+}
+
+.app-store-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.app-store-cta .header-store-btn {
+  padding: 0.48rem 0.56rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.app-store-cta .store-btn-icon {
+  height: 48px;
+}
+
+@media (max-width: 1180px) {
+  .header-icon {
+    display: none;
+  }
+
+  .logo img {
+    height: 82px;
+  }
+
+  nav {
+    gap: 0.7rem;
+  }
+}
+
+@media (max-width: 1040px) {
+  header .container {
+    justify-content: space-between;
+  }
+
+  nav {
+    display: none;
+  }
+
+  .mobile-menu {
+    display: block;
+    position: relative;
+  }
 }
 
 /* Hero Section */
