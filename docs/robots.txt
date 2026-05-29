@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /architecture/
+Disallow: /audits/
+Disallow: /Backend%20billing/
+Disallow: /Backend billing/
+Disallow: /Crashlytics/
+Disallow: /reports/
+Disallow: /sessions/
+Disallow: /setup/
+Disallow: /troubleshooting/
+Disallow: /legacy/
+Disallow: /Old/
+Disallow: /security/
+
+Sitemap: https://wegig.com.br/sitemap.xml

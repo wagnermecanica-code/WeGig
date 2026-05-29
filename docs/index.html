@@ -5,15 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="WeGig - Plataforma social que conecta músicos, bandas e espaços musicais com geolocalização, conexões por perfil, chat e notificações inteligentes"
+      content="WeGig é o app para músicos, bandas e espaços musicais encontrarem conexões, oportunidades, serviços e pessoas próximas para tocar, contratar e crescer na cena musical."
     />
     <meta
       name="keywords"
-      content="músicos, bandas, espaços musicais, conexões, networking musical, chat, geolocalização, minha rede"
+      content="app para músicos, encontrar músicos, encontrar banda, contratar músicos, espaços musicais, networking musical, oportunidades musicais, to sem banda"
     />
-    <title>
-      WeGig - Conectando Músicos, Bandas, Espaços e Sua Rede Musical
-    </title>
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://wegig.com.br/" />
+    <title>WeGig - App para Músicos, Bandas e Espaços Musicais</title>
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:site_name" content="WeGig" />
+    <meta
+      property="og:title"
+      content="WeGig - App para Músicos, Bandas e Espaços Musicais"
+    />
+    <meta
+      property="og:description"
+      content="Encontre músicos, bandas, espaços musicais, serviços e oportunidades perto de você. Baixe o WeGig para fortalecer sua rede musical."
+    />
+    <meta property="og:url" content="https://wegig.com.br/" />
+    <meta property="og:image" content="https://wegig.com.br/app_icon.png?v=8" />
+    <meta property="og:image:width" content="1024" />
+    <meta property="og:image:height" content="1024" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="WeGig - App para Músicos, Bandas e Espaços Musicais"
+    />
+    <meta
+      name="twitter:description"
+      content="Conecte-se com músicos, bandas, espaços e oportunidades musicais perto de você."
+    />
+    <meta
+      name="twitter:image"
+      content="https://wegig.com.br/app_icon.png?v=8"
+    />
+    <meta name="theme-color" content="#673dfd" />
     <meta
       name="facebook-domain-verification"
       content="msnuc7jqlreyuvcmlv7wvvcj21p27z"
@@ -24,6 +53,50 @@
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=8" />
     <link rel="icon" type="image/png" sizes="192x192" href="app_icon.png?v=8" />
     <link rel="apple-touch-icon" href="app_icon.png?v=8" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://wegig.com.br/#organization",
+            "name": "WeGig",
+            "alternateName": ["To Sem Banda", "Tô Sem Banda"],
+            "url": "https://wegig.com.br/",
+            "logo": "https://wegig.com.br/app_icon.png?v=8",
+            "sameAs": [
+              "https://www.instagram.com/wegigbr",
+              "https://www.facebook.com/share/1D1hUtvCiT/"
+            ]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://wegig.com.br/#website",
+            "name": "WeGig",
+            "alternateName": ["To Sem Banda", "Tô Sem Banda"],
+            "url": "https://wegig.com.br/",
+            "inLanguage": "pt-BR",
+            "publisher": { "@id": "https://wegig.com.br/#organization" }
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://wegig.com.br/#app",
+            "name": "WeGig",
+            "alternateName": ["To Sem Banda", "Tô Sem Banda"],
+            "applicationCategory": "SocialNetworkingApplication",
+            "operatingSystem": "iOS, Android",
+            "url": "https://wegig.com.br/",
+            "description": "App para músicos, bandas e espaços musicais encontrarem conexões, oportunidades, serviços e pessoas próximas.",
+            "downloadUrl": [
+              "https://apps.apple.com/br/app/wegig/id6756151139?l=en-GB",
+              "https://play.google.com/store/apps/details?id=com.wegig.wegig"
+            ],
+            "publisher": { "@id": "https://wegig.com.br/#organization" }
+          }
+        ]
+      }
+    </script>
 
     <!-- Firebase SDK -->
     <script type="module">
@@ -142,6 +215,8 @@
           <div class="mobile-menu-panel">
             <a href="#sobre">Sobre</a>
             <a href="#funcionalidades">Funcionalidades</a>
+            <a href="app-para-musicos.html">App para Músicos</a>
+            <a href="encontrar-banda.html">Encontrar Banda</a>
             <a href="#posts-recentes">Posts Recentes</a>
             <a href="termos.html">Termos de Uso</a>
             <a href="privacidade.html">Privacidade</a>
@@ -150,6 +225,8 @@
         <nav>
           <a href="#sobre">Sobre</a>
           <a href="#funcionalidades">Funcionalidades</a>
+          <a href="app-para-musicos.html">App para Músicos</a>
+          <a href="encontrar-banda.html">Encontrar Banda</a>
           <a href="#posts-recentes">Posts Recentes</a>
           <a href="termos.html">Termos de Uso</a>
           <a href="privacidade.html">Privacidade</a>
@@ -193,9 +270,9 @@
     <main>
       <section class="hero">
         <div class="container">
-          <h2>
+          <h1>
             Encontre oportunidades musicais e fortaleça sua rede de conexões
-          </h2>
+          </h1>
           <p>
             Busca geolocalizada, múltiplos perfis, Minha Rede, chat em tempo
             real e notificações sociais para manter sua cena em movimento
@@ -828,6 +905,17 @@
               <li><a href="#sobre">Sobre</a></li>
               <li><a href="#funcionalidades">Funcionalidades</a></li>
               <li><a href="#download">Baixar App</a></li>
+            </ul>
+          </div>
+
+          <div class="footer-section">
+            <h4>Para músicos</h4>
+            <ul>
+              <li><a href="app-para-musicos.html">App para músicos</a></li>
+              <li><a href="encontrar-musicos.html">Encontrar músicos</a></li>
+              <li><a href="encontrar-banda.html">Encontrar banda</a></li>
+              <li><a href="contratar-musicos.html">Contratar músicos</a></li>
+              <li><a href="espacos-musicais.html">Espaços musicais</a></li>
             </ul>
           </div>
 
