@@ -5,14 +5,21 @@ import {
   orderBy,
   onSnapshot,
   doc,
-  updateDoc,
   getDoc,
   deleteDoc,
   limit,
+  serverTimestamp,
+  updateDoc,
+  writeBatch,
 } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
+import { useAuth } from "../core/auth/AuthProvider";
+import { recordAudit } from "../core/audit/auditLog";
 import {
   AlertTriangle,
+  ArrowRightCircle,
+  Ban,
   CheckCircle,
   Clock,
   Flag,
@@ -21,6 +28,148 @@ import {
   Trash2,
   ShieldOff,
 } from "lucide-react";
+
+function toDate(value) {
+  if (value?.toDate) return value.toDate();
+  if (value instanceof Date) return value;
+  return null;
+}
+
+function normalizeTargetType(value) {
+  if (value === "post") return "post";
+  if (value === "perfil" || value === "profile") return "profile";
+  return null;
+}
+
+function isTerminalStatus(status) {
+  return (
+    status === "resolved" ||
+    status === "removed" ||
+    status === "dismissed"
+  );
+}
+
+function buildTargetKey(targetType, targetId) {
+  return `${targetType}:${targetId}`;
+}
+
+function inferTargetFromReport(data) {
+  if (typeof data.reportedPostId === "string" && data.reportedPostId.trim()) {
+    return { targetType: "post", targetId: data.reportedPostId.trim() };
+  }
+
+  if (
+    typeof data.reportedProfileId === "string" &&
+    data.reportedProfileId.trim()
+  ) {
+    return { targetType: "profile", targetId: data.reportedProfileId.trim() };
+  }
+
+  return null;
+}
+
+function summarizeGroupStatus(reports) {
+  const activeReports = reports.filter((report) => !isTerminalStatus(report.status));
+  if (activeReports.length > 0) return "pending";
+  if (reports.some((report) => report.status === "removed")) return "removed";
+  if (reports.some((report) => report.status === "dismissed")) return "dismissed";
+  return "resolved";
+}
+
+function buildReportGroups(reportDocs, notifications) {
+  const notificationsByTargetKey = new Map();
+
+  notifications.forEach((notification) => {
+    const targetType = normalizeTargetType(notification.targetType);
+    const targetId =
+      typeof notification.targetId === "string" ? notification.targetId.trim() : "";
+
+    if (!targetType || !targetId) return;
+
+    const key = buildTargetKey(targetType, targetId);
+    const current = notificationsByTargetKey.get(key) ?? [];
+    current.push(notification);
+    notificationsByTargetKey.set(key, current);
+  });
+
+  const groups = new Map();
+
+  reportDocs.forEach((reportDoc) => {
+    const data = reportDoc.data();
+    const target = inferTargetFromReport(data);
+    if (!target) return;
+
+    const key = buildTargetKey(target.targetType, target.targetId);
+    const currentGroup =
+      groups.get(key) ??
+      {
+        id: key,
+        targetType: target.targetType,
+        targetId: target.targetId,
+        reports: [],
+        reportIds: [],
+        relatedNotifications: notificationsByTargetKey.get(key) ?? [],
+      };
+
+    currentGroup.reports.push({
+      id: reportDoc.id,
+      reporterUid: data.reporterUid ?? null,
+      reason: data.reason ?? "Sem motivo",
+      description: data.description ?? null,
+      status: data.status ?? "pending",
+      timestamp: toDate(data.timestamp),
+      reviewedAt: toDate(data.reviewedAt),
+      reviewedBy: data.reviewedBy ?? null,
+      adminNotes: data.adminNotes ?? null,
+      resolutionAction: data.resolutionAction ?? null,
+    });
+    currentGroup.reportIds.push(reportDoc.id);
+    groups.set(key, currentGroup);
+  });
+
+  return Array.from(groups.values())
+    .map((group) => {
+      const reports = group.reports.sort((left, right) => {
+        const leftTime = left.timestamp?.getTime?.() ?? 0;
+        const rightTime = right.timestamp?.getTime?.() ?? 0;
+        return rightTime - leftTime;
+      });
+      const activeReports = reports.filter((report) => !isTerminalStatus(report.status));
+      const notificationsForGroup = group.relatedNotifications;
+      const unreadNotifications = notificationsForGroup.filter(
+        (notification) => notification.read !== true,
+      );
+      const reasons = Array.from(
+        new Set(reports.map((report) => report.reason).filter(Boolean)),
+      );
+
+      return {
+        ...group,
+        reports,
+        activeReports,
+        status: summarizeGroupStatus(reports),
+        totalReports: reports.length,
+        activeReportsCount: activeReports.length,
+        reasons,
+        latestDescription:
+          reports.find((report) => report.description)?.description ?? null,
+        latestTimestamp: reports[0]?.timestamp ?? null,
+        priority:
+          activeReports.length >= 3 ||
+          notificationsForGroup.some((notification) => notification.priority === "high")
+            ? "high"
+            : "normal",
+        read: unreadNotifications.length === 0,
+        unreadCount: unreadNotifications.length,
+        notificationIds: notificationsForGroup.map((notification) => notification.id),
+      };
+    })
+    .sort((left, right) => {
+      const leftTime = left.latestTimestamp?.getTime?.() ?? 0;
+      const rightTime = right.latestTimestamp?.getTime?.() ?? 0;
+      return rightTime - leftTime;
+    });
+}
 
 function getPriorityColor(priority) {
   if (priority === "high") return "text-red-600 bg-red-100";
@@ -82,6 +231,8 @@ function ContentPreview({ content, targetType }) {
 }
 
 export default function ReportsTab() {
+  const navigate = useNavigate();
+  const { admin, hasPermission } = useAuth();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -91,16 +242,43 @@ export default function ReportsTab() {
   const [actionLoading, setActionLoading] = useState({});
 
   useEffect(() => {
-    const q = query(
+    const reportsQuery = query(
+      collection(db, "reports"),
+      orderBy("timestamp", "desc"),
+      limit(250),
+    );
+
+    const notificationsQuery = query(
       collection(db, "adminNotifications"),
       orderBy("timestamp", "desc"),
-      limit(100),
+      limit(250),
     );
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setReports(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+
+    let reportDocs = [];
+    let notifications = [];
+
+    const syncGroups = () => {
+      setReports(buildReportGroups(reportDocs, notifications));
       setLoading(false);
+    };
+
+    const unsubscribeReports = onSnapshot(reportsQuery, (snap) => {
+      reportDocs = snap.docs;
+      syncGroups();
     });
-    return unsubscribe;
+
+    const unsubscribeNotifications = onSnapshot(notificationsQuery, (snap) => {
+      notifications = snap.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+      syncGroups();
+    });
+
+    return () => {
+      unsubscribeReports();
+      unsubscribeNotifications();
+    };
   }, []);
 
   const toggleExpand = async (report) => {
@@ -126,23 +304,68 @@ export default function ReportsTab() {
     }
   };
 
-  const markAsRead = async (reportId) => {
-    await updateDoc(doc(db, "adminNotifications", reportId), { read: true });
+  const markAsRead = async (report) => {
+    if (!report.notificationIds.length) return;
+
+    const key = `${report.id}_read`;
+    setActionLoading((prev) => ({ ...prev, [key]: true }));
+    try {
+      const batch = writeBatch(db);
+      report.notificationIds.forEach((notificationId) => {
+        batch.update(doc(db, "adminNotifications", notificationId), {
+          read: true,
+        });
+      });
+      await batch.commit();
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [key]: false }));
+    }
   };
 
-  const resolveWithoutAction = async (reportId) => {
-    setActionLoading((prev) => ({ ...prev, [reportId + "_resolve"]: true }));
+  const dismissReports = async (report) => {
+    if (!admin || !hasPermission("reports.resolve")) return;
+
+    setActionLoading((prev) => ({ ...prev, [report.id + "_dismiss"]: true }));
     try {
-      await updateDoc(doc(db, "adminNotifications", reportId), {
-        read: true,
-        status: "resolved",
+      const batch = writeBatch(db);
+
+      report.activeReports.forEach((item) => {
+        batch.update(doc(db, "reports", item.id), {
+          status: "dismissed",
+          reviewedAt: serverTimestamp(),
+          reviewedBy: admin.uid,
+        });
+      });
+
+      report.notificationIds.forEach((notificationId) => {
+        batch.update(doc(db, "adminNotifications", notificationId), {
+          read: true,
+          status: "dismissed",
+          resolvedAt: serverTimestamp(),
+          reviewedBy: admin.uid,
+        });
+      });
+
+      await batch.commit();
+      await recordAudit(admin, {
+        action: "report.dismiss",
+        targetType: "report",
+        targetId: report.id,
+        metadata: {
+          targetType: report.targetType,
+          targetEntityId: report.targetId,
+          reportIds: report.activeReports.map((item) => item.id),
+          reasons: report.reasons,
+        },
       });
     } finally {
-      setActionLoading((prev) => ({ ...prev, [reportId + "_resolve"]: false }));
+      setActionLoading((prev) => ({ ...prev, [report.id + "_dismiss"]: false }));
     }
   };
 
   const removeContent = async (report) => {
+    if (!admin || !hasPermission("content.delete")) return;
+
     const label = report.targetType === "post" ? "post" : "perfil";
     if (
       !confirm(
@@ -155,10 +378,38 @@ export default function ReportsTab() {
     try {
       const collName = report.targetType === "post" ? "posts" : "profiles";
       await deleteDoc(doc(db, collName, report.targetId));
-      await updateDoc(doc(db, "adminNotifications", report.id), {
-        read: true,
-        status: "removed",
+
+      const batch = writeBatch(db);
+      report.activeReports.forEach((item) => {
+        batch.update(doc(db, "reports", item.id), {
+          status: "resolved",
+          reviewedAt: serverTimestamp(),
+          reviewedBy: admin.uid,
+          resolutionAction: "content_removed",
+        });
       });
+
+      report.notificationIds.forEach((notificationId) => {
+        batch.update(doc(db, "adminNotifications", notificationId), {
+          read: true,
+          status: "removed",
+          resolvedAt: serverTimestamp(),
+          reviewedBy: admin.uid,
+        });
+      });
+
+      await batch.commit();
+      await recordAudit(admin, {
+        action: "content.delete",
+        targetType: report.targetType === "post" ? "post" : "user",
+        targetId: report.targetId,
+        metadata: {
+          source: "moderation_reports",
+          reportIds: report.activeReports.map((item) => item.id),
+          reasons: report.reasons,
+        },
+      });
+
       setContentCache((prev) => ({ ...prev, [report.id]: null }));
       setExpandedId(null);
     } catch (e) {
@@ -168,23 +419,107 @@ export default function ReportsTab() {
     }
   };
 
+  const moderateProfile = async (report, shouldBan) => {
+    if (!admin || !hasPermission("users.moderate")) return;
+    if (report.targetType !== "profile") return;
+
+    const actionKey = `${report.id}_${shouldBan ? "ban" : "unban"}`;
+    const actionLabel = shouldBan ? "banir" : "desbanir";
+
+    if (
+      !confirm(
+        `${shouldBan ? "Banir" : "Desbanir"} este perfil agora?`,
+      )
+    ) {
+      return;
+    }
+
+    setActionLoading((prev) => ({ ...prev, [actionKey]: true }));
+    try {
+      const profileRef = doc(db, "profiles", report.targetId);
+      const batch = writeBatch(db);
+
+      batch.update(profileRef, {
+        banned: shouldBan,
+        moderationStatus: shouldBan ? "banned" : "active",
+        moderatedAt: serverTimestamp(),
+        moderatedBy: admin.uid,
+      });
+
+      if (shouldBan) {
+        report.activeReports.forEach((item) => {
+          batch.update(doc(db, "reports", item.id), {
+            status: "resolved",
+            reviewedAt: serverTimestamp(),
+            reviewedBy: admin.uid,
+            resolutionAction: "profile_banned",
+          });
+        });
+
+        report.notificationIds.forEach((notificationId) => {
+          batch.update(doc(db, "adminNotifications", notificationId), {
+            read: true,
+            status: "resolved",
+            resolvedAt: serverTimestamp(),
+            reviewedBy: admin.uid,
+          });
+        });
+      }
+
+      await batch.commit();
+
+      await recordAudit(admin, {
+        action: shouldBan ? "user.ban" : "user.unban",
+        targetType: "user",
+        targetId: report.targetId,
+        metadata: {
+          source: "moderation_reports",
+          reportIds: report.activeReports.map((item) => item.id),
+          reasons: report.reasons,
+        },
+      });
+
+      setContentCache((prev) => {
+        const current = prev[report.id];
+        if (!current) return prev;
+        return {
+          ...prev,
+          [report.id]: {
+            ...current,
+            banned: shouldBan,
+            moderationStatus: shouldBan ? "banned" : "active",
+          },
+        };
+      });
+    } catch (e) {
+      alert(`Erro ao ${actionLabel} perfil: ` + e.message);
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
   const filteredReports = reports.filter((r) => {
     if (r.status === "removed") return false;
     if (filter === "unread") return !r.read;
     if (filter === "high") return r.priority === "high";
-    if (filter === "resolved") return r.status === "resolved";
+    if (filter === "resolved") {
+      return r.status === "resolved" || r.status === "dismissed";
+    }
     return true;
   });
 
   const unreadCount = reports.filter(
-    (r) => !r.read && r.status !== "removed",
+    (r) => !r.read && r.status === "pending",
   ).length;
   const highCount = reports.filter(
-    (r) => r.priority === "high" && r.status !== "removed",
+    (r) => r.priority === "high" && r.status === "pending",
   ).length;
-  const pendingCount = reports.filter(
-    (r) => !r.status || r.status === "pending",
-  ).length;
+  const pendingCount = reports.filter((r) => r.status === "pending").length;
+
+  const canResolveReports = hasPermission("reports.resolve");
+  const canDeleteContent = hasPermission("content.delete");
+  const canModerateUsers = hasPermission("users.moderate");
+  const canViewUsers = hasPermission("users.view");
 
   if (loading) {
     return (
@@ -267,6 +602,11 @@ export default function ReportsTab() {
             filteredReports.map((report) => {
               const isExpanded = expandedId === report.id;
               const isResolved = report.status === "resolved";
+              const cachedContent = contentCache[report.id];
+              const isProfileBanned =
+                report.targetType === "profile" &&
+                (cachedContent?.banned === true ||
+                  cachedContent?.moderationStatus === "banned");
 
               return (
                 <li
@@ -300,39 +640,89 @@ export default function ReportsTab() {
 
                       {/* Main info */}
                       <p className="text-sm font-medium text-gray-900">
-                        {report.totalReports} denúncia
-                        {report.totalReports > 1 ? "s" : ""} · {report.reason}
+                        {report.activeReportsCount || report.totalReports} denúncia
+                        {report.activeReportsCount === 1 || report.totalReports === 1
+                          ? ""
+                          : "s"}
+                        {report.status !== "pending" ? " concluída" : ""} · {report.reasons[0]}
                       </p>
-                      {report.description && (
+                      {report.reasons.length > 1 ? (
+                        <p className="text-sm text-gray-500 mt-0.5">
+                          Motivos: {report.reasons.join(", ")}
+                        </p>
+                      ) : null}
+                      {report.latestDescription && (
                         <p className="text-sm text-gray-500 italic mt-0.5">
-                          "{report.description}"
+                          "{report.latestDescription}"
                         </p>
                       )}
                       <p className="text-xs text-gray-400 mt-1">
                         ID alvo: {report.targetId} ·{" "}
-                        {report.timestamp &&
-                          new Date(report.timestamp.toDate()).toLocaleString(
-                            "pt-BR",
-                          )}
+                        {report.latestTimestamp?.toLocaleString?.("pt-BR") ?? "—"}
                       </p>
 
                       {/* Expanded content */}
                       {isExpanded && (
-                        <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
-                          <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                            Conteúdo reportado
-                          </p>
-                          {loadingContent[report.id] ? (
-                            <div className="flex items-center gap-2 text-sm text-gray-500">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400" />
-                              Carregando...
+                        <div className="mt-3 space-y-3">
+                          <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                              Conteúdo reportado
+                            </p>
+                            {loadingContent[report.id] ? (
+                              <div className="flex items-center gap-2 text-sm text-gray-500">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400" />
+                                Carregando...
+                              </div>
+                            ) : (
+                              <ContentPreview
+                                content={contentCache[report.id]}
+                                targetType={report.targetType}
+                              />
+                            )}
+                          </div>
+
+                          <div className="p-3 bg-white border border-gray-200 rounded-md">
+                            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                              Lastro das denúncias
+                            </p>
+                            <div className="space-y-2">
+                              {report.reports.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2"
+                                >
+                                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                                    <span className="font-medium text-gray-700">
+                                      {item.reason}
+                                    </span>
+                                    <span className="text-gray-400">•</span>
+                                    <span className="text-gray-500">
+                                      {item.status}
+                                    </span>
+                                    <span className="text-gray-400">•</span>
+                                    <span className="text-gray-500">
+                                      {item.timestamp?.toLocaleString?.("pt-BR") ?? "—"}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 text-xs text-gray-500">
+                                    Report: {item.id}
+                                    {item.reporterUid ? ` · Reporter UID: ${item.reporterUid}` : ""}
+                                  </p>
+                                  {item.description ? (
+                                    <p className="mt-1 text-sm text-gray-700 italic">
+                                      "{item.description}"
+                                    </p>
+                                  ) : null}
+                                  {item.reviewedBy || item.reviewedAt ? (
+                                    <p className="mt-1 text-xs text-gray-400">
+                                      Revisado por {item.reviewedBy ?? "—"} em{" "}
+                                      {item.reviewedAt?.toLocaleString?.("pt-BR") ?? "—"}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ))}
                             </div>
-                          ) : (
-                            <ContentPreview
-                              content={contentCache[report.id]}
-                              targetType={report.targetType}
-                            />
-                          )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -353,7 +743,8 @@ export default function ReportsTab() {
 
                       {!report.read && !isResolved && (
                         <button
-                          onClick={() => markAsRead(report.id)}
+                          onClick={() => markAsRead(report)}
+                          disabled={actionLoading[report.id + "_read"]}
                           className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
                         >
                           <CheckCircle className="w-3 h-3" />
@@ -361,18 +752,49 @@ export default function ReportsTab() {
                         </button>
                       )}
 
-                      {!isResolved && (
+                      {report.targetType === "profile" && canViewUsers && (
                         <button
-                          onClick={() => resolveWithoutAction(report.id)}
-                          disabled={actionLoading[report.id + "_resolve"]}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                          onClick={() => navigate(`/users/${report.targetId}`)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                         >
-                          <ShieldOff className="w-3 h-3" />
-                          Ignorar
+                          <ArrowRightCircle className="w-3 h-3" />
+                          Abrir usuário
                         </button>
                       )}
 
-                      {!isResolved && (
+                      {report.targetType === "profile" && canModerateUsers ? (
+                        <button
+                          onClick={() =>
+                            moderateProfile(report, !isProfileBanned)
+                          }
+                          disabled={
+                            actionLoading[
+                              `${report.id}_${isProfileBanned ? "unban" : "ban"}`
+                            ]
+                          }
+                          className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md text-white disabled:opacity-50 ${
+                            isProfileBanned
+                              ? "bg-slate-600 hover:bg-slate-700"
+                              : "bg-amber-600 hover:bg-amber-700"
+                          }`}
+                        >
+                          <Ban className="w-3 h-3" />
+                          {isProfileBanned ? "Desbanir" : "Banir perfil"}
+                        </button>
+                      ) : null}
+
+                      {!isResolved && canResolveReports && (
+                        <button
+                          onClick={() => dismissReports(report)}
+                          disabled={actionLoading[report.id + "_dismiss"]}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          <ShieldOff className="w-3 h-3" />
+                          Dispensar
+                        </button>
+                      )}
+
+                      {!isResolved && canDeleteContent && (
                         <button
                           onClick={() => removeContent(report)}
                           disabled={actionLoading[report.id + "_remove"]}

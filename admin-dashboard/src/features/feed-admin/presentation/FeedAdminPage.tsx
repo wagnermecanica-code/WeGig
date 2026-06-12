@@ -19,6 +19,7 @@ import { Button } from "@shared/components/ui/Button";
 import { Badge } from "@shared/components/ui/Badge";
 import { Skeleton } from "@shared/components/ui/Skeleton";
 import { exportRowsToXlsx } from "@shared/utils/exportXlsx";
+import { useAuth } from "@core/auth/AuthProvider";
 import {
   deleteFeedPost,
   listFeedPosts,
@@ -44,6 +45,7 @@ function formatDate(value?: Date) {
 }
 
 export function FeedAdminPage() {
+  const { admin } = useAuth();
   const [filter, setFilter] = useState<FilterKey>("all");
   const [search, setSearch] = useState("");
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -91,10 +93,12 @@ export function FeedAdminPage() {
   }
 
   async function handleResolveReports(post: FeedPost) {
+    if (!admin) return;
+
     setPendingId(post.id);
     setActionError(null);
     try {
-      await resolvePostReports(post);
+      await resolvePostReports(post, admin);
       setPosts((prev) =>
         prev
           .map((p) => (p.id === post.id ? { ...p, reports: undefined } : p))
@@ -109,6 +113,8 @@ export function FeedAdminPage() {
   }
 
   async function handleDeletePost(post: FeedPost) {
+    if (!admin) return;
+
     const confirmed = window.confirm(
       `Remover definitivamente o post "${post.title}"? Esta ação não pode ser desfeita.`,
     );
@@ -118,7 +124,7 @@ export function FeedAdminPage() {
     setPendingId(post.id);
     setActionError(null);
     try {
-      await deleteFeedPost(post);
+      await deleteFeedPost(post, admin);
       setPosts((prev) => prev.filter((p) => p.id !== post.id));
     } catch (err) {
       console.warn("[FeedAdminPage] delete post failed", err);

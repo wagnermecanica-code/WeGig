@@ -12,9 +12,12 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "@core/firebase/client";
+import { recordAudit } from "@core/audit/auditLog";
+import type { AdminUser } from "@core/auth/roles";
 
 export interface PostReportIndicator {
   notificationIds: string[];
+  reportIds: string[];
   totalReports: number;
   unreadReports: number;
   highPriority: boolean;
@@ -66,7 +69,8 @@ function buildPostTitle(data: Record<string, any>): string {
     cleanString(data.targetInfo?.content);
   if (contentTitle) return truncateText(contentTitle.replace(/\s+/g, " "));
 
-  const authorName = cleanString(data.authorName) ?? cleanString(data.profileName);
+  const authorName =
+    cleanString(data.authorName) ?? cleanString(data.profileName);
   if (authorName) return `Post de ${authorName}`;
 
   return "Post sem título";
@@ -77,11 +81,14 @@ function mapPost(id: string, data: Record<string, any>): FeedPost {
     id,
     title: buildPostTitle(data),
     description:
-      cleanString(data.description) ?? cleanString(data.text) ?? cleanString(data.content),
+      cleanString(data.description) ??
+      cleanString(data.text) ??
+      cleanString(data.content),
     postType: cleanString(data.postType) ?? cleanString(data.type),
     city: cleanString(data.city) ?? cleanString(data.locationCity),
     state: cleanString(data.state) ?? cleanString(data.locationState),
-    authorProfileId: cleanString(data.profileId) ?? cleanString(data.authorProfileId),
+    authorProfileId:
+      cleanString(data.profileId) ?? cleanString(data.authorProfileId),
     authorName: cleanString(data.authorName) ?? cleanString(data.profileName),
     createdAt: parseDate(data.createdAt),
     featured: data.featured === true,
@@ -109,6 +116,8 @@ export async function listPostReportIndicators(): Promise<
   const snap = await getDocs(
     query(
       collection(db, "adminNotifications"),
+      where("type", "==", "new_report"),
+      where("targetType", "==", "post"),
       orderBy("timestamp", "desc"),
       limit(250),
     ),
@@ -117,11 +126,7 @@ export async function listPostReportIndicators(): Promise<
 
   snap.docs.forEach((reportDoc) => {
     const data = reportDoc.data();
-    if (
-      data.type !== "new_report" ||
-      data.targetType !== "post" ||
-      !data.targetId
-    ) {
+    if (!data.targetId) {
       return;
     }
     if (!isActiveReportStatus(data.status)) return;
@@ -129,6 +134,7 @@ export async function listPostReportIndicators(): Promise<
     const targetId = String(data.targetId);
     const current = indicators.get(targetId) ?? {
       notificationIds: [],
+      reportIds: [],
       totalReports: 0,
       unreadReports: 0,
       highPriority: false,
@@ -138,6 +144,9 @@ export async function listPostReportIndicators(): Promise<
     const reportedAt = parseDate(data.timestamp);
 
     current.notificationIds.push(reportDoc.id);
+    if (typeof data.reportId === "string" && data.reportId.trim()) {
+      current.reportIds.push(data.reportId.trim());
+    }
     current.totalReports += Number.isFinite(totalReports) ? totalReports : 1;
     current.unreadReports += data.read ? 0 : 1;
     current.highPriority = current.highPriority || data.priority === "high";
@@ -208,34 +217,91 @@ export async function listFeedPosts(
   return items;
 }
 
-export async function resolvePostReports(post: FeedPost): Promise<void> {
-  if (!post.reports?.notificationIds.length) return;
+export async function resolvePostReports(
+  post: FeedPost,
+  admin: AdminUser,
+): Promise<void> {
+  if (!post.reports?.notificationIds.length && !post.reports?.reportIds.length) {
+    return;
+  }
 
   const batch = writeBatch(db);
+  post.reports?.reportIds.forEach((reportId) => {
+    batch.update(doc(db, "reports", reportId), {
+      status: "resolved",
+      reviewedAt: Timestamp.now(),
+      reviewedBy: admin.uid,
+      resolutionAction: "content_kept",
+    });
+  });
   post.reports.notificationIds.forEach((notificationId) => {
     batch.update(doc(db, "adminNotifications", notificationId), {
       read: true,
       status: "resolved",
       resolvedAt: Timestamp.now(),
+      reviewedBy: admin.uid,
     });
   });
   await batch.commit();
+
+  await recordAudit(admin, {
+    action: "report.resolve",
+    targetType: "post",
+    targetId: post.id,
+    metadata: {
+      reportIds: post.reports?.reportIds ?? [],
+      notificationIds: post.reports?.notificationIds ?? [],
+      reasons: post.reports?.reasons ?? [],
+    },
+  });
 }
 
-export async function deleteFeedPost(post: FeedPost): Promise<void> {
+export async function deleteFeedPost(
+  post: FeedPost,
+  admin: AdminUser,
+): Promise<void> {
   await deleteDoc(doc(db, "posts", post.id));
 
-  if (!post.reports?.notificationIds.length) return;
+  if (!post.reports?.notificationIds.length && !post.reports?.reportIds.length) {
+    await recordAudit(admin, {
+      action: "post.delete",
+      targetType: "post",
+      targetId: post.id,
+      metadata: { source: "feed_admin" },
+    });
+    return;
+  }
 
   const batch = writeBatch(db);
+  post.reports?.reportIds.forEach((reportId) => {
+    batch.update(doc(db, "reports", reportId), {
+      status: "resolved",
+      reviewedAt: Timestamp.now(),
+      reviewedBy: admin.uid,
+      resolutionAction: "content_removed",
+    });
+  });
   post.reports.notificationIds.forEach((notificationId) => {
     batch.update(doc(db, "adminNotifications", notificationId), {
       read: true,
       status: "removed",
       resolvedAt: Timestamp.now(),
+      reviewedBy: admin.uid,
     });
   });
   await batch.commit();
+
+  await recordAudit(admin, {
+    action: "post.delete",
+    targetType: "post",
+    targetId: post.id,
+    metadata: {
+      source: "feed_admin",
+      reportIds: post.reports?.reportIds ?? [],
+      notificationIds: post.reports?.notificationIds ?? [],
+      reasons: post.reports?.reasons ?? [],
+    },
+  });
 }
 
 export type FeedFlag = "featured" | "promoted" | "pinned";
