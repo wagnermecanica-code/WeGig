@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
 import {
+  BadgeCheck,
   LayoutDashboard,
   ShieldAlert,
   Users,
@@ -17,7 +18,7 @@ import {
   Bug,
   FileText,
   MapPin,
-  BadgeCheck,
+  Settings,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useAuth } from "@core/auth/AuthProvider";
@@ -80,6 +81,12 @@ const PRIMARY_NAV: NavItem[] = [
     label: "Moderação",
     icon: ShieldAlert,
     permission: "reports.view",
+  },
+  {
+    to: "/settings",
+    label: "Configurações",
+    icon: Settings,
+    permission: "dashboard.view",
   },
 ];
 
