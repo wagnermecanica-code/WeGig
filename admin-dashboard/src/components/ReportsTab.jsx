@@ -200,6 +200,59 @@ function pickReporterName(data) {
   return null;
 }
 
+function pickTargetName(data, targetType) {
+  if (!data || typeof data !== "object") return null;
+
+  const postCandidates = [
+    data.authorName,
+    data.name,
+    data.displayName,
+    data.authorProfileId,
+  ];
+  const profileCandidates = [
+    data.displayName,
+    data.name,
+    data.username,
+    data.userName,
+    data.handle,
+  ];
+
+  const candidates = targetType === "post" ? postCandidates : profileCandidates;
+
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function getReportedName(report, cachedContent) {
+  const contentName = pickTargetName(cachedContent, report.targetType);
+  if (contentName) return contentName;
+
+  for (const notification of report.relatedNotifications ?? []) {
+    const targetName = pickTargetName(notification.targetInfo, report.targetType);
+    if (targetName) return targetName;
+  }
+
+  return report.targetId;
+}
+
+function getReporterNames(reportItems, reporterNameCache) {
+  return Array.from(
+    new Set(
+      reportItems
+        .map((item) => {
+          if (!item.reporterUid) return null;
+          return reporterNameCache[item.reporterUid] ?? item.reporterUid;
+        })
+        .filter(Boolean),
+    ),
+  );
+}
+
 async function resolveReporterName(reporterUid) {
   if (!reporterUid) return null;
 
@@ -695,6 +748,8 @@ export default function ReportsTab() {
               const isExpanded = expandedId === report.id;
               const isResolved = report.status === "resolved";
               const cachedContent = contentCache[report.id];
+              const reportedName = getReportedName(report, cachedContent);
+              const reporterNames = getReporterNames(report.reports, reporterNameCache);
               const isProfileBanned =
                 report.targetType === "profile" &&
                 (cachedContent?.banned === true ||
@@ -752,6 +807,16 @@ export default function ReportsTab() {
                         ID alvo: {report.targetId} ·{" "}
                         {report.latestTimestamp?.toLocaleString?.("pt-BR") ?? "—"}
                       </p>
+                      <div className="mt-2 space-y-1 text-xs text-gray-600">
+                        <p>
+                          <span className="font-semibold text-gray-700">Denunciado:</span>{" "}
+                          {reportedName}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-gray-700">Denunciante{reporterNames.length > 1 ? "s" : ""}:</span>{" "}
+                          {reporterNames.length > 0 ? reporterNames.join(", ") : "—"}
+                        </p>
+                      </div>
 
                       {/* Expanded content */}
                       {isExpanded && (
