@@ -6,10 +6,12 @@ import {
   onSnapshot,
   doc,
   getDoc,
+  getDocs,
   deleteDoc,
   limit,
   serverTimestamp,
   updateDoc,
+  where,
   writeBatch,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
@@ -177,6 +179,59 @@ function getPriorityColor(priority) {
   return "text-gray-600 bg-gray-100";
 }
 
+function pickReporterName(data) {
+  if (!data || typeof data !== "object") return null;
+
+  const candidates = [
+    data.name,
+    data.displayName,
+    data.username,
+    data.userName,
+    data.handle,
+    data.email,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+async function resolveReporterName(reporterUid) {
+  if (!reporterUid) return null;
+
+  try {
+    const userSnap = await getDoc(doc(db, "users", reporterUid));
+    if (userSnap.exists()) {
+      const reporterName = pickReporterName(userSnap.data());
+      if (reporterName) return reporterName;
+    }
+  } catch {
+    // Fallback below.
+  }
+
+  const profileQueries = [
+    query(collection(db, "profiles"), where("ownerUid", "==", reporterUid), limit(1)),
+    query(collection(db, "profiles"), where("uid", "==", reporterUid), limit(1)),
+    query(collection(db, "profiles"), where("userId", "==", reporterUid), limit(1)),
+  ];
+
+  for (const profileQuery of profileQueries) {
+    try {
+      const profileSnap = await getDocs(profileQuery);
+      const reporterName = pickReporterName(profileSnap.docs[0]?.data());
+      if (reporterName) return reporterName;
+    } catch {
+      // Try the next fallback shape.
+    }
+  }
+
+  return null;
+}
+
 function ContentPreview({ content, targetType }) {
   if (!content)
     return (
@@ -238,6 +293,7 @@ export default function ReportsTab() {
   const [filter, setFilter] = useState("all");
   const [expandedId, setExpandedId] = useState(null);
   const [contentCache, setContentCache] = useState({});
+  const [reporterNameCache, setReporterNameCache] = useState({});
   const [loadingContent, setLoadingContent] = useState({});
   const [actionLoading, setActionLoading] = useState({});
 
@@ -280,6 +336,42 @@ export default function ReportsTab() {
       unsubscribeNotifications();
     };
   }, []);
+
+  useEffect(() => {
+    const reporterUids = Array.from(
+      new Set(
+        reports
+          .flatMap((report) => report.reports)
+          .map((item) => item.reporterUid)
+          .filter(Boolean),
+      ),
+    ).filter((reporterUid) => !(reporterUid in reporterNameCache));
+
+    if (reporterUids.length === 0) return;
+
+    let isCancelled = false;
+
+    Promise.all(
+      reporterUids.map(async (reporterUid) => [
+        reporterUid,
+        (await resolveReporterName(reporterUid)) ?? null,
+      ]),
+    ).then((entries) => {
+      if (isCancelled) return;
+
+      setReporterNameCache((current) => {
+        const next = { ...current };
+        entries.forEach(([reporterUid, reporterName]) => {
+          next[reporterUid] = reporterName;
+        });
+        return next;
+      });
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [reports, reporterNameCache]);
 
   const toggleExpand = async (report) => {
     if (expandedId === report.id) {
@@ -706,7 +798,9 @@ export default function ReportsTab() {
                                   </div>
                                   <p className="mt-1 text-xs text-gray-500">
                                     Report: {item.id}
-                                    {item.reporterUid ? ` · Reporter UID: ${item.reporterUid}` : ""}
+                                    {item.reporterUid
+                                      ? ` · Denunciante: ${reporterNameCache[item.reporterUid] ?? item.reporterUid}`
+                                      : ""}
                                   </p>
                                   {item.description ? (
                                     <p className="mt-1 text-sm text-gray-700 italic">
