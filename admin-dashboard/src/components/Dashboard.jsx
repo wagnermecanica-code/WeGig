@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import { signOut } from "firebase/auth";
 import {
   collection,
+  getDocs,
   query,
   orderBy,
-  onSnapshot,
   limit,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
@@ -17,6 +17,7 @@ import {
   Lightbulb,
   MessageCircle,
   BookOpen,
+  RefreshCw,
 } from "lucide-react";
 import ReportsTab from "./ReportsTab";
 import CommentsTab from "./CommentsTab";
@@ -51,18 +52,27 @@ function getFeedbackTypeBadge(type) {
 function FeedbacksTab() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
+  async function loadFeedbacks({ silent = false } = {}) {
+    if (!silent) setLoading(true);
+
     const q = query(
       collection(db, "feedbacks"),
       orderBy("createdAt", "desc"),
       limit(100),
     );
-    const unsubscribe = onSnapshot(q, (snap) => {
+    try {
+      const snap = await getDocs(q);
       setFeedbacks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    } finally {
       setLoading(false);
-    });
-    return unsubscribe;
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    loadFeedbacks();
   }, []);
 
   if (loading) {
@@ -74,7 +84,21 @@ function FeedbacksTab() {
   }
 
   return (
-    <div className="bg-white shadow overflow-hidden sm:rounded-md">
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button
+          onClick={() => {
+            setRefreshing(true);
+            loadFeedbacks({ silent: true });
+          }}
+          disabled={refreshing}
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          {refreshing ? "Atualizando..." : "Atualizar"}
+        </button>
+      </div>
+      <div className="bg-white shadow overflow-hidden sm:rounded-md">
       <ul className="divide-y divide-gray-200">
         {feedbacks.length === 0 ? (
           <li className="px-6 py-8 text-center text-gray-500">
@@ -115,6 +139,7 @@ function FeedbacksTab() {
           ))
         )}
       </ul>
+      </div>
     </div>
   );
 }
@@ -130,28 +155,38 @@ function Dashboard({ user }) {
   const [activeTab, setActiveTab] = useState("reports");
   const [reportCount, setReportCount] = useState(0);
   const [feedbackCount, setFeedbackCount] = useState(0);
+  const [refreshingBadges, setRefreshingBadges] = useState(false);
+
+  async function loadBadgeCounts({ silent = false } = {}) {
+    if (!silent) setRefreshingBadges(true);
+
+    try {
+      const [reportsSnap, feedbacksSnap] = await Promise.all([
+        getDocs(
+          query(
+            collection(db, "adminNotifications"),
+            orderBy("timestamp", "desc"),
+            limit(100),
+          ),
+        ),
+        getDocs(
+          query(
+            collection(db, "feedbacks"),
+            orderBy("createdAt", "desc"),
+            limit(100),
+          ),
+        ),
+      ]);
+
+      setReportCount(reportsSnap.size);
+      setFeedbackCount(feedbacksSnap.size);
+    } finally {
+      setRefreshingBadges(false);
+    }
+  }
 
   useEffect(() => {
-    const unsubReports = onSnapshot(
-      query(
-        collection(db, "adminNotifications"),
-        orderBy("timestamp", "desc"),
-        limit(100),
-      ),
-      (snap) => setReportCount(snap.size),
-    );
-    const unsubFeedbacks = onSnapshot(
-      query(
-        collection(db, "feedbacks"),
-        orderBy("createdAt", "desc"),
-        limit(100),
-      ),
-      (snap) => setFeedbackCount(snap.size),
-    );
-    return () => {
-      unsubReports();
-      unsubFeedbacks();
-    };
+    loadBadgeCounts();
   }, []);
 
   const handleLogout = async () => {
@@ -181,6 +216,14 @@ function Dashboard({ user }) {
               </p>
             </div>
             <div className="flex items-center space-x-4">
+              <button
+                onClick={() => loadBadgeCounts()}
+                disabled={refreshingBadges}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${refreshingBadges ? "animate-spin" : ""}`} />
+                {refreshingBadges ? "Atualizando..." : "Atualizar"}
+              </button>
               <span className="text-sm text-gray-600">{user.email}</span>
               <button
                 onClick={handleLogout}

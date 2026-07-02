@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   collection,
+  getDocs,
   limit,
-  onSnapshot,
   orderBy,
   query,
   Timestamp,
@@ -11,6 +11,7 @@ import { db } from "@core/firebase/client";
 import { Card } from "@shared/components/ui/Card";
 import { Badge } from "@shared/components/ui/Badge";
 import { Skeleton } from "@shared/components/ui/Skeleton";
+import { RefreshCw } from "lucide-react";
 
 interface AuditEntry {
   id: string;
@@ -40,47 +41,68 @@ const ACTION_TONE: Record<
 export function AuditLogPage() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
+  async function loadEntries({ silent = false } = {}) {
+    if (!silent) setLoading(true);
+
     const q = query(
       collection(db, "audit_logs"),
       orderBy("timestamp", "desc"),
       limit(100),
     );
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const items: AuditEntry[] = snap.docs.map((d) => {
-          const data = d.data() as Record<string, any>;
-          const ts = data.timestamp;
-          return {
-            id: d.id,
-            actorEmail: data.actorEmail,
-            actorRole: data.actorRole,
-            action: data.action,
-            targetType: data.targetType,
-            targetId: data.targetId,
-            metadata: data.metadata,
-            timestamp: ts instanceof Timestamp ? ts.toDate() : undefined,
-          };
-        });
-        setEntries(items);
-        setLoading(false);
-      },
-      () => setLoading(false),
-    );
-    return () => unsub();
+
+    try {
+      const snap = await getDocs(q);
+      const items: AuditEntry[] = snap.docs.map((d) => {
+        const data = d.data() as Record<string, any>;
+        const ts = data.timestamp;
+        return {
+          id: d.id,
+          actorEmail: data.actorEmail,
+          actorRole: data.actorRole,
+          action: data.action,
+          targetType: data.targetType,
+          targetId: data.targetId,
+          metadata: data.metadata,
+          timestamp: ts instanceof Timestamp ? ts.toDate() : undefined,
+        };
+      });
+      setEntries(items);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    loadEntries();
   }, []);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await loadEntries({ silent: true });
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight dark:text-white">
-          Log de Auditoria
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-slate-400">
-          Histórico completo de ações administrativas (últimas 100).
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight dark:text-white">
+            Log de Auditoria
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-slate-400">
+            Histórico completo de ações administrativas (últimas 100).
+          </p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          {refreshing ? "Atualizando..." : "Atualizar"}
+        </button>
       </div>
 
       <Card>

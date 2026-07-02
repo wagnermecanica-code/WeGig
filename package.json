@@ -11,6 +11,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepare": "husky",
+    "site:home-data": "node .tools/scripts/generate_site_home_data.js",
+    "site:build-admin": "cd admin-dashboard && npm run build:pages",
     "lint": "cd packages/app && flutter analyze",
     "format": "cd packages/app && dart format .",
     "test:flutter": "cd packages/app && flutter test",

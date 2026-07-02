@@ -113,13 +113,20 @@ function isActiveReportStatus(status: unknown): boolean {
 export async function listPostReportIndicators(): Promise<
   Map<string, PostReportIndicator>
 > {
+  return listPostReportIndicatorsWithinWindow(100);
+}
+
+async function listPostReportIndicatorsWithinWindow(
+  windowSize: number,
+): Promise<Map<string, PostReportIndicator>> {
+  const boundedWindow = Math.max(40, Math.min(windowSize, 120));
   const snap = await getDocs(
     query(
       collection(db, "adminNotifications"),
       where("type", "==", "new_report"),
       where("targetType", "==", "post"),
       orderBy("timestamp", "desc"),
-      limit(250),
+      limit(boundedWindow),
     ),
   );
   const indicators = new Map<string, PostReportIndicator>();
@@ -175,6 +182,7 @@ export async function listFeedPosts(
   params: FeedListParams = {},
 ): Promise<FeedPost[]> {
   const pageSize = params.pageSize ?? 60;
+  const reportWindow = Math.min(Math.max(pageSize, 80), 120);
   const constraints: any[] = [];
 
   if (params.filter === "featured") {
@@ -190,7 +198,7 @@ export async function listFeedPosts(
 
   const [snap, reportIndicators] = await Promise.all([
     getDocs(query(collection(db, "posts"), ...constraints)),
-    listPostReportIndicators(),
+    listPostReportIndicatorsWithinWindow(reportWindow),
   ]);
   let items = snap.docs.map((d) => ({
     ...mapPost(d.id, d.data()),

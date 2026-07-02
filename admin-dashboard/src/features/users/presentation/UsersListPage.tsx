@@ -8,6 +8,8 @@ import { Button } from "@shared/components/ui/Button";
 import { listProfiles, type ProfileSummary } from "../data/usersService";
 
 const TYPE_OPTIONS = ["", "musico", "banda", "produtor", "casa_de_show", "fa"];
+const USERS_INITIAL_PAGE_SIZE = 60;
+const USERS_INITIAL_MAX_RECORDS = 120;
 
 export function UsersListPage() {
   const [items, setItems] = useState<ProfileSummary[]>([]);
@@ -22,8 +24,8 @@ export function UsersListPage() {
     setLoading(true);
     listProfiles({
       profileType: type || undefined,
-      pageSize: 200,
-      maxRecords: 1000,
+      pageSize: USERS_INITIAL_PAGE_SIZE,
+      maxRecords: USERS_INITIAL_MAX_RECORDS,
     })
       .then((rows) => {
         if (!active) return;
@@ -111,6 +113,10 @@ export function UsersListPage() {
         {loading
           ? "Carregando perfis..."
           : `${filtered.length} de ${items.length} perfis exibidos`}
+      </div>
+
+      <div className="text-xs text-gray-400 dark:text-slate-500">
+        A lista carrega uma janela operacional reduzida para baixar custo do painel.
       </div>
 
       {error ? (

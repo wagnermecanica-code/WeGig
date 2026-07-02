@@ -1,0 +1,1 @@
+import{I as r,a as i,f as o,s as c}from"./index-MRx_lzvQ.js";async function d(e,t){if(e)try{await r(i(o,"audit_logs"),{actorUid:e.uid,actorEmail:e.email,actorRole:e.role,action:t.action,targetType:t.targetType,targetId:t.targetId,metadata:t.metadata??{},timestamp:c()})}catch(a){console.warn("[audit] failed to record event",t.action,a)}}export{d as r};

@@ -1,0 +1,79 @@
+{
+  "stats": {
+    "community": "3.390 ativos no último mês no ecossistema WeGig",
+    "opportunities": "Vitrine pública atualizada sem consultas ao vivo no site"
+  },
+  "postsSectionSubtitle": "Veja exemplos editoriais de oportunidades, perfis e serviços antes de baixar o app.",
+  "cards": [
+    {
+      "accent": "#37475a",
+      "initial": "M",
+      "city": "São Paulo · SP",
+      "author": "Músico freelancer",
+      "timeLabel": "vitrine",
+      "typeIcon": "music",
+      "typeLabel": "Busca banda",
+      "title": "Procuro projeto autoral para shows",
+      "priceLabel": "guitarra · voz",
+      "message": "Perfis como este aparecem no app com mais detalhes, filtros e contato direto por chat.",
+      "detailChips": [
+        {
+          "icon": "star",
+          "label": "indie · pop rock"
+        },
+        {
+          "icon": "clock",
+          "label": "ensaios e gigs"
+        }
+      ],
+      "metaLabel": "Atualizado semanalmente no app"
+    },
+    {
+      "accent": "#e47911",
+      "initial": "B",
+      "city": "Belo Horizonte · MG",
+      "author": "Banda em formação",
+      "timeLabel": "vitrine",
+      "typeIcon": "people",
+      "typeLabel": "Busca músico",
+      "title": "Vaga para baterista e baixista",
+      "priceLabel": "rock alternativo",
+      "message": "O feed completo continua no app para reduzir custo web e manter a experiência mais rápida.",
+      "detailChips": [
+        {
+          "icon": "award",
+          "label": "nível intermediário"
+        },
+        {
+          "icon": "clock",
+          "label": "shows e gravações"
+        }
+      ],
+      "metaLabel": "Novas vagas aparecem direto no app"
+    },
+    {
+      "accent": "#683fff",
+      "initial": "E",
+      "city": "Rio de Janeiro · RJ",
+      "author": "Espaço musical",
+      "timeLabel": "vitrine",
+      "typeIcon": "shop",
+      "typeLabel": "Anúncio",
+      "title": "Sala de ensaio com pacote promocional",
+      "priceLabel": "R$ 60",
+      "message": "O site mostra amostras editoriais. Para ver disponibilidade, promoções e contato, a jornada principal continua no app.",
+      "detailChips": [
+        {
+          "icon": "shop",
+          "label": "estúdio · sala equipada"
+        },
+        {
+          "icon": "tag",
+          "label": "desconto na primeira reserva"
+        }
+      ],
+      "metaLabel": "Consulte ofertas recentes no app"
+    }
+  ],
+  "generatedAt": "2026-07-02T00:14:49.848Z"
+}

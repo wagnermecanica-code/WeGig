@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:pages": "vite build --outDir ../docs/admin --emptyOutDir && node ./scripts/create-route-stubs.mjs ../docs/admin",
+    "build:pages": "node ../.tools/scripts/generate_site_home_data.js && vite build --outDir ../docs/admin --emptyOutDir && node ./scripts/create-route-stubs.mjs ../docs/admin",
     "preview": "vite preview",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0"
   },

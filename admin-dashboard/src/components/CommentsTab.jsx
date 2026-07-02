@@ -4,11 +4,11 @@ import {
   query,
   orderBy,
   limit,
-  onSnapshot,
+  getDocs,
   deleteDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { MessageSquare, Trash2, Search } from "lucide-react";
+import { MessageSquare, Trash2, Search, RefreshCw } from "lucide-react";
 
 export default function CommentsTab() {
   const [comments, setComments] = useState([]);
@@ -16,6 +16,7 @@ export default function CommentsTab() {
   const [search, setSearch] = useState("");
   const [removingId, setRemovingId] = useState(null);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const mapComments = (snap) =>
     snap.docs.map((d) => ({
@@ -44,9 +45,9 @@ export default function CommentsTab() {
     return "Erro ao carregar comentários no Firestore.";
   };
 
-  useEffect(() => {
-    // Primeiro tenta com índice (mais eficiente). Se faltar índice, cai para
-    // consulta sem orderBy e ordena localmente.
+  async function loadComments({ silent = false } = {}) {
+    if (!silent) setLoading(true);
+
     const indexedQuery = query(
       collectionGroup(db, "comments"),
       orderBy("createdAt", "desc"),
@@ -55,40 +56,38 @@ export default function CommentsTab() {
 
     const fallbackQuery = query(collectionGroup(db, "comments"), limit(200));
 
-    let unsubscribe = onSnapshot(
-      indexedQuery,
-      (snap) => {
-        setComments(mapComments(snap));
-        setLoading(false);
-        setError(null);
-      },
-      (err) => {
-        if (err?.code === "failed-precondition") {
-          unsubscribe = onSnapshot(
-            fallbackQuery,
-            (snap) => {
-              const data = sortByCreatedAtDesc(mapComments(snap));
-              setComments(data);
-              setLoading(false);
-              setError(null);
-            },
-            (fallbackErr) => {
-              setError(formatLoadError(fallbackErr));
-              setLoading(false);
-              console.error("CommentsTab fallback:", fallbackErr);
-            },
-          );
-          return;
+    try {
+      const snap = await getDocs(indexedQuery);
+      setComments(mapComments(snap));
+      setError(null);
+    } catch (err) {
+      if (err?.code === "failed-precondition") {
+        try {
+          const fallbackSnap = await getDocs(fallbackQuery);
+          setComments(sortByCreatedAtDesc(mapComments(fallbackSnap)));
+          setError(null);
+        } catch (fallbackErr) {
+          setError(formatLoadError(fallbackErr));
+          console.error("CommentsTab fallback:", fallbackErr);
         }
-
+      } else {
         setError(formatLoadError(err));
-        setLoading(false);
         console.error("CommentsTab:", err);
-      },
-    );
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
 
-    return () => unsubscribe();
+  useEffect(() => {
+    loadComments();
   }, []);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await loadComments({ silent: true });
+  }
 
   const removeComment = async (comment) => {
     if (
@@ -101,6 +100,7 @@ export default function CommentsTab() {
     setRemovingId(comment.id);
     try {
       await deleteDoc(comment._ref);
+      setComments((current) => current.filter((item) => item.id !== comment.id));
     } catch (e) {
       alert("Erro ao remover comentário: " + e.message);
     } finally {
@@ -142,15 +142,25 @@ export default function CommentsTab() {
           Exibindo os <span className="font-semibold">{comments.length}</span>{" "}
           comentários mais recentes.
         </p>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar por texto, autor ou post ID..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent w-80"
-          />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Atualizando..." : "Atualizar"}
+          </button>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar por texto, autor ou post ID..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent w-80"
+            />
+          </div>
         </div>
       </div>
 

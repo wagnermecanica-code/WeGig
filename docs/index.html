@@ -98,51 +98,6 @@
       }
     </script>
 
-    <!-- Firebase SDK -->
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-      import {
-        getFirestore,
-        collection,
-        query,
-        where,
-        orderBy,
-        limit,
-        getDocs,
-        getCountFromServer,
-        Timestamp,
-      } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
-
-      // Firebase config - PROD (to-sem-banda-83e19)
-      const firebaseConfig = {
-        apiKey: "AIzaSyDSf3JS9jg2LInpQma25FgIm1qWeToFXSQ",
-        authDomain: "to-sem-banda-83e19.firebaseapp.com",
-        projectId: "to-sem-banda-83e19",
-        storageBucket: "to-sem-banda-83e19.firebasestorage.app",
-        messagingSenderId: "278498777601",
-        appId: "1:278498777601:web:b0c425b0b641d9589ebe00",
-      };
-
-      // Initialize Firebase
-      const app = initializeApp(firebaseConfig);
-      const db = getFirestore(app);
-
-      // Export for use in main script
-      window.firebaseDb = db;
-      window.firebaseQuery = query;
-      window.firebaseCollection = collection;
-      window.firebaseWhere = where;
-      window.firebaseOrderBy = orderBy;
-      window.firebaseLimit = limit;
-      window.firebaseGetDocs = getDocs;
-      window.firebaseGetCountFromServer = getCountFromServer;
-      window.firebaseTimestamp = Timestamp;
-      window.firebaseReady = true;
-
-      // Dispatch event when Firebase is ready
-      window.dispatchEvent(new Event("firebase-ready"));
-    </script>
-
     <script>
       // Redirect Firebase domain to custom domain
       if (
@@ -381,7 +336,9 @@
                       /></svg
                     >Multi-Perfil
                   </h3>
-                  <p>Até 5 perfis: músico, banda, espaço, técnico ou contratante</p>
+                  <p>
+                    Até 5 perfis: músico, banda, espaço, técnico ou contratante
+                  </p>
                 </div>
                 <div class="stat">
                   <h3>
@@ -455,8 +412,8 @@
                       /></svg
                     >Comunidade WeGig
                   </h3>
-                  <p>
-                    <span id="profile-count">--</span> usuários já cadastrados
+                  <p id="community-stat-text">
+                    Comunidade musical ativa e em expansão contínua
                   </p>
                 </div>
                 <div class="stat stat-counter">
@@ -480,7 +437,9 @@
                       /></svg
                     >Oportunidades
                   </h3>
-                  <p><span id="post-count">--</span> posts já realizados</p>
+                  <p id="opportunity-stat-text">
+                    Novas oportunidades, serviços e convites toda semana
+                  </p>
                 </div>
               </div>
             </div>
@@ -824,17 +783,16 @@
       <section id="posts-recentes" class="posts-feed">
         <div class="container">
           <h2>Posts Recentes</h2>
-          <p class="section-subtitle">
+          <p class="section-subtitle" id="posts-section-subtitle">
             Veja as últimas oportunidades compartilhadas pela comunidade
           </p>
 
           <div class="posts-feed-shell">
             <div class="carousel-side">
               <div class="posts-carousel" id="posts-carousel">
-                <!-- Posts serão inseridos dinamicamente -->
                 <div class="loading-posts">
                   <div class="spinner"></div>
-                  <p>Carregando posts...</p>
+                  <p>Carregando vitrine pública...</p>
                 </div>
               </div>
               <div class="carousel-cta">
@@ -989,50 +947,130 @@
       </div>
     </footer>
 
-    <!-- Counters Script -->
+    <!-- Meta Pixel: Download Tracking -->
     <script>
-      async function loadCounters() {
-        if (!window.firebaseReady) {
-          window.addEventListener("firebase-ready", loadCounters);
-          return;
-        }
+      function escapeHtml(text) {
+        return String(text ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function renderHomeCard(card) {
+        const accent = escapeHtml(card.accent ?? "#37475a");
+        const initial = escapeHtml(card.initial ?? "W");
+        const city = escapeHtml(card.city ?? "Brasil");
+        const author = escapeHtml(card.author ?? "Comunidade WeGig");
+        const time = escapeHtml(card.timeLabel ?? "amostra");
+        const typeIcon = escapeHtml(card.typeIcon ?? "music");
+        const typeLabel = escapeHtml(card.typeLabel ?? "Destaque");
+        const title = escapeHtml(card.title ?? "Atualização WeGig");
+        const price = escapeHtml(card.priceLabel ?? "");
+        const message = escapeHtml(card.message ?? "");
+        const meta = escapeHtml(card.metaLabel ?? "Atualizado no app");
+        const chips = Array.isArray(card.detailChips) ? card.detailChips : [];
+
+        return `
+          <article class="post-card post-card--no-photo" style="--pc-accent: ${accent}">
+            <div class="pc-content">
+              <div class="pc-inline-header">
+                <div class="pc-author-block">
+                  <span class="pc-avatar pc-avatar--placeholder" style="background: ${accent}">${initial}</span>
+                  <div class="pc-author-copy">
+                    <span class="pc-kicker"><i class="iconsax" data-icon="location"></i>${city}</span>
+                    <span class="pc-name">${author}</span>
+                  </div>
+                </div>
+                <span class="pc-time">${time}</span>
+              </div>
+              <span class="pc-type-chip pc-type-chip--inline"><i class="iconsax" data-icon="${typeIcon}"></i>${typeLabel}</span>
+              <div class="pc-title-row">
+                <h3 class="pc-title">${title}</h3>
+                ${price ? `<span class="pc-price pc-price--soft">${price}</span>` : ""}
+              </div>
+              ${message ? `<p class="pc-message">${message}</p>` : ""}
+              <div class="pc-detail-grid">
+                ${chips
+                  .slice(0, 4)
+                  .map(
+                    (chip) =>
+                      `<span class="pc-detail-chip"><i class="iconsax" data-icon="${escapeHtml(chip.icon ?? "star")}"></i>${escapeHtml(chip.label ?? "")}</span>`,
+                  )
+                  .join("")}
+              </div>
+              <div class="pc-meta-row">
+                <span class="pc-meta-chip"><i class="iconsax" data-icon="calendar-1"></i>${meta}</span>
+              </div>
+            </div>
+          </article>
+        `;
+      }
+
+      async function loadSiteHomeData() {
+        const communityStat = document.getElementById("community-stat-text");
+        const opportunityStat = document.getElementById("opportunity-stat-text");
+        const subtitle = document.getElementById("posts-section-subtitle");
+        const carousel = document.getElementById("posts-carousel");
+
+        if (!carousel) return;
+
         try {
-          // Count profiles
-          const profilesColl = window.firebaseCollection(
-            window.firebaseDb,
-            "profiles",
-          );
-          const profilesSnapshot =
-            await window.firebaseGetCountFromServer(profilesColl);
-          const profileCount = profilesSnapshot.data().count;
-          const profileEl = document.getElementById("profile-count");
-          if (profileEl) {
-            profileEl.textContent = profileCount.toLocaleString("pt-BR");
+          const response = await fetch("site-home-data.json?v=1", {
+            cache: "no-store",
+          });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
           }
 
-          // Count posts
-          const postsColl = window.firebaseCollection(
-            window.firebaseDb,
-            "posts",
-          );
-          const postsSnapshot =
-            await window.firebaseGetCountFromServer(postsColl);
-          const postCount = postsSnapshot.data().count;
-          const postEl = document.getElementById("post-count");
-          if (postEl) {
-            postEl.textContent = postCount.toLocaleString("pt-BR");
+          const payload = await response.json();
+          if (communityStat && payload.stats?.community) {
+            communityStat.textContent = payload.stats.community;
           }
-        } catch (e) {
-          console.error("Erro ao contar:", e);
+          if (opportunityStat && payload.stats?.opportunities) {
+            opportunityStat.textContent = payload.stats.opportunities;
+          }
+          if (subtitle && payload.postsSectionSubtitle) {
+            subtitle.textContent = payload.postsSectionSubtitle;
+          }
+
+          const cards = Array.isArray(payload.cards) ? payload.cards : [];
+          if (cards.length === 0) {
+            carousel.innerHTML = `
+              <div class="no-posts-message">
+                <div class="icon"><i class="iconsax" data-icon="box"></i></div>
+                <h3>Vitrine em atualização</h3>
+                <p>Abra o app para ver as oportunidades mais recentes da comunidade.</p>
+                <a href="#download" class="btn btn-primary">Baixar App</a>
+              </div>
+            `;
+          } else {
+            carousel.innerHTML = cards.map(renderHomeCard).join("");
+          }
+
+          if (window.iconsax?.replace) {
+            window.iconsax.replace();
+          }
+        } catch (error) {
+          console.error("Erro ao carregar site-home-data.json:", error);
+          carousel.innerHTML = `
+            <div class="error-message">
+              <div class="icon"><i class="iconsax" data-icon="warning-2"></i></div>
+              <h3>Não foi possível carregar a vitrine</h3>
+              <p>Baixe o app para ver as oportunidades mais recentes da comunidade.</p>
+              <a href="#download" class="btn btn-primary">Baixar App</a>
+            </div>
+          `;
+          if (window.iconsax?.replace) {
+            window.iconsax.replace();
+          }
         }
       }
-      loadCounters();
+
+      loadSiteHomeData();
     </script>
 
-    <!-- Posts Feed Script -->
-    <script src="posts-feed.js?v=34"></script>
-
-    <!-- Meta Pixel: Download Tracking -->
     <script>
       document.querySelectorAll(".store-btn").forEach(function (btn) {
         btn.addEventListener("click", function () {

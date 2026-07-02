@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   collection,
+  getDocs,
   limit,
-  onSnapshot,
   orderBy,
   query,
   Timestamp,
@@ -11,6 +11,7 @@ import { db } from "@core/firebase/client";
 import { Card } from "@shared/components/ui/Card";
 import { Skeleton } from "@shared/components/ui/Skeleton";
 import { Badge } from "@shared/components/ui/Badge";
+import { RefreshCw } from "lucide-react";
 
 interface Feedback {
   id: string;
@@ -24,46 +25,67 @@ interface Feedback {
 export function FeedbacksPage() {
   const [items, setItems] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
+  async function loadFeedbacks({ silent = false } = {}) {
+    if (!silent) setLoading(true);
+
     const q = query(
       collection(db, "feedbacks"),
       orderBy("createdAt", "desc"),
       limit(100),
     );
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setItems(
-          snap.docs.map((d) => {
-            const data = d.data() as any;
-            const ts = data.createdAt;
-            return {
-              id: d.id,
-              message: data.message ?? data.text,
-              category: data.category,
-              rating: data.rating,
-              userEmail: data.userEmail ?? data.email,
-              createdAt: ts instanceof Timestamp ? ts.toDate() : undefined,
-            };
-          }),
-        );
-        setLoading(false);
-      },
-      () => setLoading(false),
-    );
-    return () => unsub();
+
+    try {
+      const snap = await getDocs(q);
+      setItems(
+        snap.docs.map((d) => {
+          const data = d.data() as any;
+          const ts = data.createdAt;
+          return {
+            id: d.id,
+            message: data.message ?? data.text,
+            category: data.category,
+            rating: data.rating,
+            userEmail: data.userEmail ?? data.email,
+            createdAt: ts instanceof Timestamp ? ts.toDate() : undefined,
+          };
+        }),
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    loadFeedbacks();
   }, []);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await loadFeedbacks({ silent: true });
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight dark:text-white">
-          Feedbacks
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-slate-400">
-          Sugestões e reclamações recebidas dos usuários.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight dark:text-white">
+            Feedbacks
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-slate-400">
+            Sugestões e reclamações recebidas dos usuários.
+          </p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          {refreshing ? "Atualizando..." : "Atualizar"}
+        </button>
       </div>
 
       <div className="space-y-3">

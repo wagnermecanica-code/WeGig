@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   collection,
   query,
   orderBy,
-  onSnapshot,
   doc,
   getDoc,
   getDocs,
@@ -29,6 +28,7 @@ import {
   EyeOff,
   Trash2,
   ShieldOff,
+  RefreshCw,
 } from "lucide-react";
 
 function toDate(value) {
@@ -349,46 +349,49 @@ export default function ReportsTab() {
   const [reporterNameCache, setReporterNameCache] = useState({});
   const [loadingContent, setLoadingContent] = useState({});
   const [actionLoading, setActionLoading] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const reportsQuery = query(
-      collection(db, "reports"),
-      orderBy("timestamp", "desc"),
-      limit(250),
-    );
+  const loadReports = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
 
-    const notificationsQuery = query(
-      collection(db, "adminNotifications"),
-      orderBy("timestamp", "desc"),
-      limit(250),
-    );
+    try {
+      const reportsQuery = query(
+        collection(db, "reports"),
+        orderBy("timestamp", "desc"),
+        limit(100),
+      );
 
-    let reportDocs = [];
-    let notifications = [];
+      const notificationsQuery = query(
+        collection(db, "adminNotifications"),
+        orderBy("timestamp", "desc"),
+        limit(100),
+      );
 
-    const syncGroups = () => {
-      setReports(buildReportGroups(reportDocs, notifications));
-      setLoading(false);
-    };
+      const [reportsSnap, notificationsSnap] = await Promise.all([
+        getDocs(reportsQuery),
+        getDocs(notificationsQuery),
+      ]);
 
-    const unsubscribeReports = onSnapshot(reportsQuery, (snap) => {
-      reportDocs = snap.docs;
-      syncGroups();
-    });
-
-    const unsubscribeNotifications = onSnapshot(notificationsQuery, (snap) => {
-      notifications = snap.docs.map((docSnap) => ({
+      const notifications = notificationsSnap.docs.map((docSnap) => ({
         id: docSnap.id,
         ...docSnap.data(),
       }));
-      syncGroups();
-    });
 
-    return () => {
-      unsubscribeReports();
-      unsubscribeNotifications();
-    };
+      setReports(buildReportGroups(reportsSnap.docs, notifications));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadReports();
+  }, [loadReports]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadReports({ silent: true });
+  };
 
   useEffect(() => {
     const reporterUids = Array.from(
@@ -462,6 +465,7 @@ export default function ReportsTab() {
         });
       });
       await batch.commit();
+      await loadReports({ silent: true });
     } finally {
       setActionLoading((prev) => ({ ...prev, [key]: false }));
     }
@@ -503,6 +507,7 @@ export default function ReportsTab() {
           reasons: report.reasons,
         },
       });
+      await loadReports({ silent: true });
     } finally {
       setActionLoading((prev) => ({ ...prev, [report.id + "_dismiss"]: false }));
     }
@@ -557,6 +562,7 @@ export default function ReportsTab() {
 
       setContentCache((prev) => ({ ...prev, [report.id]: null }));
       setExpandedId(null);
+      await loadReports({ silent: true });
     } catch (e) {
       alert("Erro ao remover: " + e.message);
     } finally {
@@ -623,6 +629,7 @@ export default function ReportsTab() {
           reasons: report.reasons,
         },
       });
+      await loadReports({ silent: true });
 
       setContentCache((prev) => {
         const current = prev[report.id];
@@ -712,7 +719,7 @@ export default function ReportsTab() {
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-6 flex flex-wrap items-center gap-2">
         {[
           {
             key: "all",
@@ -734,6 +741,14 @@ export default function ReportsTab() {
             {label}
           </button>
         ))}
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          {refreshing ? "Atualizando..." : "Atualizar"}
+        </button>
       </div>
 
       {/* List */}
