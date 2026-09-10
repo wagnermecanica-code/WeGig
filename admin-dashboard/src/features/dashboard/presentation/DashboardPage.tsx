@@ -52,6 +52,8 @@ export function DashboardPage() {
   const [seriesIsFallback, setSeriesIsFallback] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const latestSnapshot = series[series.length - 1] ?? null;
+  const newConnectionsToday = Number(latestSnapshot?.newConnections ?? 0);
 
   useEffect(() => {
     let active = true;
@@ -165,7 +167,7 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading || !overview ? (
-          Array.from({ length: 9 }).map((_, i) => (
+          Array.from({ length: 10 }).map((_, i) => (
             <Skeleton key={i} className="h-28" />
           ))
         ) : (
@@ -201,6 +203,12 @@ export function DashboardPage() {
               label="Interesses"
               value={formatNumber(overview.totalInterests)}
               icon={<Heart className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Conexões novas hoje"
+              value={formatNumber(newConnectionsToday)}
+              icon={<UsersRound className="h-5 w-5" />}
+              hint={latestSnapshot ? latestSnapshot.date : "Aguardando série diária"}
             />
             <StatCard
               label="Reports pendentes"
@@ -250,6 +258,16 @@ export function DashboardPage() {
                     <stop offset="0%" stopColor="#37475A" stopOpacity={0.4} />
                     <stop offset="100%" stopColor="#37475A" stopOpacity={0} />
                   </linearGradient>
+                  <linearGradient
+                    id="newConnections"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="0%" stopColor="#0F766E" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="#0F766E" stopOpacity={0} />
+                  </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
@@ -270,6 +288,14 @@ export function DashboardPage() {
                   fill="transparent"
                   strokeWidth={2}
                   name="Novos posts"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="newConnections"
+                  stroke="#0F766E"
+                  fill="url(#newConnections)"
+                  strokeWidth={2}
+                  name="Novas conexões"
                 />
               </AreaChart>
             </ResponsiveContainer>

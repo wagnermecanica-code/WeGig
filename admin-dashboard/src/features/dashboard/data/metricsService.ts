@@ -31,6 +31,7 @@ export interface DailySnapshot {
   dau?: number;
   newUsers?: number;
   newPosts?: number;
+  newConnections?: number;
   messagesSent?: number;
 }
 
@@ -50,6 +51,7 @@ export function normalizeDailySnapshots(
       dau: 0,
       newUsers: 0,
       newPosts: 0,
+      newConnections: 0,
       messagesSent: 0,
     });
   }
@@ -65,6 +67,9 @@ export function normalizeDailySnapshots(
       dau: Number(item.dau ?? existing.dau ?? 0),
       newUsers: Number(item.newUsers ?? existing.newUsers ?? 0),
       newPosts: Number(item.newPosts ?? existing.newPosts ?? 0),
+      newConnections: Number(
+        item.newConnections ?? existing.newConnections ?? 0,
+      ),
       messagesSent: Number(item.messagesSent ?? existing.messagesSent ?? 0),
     });
   }
@@ -81,6 +86,7 @@ function mapDailySnapshot(
     dau: Number(data.dau ?? 0),
     newUsers: Number(data.newUsers ?? 0),
     newPosts: Number(data.newPosts ?? 0),
+    newConnections: Number(data.newConnections ?? 0),
     messagesSent: Number(data.messagesSent ?? 0),
   };
 }
@@ -345,6 +351,7 @@ export async function fetchTodaySnapshot(): Promise<DailySnapshot | null> {
       dau: data.dau,
       newUsers: data.newUsers,
       newPosts: data.newPosts,
+      newConnections: data.newConnections,
       messagesSent: data.messagesSent,
     };
   } catch {

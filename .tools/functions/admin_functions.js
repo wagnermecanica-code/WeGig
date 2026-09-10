@@ -79,6 +79,7 @@ exports.aggregateDailyMetrics = functions
       newUsers,
       newPosts,
       newConversations,
+      newConnections,
       newMessages,
     ] = await Promise.all([
       safeCount(db.collection("profiles")),
@@ -109,6 +110,12 @@ exports.aggregateDailyMetrics = functions
       ),
       safeCount(
         db
+          .collection("connections")
+          .where("createdAt", ">=", startTs)
+          .where("createdAt", "<=", endTs),
+      ),
+      safeCount(
+        db
           .collectionGroup("messages")
           .where("createdAt", ">=", startTs)
           .where("createdAt", "<=", endTs),
@@ -124,6 +131,7 @@ exports.aggregateDailyMetrics = functions
       newUsers,
       newPosts,
       newConversations,
+      newConnections,
       messagesSent: newMessages,
       dau: newMessages > 0 ? newUsers + Math.round(newMessages / 5) : newUsers,
       generatedAt: admin.firestore.FieldValue.serverTimestamp(),
