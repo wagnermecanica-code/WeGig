@@ -33,10 +33,30 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
+      - name: Prepare public website artifact
+        shell: bash
+        run: |
+          publish_dir="$RUNNER_TEMP/wegig-pages"
+          mkdir -p "$publish_dir"
+          rsync -a \
+            --exclude='/reports/API_KEYS_SUMMARY.md' \
+            --exclude='/security/API_KEYS_CHECKLIST.md' \
+            --exclude='/api/firebase_options*/' \
+            --exclude='GoogleService-Info*.plist' \
+            --exclude='google-services*.json' \
+            --exclude='*.p8' --exclude='*.p12' --exclude='*.pfx' \
+            --exclude='*.pem' --exclude='*.key' --exclude='*.jks' --exclude='*.keystore' \
+            docs/ "$publish_dir/"
+
+          if grep -rIlE -- '-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY-----' "$publish_dir"; then
+            echo '::error::Private key material found in the public website artifact.'
+            exit 1
+          fi
+
       - name: Upload website artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: ${{ runner.temp }}/wegig-pages
 
       - name: Deploy to GitHub Pages
         id: deployment
