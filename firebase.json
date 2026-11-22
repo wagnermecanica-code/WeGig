@@ -12,7 +12,23 @@
   },
   "hosting": {
     "public": "docs",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "reports/API_KEYS_SUMMARY.md",
+      "security/API_KEYS_CHECKLIST.md",
+      "**/*.[pP]8",
+      "**/*.p12",
+      "**/*.pfx",
+      "**/*.pem",
+      "**/*.key",
+      "**/*.jks",
+      "**/*.keystore",
+      "**/GoogleService-Info*.plist",
+      "**/google-services*.json",
+      "api/firebase_options*/**"
+    ],
     "rewrites": [
       {
         "source": "/admin/**",

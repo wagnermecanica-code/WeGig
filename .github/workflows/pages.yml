@@ -45,9 +45,11 @@ jobs:
             --exclude='/api/firebase_options*/' \
             --exclude='GoogleService-Info*.plist' \
             --exclude='google-services*.json' \
-            --exclude='*.p8' --exclude='*.p12' --exclude='*.pfx' \
+            --exclude='*.[pP]8' --exclude='*.p12' --exclude='*.pfx' \
             --exclude='*.pem' --exclude='*.key' --exclude='*.jks' --exclude='*.keystore' \
             docs/ "$publish_dir/"
+
+          python3 .tools/scripts/check_no_p8.py "$publish_dir"
 
           if grep -rIlE -- '-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY-----' "$publish_dir"; then
             echo '::error::Private key material found in the public website artifact.'

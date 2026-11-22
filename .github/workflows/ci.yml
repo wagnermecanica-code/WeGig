@@ -132,6 +132,9 @@ jobs:
           cd packages/app
           flutter build ios --debug --no-codesign --flavor dev -t lib/main_dev.dart
 
+      - name: Verify iOS build contains no APNs private keys
+        run: python3 .tools/scripts/check_no_p8.py packages/app/build/ios/iphoneos
+
       - name: Verify build settings
         run: |
           cd packages/app
@@ -188,6 +191,9 @@ jobs:
         run: |
           cd packages/app
           flutter build apk --debug --flavor dev -t lib/main_dev.dart
+
+      - name: Verify APK contains no APNs private keys
+        run: python3 .tools/scripts/check_no_p8.py packages/app/build/app/outputs/apk/dev/debug/app-dev-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

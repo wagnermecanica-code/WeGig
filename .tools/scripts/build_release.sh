@@ -12,6 +12,7 @@
 # ========================================
 
 set -e # Exit on error
+CHECK_NO_P8="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check_no_p8.py"
 
 # ========== CORES PARA OUTPUT ==========
 RED='\033[0;31m'
@@ -132,6 +133,7 @@ build_android_apk() {
     
     print_info "Executando: flutter build apk $BUILD_ARGS"
     flutter build apk $BUILD_ARGS
+    python3 "$CHECK_NO_P8" "build/app/outputs/flutter-apk/app-$FLAVOR-release.apk"
     
     echo ""
     print_success "Android APK criado!"
@@ -156,6 +158,7 @@ build_android_bundle() {
     
     print_info "Executando: flutter build appbundle $BUILD_ARGS"
     flutter build appbundle $BUILD_ARGS
+    python3 "$CHECK_NO_P8" "build/app/outputs/bundle/${FLAVOR}Release/app-$FLAVOR-release.aab"
     
     echo ""
     print_success "Android App Bundle criado!"
@@ -186,6 +189,7 @@ build_ios() {
     
     print_info "Executando: flutter build ios $BUILD_ARGS"
     flutter build ios $BUILD_ARGS
+    python3 "$CHECK_NO_P8" build/ios/iphoneos
     
     echo ""
     print_success "iOS build criado!"
